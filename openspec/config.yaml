@@ -1,0 +1,23 @@
+schema: spec-driven
+context: |
+  企业协作智能面板，详细产品基线见根目录方案.md。
+  Flutter Android + Vue 3/TypeScript Web；Spring Boot + PostgreSQL + Redis。
+  AI 由服务端调用 DeepSeek，客户端不保存密钥。
+  App 底栏从右到左为导图、视图、日志、AI地图、我的，默认导图。
+  公司四象限上方只读，可写私人备注；下方个人重点和日志可编辑。
+  派发界面不得出现完成情况；有资格的人在导图右下角看到圆形加号。
+  下属日志入口在日志页面；所有数据范围在服务端检查。
+  注册默认为员工，预置三个部门，管理员初始化；管理员、创始人、部门老总、团队长、员工五角色。
+  关键修改采用候选版本和分层复核，禁止自审；敏感私人信息不包含在穿透范围。
+  Web 卡通素材选 OpenMoji（CC BY-SA 4.0），保留署名；直接查官网/GitHub，不使用百炼。
+  Codex、Claude Code、CodeBuddy 共享相同规范，不固定工具职责，不默认多代理。
+rules:
+  proposal:
+    - 中文编写正文，保留标准 Why、What Changes、Capabilities、Impact 标题
+  specs:
+    - 使用 SHALL 或 MUST 声明需求，使用 WHEN/THEN 场景描述验收
+    - 覆盖越权拒绝、双端一致性和失败处理
+  design:
+    - 明确数据范围、审核版本、跨端契约和 DeepSeek 服务端密钥管理
+  tasks:
+    - 按依赖顺序拆分可验证任务，未实施的任务不得勾选
