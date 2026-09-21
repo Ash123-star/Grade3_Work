@@ -1,0 +1,24 @@
+name: pandora_mobile
+description: Pandora enterprise collaboration Android UI shell.
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: ^3.10.7
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_riverpod: ^2.6.1
+  go_router: ^16.0.0
+  dio: ^5.8.0
+  shared_preferences: ^2.5.3
+  file_picker: ^10.3.0
+  cute_ui:
+    path: packages/cute_ui
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

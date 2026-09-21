@@ -1,0 +1,13 @@
+name: cute_ui
+description: Local cartoon design system for Pandora.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.10.7
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_svg: ^2.2.0
+flutter:
+  assets:
+    - assets/openmoji/

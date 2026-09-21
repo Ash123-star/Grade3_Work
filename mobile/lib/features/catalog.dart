@@ -1,0 +1,185 @@
+class ScreenSpec {
+  const ScreenSpec(
+    this.title,
+    this.resource, {
+    this.fields = const [],
+    this.action = 'create',
+    this.manager = false,
+    this.admin = false,
+  });
+  final String title, resource, action;
+  final List<String> fields;
+  final bool manager, admin;
+}
+
+const screens = <String, ScreenSpec>{
+  'login': ScreenSpec('欢迎回来', 'auth', fields: ['账号', '密码'], action: 'login'),
+  'register': ScreenSpec(
+    '加入你的团队',
+    'auth',
+    fields: ['账号', '密码', '手机号', '部门'],
+    action: 'register',
+  ),
+  'password': ScreenSpec(
+    '设置新密码',
+    'auth',
+    fields: ['原密码', '新密码', '确认密码'],
+    action: 'password',
+  ),
+  'profile-edit': ScreenSpec(
+    '编辑个人资料',
+    'organization/profile',
+    fields: ['姓名', '个人介绍', '头像'],
+    action: 'update',
+  ),
+  'dispatch': ScreenSpec(
+    '派发任务',
+    'tasks',
+    fields: [
+      '任务名称',
+      '所属分组',
+      '任务内容',
+      '截止时间',
+      '紧急程度',
+      '进度备注',
+      '主负责人',
+      '协作人',
+      '附件',
+    ],
+    manager: true,
+  ),
+  'feedback': ScreenSpec(
+    '提交成果反馈',
+    'tasks',
+    fields: ['成果说明', '遇到的阻碍', '附件'],
+    action: 'feedback',
+  ),
+  'acceptance': ScreenSpec(
+    '任务验收',
+    'tasks',
+    fields: ['验收意见'],
+    action: 'accept',
+    manager: true,
+  ),
+  'transfer': ScreenSpec(
+    '转派任务',
+    'tasks',
+    fields: ['主负责人', '变更理由'],
+    action: 'transfer',
+    manager: true,
+  ),
+  'reschedule': ScreenSpec(
+    '调整截止时间',
+    'tasks',
+    fields: ['截止时间', '变更理由'],
+    action: 'reschedule',
+    manager: true,
+  ),
+  'withdraw': ScreenSpec(
+    '撤回任务',
+    'tasks',
+    fields: ['撤回原因'],
+    action: 'withdraw',
+    manager: true,
+  ),
+  'focus-edit': ScreenSpec(
+    '个人重点',
+    'dashboard/personal',
+    fields: ['标题', '内容', '排序位置'],
+  ),
+  'publish': ScreenSpec(
+    '发布公司展示项',
+    'dashboard/company',
+    fields: ['标题', '内容', '展示受众', '修改理由'],
+    action: 'request-review',
+    manager: true,
+  ),
+  'note': ScreenSpec('私人备注', 'private-notes', fields: ['备注'], action: 'save'),
+  'log-edit': ScreenSpec(
+    '写工作日志',
+    'logs',
+    fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时'],
+    action: 'submit',
+  ),
+  'log-revise': ScreenSpec(
+    '修订已提交日志',
+    'logs',
+    fields: ['今日工作', '明日计划', '修改理由'],
+    action: 'request-review',
+  ),
+  'comment': ScreenSpec(
+    '日志评语',
+    'logs/comments',
+    fields: ['评语'],
+    action: 'comment',
+    manager: true,
+  ),
+  'reject': ScreenSpec(
+    '驳回申请',
+    'reviews',
+    fields: ['驳回原因'],
+    action: 'reject',
+    manager: true,
+  ),
+  'department': ScreenSpec(
+    '部门与团队',
+    'organization/admin',
+    fields: ['名称', '上级部门'],
+    admin: true,
+  ),
+  'membership': ScreenSpec(
+    '确认员工归属',
+    'organization/admin',
+    fields: ['员工', '部门', '团队'],
+    action: 'membership',
+    admin: true,
+  ),
+  'role': ScreenSpec(
+    '角色与权限',
+    'organization/admin',
+    fields: ['员工', '角色', '允许派发任务'],
+    action: 'role',
+    admin: true,
+  ),
+  'reporting': ScreenSpec(
+    '直属汇报关系',
+    'organization/admin',
+    fields: ['员工', '直属上级'],
+    action: 'reporting',
+    admin: true,
+  ),
+  'disable': ScreenSpec(
+    '停用账号',
+    'organization/admin',
+    fields: ['员工', '停用理由'],
+    action: 'disable',
+    admin: true,
+  ),
+  'policy': ScreenSpec(
+    '审核策略',
+    'organization/admin',
+    fields: ['指定公司复核人', '任务关键修改需复核'],
+    action: 'policy',
+    admin: true,
+  ),
+  'ai-draft': ScreenSpec(
+    '确认建议草稿',
+    'tasks',
+    fields: ['任务名称', '任务内容', '截止时间', '主负责人'],
+    manager: true,
+  ),
+};
+const resourceTitles = <String, String>{
+  'tasks': '任务安排',
+  'logs': '工作日志',
+  'logs/subordinates': '下属日志',
+  'dashboard/company': '公司重要展示项',
+  'dashboard/personal': '个人重要展示项',
+  'reviews': '审批中心',
+  'notifications': '消息中心',
+  'organization': '组织与成员',
+  'organization/admin': '组织管理',
+  'audit': '审计记录',
+  'analytics': '经营分析',
+  'ai-maps': 'AI 工作地图',
+};
