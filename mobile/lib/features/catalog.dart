@@ -54,6 +54,14 @@ const screens = <String, ScreenSpec>{
     fields: ['成果说明', '遇到的阻碍', '附件'],
     action: 'feedback',
   ),
+  'return': ScreenSpec(
+    '退回补充',
+    'tasks',
+    fields: ['验收意见'],
+    action: 'return',
+    manager: true,
+  ),
+  'support': ScreenSpec('意见反馈', 'feedback', fields: ['问题描述', '附件']),
   'acceptance': ScreenSpec(
     '任务验收',
     'tasks',
@@ -170,6 +178,7 @@ const screens = <String, ScreenSpec>{
   ),
 };
 const resourceTitles = <String, String>{
+  'feedback': '我的反馈',
   'tasks': '任务安排',
   'logs': '工作日志',
   'logs/subordinates': '下属日志',

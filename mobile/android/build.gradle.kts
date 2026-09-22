@@ -12,7 +12,16 @@ val newBuildDir: Directory =
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
+    // AGP generates unit-test resource paths relative to each plugin's source.
+    // Windows cannot relativize a Pub cache on C: against build output on D:.
+    // Keep cross-drive output beside the plugin, isolated for this application.
+    val sameDrive = projectDir.toPath().root == newBuildDir.asFile.toPath().root
+    val projectBuildKey = rootProject.projectDir.absolutePath.hashCode().toUInt().toString(16)
+    val newSubprojectBuildDir: Directory = if (sameDrive) {
+        newBuildDir.dir(project.name)
+    } else {
+        layout.projectDirectory.dir("build/pandora-$projectBuildKey/${project.name}")
+    }
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {

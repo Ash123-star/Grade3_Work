@@ -9,6 +9,7 @@ import 'features/detail_pages.dart';
 import 'features/form_page.dart';
 import 'features/utility_pages.dart';
 import 'features/catalog.dart';
+import 'features/demo_pages.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -36,19 +37,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             onDestinationSelected: (i) => shell.goBranch(i),
             destinations: const [
               NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: '我的',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.hub_outlined),
-                selectedIcon: Icon(Icons.hub),
-                label: 'AI 地图',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.edit_note_outlined),
-                selectedIcon: Icon(Icons.edit_note),
-                label: '日志',
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard),
+                label: '导图',
               ),
               NavigationDestination(
                 icon: Icon(Icons.calendar_month_outlined),
@@ -56,9 +47,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                 label: '视图',
               ),
               NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: '导图',
+                icon: Icon(Icons.edit_note_outlined),
+                selectedIcon: Icon(Icons.edit_note),
+                label: '日志',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.hub_outlined),
+                selectedIcon: Icon(Icons.hub),
+                label: 'AI地图',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: '我的',
               ),
             ],
           ),
@@ -66,15 +67,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         branches: [
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/profile', builder: (_, _) => const ProfilePage()),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [GoRoute(path: '/ai', builder: (_, _) => const AiPage())],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(path: '/logs', builder: (_, _) => const LogsPage()),
+              GoRoute(
+                path: '/dashboard',
+                builder: (_, _) => const DashboardPage(),
+              ),
             ],
           ),
           StatefulShellBranch(
@@ -87,34 +83,50 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(
-                path: '/dashboard',
-                builder: (_, _) => const DashboardPage(),
-              ),
+              GoRoute(path: '/logs', builder: (_, _) => const LogsPage()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/ai', builder: (_, _) => const AiPage())],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/profile', builder: (_, _) => const ProfilePage()),
             ],
           ),
         ],
       ),
       GoRoute(
         path: '/list/:resource',
-        builder: (_, s) => ListPage(s.pathParameters['resource']!),
+        builder: (_, s) => ListPage(
+          s.pathParameters['resource']!,
+          key: ValueKey(s.uri.toString()),
+        ),
       ),
       GoRoute(
         path: '/item/:resource/:id',
-        builder: (_, s) =>
-            DetailPage(s.pathParameters['resource']!, s.pathParameters['id']!),
+        builder: (_, s) => DetailPage(
+          s.pathParameters['resource']!,
+          s.pathParameters['id']!,
+          key: ValueKey(s.uri.toString()),
+        ),
       ),
       GoRoute(
         path: '/form/:kind',
         builder: (_, s) => screens.containsKey(s.pathParameters['kind'])
             ? FormPage(
                 s.pathParameters['kind']!,
+                key: ValueKey(s.uri.toString()),
                 id: s.uri.queryParameters['id'],
+                source: s.uri.queryParameters['source'],
                 version:
                     int.tryParse(s.uri.queryParameters['version'] ?? '') ?? 1,
               )
             : const UtilityPage('not-found'),
       ),
+      GoRoute(path: '/help', builder: (_, _) => const HelpPage()),
+      GoRoute(path: '/guide', builder: (_, _) => const GuidePage()),
+      GoRoute(path: '/analytics', builder: (_, _) => const AnalyticsPage()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
       for (final path in [
         'pending',

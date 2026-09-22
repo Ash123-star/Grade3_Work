@@ -12,9 +12,15 @@ import '../shared/widgets.dart';
 import 'catalog.dart';
 
 class FormPage extends ConsumerStatefulWidget {
-  const FormPage(this.kind, {super.key, this.id, this.version = 1});
+  const FormPage(
+    this.kind, {
+    super.key,
+    this.id,
+    this.source,
+    this.version = 1,
+  });
   final String kind;
-  final String? id;
+  final String? id, source;
   final int version;
   @override
   ConsumerState<FormPage> createState() => _FormPageState();
@@ -30,9 +36,10 @@ class _FormPageState extends ConsumerState<FormPage> {
   String? error;
   String? selectedOwner;
   DateTime? deadline;
+  int? loadedVersion;
   bool get log => widget.kind == 'log-edit';
   String get draftKey =>
-      'draft:${ref.read(sessionProvider).id}:${ref.read(selectedDateProvider).toIso8601String().split('T').first}';
+      'draft:${ref.read(sessionProvider).id}:${ref.read(logDateProvider).toIso8601String().split('T').first}';
   @override
   void initState() {
     super.initState();
@@ -41,6 +48,60 @@ class _FormPageState extends ConsumerState<FormPage> {
       controllers[field] = TextEditingController();
     }
     if (log) restore();
+    if (widget.id != null ||
+        widget.source != null ||
+        widget.kind == 'profile-edit') {
+      loadExisting();
+    }
+  }
+
+  Future<void> loadExisting() async {
+    try {
+      final resource = widget.source != null
+          ? 'ai-maps'
+          : widget.kind == 'note'
+          ? 'private-notes'
+          : spec.resource;
+      final item = await ref
+          .read(repositoryProvider)
+          .detail(
+            resource,
+            widget.source ?? widget.id ?? ref.read(sessionProvider).id,
+          );
+      if (!mounted) return;
+      loadedVersion = item.version;
+      for (final entry in controllers.entries) {
+        entry.value.text = '${item.fields[entry.key] ?? ''}';
+      }
+      for (final title in ['标题', '任务名称']) {
+        if (controllers.containsKey(title)) {
+          controllers[title]!.text = item.title;
+        }
+      }
+      if (controllers.containsKey('任务内容')) {
+        controllers['任务内容']!.text =
+            '${item.fields['任务内容'] ?? item.fields['body'] ?? ''}';
+      }
+      if (controllers.containsKey('内容')) {
+        controllers['内容']!.text =
+            '${item.fields['内容'] ?? item.fields['body'] ?? ''}';
+      }
+      if (controllers.containsKey('个人介绍')) {
+        controllers['个人介绍']!.text =
+            '${item.fields['个人介绍'] ?? item.fields['body'] ?? ''}';
+      }
+      selectedOwner = item.ownerId;
+      deadline = DateTime.tryParse('${item.fields['deadline']}');
+      if (controllers.containsKey('截止时间') && deadline != null) {
+        controllers['截止时间']!.text = deadline!.toLocal().toString().substring(
+          0,
+          16,
+        );
+      }
+      setState(() {});
+    } catch (e) {
+      if (mounted && widget.kind != 'note') setState(() => error = '$e');
+    }
   }
 
   Future<void> restore() async {
@@ -86,6 +147,8 @@ class _FormPageState extends ConsumerState<FormPage> {
     '截止时间',
     '今日工作',
     '成果说明',
+    '问题描述',
+    '验收意见',
     '驳回原因',
     '变更理由',
     '撤回原因',
@@ -141,6 +204,10 @@ class _FormPageState extends ConsumerState<FormPage> {
     };
     if (options.isNotEmpty) {
       return DropdownButtonFormField<String>(
+        key: ValueKey('$label:${controller.text}'),
+        initialValue: options.contains(controller.text)
+            ? controller.text
+            : null,
         decoration: InputDecoration(labelText: label),
         items: options
             .map((v) => DropdownMenuItem(value: v, child: Text(v)))
@@ -176,6 +243,34 @@ class _FormPageState extends ConsumerState<FormPage> {
         ),
       );
     }
+    if (label == '关联任务') {
+      return ref
+          .watch(recordsProvider('tasks'))
+          .when(
+            data: (page) => DropdownButtonFormField<String>(
+              key: ValueKey('task:${controller.text}'),
+              initialValue: page.items.any((r) => r.id == controller.text)
+                  ? controller.text
+                  : null,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: '关联任务'),
+              items: page.items
+                  .map(
+                    (r) => DropdownMenuItem(
+                      value: r.id,
+                      child: Text(r.title, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                controller.text = value ?? '';
+                autoSave();
+              },
+            ),
+            loading: () => const LinearProgressIndicator(),
+            error: (e, s) => Text('$e'),
+          );
+    }
     final person = ['主负责人', '协作人', '员工', '直属上级', '指定公司复核人'].contains(label);
     return TextFormField(
       controller: controller,
@@ -199,6 +294,9 @@ class _FormPageState extends ConsumerState<FormPage> {
             '备注',
             '个人介绍',
             '评语',
+            '问题描述',
+            '遇到的阻碍',
+            '验收意见',
           ].contains(label)
           ? 4
           : 1,
@@ -242,6 +340,26 @@ class _FormPageState extends ConsumerState<FormPage> {
 
   Future<void> submit() async {
     if (!form.currentState!.validate()) return;
+    if (['withdraw', 'disable'].contains(widget.kind)) {
+      final yes = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(spec.title),
+          content: const Text('确认执行此操作？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('确认'),
+            ),
+          ],
+        ),
+      );
+      if (yes != true || !mounted) return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -249,12 +367,17 @@ class _FormPageState extends ConsumerState<FormPage> {
     final values = <String, dynamic>{
       for (final e in controllers.entries) e.key: e.value.text,
       if (widget.id != null) 'id': widget.id,
-      'title':
-          controllers['任务名称']?.text ??
-          controllers['标题']?.text ??
-          (log
-              ? '${ref.read(selectedDateProvider).toIso8601String().split('T').first} 工作日报'
-              : spec.title),
+      if (widget.kind == 'profile-edit') 'id': ref.read(sessionProvider).id,
+      if (widget.id == null ||
+          controllers.containsKey('任务名称') ||
+          controllers.containsKey('标题'))
+        'title':
+            controllers['任务名称']?.text ??
+            controllers['标题']?.text ??
+            controllers['问题描述']?.text ??
+            (log
+                ? '${ref.read(logDateProvider).toIso8601String().split('T').first} 工作日报'
+                : spec.title),
       if (selectedOwner != null) 'ownerId': selectedOwner,
       if (deadline != null) 'deadline': deadline!.toUtc().toIso8601String(),
       if (log)
@@ -273,16 +396,37 @@ class _FormPageState extends ConsumerState<FormPage> {
             Command(
               spec.action,
               values,
-              version: widget.id == null ? null : widget.version,
+              version: widget.kind == 'note' ? loadedVersion : widget.id == null ? null : (loadedVersion ?? widget.version),
               idempotencyKey: idem,
             ),
           );
+      refreshBusiness(ref);
       ref.invalidate(recordsProvider(spec.resource));
       ref.invalidate(datedRecordsProvider(spec.resource));
       if (widget.id != null) {
         ref.invalidate(itemProvider((spec.resource, widget.id!)));
       }
       if (!mounted) return;
+      if (log) {
+        final prefs = await SharedPreferences.getInstance();
+        for (final field in controllers.keys) {
+          await prefs.remove('$draftKey:$field');
+        }
+      }
+      if (!mounted) return;
+      if (widget.kind == 'profile-edit') {
+        final old = ref.read(sessionProvider);
+        ref.read(sessionProvider.notifier).state = Session(
+          id: old.id,
+          name: controllers['姓名']!.text.isEmpty
+              ? old.name
+              : controllers['姓名']!.text,
+          role: old.role,
+          dispatch: old.dispatch,
+          active: old.active,
+          token: old.token,
+        );
+      }
       if (widget.kind == 'login') {
         if (AppConfig.mock) {
           ref.read(sessionProvider.notifier).state = const Session();
@@ -343,6 +487,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                     padding: EdgeInsets.only(bottom: 16),
                     child: Text('提交后进入审核，原版本继续生效。'),
                   ),
+                if (log) Padding(padding:const EdgeInsets.only(bottom:12),child:Text('日志日期：${ref.watch(logDateProvider).year}年${ref.watch(logDateProvider).month}月${ref.watch(logDateProvider).day}日')),
                 if (log)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),

@@ -15,10 +15,15 @@ final scenarioProvider = StateProvider<DemoScenario>(
 final fontScaleProvider = StateProvider<double>((ref) => 1);
 final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
 final periodProvider = StateProvider<String>((ref) => '日');
+final demoStoreProvider = Provider<DemoStore>((ref) => DemoStore());
 final repositoryProvider = Provider<Repository>((ref) {
   final session = ref.watch(sessionProvider);
   return AppConfig.mock
-      ? MockRepository(session, scenario: ref.watch(scenarioProvider))
+      ? MockRepository(
+          session,
+          scenario: ref.watch(scenarioProvider),
+          store: ref.watch(demoStoreProvider),
+        )
       : HttpRepository(AppConfig.baseUrl, session.token);
 });
 final recordsProvider = FutureProvider.autoDispose.family<PageResult, String>(
@@ -39,3 +44,26 @@ final datedRecordsProvider = FutureProvider.autoDispose
           .watch(repositoryProvider)
           .list(resource, Query(from: range.from, to: range.to));
     });
+
+void refreshBusiness(WidgetRef ref) {
+  ref.invalidate(recordsProvider);
+  ref.invalidate(datedRecordsProvider);
+  ref.invalidate(itemProvider);
+  ref.invalidate(memberRecordsProvider);
+  ref.invalidate(logDayRecordsProvider);
+}
+
+final memberRecordsProvider = FutureProvider.autoDispose
+    .family<PageResult, (String, String)>(
+      (ref, key) =>
+          ref.watch(repositoryProvider).list(key.$1, Query(ownerId: key.$2)),
+    );
+
+final logDateProvider=StateProvider<DateTime>((ref)=>DateTime.now());
+final logDayRecordsProvider=FutureProvider.autoDispose.family<PageResult,(String,String?)>((ref,key){
+  final date=ref.watch(logFilterDateProvider);
+  final range=date==null?null:BusinessRange(date,'日');
+  return ref.watch(repositoryProvider).list(key.$1,Query(ownerId:key.$2,from:range?.from,to:range?.to));
+});
+
+final logFilterDateProvider=StateProvider<DateTime?>((ref)=>null);

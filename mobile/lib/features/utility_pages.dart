@@ -7,6 +7,7 @@ import '../core/providers.dart';
 import '../data/models.dart';
 import '../data/mock_repository.dart';
 import '../shared/widgets.dart';
+import 'demo_pages.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -23,6 +24,11 @@ class SettingsPage extends ConsumerWidget {
           max: 1.5,
           divisions: 5,
           onChanged: (v) => ref.read(fontScaleProvider.notifier).state = v,
+        ),
+        ListTile(
+          title: const Text('帮助与新手引导'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/help'),
         ),
         ListTile(
           title: const Text('修改密码'),
@@ -50,10 +56,24 @@ class SettingsPage extends ConsumerWidget {
             onChanged: (r) {
               if (r != null) {
                 ref.read(sessionProvider.notifier).state = Session(
+                  id: r == UserRole.employee ? 'u2' : 'u1',
+                  name: r == UserRole.employee ? '陈一诺' : '林小满',
                   role: r,
                   dispatch: r != UserRole.employee,
                 );
               }
+            },
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            key: ValueKey(ref.watch(sessionProvider).id),
+            initialValue: ref.watch(sessionProvider).id,
+            decoration: const InputDecoration(labelText: '演示账号'),
+            items: const [DropdownMenuItem(value:'u1',child:Text('林小满')),DropdownMenuItem(value:'u2',child:Text('陈一诺')),DropdownMenuItem(value:'u3',child:Text('许知远'))],
+            onChanged: (id) {
+              if(id == null) return;
+              final old=ref.read(sessionProvider);
+              ref.read(sessionProvider.notifier).state=Session(id:id,name:{'u1':'林小满','u2':'陈一诺','u3':'许知远'}[id]!,role:old.role,dispatch:old.dispatch);
             },
           ),
           const SizedBox(height: 16),
@@ -78,6 +98,8 @@ class SettingsPage extends ConsumerWidget {
             onChanged: (v) {
               final u = ref.read(sessionProvider);
               ref.read(sessionProvider.notifier).state = Session(
+                id: u.id,
+                name: u.name,
                 role: u.role,
                 dispatch: v,
               );
@@ -126,7 +148,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         '素材与开源许可',
         'OpenMoji，作者：HfG Schwäbisch Gmünd 及 OpenMoji contributors。来源：https://openmoji.org/ 。许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0/）。本项目原样使用六份 SVG，未修改图形。Flutter 组件许可可在下方查看。',
       ),
-      'history' => ('历史修订与已读', '演示：v1 为当前生效版本；v2 为待审候选版本。上级已读记录与正文独立保存。'),
+      'history' => ('历史修订与已读', '已提交版本与待审候选内容分别展示，审核通过后更新正式记录。'),
       'conflict' => (
         '草稿与同步',
         '本地草稿独立保存。接入服务后，服务器版本发生变化时，选择保留本地内容或重新读取服务器版本，不自动覆盖。',
@@ -160,14 +182,23 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
                   showLicensePage(context: context, applicationName: '潘多拉工作台'),
               child: const Text('组件许可证'),
             ),
-          if (widget.kind == 'history') ...[
-            const SectionHeader('候选版本 v2 · 待审'),
-            const Text('补充访谈记录，原版保持生效。'),
-            const SectionHeader('生效版本 v1'),
-            const Text('完成初步需求梳理。'),
-            const SectionHeader('阅读记录'),
-            const Text('团队长已阅读 · 演示记录'),
+          if (widget.kind == 'ai-usage') ...[
+            const SectionHeader('今日额度'),
+            const LinearProgressIndicator(value: .3, minHeight: 12),
+            const SizedBox(height: 12),
+            const Text('示例用量 3 / 10 次 · 真实调用 0 次'),
+            const SectionHeader('最近分析'),
+            const ListTile(
+              leading: Icon(Icons.auto_awesome),
+              title: Text('今日工作摘要'),
+              subtitle: Text('已生成 · 来源：工作日志、任务安排'),
+            ),
+            const Text('本地演示不消耗 AI 额度'),
           ],
+          if (widget.kind == 'history')
+            LogHistory(
+              logId: GoRouterState.of(context).uri.queryParameters['id'] ?? '1',
+            ),
           if (widget.kind == 'conflict') ...[
             OutlinedButton.icon(
               onPressed: () => openForm(context, 'log-edit'),
@@ -181,6 +212,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
           ],
           if (widget.kind == 'report') ...[
             const DateControls(),
+            const ReportSummary(),
             const RecordList('logs', dated: true),
             OutlinedButton.icon(
               onPressed: () => context.go('/ai'),

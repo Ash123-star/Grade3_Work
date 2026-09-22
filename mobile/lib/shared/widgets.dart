@@ -158,9 +158,11 @@ class DateControls extends ConsumerWidget {
         Row(
           children: [
             IconButton(
-              tooltip: '前一天',
-              onPressed: () => ref.read(selectedDateProvider.notifier).state =
-                  date.subtract(const Duration(days: 1)),
+              tooltip: '上一个$period',
+              onPressed: () =>
+                  ref.read(selectedDateProvider.notifier).state = period == '月'
+                  ? DateTime(date.year, date.month - 1, 1)
+                  : date.subtract(Duration(days: period == '周' ? 7 : 1)),
               icon: const Icon(Icons.chevron_left),
             ),
             Expanded(
@@ -181,9 +183,11 @@ class DateControls extends ConsumerWidget {
               ),
             ),
             IconButton(
-              tooltip: '后一天',
-              onPressed: () => ref.read(selectedDateProvider.notifier).state =
-                  date.add(const Duration(days: 1)),
+              tooltip: '下一个$period',
+              onPressed: () =>
+                  ref.read(selectedDateProvider.notifier).state = period == '月'
+                  ? DateTime(date.year, date.month + 1, 1)
+                  : date.add(Duration(days: period == '周' ? 7 : 1)),
               icon: const Icon(Icons.chevron_right),
             ),
           ],
@@ -198,6 +202,15 @@ class DateControls extends ConsumerWidget {
           onSelectionChanged: (s) =>
               ref.read(periodProvider.notifier).state = s.first,
         ),
+        const SizedBox(height: 8),
+        Text(() {
+          final range = BusinessRange(date, period);
+          final a = range.from.add(const Duration(hours: 8)),
+              b = range.to
+                  .add(const Duration(hours: 8))
+                  .subtract(const Duration(days: 1));
+          return '${a.month}月${a.day}日 — ${b.month}月${b.day}日';
+        }(), style: const TextStyle(color: CuteTokens.muted)),
         const SizedBox(height: 16),
       ],
     );
