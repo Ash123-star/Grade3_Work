@@ -1,0 +1,10 @@
+server/target/
+deploy/backend/.env
+*.log
+server/.data/
+docs/openapi.generated.json
+deploy/.env
+deploy/postgresql/.env
+deploy/redis/.env
+deploy/dist/
+deploy/backend/backups/
