@@ -8,3 +8,4 @@ deploy/postgresql/.env
 deploy/redis/.env
 deploy/dist/
 deploy/backend/backups/
+.agents/skills/project-development-gate/SKILL.md

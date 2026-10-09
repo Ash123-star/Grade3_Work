@@ -29,9 +29,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class BackendIntegrationTest {
     @LocalServerPort int port;
     @Autowired Db db;
-    @Autowired Bootstrap bootstrap;
+    @Autowired cn.workpanel.module.auth.controller.AuthBootstrap bootstrap;
     @Autowired StringRedisTemplate redis;
-    @Autowired Messages messages;
+    @Autowired cn.workpanel.module.message.application.MessageApplicationService messages;
     @Autowired Limiter limiter;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     static final ObjectMapper JSON=new ObjectMapper();
@@ -43,7 +43,7 @@ class BackendIntegrationTest {
     final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     final Map<String,String> tokens=new HashMap<>();
     final Map<String,String> ids=new HashMap<>();
-    String pendingItem,task,log,team,avatar,successfulJob;
+    String pendingItem,task,log,team,avatar,successfulJob,review;
     final String date=LocalDate.now(ZoneId.of("Asia/Shanghai")).toString();
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) {
@@ -190,10 +190,11 @@ class BackendIntegrationTest {
         call(404,"GET","/logs/"+log,"leader",null,null); assertTrue(get("/logs?ownerId="+ids.get("alice"),"leader").get("items").isEmpty());
         call(403,"GET","/logs?ownerId="+ids.get("alice"),"bob",null,null);
         post("/logs/"+log+"/submit","alice",Map.of("version",1));
+        assertEquals(1,db.count("SELECT count(*) FROM log_tasks WHERE log_id=? AND task_id=?",log,task));
         assertEquals(1,get("/logs/subordinates?date="+date,"leader").get("total").asInt());
         call(403,"GET","/logs/subordinates","alice",null,null);
         var revision=post("/logs/"+log+"/revisions","alice",Map.of("version",2,"body",Map.of("work","修订后的研发成果","blockers","联系13812345678 密码:never-send"),"reason","补充成果"));
-        String review=revision.get("id").asText(); var chain=get("/reviews/"+review,"alice").get("steps"); assertEquals(3,chain.size());
+        review=revision.get("id").asText(); var chain=get("/reviews/"+review,"alice").get("steps"); assertEquals(3,chain.size());
         assertEquals(ids.get("leader"),chain.get(0).get("reviewer_id").asText()); assertEquals(ids.get("director"),chain.get(1).get("reviewer_id").asText());
         call(403,"POST","/reviews/"+review+"/decision","director",Map.of("approve",true),null);
         call(403,"POST","/reviews/"+review+"/decision","alice",Map.of("approve",true),null);
@@ -235,7 +236,7 @@ class BackendIntegrationTest {
         var report=get("/analytics?date="+date+"&period=day","leader"); assertEquals(1,report.at("/dailySubmission/numerator").asInt()); assertTrue(report.at("/dailySubmission/definition").isTextual());
         var export=request("GET","/analytics/export?date="+date+"&resource=logs","alice",null,null); assertEquals(200,export.statusCode()); assertTrue(export.body().contains(log));
         assertFalse(request("GET","/analytics/export?date="+date+"&resource=logs","bob",null,null).body().contains(log));
-        assertEquals("\"'=formula\"",Analytics.csv("=formula"));
+        assertEquals("\"'=formula\"",cn.workpanel.module.analytics.controller.AnalyticsController.csv("=formula"));
     }
     @Test @Order(7) void transactionalOutboxRemindersAndSseReplay() throws Exception {
         long original=db.count("SELECT count(*) FROM outbox_events"); new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status->{ db.notify(Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("alice"))),ids.get("alice"),"TEST_ROLLBACK",task,"rollback-only"); status.setRollbackOnly(); }); assertEquals(original,db.count("SELECT count(*) FROM outbox_events"));
@@ -276,11 +277,13 @@ class BackendIntegrationTest {
         providerMode.set("OK"); String budgetKey="workpanel:ai-budget:"+ids.get("director")+":"+LocalDate.now(ZoneOffset.UTC); redis.opsForValue().set(budgetKey,"50000");
         var budget=post("/ai/jobs","director",Map.of("date",date,"period","day")); waitJob(budget.get("id").asText(),"director","FAILED"); assertTrue(get("/dashboard","director").has("logs"));
         assertThrows(ApiError.class,()->{ limiter.check("integration-test-limit",1,60); limiter.check("integration-test-limit",1,60); });
-        assertEquals("[已隐藏手机号] [已隐藏敏感信息]",Ai.sanitize("13812345678 密码:secret"));
+        assertEquals("[已隐藏手机号] [已隐藏敏感信息]",cn.workpanel.module.ai.application.AiApplicationService.sanitize("13812345678 密码:secret"));
     }
     @Test @Order(10) void transferDisableCycleAndTenantIsolation() throws Exception {
         configure("alice",Map.of("managerId",ids.get("leader")));
         call(400,"POST","/organization/users/"+ids.get("leader")+"/revisions","integration-admin",Map.of("version",get("/auth/me","leader").get("version").asInt(),"reason","构成循环","managerId",ids.get("alice")),null);
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",ids.get("leader"),ids.get("alice"),"default"));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->db.update("INSERT INTO review_steps(request_id,reviewer_id,applicant_id,position,company_id) VALUES (?,?,?,?,?)",review,ids.get("alice"),ids.get("alice"),99,"default"));
         configure("leader",Map.of("role","DIRECTOR","departmentId","marketing","teamId",""));
         call(404,"GET","/logs/"+log,"leader",null,null); call(404,"GET","/ai/jobs/"+successfulJob,"leader",null,null);
         assertTrue(get("/ai-maps","leader").get("nodes").isEmpty());
