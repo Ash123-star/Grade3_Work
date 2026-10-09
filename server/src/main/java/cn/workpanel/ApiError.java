@@ -13,10 +13,10 @@ import java.util.Map;
 public class ApiError extends RuntimeException {
     final int status; final String code;
     public ApiError(int status,String code,String message) { super(message); this.status=status; this.code=code; }
-    static ApiError bad(String code,String message) { return new ApiError(400,code,message); }
-    static ApiError forbidden() { return new ApiError(403,"FORBIDDEN","不在授权范围内"); }
-    static ApiError notFound() { return new ApiError(404,"NOT_FOUND","记录不存在"); }
-    static ApiError conflict() { return new ApiError(409,"VERSION_CONFLICT","版本已变化，请刷新后重试"); }
+    public static ApiError bad(String code,String message) { return new ApiError(400,code,message); }
+    public static ApiError forbidden() { return new ApiError(403,"FORBIDDEN","不在授权范围内"); }
+    public static ApiError notFound() { return new ApiError(404,"NOT_FOUND","记录不存在"); }
+    public static ApiError conflict() { return new ApiError(409,"VERSION_CONFLICT","版本已变化，请刷新后重试"); }
 }
 
 @RestControllerAdvice

@@ -42,21 +42,9 @@ public class Security {
         };
         var registration=new FilterRegistrationBean<OncePerRequestFilter>(filter); registration.setOrder(-90); return registration;
     }
-    static Actor authenticate(Db db,String authorization) {
+    public static Actor authenticate(Db db,String authorization) {
         if(authorization==null||!authorization.startsWith("Bearer ")) throw new ApiError(401,"UNAUTHENTICATED","请登录");
         var users=db.rows("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>now() AND u.status<>'DISABLED'",Db.hash(authorization.substring(7)));
         if(users.isEmpty()) throw new ApiError(401,"SESSION_EXPIRED","会话失效"); return Actor.from(users.getFirst());
-    }
-}
-
-@org.springframework.stereotype.Component
-class Limiter {
-    final StringRedisTemplate redis;
-    Limiter(StringRedisTemplate redis) { this.redis=redis; }
-    void check(String key,long limit,long seconds) {
-        try {
-            Long n=redis.execute(new DefaultRedisScript<>("local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n",Long.class),List.of("workpanel:"+key),String.valueOf(seconds));
-            if(n!=null&&n>limit) throw new ApiError(429,"RATE_LIMITED","请求过于频繁");
-        } catch(ApiError e) { throw e; } catch(Exception e) { throw new ApiError(503,"LIMITER_UNAVAILABLE","限流服务不可用"); }
     }
 }
