@@ -1,0 +1,34 @@
+name: ${COMPOSE_PROJECT_NAME:-collaboration-data}
+services:
+  data:
+    image: collaboration-data-runtime:local
+    build:
+      context: .
+      dockerfile: runtime/Dockerfile
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-collaboration}
+      POSTGRES_USER: ${POSTGRES_USER:-collaboration_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in deploy/.env}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+      - "127.0.0.1:${REDIS_PORT:-56379}:6379"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgresql/migrations:/migrations:ro
+      - redis-data:/data
+      - ./redis:/opt/redis:ro
+    healthcheck:
+      test: ["CMD", "/bin/sh", "/opt/runtime/health.sh"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+volumes:
+  postgres-data:
+  redis-data:

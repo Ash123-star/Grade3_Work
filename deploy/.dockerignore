@@ -1,0 +1,7 @@
+.env
+dist
+backend
+postgresql/sql
+postgresql/migrations
+**/*.ps1
+**/*.md
