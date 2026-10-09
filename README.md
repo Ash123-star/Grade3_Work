@@ -1,6 +1,8 @@
 # 企业协作智能面板
 
-产品需求见 [方案.md](方案.md)，实施任务见 [tasks.md](openspec/changes/initial-product/tasks.md)。当前交付为规划和工具配置，尚无可运行应用。
+产品需求见 [方案.md](方案.md)，跨端实施任务见 [tasks.md](openspec/changes/initial-product/tasks.md)。Flutter 当前使用演示数据；Spring Boot 后端实现位于 `server/`，运行、接口与验收分别见 [后端说明](docs/backend.md)、[接口说明](docs/backend-api.md) 和 [验证记录](docs/backend-validation.md)。
+
+后端覆盖认证、组织范围、独立审核、导图数据、日报、任务、附件、站内消息、统计导出及服务端 DeepSeek 建议。Android 联网接入、独立 Web 工作台和生产环境上线仍需实施，不能视为整个产品已交付。
 
 OpenSpec 1.5.0 已通过官方命令初始化：
 ```powershell
@@ -17,4 +19,4 @@ openspec.cmd status --change initial-product
 openspec.cmd validate --all --strict
 ```
 
-initial-product 是待实施变更，规范尚未归档为已交付能力。
+initial-product 保留跨端里程碑待办。后端的具体交付以对应变更和验证记录为准，不将其他待办自动勾选。

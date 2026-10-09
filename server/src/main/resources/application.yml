@@ -1,0 +1,43 @@
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:55432/workpanel}
+    username: ${DB_USER:workpanel}
+    password: ${DB_PASSWORD:}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:56379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+  jackson:
+    time-zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+  mvc:
+    async:
+      request-timeout: 60000
+app:
+  admin-account: ${ADMIN_ACCOUNT:}
+  admin-password: ${ADMIN_PASSWORD:}
+  admin-phone: ${ADMIN_PHONE:}
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173}
+  session-hours: ${SESSION_HOURS:24}
+  jobs-enabled: ${JOBS_ENABLED:true}
+  deepseek-key: ${DEEPSEEK_API_KEY:}
+  deepseek-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+  deepseek-model: ${DEEPSEEK_MODEL:deepseek-chat}
+  ai-daily-tokens: ${AI_DAILY_TOKENS:50000}
+  ai-max-tokens: ${AI_MAX_TOKENS:2000}
+  ai-timeout-seconds: ${AI_TIMEOUT_SECONDS:60}
+springdoc:
+  remove-broken-reference-definitions: false
+  api-docs:
+    path: /api/openapi
+  swagger-ui:
+    path: /api/docs

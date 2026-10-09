@@ -1,0 +1,24 @@
+# PostgreSQL 包解压后可使用自己的 .env 独立启动。
+name: ${COMPOSE_PROJECT_NAME:-collaboration-data}
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-collaboration}
+      POSTGRES_USER: ${POSTGRES_USER:-collaboration_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations:/migrations:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  postgres-data:

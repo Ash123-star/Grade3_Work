@@ -1,0 +1,9 @@
+.git
+.codex
+.claude
+.codebuddy
+mobile
+server/target
+**/.env
+**/*.log
+deploy/dist
