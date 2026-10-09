@@ -1,0 +1,21 @@
+name: ${COMPOSE_PROJECT_NAME:-collaboration-data}
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      TZ: UTC
+    entrypoint: ["/bin/sh", "/opt/redis/start.sh"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-56379}:6379"
+    volumes:
+      - redis-data:/data
+      - .:/opt/redis:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(/bin/sh /opt/redis/auth-cli.sh ping)\" = PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  redis-data:

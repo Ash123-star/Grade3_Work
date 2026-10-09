@@ -1,0 +1,92 @@
+name: workpanel-backend
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: workpanel
+      POSTGRES_USER: workpanel
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?请设置 DB_PASSWORD}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55435}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workpanel -d workpanel"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
+    entrypoint: ["/bin/sh", "/opt/redis/start.sh"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-56382}:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis:/opt/redis:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(/bin/sh /opt/redis/auth-cli.sh ping)\" = PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    image: workpanel-backend:${BACKEND_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: deploy/backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/workpanel
+      DB_USER: workpanel
+      DB_PASSWORD: ${DB_PASSWORD:?请设置 DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
+      ADMIN_ACCOUNT: ${ADMIN_ACCOUNT:?请设置 ADMIN_ACCOUNT}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请设置 ADMIN_PASSWORD}
+      ADMIN_PHONE: ${ADMIN_PHONE:?请设置 ADMIN_PHONE}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      AI_DAILY_TOKENS: ${AI_DAILY_TOKENS:-50000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+  gateway:
+    image: caddy:2-alpine
+    profiles: [https]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
