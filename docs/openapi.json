@@ -7068,6 +7068,8 @@
                                                                                                       "RECEIVED",
                                                                                                       "FEEDBACK",
                                                                                                       "ACCEPTED",
+                                                                                                      "TRANSFERRED",
+                                                                                                      "RESCHEDULED",
                                                                                                       "ARCHIVED",
                                                                                                       "WITHDRAWN"
                                                                                                   ]
@@ -7079,9 +7081,18 @@
                                                                                         },
                                                                             "text":  {
                                                                                          "type":  "string",
-                                                                                         "description":  "åé¦/æ¤åå¿\u0085å¡«",
+                                                                                         "description":  "Required for feedback or withdrawal",
                                                                                          "maxLength":  20000
-                                                                                     }
+                                                                                     },
+                                                                            "ownerId":  {
+                                                                                             "type":  "string",
+                                                                                             "description":  "Transfer target user id"
+                                                                                         },
+                                                                            "deadline":  {
+                                                                                               "type":  "string",
+                                                                                               "format":  "date-time",
+                                                                                               "description":  "New deadline for reschedule"
+                                                                                           }
                                                                         },
                                                          "required":  [
                                                                           "type",

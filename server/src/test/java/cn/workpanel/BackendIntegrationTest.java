@@ -168,6 +168,12 @@ class BackendIntegrationTest {
     }
     @Test @Order(3) void scopedTasksIdempotencyAndLifecycle() throws Exception {
         var content=taskBody("产品任务","alice"); var created=call(200,"POST","/tasks","leader",content,"product-task"); task=created.get("id").asText();
+        var transitionTask=call(200,"POST","/tasks","leader",taskBody("转派改期契约","alice"),"transfer-reschedule-task");
+        var transferred=post("/tasks/"+transitionTask.get("id").asText()+"/events","leader",Map.of("type","TRANSFERRED","ownerId",ids.get("reviewer"),"version",transitionTask.get("version").asInt()));
+        assertEquals(ids.get("reviewer"),transferred.get("owner_id").asText());
+        var rescheduled=post("/tasks/"+transitionTask.get("id").asText()+"/events","leader",Map.of("type","RESCHEDULED","deadline",LocalDate.now().plusDays(2).atTime(18,0).atZone(ZoneId.of("Asia/Shanghai")).toOffsetDateTime().toString(),"version",transferred.get("version").asInt()));
+        assertEquals(2,rescheduled.get("version").asInt());
+        call(400,"POST","/tasks/"+transitionTask.get("id").asText()+"/events","leader",Map.of("type","RESCHEDULED","deadline","yesterday","version",2),null);
         var concurrent=taskBody("并发幂等派发","alice"); var first=CompletableFuture.supplyAsync(()->{try{return call(200,"POST","/tasks","leader",concurrent,"parallel-key").get("id").asText();}catch(Exception e){throw new CompletionException(e);}}); var second=CompletableFuture.supplyAsync(()->{try{return call(200,"POST","/tasks","leader",concurrent,"parallel-key").get("id").asText();}catch(Exception e){throw new CompletionException(e);}}); assertEquals(first.get(),second.get());
         assertEquals(task,call(200,"POST","/tasks","leader",content,"product-task").get("id").asText());
         content.put("title","不同内容"); call(409,"POST","/tasks","leader",content,"product-task");
