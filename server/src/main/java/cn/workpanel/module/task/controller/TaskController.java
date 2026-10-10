@@ -39,20 +39,37 @@ public class TaskController {
         Business.assign(db,a,id,c); db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body) VALUES (?,?,?,'DISPATCHED',?::jsonb)",a.company(),id,a.id(),db.write(c));
         db.update("INSERT INTO idempotency_keys VALUES (?,?,?,?,?)",a.company(),a.id(),key,hash,id); db.audit(a,"TASK_DISPATCHED",id,Map.of(),c,"派发任务"); return Business.taskDto(db,business.task(a,id,false),true);
     }
-    /** 追加接收、反馈、验收、转派、改期或撤回事件。需要参与者或派发权限；非法流转返回 409。 */
+    /**
+     * 追加任务生命周期事件。
+     * 权限：负责人可接收/反馈，派发人或管理员可验收、归档、转派、改期和撤回。
+     * 请求：必须包含 type 和当前 version；TRANSFERRED 还需要 ownerId，RESCHEDULED 还需要 deadline，
+     * FEEDBACK/WITHDRAWN 需要 text。返回更新后的任务详情；版本冲突返回 409。
+     */
     @PostMapping("/{id}/events") @Transactional
     public Map<String,Object> event(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) {
-        Db.fields(b,"type","text","version"); Actor a=Actor.current(r); var t=business.task(a,id,true); String type=Db.required(b,"type"),phase=Db.str(t,"phase"); int version=Db.version(b); boolean issuer=a.id().equals(t.get("issuer_id"))||a.admin(),owner=a.id().equals(t.get("owner_id"));
+        Db.fields(b,"type","text","version","ownerId","deadline"); Actor a=Actor.current(r); var t=business.task(a,id,true); String type=Db.required(b,"type"),phase=Db.str(t,"phase"); int version=Db.version(b); boolean issuer=a.id().equals(t.get("issuer_id"))||a.admin(),owner=a.id().equals(t.get("owner_id"));
         String next=switch(type) {
             case "RECEIVED" -> { if(!owner||!phase.equals("DISPATCHED")) throw ApiError.forbidden(); yield "RECEIVED"; }
             case "FEEDBACK" -> { if(db.count("SELECT count(*) FROM task_assignees WHERE task_id=? AND user_id=?",id,a.id())==0||!Set.of("RECEIVED","FEEDBACK").contains(phase)) throw ApiError.forbidden(); Db.required(b,"text"); yield "FEEDBACK"; }
             case "ACCEPTED" -> { if(!issuer||!phase.equals("FEEDBACK")) throw ApiError.forbidden(); yield "ACCEPTED"; }
+            case "TRANSFERRED" -> { if(!issuer||Set.of("ACCEPTED","ARCHIVED","WITHDRAWN").contains(phase)) throw ApiError.forbidden(); String ownerId=Db.required(b,"ownerId"); var user=db.one("SELECT * FROM users WHERE id=? AND company_id=?",ownerId,a.company()); if(!a.canSeeUser(user)||!Db.str(user,"status").equals("ACTIVE")) throw ApiError.bad("INVALID_OWNER","负责人不存在或不可用"); yield phase; }
+            case "RESCHEDULED" -> { if(!issuer||Set.of("ACCEPTED","ARCHIVED","WITHDRAWN").contains(phase)) throw ApiError.forbidden(); String deadline=Db.required(b,"deadline"); try { if(!java.time.Instant.parse(deadline).isAfter(java.time.Instant.now())) throw ApiError.bad("INVALID_DEADLINE","截止时间必须晚于当前时间"); } catch(java.time.format.DateTimeParseException e) { throw ApiError.bad("INVALID_DEADLINE","截止时间必须为 ISO-8601 时间"); } yield phase; }
             case "ARCHIVED" -> { if(!issuer||!phase.equals("ACCEPTED")) throw ApiError.forbidden(); yield "ARCHIVED"; }
             case "WITHDRAWN" -> { if(!issuer||Set.of("ACCEPTED","ARCHIVED","WITHDRAWN").contains(phase)) throw ApiError.forbidden(); Db.required(b,"text"); yield "WITHDRAWN"; }
             default -> throw ApiError.bad("INVALID_EVENT","不支持的任务事件");
         };
-        Db.conflict(db.update("UPDATE tasks SET phase=?,version=version+1 WHERE id=? AND version=?",next,id,version));
-        db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body) VALUES (?,?,?,?,?::jsonb)",a.company(),id,a.id(),type,db.write(Map.of("text",Db.str(b,"text"))));
+        if (type.equals("TRANSFERRED")) {
+            Db.conflict(db.update("UPDATE tasks SET owner_id=?,version=version+1 WHERE id=? AND version=?",Db.required(b,"ownerId"),id,version));
+            db.update("DELETE FROM task_assignees WHERE task_id=? AND kind='PRIMARY'",id);
+            db.update("INSERT INTO task_assignees(task_id,user_id,kind,company_id) VALUES (?,?, 'PRIMARY',?)",id,Db.required(b,"ownerId"),a.company());
+        } else if (type.equals("RESCHEDULED")) {
+            Db.conflict(db.update("UPDATE tasks SET deadline=?::timestamptz,version=version+1 WHERE id=? AND version=?",Db.required(b,"deadline"),id,version));
+        } else {
+            Db.conflict(db.update("UPDATE tasks SET phase=?,version=version+1 WHERE id=? AND version=?",next,id,version));
+        }
+        var eventBody=new LinkedHashMap<String,Object>();
+        for (String field: List.of("text","ownerId","deadline")) if (b.containsKey(field)) eventBody.put(field,b.get(field));
+        db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body) VALUES (?,?,?,?,?::jsonb)",a.company(),id,a.id(),type,db.write(eventBody));
         db.audit(a,"TASK_EVENT",id,Map.of("phase",phase),Map.of("phase",next,"text",Db.str(b,"text")),type);
         var recipients=new HashSet<String>(); recipients.add(Db.str(t,"issuer_id")); db.rows("SELECT user_id FROM task_assignees WHERE task_id=?",id).forEach(p->recipients.add(Db.str(p,"user_id")));
         for(String recipient:recipients) db.notify(a,recipient,"TASK_EVENT",id,"task-event:"+id+":"+version+":"+recipient);

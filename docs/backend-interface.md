@@ -1,6 +1,8 @@
 # 后端接口文档
 
-## 通用约定
+## 契约来源与通用约定
+
+实现事实以 SpringDoc 运行时文档 `GET /api/openapi` 为准；提交到仓库的 `docs/openapi.json` 是同一份契约快照，本文件只解释调用规则。三者必须同步更新，客户端不得根据旧版本猜测字段。
 
 根路径为 `/api`。除公开登录、注册和健康检查外均需 `Authorization: Bearer <session-token>`。每个响应带 `X-Trace-Id`；错误体为 `{code,message,traceId}`。列表使用 `{items,total,nextCursor}`，`cursor` 为偏移量，`limit` 范围 1–100。时间使用 UTC ISO-8601，业务日期按 `Asia/Shanghai` 且周一为周首。
 
@@ -23,7 +25,23 @@
 
 ## 任务 `/tasks`
 
-`GET /tasks` 列表故意不返回完成情况或状态列；流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 创建任务需要 `title,deadline,ownerId`，支持协作人、附件和幂等键。`POST /tasks/{id}/events` 支持 receive、feedback、accept、transfer、reschedule、withdraw；`POST /tasks/{id}/revisions` 修改已发布任务并携带版本，必要时进入审核。无派发资格返回 403。
+`GET /tasks` 列表故意不返回完成情况或状态列；流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 创建任务需要 `title,deadline,ownerId`，支持协作人、附件和 `Idempotency-Key`。
+
+`POST /tasks/{id}/events` 请求至少包含当前 `version` 和 `type`。事件枚举及附加字段如下：
+
+| type | 权限 | 必填附加字段 | 结果 |
+| --- | --- | --- | --- |
+| `RECEIVED` | 负责人 | 无 | 任务进入已接收 |
+| `FEEDBACK` | 负责人/协作人 | `text` | 追加反馈 |
+| `ACCEPTED` | 派发人/管理员 | 无 | 任务验收 |
+| `TRANSFERRED` | 派发人/管理员 | `ownerId` | 更换负责人并重建主负责人关联 |
+| `RESCHEDULED` | 派发人/管理员 | `deadline` | 更新截止时间，必须晚于当前时间 |
+| `ARCHIVED` | 派发人/管理员 | 无 | 归档已验收任务 |
+| `WITHDRAWN` | 派发人/管理员 | `text` | 撤回未验收任务 |
+
+事件更新使用乐观锁；版本不匹配返回 `409 VERSION_CONFLICT`，字段缺失或时间格式错误返回 `400`。事件写入和任务更新在同一事务中完成。
+
+`POST /tasks/{id}/revisions` 修改已发布任务并携带版本，必要时进入审核。无派发资格返回 403。
 
 ## 日志 `/logs`
 
