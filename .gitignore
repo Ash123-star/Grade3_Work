@@ -9,3 +9,6 @@ deploy/redis/.env
 deploy/dist/
 deploy/backend/backups/
 .agents/skills/project-development-gate/SKILL.md
+
+# 本地对话产出，不上传 GitHub
+output/
