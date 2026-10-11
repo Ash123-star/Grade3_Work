@@ -3,6 +3,8 @@ package cn.workpanel.module.review.application;
 import cn.workpanel.*;
 import cn.workpanel.module.log.controller.LogController;
 import cn.workpanel.module.organization.controller.OrganizationController;
+import cn.workpanel.module.review.domain.ReviewPolicy;
+import cn.workpanel.module.review.infrastructure.ReviewRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
@@ -13,7 +15,12 @@ import java.util.*;
 @org.springframework.stereotype.Service
 public class ReviewApplicationService {
     final Db db;
-    public ReviewApplicationService(Db db) { this.db=db; }
+    final ReviewRepository repository;
+    public ReviewApplicationService(Db db,ReviewRepository repository) { this.db=db; this.repository=repository; }
+    public Map<String,Object> list(Actor actor,int cursor,int limit) {
+        Business.page(cursor,limit);
+        return repository.list(actor,cursor,limit);
+    }
     @Transactional
     public Map<String,Object> create(Actor a,String kind,String target,int version,Object before,Map<String,Object> candidate,String reason) {
         if(reason.isBlank()) throw ApiError.bad("REASON_REQUIRED","关键变更需填写理由");
@@ -38,7 +45,7 @@ public class ReviewApplicationService {
     void first(Set<String> ids,Actor a,String clause,String value) {
         var rows=db.rows("SELECT id FROM users WHERE company_id=? AND status='ACTIVE' AND id<>? AND "+clause+" ORDER BY id LIMIT 1",a.company(),a.id(),value); if(!rows.isEmpty()) ids.add(Db.str(rows.getFirst(),"id"));
     }
-    Map<String,Object> get(Actor a,String id) {
+    public Map<String,Object> get(Actor a,String id) {
         var row=db.one("SELECT * FROM review_requests WHERE id=? AND company_id=?",id,a.company());
         if(!a.id().equals(row.get("applicant_id"))&&db.count("SELECT count(*) FROM review_steps WHERE request_id=? AND reviewer_id=?",id,a.id())==0) throw ApiError.forbidden();
         var result=new LinkedHashMap<>(row); result.put("candidate",db.read(row.get("candidate"))); result.put("before_value",db.read(row.get("before_value"))); result.put("steps",db.rows("SELECT * FROM review_steps WHERE request_id=? ORDER BY position",id)); return result;
@@ -46,8 +53,10 @@ public class ReviewApplicationService {
     @Transactional
     public Map<String,Object> decide(Actor a,String id,boolean approve,String reason) {
         var row=db.one("SELECT * FROM review_requests WHERE id=? AND company_id=? FOR UPDATE",id,a.company());
-        if(a.id().equals(row.get("applicant_id"))) throw new ApiError(403,"SELF_REVIEW","禁止审核自己的申请");
-        if(!row.get("status").equals("PENDING")) throw ApiError.conflict();
+        // 请求可能排队等待申请锁；进入决定时重新读取身份，禁止沿用已撤销的职责快照。
+        a=Actor.from(db.one("SELECT * FROM users WHERE id=? AND company_id=?",a.id(),a.company()));
+        if(!a.status().equals("ACTIVE")||a.mustChange()) throw ApiError.forbidden();
+        ReviewPolicy.request(a.id(),Db.str(row,"applicant_id"),Db.str(row,"status"));
         var steps=db.rows("SELECT * FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position LIMIT 1",id);
         if(steps.isEmpty()||!steps.getFirst().get("reviewer_id").equals(a.id())) throw ApiError.forbidden();
         String kind=Db.str(row,"kind");
@@ -57,7 +66,7 @@ public class ReviewApplicationService {
         long last=db.count("SELECT max(position) FROM review_steps WHERE request_id=?",id);
         if(position==last ? !a.reviewer() : !(a.role().equals("LEADER")&&!a.team().isEmpty()&&a.team().equals(applicant.team())||a.role().equals("DIRECTOR")&&!a.department().isEmpty()&&a.department().equals(applicant.department()))) throw ApiError.forbidden();
         if(Set.of("MEMBERSHIP","REVIEWER").contains(kind)&&!a.admin()) throw ApiError.forbidden();
-        if(!approve&&reason.isBlank()) throw ApiError.bad("REASON_REQUIRED","驳回需填写原因");
+        ReviewPolicy.reason(approve,reason);
         db.update("UPDATE review_steps SET state=?,reason=?,decided_at=now() WHERE id=?",approve?"APPROVED":"REJECTED",reason,steps.getFirst().get("id"));
         if(!approve) db.update("UPDATE review_requests SET status='REJECTED' WHERE id=?",id);
         else if(position==last) { apply(a,row); db.update("UPDATE review_requests SET status='APPROVED' WHERE id=?",id); }
@@ -133,24 +142,4 @@ public class ReviewApplicationService {
         db.audit(approver,"REVISION_APPLIED",target,db.read(row.get("before_value")),c,Db.str(row,"reason"));
     }
     static Object nullable(Map<String,Object> c,String key) { String s=Db.str(c,key); return s.isBlank()?null:s; }
-}
-
-@RestController
-@RequestMapping("/api/reviews")
-/** 审核接口。申请人不能自审，驳回必须提供原因，最终通过检查目标版本。 */
-class ReviewController {
-    final ReviewApplicationService service; final Db db;
-    ReviewController(ReviewApplicationService service,Db db) { this.service=service; this.db=db; }
-    /** 分页读取本人申请或分配给本人的审核。支持 cursor、limit。 */
-    @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit) {
-        Actor a=Actor.current(r); Business.page(cursor,limit);
-        String where="company_id=? AND (applicant_id=? OR id IN (SELECT request_id FROM review_steps WHERE reviewer_id=?))";
-        return Map.of("items",db.rows("SELECT id,kind,target_id,applicant_id,status,reason,created_at FROM review_requests WHERE "+where+" ORDER BY created_at DESC,id LIMIT ? OFFSET ?",a.company(),a.id(),a.id(),limit,cursor),"total",db.count("SELECT count(*) FROM review_requests WHERE "+where,a.company(),a.id(),a.id()),"nextCursor",String.valueOf(cursor+limit));
-    }
-    /** 获取审核详情、候选值和审核步骤。仅申请人或当前步骤审核人可见。 */
-    @GetMapping("/{id}") public Map<String,Object> get(HttpServletRequest r,@PathVariable String id) { return service.get(Actor.current(r),id); }
-    /** 通过或驳回审核。请求含 approve、reason；驳回 reason 必填；申请人自审返回 403。 */
-    @PostMapping("/{id}/decision") public Map<String,Object> decide(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) { Db.fields(b,"approve","reason"); if(!(b.get("approve") instanceof Boolean)) throw ApiError.bad("INVALID_DECISION","approve 必须为布尔值"); return service.decide(Actor.current(r),id,(boolean)b.get("approve"),Db.str(b,"reason")); }
-    /** 在尚无审核决定时由申请人重新计算审核链。已有决定或非申请人返回 409/403。 */
-    @PostMapping("/{id}/reroute") public Map<String,Object> reroute(HttpServletRequest r,@PathVariable String id) { return service.reroute(Actor.current(r),id); }
 }
