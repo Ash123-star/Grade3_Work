@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../data/models.dart';
-import '../data/mock_repository.dart';
-import '../data/repository.dart';
-import 'config.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/repositories/mock_repository.dart';
+import 'package:pandora_mobile/data/repositories/repository.dart';
+import 'package:pandora_mobile/core/config.dart';
 
 final sessionProvider = StateProvider<Session>(
   (ref) => AppConfig.mock
@@ -59,11 +59,17 @@ final memberRecordsProvider = FutureProvider.autoDispose
           ref.watch(repositoryProvider).list(key.$1, Query(ownerId: key.$2)),
     );
 
-final logDateProvider=StateProvider<DateTime>((ref)=>DateTime.now());
-final logDayRecordsProvider=FutureProvider.autoDispose.family<PageResult,(String,String?)>((ref,key){
-  final date=ref.watch(logFilterDateProvider);
-  final range=date==null?null:BusinessRange(date,'日');
-  return ref.watch(repositoryProvider).list(key.$1,Query(ownerId:key.$2,from:range?.from,to:range?.to));
-});
+final logDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final logDayRecordsProvider = FutureProvider.autoDispose
+    .family<PageResult, (String, String?)>((ref, key) {
+      final date = ref.watch(logFilterDateProvider);
+      final range = date == null ? null : BusinessRange(date, '日');
+      return ref
+          .watch(repositoryProvider)
+          .list(
+            key.$1,
+            Query(ownerId: key.$2, from: range?.from, to: range?.to),
+          );
+    });
 
-final logFilterDateProvider=StateProvider<DateTime?>((ref)=>null);
+final logFilterDateProvider = StateProvider<DateTime?>((ref) => null);

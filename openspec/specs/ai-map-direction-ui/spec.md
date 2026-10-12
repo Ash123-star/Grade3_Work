@@ -1,7 +1,7 @@
 # ai-map-direction-ui Specification
 
 ## Purpose
-TBD - created by archiving change ai-map-direction-ui. Update Purpose after archive.
+定义 AI 地图的三个工作入口、权限可见性、服务未接入状态和本地行动草稿行为，确保演示界面不会把样例结论误当成生产事实。
 ## Requirements
 ### Requirement: 三个功能入口
 AI 地图 SHALL 展示发展分析、堵点风险、行动规划，且不包含日周月筛选。

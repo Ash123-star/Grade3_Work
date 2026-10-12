@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart';
-import '../core/config.dart';
-import '../core/providers.dart';
-import '../data/models.dart';
+import 'package:pandora_mobile/core/config.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
 
 String encode(String value) => Uri.encodeComponent(value);
 void openList(BuildContext context, String resource) =>

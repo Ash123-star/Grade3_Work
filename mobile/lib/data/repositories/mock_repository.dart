@@ -1,6 +1,6 @@
-import '../core/failure.dart';
-import 'models.dart';
-import 'repository.dart';
+import 'package:pandora_mobile/core/errors/api_failure.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/repositories/repository.dart';
 
 enum DemoScenario { normal, empty, offline, forbidden }
 
@@ -71,7 +71,17 @@ class MockRepository implements Repository {
     if (resource == 'feedback') return [];
     final titles = switch (resource) {
       'dashboard/company' => ['秋季产品体验升级计划', '本周五产品评审', '跨部门协作约定'],
-      'dashboard/personal' => ['梳理工作台体验', '准备周会分享', '整理接口联调清单', '确认评审时间', '补充设计规范', '检查版本质量', '总结客户反馈', '完善交互细节', '更新测试清单'],
+      'dashboard/personal' => [
+        '梳理工作台体验',
+        '准备周会分享',
+        '整理接口联调清单',
+        '确认评审时间',
+        '补充设计规范',
+        '检查版本质量',
+        '总结客户反馈',
+        '完善交互细节',
+        '更新测试清单',
+      ],
       'tasks' => [
         '完成工作台交互稿',
         '整理客户访谈记录',

@@ -1,7 +1,7 @@
 class AppConfig {
-  static const mock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+  static const mock = bool.fromEnvironment('USE_MOCK', defaultValue: false);
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://localhost:8443/api',
+    defaultValue: 'http://localhost:8080/api',
   );
 }

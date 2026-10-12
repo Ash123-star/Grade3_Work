@@ -2,9 +2,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cute_ui/cute_ui.dart';
-import '../core/providers.dart';
-import '../data/models.dart';
-import '../shared/widgets.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/shared/widgets.dart';
 
 class CalendarEvent {
   CalendarEvent(this.record, this.resource, this.day, this.start, this.end);

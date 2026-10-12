@@ -1,11 +1,11 @@
-export 'calendar_content.dart';
+export 'package:pandora_mobile/features/calendar/calendar_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart';
-import '../core/providers.dart';
-import '../data/models.dart';
-import '../shared/widgets.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/shared/widgets.dart';
 
 class AiGraph extends ConsumerWidget {
   const AiGraph({super.key});

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart';
-import '../core/providers.dart';
-import '../data/models.dart';
-import '../shared/widgets.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/shared/widgets.dart';
 import 'catalog.dart';
 import 'form_page.dart';
 
@@ -321,7 +321,9 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     : () => openForm(
                         context,
                         kind,
-                        id: kind == 'note' ? '$resource:${item.id}:${user.id}' : item.id,
+                        id: kind == 'note'
+                            ? '$resource:${item.id}:${user.id}'
+                            : item.id,
                         version: item.version,
                       ),
                 icon: const Icon(Icons.edit_outlined),
@@ -530,7 +532,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       title: '已提交日志',
                     ),
                     TextButton(
-                      onPressed: () => context.go('/profile'),
+                      onPressed: () => context.go('/me'),
                       child: const Text('返回本人面板'),
                     ),
                   ] else if (resource == 'ai-maps') ...[
@@ -542,10 +544,57 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     section('风险解释', '依赖事项尚未确认，可能影响后续评审。建议先与相关成员同步。'),
                     Text('生成时间：${prettyDate(f['createdAt'])}'),
                     const SectionHeader('参考来源'),
-                    if(f['sourceResource'] != null) TextButton.icon(onPressed:()=>openItem(context,'${f['sourceResource']}','${f['sourceId']}'),icon:const Icon(Icons.link),label:const Text('查看生成依据'))
+                    if (f['sourceResource'] != null)
+                      TextButton.icon(
+                        onPressed: () => openItem(
+                          context,
+                          '${f['sourceResource']}',
+                          '${f['sourceId']}',
+                        ),
+                        icon: const Icon(Icons.link),
+                        label: const Text('查看生成依据'),
+                      )
                     else ...[
-                      if(ref.watch(recordsProvider('logs')).valueOrNull?.items.isNotEmpty ?? false) TextButton.icon(onPressed:()=>openItem(context,'logs',ref.read(recordsProvider('logs')).valueOrNull!.items.first.id),icon:const Icon(Icons.link),label:const Text('工作日报')),
-                      if(ref.watch(recordsProvider('tasks')).valueOrNull?.items.isNotEmpty ?? false) TextButton.icon(onPressed:()=>openItem(context,'tasks',ref.read(recordsProvider('tasks')).valueOrNull!.items.first.id),icon:const Icon(Icons.link),label:const Text('关联任务')),
+                      if (ref
+                              .watch(recordsProvider('logs'))
+                              .valueOrNull
+                              ?.items
+                              .isNotEmpty ??
+                          false)
+                        TextButton.icon(
+                          onPressed: () => openItem(
+                            context,
+                            'logs',
+                            ref
+                                .read(recordsProvider('logs'))
+                                .valueOrNull!
+                                .items
+                                .first
+                                .id,
+                          ),
+                          icon: const Icon(Icons.link),
+                          label: const Text('工作日报'),
+                        ),
+                      if (ref
+                              .watch(recordsProvider('tasks'))
+                              .valueOrNull
+                              ?.items
+                              .isNotEmpty ??
+                          false)
+                        TextButton.icon(
+                          onPressed: () => openItem(
+                            context,
+                            'tasks',
+                            ref
+                                .read(recordsProvider('tasks'))
+                                .valueOrNull!
+                                .items
+                                .first
+                                .id,
+                          ),
+                          icon: const Icon(Icons.link),
+                          label: const Text('关联任务'),
+                        ),
                     ],
                     if (user.manager && user.dispatch)
                       FilledButton(
@@ -571,7 +620,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     form('我的私人备注', 'note'),
                   if (resource == 'dashboard/company' && user.manager)
                     form('修改公司展示项', 'publish'),
-                  if (resource == 'dashboard/personal' && item.ownerId == user.id) ...[
+                  if (resource == 'dashboard/personal' &&
+                      item.ownerId == user.id) ...[
                     form('编辑与排序', 'focus-edit'),
                     TextButton(
                       onPressed: busy ? null : () => action(item, 'archive'),

@@ -3,11 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:pandora_mobile/app.dart';
-import 'package:pandora_mobile/core/providers.dart';
-import 'package:pandora_mobile/core/failure.dart';
-import 'package:pandora_mobile/data/models.dart';
-import 'package:pandora_mobile/data/mock_repository.dart';
-import 'package:pandora_mobile/features/form_page.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/core/errors/api_failure.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/repositories/mock_repository.dart';
+import 'package:pandora_mobile/features/common/form_page.dart';
 import 'package:cute_ui/cute_ui.dart';
 
 void main() {

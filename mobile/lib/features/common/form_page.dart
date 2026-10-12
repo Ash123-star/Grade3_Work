@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cute_ui/cute_ui.dart';
-import '../core/providers.dart';
-import '../core/config.dart';
-import '../data/models.dart';
-import '../shared/widgets.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/core/config.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/shared/widgets.dart';
 import 'catalog.dart';
 
 class FormPage extends ConsumerStatefulWidget {
@@ -396,7 +396,11 @@ class _FormPageState extends ConsumerState<FormPage> {
             Command(
               spec.action,
               values,
-              version: widget.kind == 'note' ? loadedVersion : widget.id == null ? null : (loadedVersion ?? widget.version),
+              version: widget.kind == 'note'
+                  ? loadedVersion
+                  : widget.id == null
+                  ? null
+                  : (loadedVersion ?? widget.version),
               idempotencyKey: idem,
             ),
           );
@@ -434,16 +438,26 @@ class _FormPageState extends ConsumerState<FormPage> {
         } else {
           final token = result.fields['accessToken'] as String?;
           if (token == null) throw StateError('登录响应缺少访问令牌');
+          final role = switch ('${result.fields['role'] ?? 'EMPLOYEE'}'.toUpperCase()) {
+            'ADMIN' => UserRole.admin,
+            'FOUNDER' => UserRole.founder,
+            'DIRECTOR' => UserRole.director,
+            'LEADER' => UserRole.leader,
+            _ => UserRole.employee,
+          };
           ref.read(sessionProvider.notifier).state = Session(
             id: result.ownerId,
-            role: UserRole.employee,
-            dispatch: false,
+            name: result.title,
+            role: role,
+            dispatch: result.fields['dispatch_enabled'] == true ||
+                result.fields['dispatchEnabled'] == true,
+            active: '${result.fields['status'] ?? 'ACTIVE'}' == 'ACTIVE',
             token: token,
           );
           context.go('/dashboard');
         }
       } else if (widget.kind == 'register') {
-        context.go('/pending');
+        context.go('/auth/pending');
       } else {
         notice(context, AppConfig.mock ? '已保存到演示数据' : '已提交');
         if (context.canPop()) context.pop();
@@ -487,7 +501,13 @@ class _FormPageState extends ConsumerState<FormPage> {
                     padding: EdgeInsets.only(bottom: 16),
                     child: Text('提交后进入审核，原版本继续生效。'),
                   ),
-                if (log) Padding(padding:const EdgeInsets.only(bottom:12),child:Text('日志日期：${ref.watch(logDateProvider).year}年${ref.watch(logDateProvider).month}月${ref.watch(logDateProvider).day}日')),
+                if (log)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      '日志日期：${ref.watch(logDateProvider).year}年${ref.watch(logDateProvider).month}月${ref.watch(logDateProvider).day}日',
+                    ),
+                  ),
                 if (log)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
@@ -535,7 +555,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                 ),
                 if (widget.kind == 'login')
                   TextButton(
-                    onPressed: () => openForm(context, 'register'),
+                    onPressed: () => context.push('/auth/register'),
                     child: const Text('注册员工账号'),
                   ),
               ],

@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/app.dart';
-import 'package:pandora_mobile/core/providers.dart';
-import 'package:pandora_mobile/data/models.dart';
-import 'package:pandora_mobile/features/catalog.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/features/common/catalog.dart';
 
 void main() {
   for (final config in [
@@ -40,15 +40,18 @@ void main() {
       final router = container.read(routerProvider);
       final routes = [
         '/dashboard',
-        '/profile',
+        '/me',
         '/ai',
         '/logs',
-        '/calendar',
-        '/settings',
-        '/admin',
-        '/help',
+        '/view',
+        '/me/settings',
+        '/me/admin',
+        '/me/help',
+        '/me/team',
+        '/me/team/u2',
+        '/me/team/u2/logs',
         '/guide',
-        '/analytics',
+        '/me/statistics',
         '/privacy',
         '/licenses',
         '/history',
@@ -56,9 +59,9 @@ void main() {
         '/report',
         '/ai-usage',
         '/export',
-        '/pending',
-        '/disabled',
-        '/expired',
+        '/auth/pending',
+        '/auth/disabled',
+        '/auth/expired',
         for (final resource in resourceTitles.keys)
           '/list/${Uri.encodeComponent(resource)}',
         for (final resource in resourceTitles.keys)

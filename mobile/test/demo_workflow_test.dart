@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pandora_mobile/data/mock_repository.dart';
-import 'package:pandora_mobile/data/models.dart';
+import 'package:pandora_mobile/data/repositories/mock_repository.dart';
+import 'package:pandora_mobile/data/models/models.dart';
 
 void main() {
   test(

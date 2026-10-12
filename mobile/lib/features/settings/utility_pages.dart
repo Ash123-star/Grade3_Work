@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart';
-import '../core/config.dart';
-import '../core/providers.dart';
-import '../data/models.dart';
-import '../data/mock_repository.dart';
-import '../shared/widgets.dart';
-import 'demo_pages.dart';
+import 'package:pandora_mobile/core/config.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/repositories/mock_repository.dart';
+import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/features/common/demo_pages.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -28,7 +28,7 @@ class SettingsPage extends ConsumerWidget {
         ListTile(
           title: const Text('帮助与新手引导'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/help'),
+          onTap: () => context.push('/me/help'),
         ),
         ListTile(
           title: const Text('修改密码'),
@@ -69,11 +69,20 @@ class SettingsPage extends ConsumerWidget {
             key: ValueKey(ref.watch(sessionProvider).id),
             initialValue: ref.watch(sessionProvider).id,
             decoration: const InputDecoration(labelText: '演示账号'),
-            items: const [DropdownMenuItem(value:'u1',child:Text('林小满')),DropdownMenuItem(value:'u2',child:Text('陈一诺')),DropdownMenuItem(value:'u3',child:Text('许知远'))],
+            items: const [
+              DropdownMenuItem(value: 'u1', child: Text('林小满')),
+              DropdownMenuItem(value: 'u2', child: Text('陈一诺')),
+              DropdownMenuItem(value: 'u3', child: Text('许知远')),
+            ],
             onChanged: (id) {
-              if(id == null) return;
-              final old=ref.read(sessionProvider);
-              ref.read(sessionProvider.notifier).state=Session(id:id,name:{'u1':'林小满','u2':'陈一诺','u3':'许知远'}[id]!,role:old.role,dispatch:old.dispatch);
+              if (id == null) return;
+              final old = ref.read(sessionProvider);
+              ref.read(sessionProvider.notifier).state = Session(
+                id: id,
+                name: {'u1': '林小满', 'u2': '陈一诺', 'u3': '许知远'}[id]!,
+                role: old.role,
+                dispatch: old.dispatch,
+              );
             },
           ),
           const SizedBox(height: 16),
@@ -114,7 +123,7 @@ class SettingsPage extends ConsumerWidget {
               role: UserRole.employee,
               dispatch: false,
             );
-            context.go('/form/login');
+            context.go('/auth/login');
           },
           icon: const Icon(Icons.logout),
           label: const Text('退出登录'),
@@ -173,7 +182,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
           const SizedBox(height: 20),
           if (['pending', 'disabled', 'expired'].contains(widget.kind))
             OutlinedButton(
-              onPressed: () => context.go('/form/login'),
+              onPressed: () => context.go('/auth/login'),
               child: const Text('返回登录'),
             ),
           if (widget.kind == 'licenses')

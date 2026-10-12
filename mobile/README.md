@@ -1,6 +1,6 @@
 # 潘多拉 Flutter 安卓前端
 
-本工程实现 Android UI 框架和演示交互。默认使用 MockRepository，不连接公司数据库，不调用 DeepSeek，不发送短信或上传附件。
+本工程实现 Android UI 框架和真实后端接入。默认使用后端 HTTP Repository；需要离线演示时显式传入 `--dart-define=USE_MOCK=true`。客户端不直接连接数据库、不调用 DeepSeek，不保存 API Key。
 
 ## 运行
 
@@ -34,7 +34,7 @@ flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5175
 
 ## 结构与接入
 
-lib/core 管理配置、权限快照、状态和错误；lib/data 定义模型、Repository、HTTP 适配器和演示实现；lib/features 包含五栏页面、业务表单和详情；lib/shared 提供布局与日期选择；packages/cute_ui 是通过 path 依赖引入的本地卡通组件包。
+`lib/core` 管理配置、错误和 Riverpod 状态；`lib/routing` 管理 GoRouter 和五栏导航；`lib/theme` 负责应用主题组装；`lib/data/models` 定义模型，`lib/data/repositories` 提供可替换的 HTTP/Mock 数据源；`lib/features` 按认证、导图、视图、日志、AI 地图、我的和公共业务页面组织；`lib/shared` 提供布局与状态组件；`packages/cute_ui` 是通过 path 依赖引入的本地卡通组件包。页面和测试均使用新目录下的正式模块路径，旧顶层兼容导出已移除。
 
 设置页面的“演示环境”可切换五角色、空数据、超时和无权限场景。角色切换只存在于演示模式，不是生产角色授予功能。演示业务变更保留在本次 App 运行期间，切换角色或账号不会清空（重启 App 恢复样例），日志草稿按用户和业务日期保存在设备上。
 
@@ -60,7 +60,7 @@ OpenMoji 通过 flutter_svg 从本地 assets 加载。作者、来源和 CC BY-S
 
 演示可在设置选择五种角色及三个账号。附件显示本地所选文件名；AI、反馈处理、导出不连接外部服务。审批角色用于演示，不代表生产审批授权。Android Studio 打开 mobile/android。
 
-2026-09-22 最新布局：首页四块各预览前三条；月历大格内事件标签可点击，周视图七日横轴可左右上下滚动，日视图按24小时等比例排布。未设置时段的记录独立显示。静态检查、15项测试及debug APK构建通过，Pixel虚拟机已重启并安装。截图见docs/screenshots。
+2026-09-22 最新布局：首页四块各预览前三条；月历大格内事件标签可点击，周视图七日横轴可左右上下滚动，日视图按24小时等比例排布。未设置时段的记录独立显示。页面已按新架构迁移；本轮命令行测试和 APK 构建未取得退出结果，不能据此报告为通过。截图见docs/screenshots。
 
 日志页：我的日志按具体日期填写提交；管理者可切换下属日志，组合人员与日期查询。日志日期独立于视图页日期和周期。
 

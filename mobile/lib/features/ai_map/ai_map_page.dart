@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart';
-import '../core/config.dart';
-import '../core/providers.dart';
-import '../data/mock_repository.dart';
-import '../shared/widgets.dart';
+import 'package:pandora_mobile/core/config.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/repositories/mock_repository.dart';
+import 'package:pandora_mobile/shared/widgets.dart';
 
 const _green = Color(0xFF185D4E);
 const _mint = Color(0xFFE7F3EC);
