@@ -1,16 +1,28 @@
+export 'page_states.dart';
+export 'sunny_button.dart';
+import 'page_states.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cute_ui/cute_ui.dart';
+import 'package:cute_ui/cute_ui.dart'
+    hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
 import 'package:pandora_mobile/core/config.dart';
+import 'paper_layout.dart';
+import 'sunny_widgets.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 
 String encode(String value) => Uri.encodeComponent(value);
 void openList(BuildContext context, String resource) =>
     context.push('/list/${encode(resource)}');
-void openItem(BuildContext context, String resource, String id) =>
-    context.push('/item/${encode(resource)}/${encode(id)}');
+void openItem(
+  BuildContext context,
+  String resource,
+  String id, {
+  String? ownerId,
+}) => context.push(
+  '/item/${encode(resource)}/${encode(id)}${ownerId == null ? '' : '?ownerId=${encode(ownerId)}'}',
+);
 void openForm(
   BuildContext context,
   String form, {
@@ -19,19 +31,44 @@ void openForm(
 }) => context.push(
   '/form/$form${id == null ? '' : '?id=${encode(id)}&version=${version ?? 1}'}',
 );
-void notice(BuildContext context, String text) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+void notice(BuildContext context, String text, {bool success = false}) =>
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: success
+            ? Theme.of(context).colorScheme.tertiaryContainer
+            : null,
+        content: success
+            ? Row(
+                children: [
+                  const WorkBuddy(size: 28, pose: BuddyPose.success),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onTertiaryContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Text(text),
+      ),
+    );
 
 class PageBody extends StatelessWidget {
-  const PageBody({super.key, required this.children});
+  const PageBody({super.key, required this.children, this.bottomPadding = 24});
   final List<Widget> children;
+  final double bottomPadding;
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.topCenter,
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 760),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
         children: children,
       ),
     ),
@@ -45,16 +82,26 @@ class PageFrame extends StatelessWidget {
     required this.child,
     this.actions,
     this.fab,
+    this.bottom,
   });
   final String title;
   final Widget child;
   final List<Widget>? actions;
   final Widget? fab;
+  final Widget? bottom;
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(title), actions: actions),
     body: SafeArea(child: child),
     floatingActionButton: fab,
+    bottomNavigationBar: bottom == null
+        ? null
+        : Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: bottom,
+          ),
   );
 }
 
@@ -63,10 +110,13 @@ class DemoLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppConfig.mock
       ? const Padding(
-          padding: EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.only(top: 8, bottom: 8),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: StatusPill('演示数据 · 未连接企业服务'),
+            child: Text(
+              '演示数据 · 未连接企业服务',
+              style: TextStyle(fontSize: 11, color: CuteTokens.muted),
+            ),
           ),
         )
       : const SizedBox.shrink();
@@ -103,7 +153,7 @@ class RecordList extends ConsumerWidget {
                       .map(
                         (item) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: CuteCard(
+                          child: PaperSurface(
                             onTap: () => onTap != null
                                 ? onTap!(item)
                                 : openItem(context, resource, item.id),
@@ -153,20 +203,21 @@ class DateControls extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final date = ref.watch(selectedDateProvider),
         period = ref.watch(periodProvider);
+    void move(int direction) =>
+        ref.read(selectedDateProvider.notifier).state = period == '月'
+        ? DateTime(date.year, date.month + direction, 1)
+        : date.add(Duration(days: direction * (period == '周' ? 7 : 1)));
     return Column(
       children: [
         Row(
           children: [
             IconButton(
               tooltip: '上一个$period',
-              onPressed: () =>
-                  ref.read(selectedDateProvider.notifier).state = period == '月'
-                  ? DateTime(date.year, date.month - 1, 1)
-                  : date.subtract(Duration(days: period == '周' ? 7 : 1)),
+              onPressed: () => move(-1),
               icon: const Icon(Icons.chevron_left),
             ),
             Expanded(
-              child: TextButton.icon(
+              child: TextButton(
                 onPressed: () async {
                   final next = await showDatePicker(
                     context: context,
@@ -178,40 +229,32 @@ class DateControls extends ConsumerWidget {
                     ref.read(selectedDateProvider.notifier).state = next;
                   }
                 },
-                icon: const Icon(Icons.calendar_today_outlined),
-                label: Text('${date.year}年${date.month}月${date.day}日'),
+                child: Text(
+                  period == '月'
+                      ? '${date.year}年${date.month}月'
+                      : '${date.month}月${date.day}日${period == '周' ? ' · 本周' : ''}',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: CuteTokens.ink,
+                  ),
+                ),
               ),
             ),
             IconButton(
               tooltip: '下一个$period',
-              onPressed: () =>
-                  ref.read(selectedDateProvider.notifier).state = period == '月'
-                  ? DateTime(date.year, date.month + 1, 1)
-                  : date.add(Duration(days: period == '周' ? 7 : 1)),
+              onPressed: () => move(1),
               icon: const Icon(Icons.chevron_right),
             ),
           ],
         ),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: '日', label: Text('日')),
-            ButtonSegment(value: '周', label: Text('周')),
-            ButtonSegment(value: '月', label: Text('月')),
-          ],
-          selected: {period},
-          onSelectionChanged: (s) =>
-              ref.read(periodProvider.notifier).state = s.first,
+        PillTabs(
+          labels: const ['日', '周', '月'],
+          selected: ['日', '周', '月'].indexOf(period),
+          onChanged: (i) =>
+              ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
         ),
         const SizedBox(height: 8),
-        Text(() {
-          final range = BusinessRange(date, period);
-          final a = range.from.add(const Duration(hours: 8)),
-              b = range.to
-                  .add(const Duration(hours: 8))
-                  .subtract(const Duration(days: 1));
-          return '${a.month}月${a.day}日 — ${b.month}月${b.day}日';
-        }(), style: const TextStyle(color: CuteTokens.muted)),
-        const SizedBox(height: 16),
       ],
     );
   }

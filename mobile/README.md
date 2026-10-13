@@ -2,7 +2,25 @@
 
 本工程实现 Android UI 框架和真实后端接入。默认使用后端 HTTP Repository；需要离线演示时显式传入 `--dart-define=USE_MOCK=true`。客户端不直接连接数据库、不调用 DeepSeek，不保存 API Key。
 
+设计、接口与验收请从[文档索引](docs/README.md)进入。命令过程日志统一放 `.diagnostics/`（Git忽略），不要再写入工程根目录；历史日志已整理，验收结论与截图保留在 `docs/`。
+
 ## 运行
+
+### UI 演示与真实后端启动（2026-10-12）
+
+Android Studio 打开 `mobile/` 后，运行配置选择 **UI Demo**（`.run/UI Demo.run.xml`），用于评审本轮界面，无需注册或启动后端。或者在现有 `main.dart` 配置的 Additional run args 填写 `--dart-define=USE_MOCK=true`。**必须停止后重新运行，Hot Reload 不会修改 dart-define。**
+
+```powershell
+D:\flutter\bin\flutter.bat run --dart-define=USE_MOCK=true
+```
+
+真实联调选择 **Android Backend**，先启动后端（8080）。默认真实模式未登录时进入登录页是正常行为；Android 模拟器的 `localhost` 指向模拟器自身，访问电脑使用 `http://10.0.2.2:8080/api`。Android 默认开发地址已改为该地址；Web/桌面仍是 localhost。真机需通过 `API_BASE_URL` 指定电脑局域网地址或 HTTPS 服务。
+
+```powershell
+D:\flutter\bin\flutter.bat run --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://10.0.2.2:8080/api
+```
+
+真实注册加载 `/auth/departments`，提交部门 ID；密码至少 12 字符，注册后为待确认员工，不会直接进入业务页面。Mock 不等于创建真实账号。开发 HTTP 仅 debug manifest 允许；生产环境使用 HTTPS。
 
 需要 Flutter 3.38.7 / Dart 3.10.7 或兼容版本、Android SDK、JDK 17。依赖已通过 pubspec.lock 固定。
 
@@ -10,13 +28,23 @@
 flutter pub get
 flutter run -d <android-device>
 flutter analyze
-flutter test
-flutter build apk --debug
+flutter test --dart-define=USE_MOCK=true
 ```
 
 本机 Flutter 位于 D:\flutter，未加入 PATH 时可使用 D:\flutter\bin\flutter.bat。
 
-### Android Studio 跨盘同步
+### Windows 中文账号依赖与 SQLite 下载修复
+
+若日志先报 `/C:/Users/%E5%BF%B5/...` 包文件不存在，使用下面脚本迁移到英文 Pub 缓存并由官方 `pub get` 重新生成包/插件配置。默认离线使用现有锁文件，缺包时加 `-Online`。成功后用户级 `PUB_CACHE` 更新为 `D:\FlutterPubCache`，**完全退出并重新打开 Android Studio** 后再运行，已有IDE不会自动继承环境。旧缓存保留，未升级依赖。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/repair-flutter-pub-cache.ps1 -FlutterSdk D:/flutter -CachePath D:/FlutterPubCache
+powershell -ExecutionPolicy Bypass -File scripts/prepare-flutter-sqlite.ps1
+```
+
+在仓库根目录执行。第二个脚本解决 sqlite3 原生库 GitHub Release 默认下载地址超时：从同项目官方 Release API 获取锁定版本的 Android x64/arm64/arm 二进制，逐项核对包内 SHA-256，然后预热默认构建钩子缓存。不会换成系统 SQLite、降级版本或改第三方源码。有效副本保存在忽略目录 `.native-cache/`，再次执行无需联网；**执行 `flutter clean` 后重新运行第二个脚本**。也可传 `-Architectures x64` 仅准备当前模拟器；`-LocalAssetDirectory <目录>`支持已下载的原版文件，校验失败拒绝安装。脚本本身不构建APK。
+
+### 跨盘同步说明
 
 Windows 上项目与 Pub 缓存位于不同盘符时，AGP 的 `generateDebugUnitTestConfig` 可能报 `this and base files have different roots`。`android/build.gradle.kts` 已将跨盘插件的构建输出放到插件目录下的 `build/pandora-<项目路径哈希>/`，避免相对路径跨盘，并隔离不同应用的构建产物。同盘插件及应用仍使用项目的 `build/`。修改后在 Android Studio 执行 **Sync Project with Gradle Files**。
 
@@ -40,9 +68,17 @@ flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5175
 
 真实模式通过 `--dart-define=USE_MOCK=false --dart-define=API_BASE_URL=https://example.com/api` 启用，不会在 HTTP 失败时回退为虚假成功。请先按 docs/API_CONTRACT.md 对齐接口。鉴权、组织范围、审批路由和 AI 安全由服务端负责，客户端 guard 仅用于交互限制。
 
-## 素材
+## 当前 UI 设计基线（2026-10-12）
+
+用户已确定“阳光纸张 + 动漫橙 + Q 版人物 + 圆润组件”。后续实现以 [阶段 2 主题规范](docs/stage-2-sunny-paper-design-system-plan.md) 为唯一基线；参考与取舍见 [官方研究](docs/stage-2-ui-theme-research.md)，示意见 [风格板](docs/stage-2-anime-orange-style-board.svg)。
+
+2026-10-13 已依 [阶段 3 设计](docs/stage-3-page-layout-and-interaction-design.md) 重建五个主页、连续日志编辑、任务时间线和审批对比布局，同时重排辅助表单、成员、设置和状态页，补齐验收成果、转派旧值、本人时间线与只读日志版本。正式附件、AI、管理/统计和安全草稿/会话恢复客户端已接现有契约；本批继续补齐原阶段2语义主题、主按钮完整状态、六姿态人物与橙色导航。[实际 Flutter 八屏截图](docs/evidence/stage3-rebuild/stage3-rebuild-contact-sheet.png)、[组件与六姿态](docs/evidence/stage3-rebuild/41-sunny-component-states.png) 与[验收记录](docs/stage-3-verification.md) 可对照原设计，最新命令结果以验收记录为准。本环境按用户要求不构建APK。[离线原型](prototypes/stage-3-pages/index.html) 是设计样例。帮助反馈/退回补充/精细AI范围缺少现有服务端契约，真实服务/数据库/设备尚未联调，不能视为线上能力完成。
+
+## 素材与许可
 
 OpenMoji 通过 flutter_svg 从本地 assets 加载。作者、来源和 CC BY-SA 4.0 许可见 packages/cute_ui/ATTRIBUTION.md。Material Icons 用于常规工具按钮。
+
+原创橙橙角色来源、六姿态用途和修改记录见[人物资产记录](docs/sunny-companion-assets.md)；人物采用项目自有矢量绘制，不冒充员工头像。
 
 
 ## UI 演示顺序（2026-09-22）
@@ -65,3 +101,13 @@ OpenMoji 通过 flutter_svg 从本地 assets 加载。作者、来源和 CC BY-S
 日志页：我的日志按具体日期填写提交；管理者可切换下属日志，组合人员与日期查询。日志日期独立于视图页日期和周期。
 
 日志列表默认展示全部日期的记录；日期筛选可清除恢复全部。下属日志可组合人员与日期筛选。未选日期时编辑入口对应今天。
+
+## 当前正式页面接入（2026-10-13）
+
+阶段2阳光纸张/动漫橙、阶段3文档与两张参考板为UI基线；重做及验收记录见docs/stage-3-verification.md，历史演示记录不能证明正式服务完成。正式AI支持既有作业创建/SSE/状态/取消/重试、来源阅读、人工草稿编辑、显式任务确认、地图/用量；范围由服务端身份决定，未配置供应商显示明确错误，基础业务不依赖AI。附件上传/下载和头像使用真实受控ID/字节，CSV使用已有同步接口，均有客户端HTTP/UI验证；真实服务器、数据库和设备尚需联调。演示须显式USE_MOCK=true，固定建议不冒充正式结果。原生加密Drift草稿/精确旧稿迁移、安全会话与启动身份验证已编写并有本地测试，AndroidKeystore/原生SQLite仍待设备验收，见docs/secure-local-state-verification.md。浏览器不持久化安全材料，只保留当前运行会话；支持反馈仍缺服务器契约。不构建APK。
+
+2026-10-13 原设计补齐task2.20：日历/日志/报告完整分页、上海日期、正式日报聚合与草稿区分、周日期和未设时段固定上下文及滚动恢复已验收。最新144Mock/116formalHTTP、分析exit0，46单页截图；详见[验收记录](docs/stage-3-verification.md)。尚未完成真实服务/设备及产品契约缺口，不代表整体交付完成。
+
+原成员工作台补齐2.21：完整授权分页、紧凑概览、独立成员日期与下属日志导航、失权整页清理和公开正式日志过滤；帮助无结果搜索/能力说明已纠正。最新156Mock/129formalHTTP、分析exit0、49实际单页证据，见stage-3-verification.md。
+
+阶段3 task2.22：完整授权通用列表/消息忙碌与失权账号保护；设置→草稿与同步已读取实际加密稿及服务器日志版本，支持只读对照、独立选日和原版本编辑。最终分析、171全量Mock/144正式HTTP及追加后17项定向通过；51张实际Flutter页面证据。全部产品未完成，真实服务/设备和远程交付缺口见docs/stage-3-completion-audit.md；不构建APK。

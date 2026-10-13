@@ -16,6 +16,12 @@ dependencies:
   file_picker: ^10.3.0
   cute_ui:
     path: packages/cute_ui
+  drift: ^2.35.2
+  sqlite3: 3.5.1
+  cryptography: ^2.9.0
+  flutter_secure_storage: 10.0.0
+  path_provider: ^2.1.6
+  path: ^1.9.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

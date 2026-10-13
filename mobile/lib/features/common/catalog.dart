@@ -112,7 +112,7 @@ const screens = <String, ScreenSpec>{
   'log-revise': ScreenSpec(
     '修订已提交日志',
     'logs',
-    fields: ['今日工作', '明日计划', '修改理由'],
+    fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时', '修改理由'],
     action: 'request-review',
   ),
   'comment': ScreenSpec(

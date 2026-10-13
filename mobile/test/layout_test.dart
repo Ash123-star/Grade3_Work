@@ -1,3 +1,4 @@
+import 'support/local_test_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,7 +22,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       SharedPreferences.setMockInitialValues({});
-      final container = ProviderContainer(
+      final container = testContainer(
         overrides: [
           sessionProvider.overrideWith(
             (ref) => const Session(role: UserRole.admin),
@@ -40,14 +41,23 @@ void main() {
       final router = container.read(routerProvider);
       final routes = [
         '/dashboard',
+        '/logs/subordinates',
+        '/me/reviews',
+        '/me/reviews/1',
+        '/ai/graph',
         '/me',
+        '/me/profile',
         '/ai',
         '/logs',
         '/view',
+        '/view/day',
+        '/view/week',
+        '/view/month',
         '/me/settings',
         '/me/admin',
         '/me/help',
         '/me/team',
+        '/me/organization',
         '/me/team/u2',
         '/me/team/u2/logs',
         '/guide',
@@ -55,6 +65,8 @@ void main() {
         '/privacy',
         '/licenses',
         '/history',
+        '/history/1/version/1',
+        '/history/1/version/99',
         '/conflict',
         '/report',
         '/ai-usage',

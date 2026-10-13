@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>阳光纸张 · 阶段 3 页面设计</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <aside class="review">
+    <p class="eyebrow">SUNNY PAPER / PAGE DESIGN</p>
+    <h1>把工作，放在顺手的位置。</h1>
+    <p>动漫橙与纸张的温度，配合日历、文档、收件箱和审批的使用习惯。页面各有结构，共用一套视觉语言。</p>
+    <div class="review-controls">
+      <label>预览宽度<select id="width"><option value="390">390dp</option><option value="360">360dp</option></select></label>
+      <label>文字比例<select id="scale"><option value="1">1.0</option><option value="1.3">1.3</option><option value="1.5">1.5</option></select></label>
+      <label>演示角色<select id="role"><option value="manager">团队长</option><option value="employee">员工</option></select></label>
+      <label>页面状态<select id="state"><option value="normal">正常</option><option value="loading">加载</option><option value="empty">无数据</option><option value="error">网络失败</option><option value="forbidden">无权限</option></select></label>
+    </div>
+    <p class="note">固定演示数据 · 不连接服务端<br>角色选择仅用于页面评审，不代表真实授权。</p>
+    <ol class="steps"><li>视图切换日/周/月，选择日期后打开事件。</li><li>日志继续草稿，第一次提交模拟失败，重试后展示演示正式版。</li><li>我的进入下属工作台、审批，查看人物上下文和新旧版本。</li><li>AI 建议查看来源，人工确认与任务创建分开。</li></ol>
+    <a href="../../docs/stage-3-page-layout-and-interaction-design.md">页面设计与需求对照文档 ↗</a>
+    <p class="note">原型仅供布局评审。业务字段、权限与状态以设计文档和真实接口为准。浏览器字体预览不等于 Flutter 无障碍验收。</p>
+  </aside>
+  <div class="phone" id="phone">
+    <div class="statusbar" aria-hidden="true"><b>9:41</b><span>● ▰</span></div>
+    <main id="screen" aria-label="页面预览"></main>
+    <nav id="nav" aria-label="主导航"></nav>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </div>
+</body>
+</html>

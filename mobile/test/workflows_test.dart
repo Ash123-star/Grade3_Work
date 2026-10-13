@@ -1,3 +1,4 @@
+import 'support/local_test_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +9,7 @@ import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/features/common/form_page.dart';
-import 'package:cute_ui/cute_ui.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 
 void main() {
   test('Shanghai week range begins Monday and survives year boundary', () {
@@ -82,6 +83,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          ...localTestOverrides(),
           sessionProvider.overrideWith(
             (ref) => const Session(role: UserRole.employee, dispatch: false),
           ),
@@ -90,7 +92,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('工作导图'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '导图'), findsOneWidget);
     expect(find.byType(NavigationDestination), findsNWidgets(5));
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
@@ -107,20 +109,17 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
-        child: MaterialApp(
-          theme: cuteTheme(),
-          home: const FormPage('dispatch'),
-        ),
+        child: MaterialApp(theme: appTheme(), home: const FormPage('dispatch')),
       ),
     );
     await tester.pumpAndSettle();
     expect(find.textContaining('完成情况'), findsNothing);
     await tester.scrollUntilVisible(
-      find.text('确认提交'),
+      find.widgetWithText(FilledButton, '派发任务'),
       250,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('确认提交'));
+    await tester.tap(find.widgetWithText(FilledButton, '派发任务'));
     await tester.pumpAndSettle();
     expect(find.text('请填写主负责人'), findsOneWidget);
     expect(tester.takeException(), isNull);

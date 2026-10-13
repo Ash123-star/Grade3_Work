@@ -7,6 +7,7 @@
 .atom/
 .build/
 .buildlog/
+.diagnostics/
 .history
 .svn/
 .swiftpm/
@@ -32,6 +33,7 @@ preview-*.log
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
+.native-cache/
 .pub/
 /build/
 /coverage/

@@ -12,11 +12,71 @@ class Session {
     this.dispatch = true,
     this.active = true,
     this.token,
+    this.status = 'ACTIVE',
+    this.mustChangePassword = false,
+    this.expired = false,
+    this.expiresAt,
+    this.departmentId,
+    this.teamId,
   });
   final String id, name;
   final UserRole role;
   final bool dispatch, active;
   final String? token;
+  final String status;
+  final bool mustChangePassword, expired;
+  final DateTime? expiresAt;
+  final String? departmentId, teamId;
+  bool get authenticated => !expired && (token != null || active);
+  bool get canReadBusiness =>
+      authenticated && active && status == 'ACTIVE' && !mustChangePassword;
+  Session restrict({
+    String? status,
+    bool? mustChangePassword,
+    bool expired = false,
+  }) => Session(
+    id: id,
+    name: name,
+    role: role,
+    dispatch: dispatch,
+    active: !expired && (status ?? this.status) == 'ACTIVE',
+    token: expired ? null : token,
+    status: status ?? this.status,
+    mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+    expired: expired,
+    expiresAt: expiresAt,
+    departmentId: departmentId,
+    teamId: teamId,
+  );
+
+  /// Uses the server's public identity; an absent status never grants access.
+  factory Session.fromRecord(
+    Record record, {
+    String? token,
+    DateTime? expiresAt,
+  }) {
+    final f = record.fields;
+    final state = '${f['status'] ?? 'UNKNOWN'}';
+    return Session(
+      id: record.id,
+      name: record.title,
+      role: switch ('${f['role']}'.toUpperCase()) {
+        'ADMIN' => UserRole.admin,
+        'FOUNDER' => UserRole.founder,
+        'DIRECTOR' => UserRole.director,
+        'LEADER' => UserRole.leader,
+        _ => UserRole.employee,
+      },
+      active: state == 'ACTIVE',
+      status: state,
+      dispatch: f['dispatch_enabled'] == true,
+      mustChangePassword: f['must_change_password'] == true,
+      token: token ?? f['accessToken'] as String?,
+      expiresAt: expiresAt ?? DateTime.tryParse('${f['expiresAt'] ?? ''}'),
+      departmentId: f['department_id'] as String?,
+      teamId: f['team_id'] as String?,
+    );
+  }
   bool get manager => role != UserRole.employee;
   bool get administrator => role == UserRole.admin;
 }
@@ -41,6 +101,21 @@ class Record {
     version: j['version'] as int? ?? 1,
     fields: Map<String, dynamic>.from(j['fields'] as Map? ?? {}),
   );
+}
+
+/// Account-scoped UI lookup key; this is never a server note UUID or object ID.
+class PrivateNoteTarget {
+  const PrivateNoteTarget(this.resource, this.objectId, this.accountId);
+  final String resource, objectId, accountId;
+  String get key => '$resource:$objectId:$accountId';
+  bool get supported => resource == 'tasks' || resource == 'dashboard/company';
+  static PrivateNoteTarget? parse(String key) {
+    final parts = key.split(':');
+    if (parts.length != 3 || parts.any((part) => part.trim().isEmpty)) {
+      return null;
+    }
+    return PrivateNoteTarget(parts[0], parts[1], parts[2]);
+  }
 }
 
 class PageResult {
@@ -97,3 +172,29 @@ class BusinessRange {
   }
   late final DateTime from, to;
 }
+
+/// Shanghai wall dates are independent of the phone's timezone.
+DateTime shanghaiWallTime(DateTime instant) {
+  final shifted = instant.toUtc().add(const Duration(hours: 8));
+  return DateTime(
+    shifted.year,
+    shifted.month,
+    shifted.day,
+    shifted.hour,
+    shifted.minute,
+    shifted.second,
+    shifted.millisecond,
+    shifted.microsecond,
+  );
+}
+
+/// Server instant strings carry Z/offset; legacy offsetless fixture times are wall time.
+DateTime? businessEventTime(dynamic value) {
+  final text = '$value', parsed = DateTime.tryParse(text);
+  if (parsed == null) return null;
+  return parsed.isUtc ? shanghaiWallTime(parsed) : parsed;
+}
+
+bool isSubmittedDiary(Record record) =>
+    record.fields['submitted'] == true ||
+    record.fields['submitted'] != false && record.fields['status'] == '已提交';

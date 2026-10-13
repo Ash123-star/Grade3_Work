@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cute_ui/cute_ui.dart';
+import 'package:cute_ui/cute_ui.dart'
+    hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
+import 'diary_sync_page.dart';
 
-class SettingsPage extends ConsumerWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PageFrame(
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  bool exiting = false;
+  String? exitError;
+  @override
+  Widget build(BuildContext context) => PageFrame(
     title: '设置',
     child: PageBody(
       children: [
@@ -41,11 +51,19 @@ class SettingsPage extends ConsumerWidget {
           onTap: () => context.push('/privacy'),
         ),
         ListTile(
+          title: const Text('草稿与同步'),
+          subtitle: const Text('查看本机草稿与服务器日志版本'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/conflict'),
+        ),
+        ListTile(
           title: const Text('开源素材许可'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => context.push('/licenses'),
         ),
-        if (AppConfig.mock) ...[
+        if (AppConfig.mock &&
+            ref.watch(sessionProvider).token == null &&
+            ref.watch(sessionProvider).canReadBusiness) ...[
           const SectionHeader('演示环境'),
           DropdownButtonFormField<UserRole>(
             initialValue: ref.watch(sessionProvider).role,
@@ -116,17 +134,46 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: 24),
+        if (ref.watch(sessionStorageErrorProvider) != null)
+          ErrorPanel(ref.watch(sessionStorageErrorProvider)!),
+        if (exitError != null) ErrorPanel(exitError!),
         OutlinedButton.icon(
-          onPressed: () {
-            ref.read(sessionProvider.notifier).state = const Session(
-              active: false,
-              role: UserRole.employee,
-              dispatch: false,
-            );
-            context.go('/auth/login');
-          },
+          onPressed: exiting
+              ? null
+              : () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (dialog) => AlertDialog(
+                      title: const Text('退出登录？'),
+                      content: const Text('本机草稿将按账号保留。'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialog, false),
+                          child: const Text('取消'),
+                        ),
+                        SunnyPrimaryButton(
+                          onPressed: () => Navigator.pop(dialog, true),
+                          child: const Text('退出'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true || !context.mounted) return;
+                  setState(() {
+                    exiting = true;
+                    exitError = null;
+                  });
+                  try {
+                    await logoutCurrentSession(ref);
+                    if (context.mounted) context.go('/auth/login');
+                  } catch (error) {
+                    if (mounted) setState(() => exitError = '退出未完成：$error');
+                  } finally {
+                    if (mounted) setState(() => exiting = false);
+                  }
+                },
           icon: const Icon(Icons.logout),
-          label: const Text('退出登录'),
+          label: Text(exiting ? '正在退出…' : '退出登录'),
         ),
       ],
     ),
@@ -143,8 +190,55 @@ class UtilityPage extends ConsumerStatefulWidget {
 class _UtilityPageState extends ConsumerState<UtilityPage> {
   String result = '';
   bool busy = false;
+  Future<void> refreshAccount() async {
+    setState(() {
+      busy = true;
+      result = '';
+    });
+    try {
+      await refreshCurrentSession(ref);
+      if (!mounted) return;
+      final session = ref.read(sessionProvider);
+      if (session.canReadBusiness) {
+        context.go('/dashboard');
+      } else {
+        setState(() => result = '归属尚未确认，请稍后刷新。');
+      }
+    } catch (error) {
+      if (mounted) setState(() => result = '$error');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> leaveAccount() async {
+    setState(() {
+      busy = true;
+      result = '';
+    });
+    try {
+      await logoutCurrentSession(ref);
+      if (mounted) context.go('/auth/login');
+    } catch (error) {
+      if (mounted) setState(() => result = '退出未完成：$error');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.kind == 'conflict') return const DiarySyncPage();
+    final user = ref.watch(sessionProvider);
+    final department = widget.kind == 'pending' && user.departmentId != null
+        ? ref
+              .watch(registrationDepartmentsProvider)
+              .valueOrNull
+              ?.items
+              .where((record) => record.id == user.departmentId)
+              .firstOrNull
+              ?.title
+        : null;
     final (title, body) = switch (widget.kind) {
       'pending' => ('等待归属确认', '你的员工申请已登记。管理员确认部门后，才能查看公司内部内容。'),
       'disabled' => ('账号已停用', '当前会话已撤销，请联系公司管理员确认账号状态。'),
@@ -158,15 +252,8 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
         'OpenMoji，作者：HfG Schwäbisch Gmünd 及 OpenMoji contributors。来源：https://openmoji.org/ 。许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0/）。本项目原样使用六份 SVG，未修改图形。Flutter 组件许可可在下方查看。',
       ),
       'history' => ('历史修订与已读', '已提交版本与待审候选内容分别展示，审核通过后更新正式记录。'),
-      'conflict' => (
-        '草稿与同步',
-        '本地草稿独立保存。接入服务后，服务器版本发生变化时，选择保留本地内容或重新读取服务器版本，不自动覆盖。',
-      ),
       'report' => ('周报与月报', '按所选业务日期区间聚合已提交日报。AI 摘要为建议草稿，发布前请核对来源。'),
-      'ai-usage' => (
-        'AI 用量与来源',
-        '演示：今日 0 次真实调用；本地示例不消耗模型额度。预算达到上限时停止生成，任务和日志继续可用。',
-      ),
+      'ai-usage' => ('AI 用量与来源', '分析建议需要人工确认。'),
       'export' => ('统计导出', '导出仅包含当前授权范围和所选日期内的数据。'),
       'admin' => ('组织与权限设置', '关键修改进入审核，审批通过前原配置继续生效。'),
       _ => ('内容不存在', '请返回工作空间重新进入。'),
@@ -175,15 +262,46 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       title: title,
       child: PageBody(
         children: [
-          const DemoLabel(),
           if (['pending', 'disabled', 'expired'].contains(widget.kind))
-            const CuteArt('1F331', size: 88),
-          Text(body),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Icon(Icons.lock_clock_outlined, size: 48),
+            ),
+          PaperSurface(
+            child: Text(
+              body,
+              style: const TextStyle(fontSize: 15, height: 1.8),
+            ),
+          ),
           const SizedBox(height: 20),
+          if (widget.kind == 'pending') ...[
+            if (user.name.isNotEmpty) Text('申请账号：${user.name}'),
+            if (user.departmentId != null) Text('申请部门：${department ?? '等待确认'}'),
+            const SizedBox(height: 12),
+            Text(user.status == 'UNKNOWN' ? '账号状态未确认，请重新登录核对。' : '状态：等待归属确认'),
+            if (user.authenticated) ...[
+              const SizedBox(height: 16),
+              SunnyPrimaryButton(
+                loading: busy,
+                onPressed: busy ? null : refreshAccount,
+                child: const Text('刷新申请状态'),
+              ),
+            ] else
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Text('申请已提交。登录后可刷新归属确认状态。'),
+              ),
+          ],
+          if (result.isNotEmpty &&
+              ['pending', 'disabled', 'expired'].contains(widget.kind))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: ErrorPanel(result),
+            ),
           if (['pending', 'disabled', 'expired'].contains(widget.kind))
             OutlinedButton(
-              onPressed: () => context.go('/auth/login'),
-              child: const Text('返回登录'),
+              onPressed: busy ? null : leaveAccount,
+              child: Text(user.authenticated ? '退出登录' : '返回登录'),
             ),
           if (widget.kind == 'licenses')
             TextButton(
@@ -192,82 +310,44 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               child: const Text('组件许可证'),
             ),
           if (widget.kind == 'ai-usage') ...[
-            const SectionHeader('今日额度'),
-            const LinearProgressIndicator(value: .3, minHeight: 12),
-            const SizedBox(height: 12),
-            const Text('示例用量 3 / 10 次 · 真实调用 0 次'),
-            const SectionHeader('最近分析'),
-            const ListTile(
-              leading: Icon(Icons.auto_awesome),
-              title: Text('今日工作摘要'),
-              subtitle: Text('已生成 · 来源：工作日志、任务安排'),
+            const SectionHeader('服务状态'),
+            PaperSurface(
+              color: const Color(0xFFF1E7FF),
+              child: Text(
+                AppConfig.mock
+                    ? '本地预设样例不调用模型，也不消耗额度。'
+                    : '用量查询服务待接入，当前不能显示调用次数或预算。',
+              ),
             ),
-            const Text('本地演示不消耗 AI 额度'),
+            const SectionHeader('来源规则'),
+            const Text('每条建议需提供可访问来源、生成时间和数据范围。信息不足时仅作提示，不自动创建任务。'),
           ],
           if (widget.kind == 'history')
             LogHistory(
               logId: GoRouterState.of(context).uri.queryParameters['id'] ?? '1',
             ),
-          if (widget.kind == 'conflict') ...[
-            OutlinedButton.icon(
-              onPressed: () => openForm(context, 'log-edit'),
-              icon: const Icon(Icons.edit_note),
-              label: const Text('继续编辑本地草稿'),
-            ),
-            TextButton(
-              onPressed: () => notice(context, '尚未连接服务端，本地内容未被覆盖'),
-              child: const Text('检查服务器版本'),
-            ),
-          ],
           if (widget.kind == 'report') ...[
-            const DateControls(),
-            const ReportSummary(),
-            const RecordList('logs', dated: true),
+            const PeriodReport(),
             OutlinedButton.icon(
               onPressed: () => context.go('/ai'),
               icon: const Icon(Icons.auto_awesome),
               label: const Text('生成总结建议'),
             ),
           ],
-          if (widget.kind == 'export') ...[
-            const DateControls(),
-            FilledButton.icon(
-              onPressed: busy
-                  ? null
-                  : () async {
-                      setState(() => busy = true);
-                      try {
-                        await ref
-                            .read(repositoryProvider)
-                            .execute(
-                              'analytics/export',
-                              const Command('export', {}),
-                            );
-                        if (mounted) {
-                          setState(
-                            () => result = AppConfig.mock
-                                ? '演示模式未生成真实下载文件，导出接口已预留。'
-                                : '导出请求已提交，请查看任务结果',
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) setState(() => result = '$e');
-                      }
-                      if (mounted) setState(() => busy = false);
-                    },
-              icon: const Icon(Icons.download),
-              label: const Text('申请导出'),
-            ),
-            Text(result),
-          ],
           if (widget.kind == 'admin') ...[
             if (!ref.watch(sessionProvider).administrator)
               const Text('仅管理员可访问')
             else ...[
+              const SectionHeader('组织与人员'),
+              ListTile(
+                title: const Text('浏览组织与成员'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/me/organization'),
+              ),
               for (final entry in {
                 'department': '部门与团队',
                 'membership': '确认员工归属',
-                'role': '角色与派发资格',
+                'role': '角色与权限（含公司复核资格）',
                 'reporting': '直属汇报关系',
                 'disable': '停用账号',
                 'policy': '审核策略',
@@ -283,6 +363,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               ),
             ],
           ],
+          const DemoLabel(),
         ],
       ),
     );

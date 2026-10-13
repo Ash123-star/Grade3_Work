@@ -6,16 +6,16 @@ import 'package:flutter_svg/flutter_svg.dart';
 @immutable
 class CuteTokens extends ThemeExtension<CuteTokens> {
   const CuteTokens();
-  static const ink = Color(0xFF263238),
-      mint = Color(0xFF75C9B7),
-      coral = Color(0xFFFF9D87),
-      canvas = Color(0xFFFAFCFB),
-      cream = Color(0xFFFFF9F0),
-      line = Color(0xFFDCE6E1),
-      muted = Color(0xFF5B6D65),
-      blue = Color(0xFFE9F2FC),
-      yellow = Color(0xFFFFF3C9);
-  static const gap = 16.0, radius = 8.0;
+  static const ink = Color(0xFF3C3028),
+      mint = Color(0xFFDEF4E6),
+      coral = Color(0xFFFF8A24),
+      canvas = Color(0xFFFFF8EE),
+      cream = Color(0xFFFFFDF8),
+      line = Color(0xFFEAD4BD),
+      muted = Color(0xFF756456),
+      blue = Color(0xFFE2F1FF),
+      yellow = Color(0xFFFFF0BD);
+  static const gap = 16.0, radius = 20.0;
   @override
   CuteTokens copyWith() => this;
   @override
@@ -109,7 +109,7 @@ class CuteCard extends StatelessWidget {
   const CuteCard({
     super.key,
     required this.child,
-    this.color = Colors.white,
+    this.color = CuteTokens.cream,
     this.onTap,
   });
   final Widget child;
@@ -158,7 +158,7 @@ class StatusPill extends StatelessWidget {
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(24),
     ),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

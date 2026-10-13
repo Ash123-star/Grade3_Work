@@ -1,4 +1,6 @@
 import 'package:pandora_mobile/core/errors/api_failure.dart';
+import 'package:dio/dio.dart';
+import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
 
@@ -7,6 +9,7 @@ enum DemoScenario { normal, empty, offline, forbidden }
 class DemoStore {
   final Map<String, List<Record>> records = {};
   final Map<String, Record> responses = {};
+  final Map<String, SelectedAttachment> attachments = {};
 }
 
 class MockRepository implements Repository {
@@ -18,13 +21,54 @@ class MockRepository implements Repository {
   final Session session;
   final DemoScenario scenario;
   final DemoStore store;
-  String _resource(String r) => r == 'logs/subordinates' ? 'logs' : r;
+  String _resource(String r) => switch (r) {
+    'logs/subordinates' => 'logs',
+    'organization/dispatch-people' => 'organization',
+    _ => r,
+  };
+  @override
+  Future<UploadedAttachment> uploadAttachment(
+    SelectedAttachment file, {
+    CancelToken? cancelToken,
+    void Function(int, int)? onProgress,
+  }) async {
+    file.validate();
+    await _check('attachments');
+    if (cancelToken?.isCancelled == true) {
+      throw const ApiFailure(FailureKind.unavailable, '上传已取消');
+    }
+    final id = 'demo-file-${DateTime.now().microsecondsSinceEpoch}';
+    store.attachments[id] = file;
+    onProgress?.call(file.bytes.length, file.bytes.length);
+    return UploadedAttachment(
+      id: id,
+      name: safeAttachmentName(file.name),
+      size: file.bytes.length,
+    );
+  }
+
+  @override
+  Future<DownloadedAttachment> downloadAttachment(
+    String id, {
+    CancelToken? cancelToken,
+  }) async {
+    await _check('attachments');
+    final file = store.attachments[id];
+    if (file == null) {
+      throw const ApiFailure(FailureKind.notFound, '演示附件没有文件内容');
+    }
+    return DownloadedAttachment(
+      name: safeAttachmentName(file.name),
+      bytes: file.bytes,
+    );
+  }
+
   Future<void> _check(String resource) async {
     await Future<void>.delayed(const Duration(milliseconds: 120));
     if (scenario == DemoScenario.offline) {
       throw const ApiFailure(FailureKind.timeout, '演示：网络连接超时，请重试');
     }
-    if (!session.active || scenario == DemoScenario.forbidden) {
+    if (!session.canReadBusiness || scenario == DemoScenario.forbidden) {
       throw const ApiFailure(FailureKind.forbidden, '当前账号无权访问');
     }
     if ((resource.startsWith('organization/admin') || resource == 'audit') &&
@@ -53,7 +97,12 @@ class MockRepository implements Repository {
             subtitle: i == 2 ? '技术部 · 研发团队' : '产品部 · 体验团队',
             fields: {
               'body': ['关注团队协作与产品体验。', '用清晰的设计解决真实问题。', '让每一个功能稳定交付。'][i],
-              'role': i == 0 ? '团队长' : '员工',
+              'role': i == 0 ? 'LEADER' : 'EMPLOYEE',
+              'status': 'ACTIVE',
+              'dispatch_enabled': i == 0,
+              'company_reviewer': false,
+              'department_id': i == 2 ? 'd-tech' : 'd-product',
+              'team_id': i == 2 ? 't-dev' : 't-experience',
             },
           ),
       ];
@@ -64,7 +113,17 @@ class MockRepository implements Repository {
           id: session.id,
           title: session.name,
           ownerId: session.id,
-          fields: {'姓名': session.name, '个人介绍': '认真工作，也记得好好生活。', '头像': ''},
+          fields: {
+            '姓名': session.name,
+            '个人介绍': '认真工作，也记得好好生活。',
+            '头像': '',
+            'role': session.role.name.toUpperCase(),
+            'status': 'ACTIVE',
+            'dispatch_enabled': session.dispatch,
+            'company_reviewer': false,
+            'department_id': 'd-product',
+            'team_id': 't-experience',
+          },
         ),
       ];
     }
@@ -217,6 +276,12 @@ class MockRepository implements Repository {
     if (resource == 'logs/subordinates' && query.ownerId != null) {
       items = items.where((r) => r.ownerId == query.ownerId);
     }
+    if (resource == 'organization/dispatch-people') {
+      if (!session.manager || !session.dispatch) {
+        throw const ApiFailure(FailureKind.forbidden, '没有派发资格');
+      }
+      items = items.where((p) => p.fields['status'] == 'ACTIVE');
+    }
     if (resource == 'tasks' && !session.manager) {
       items = items.where((r) => r.ownerId == session.id);
     }
@@ -249,16 +314,78 @@ class MockRepository implements Repository {
   }
 
   @override
-  Future<Record> detail(String resource, String id) async {
+  Future<Record> detail(String resource, String id, {String? ownerId}) async {
     await _check(resource);
+    if (resource == 'organization/tree') {
+      return Record(
+        id: 'tree',
+        title: '演示组织',
+        fields: {
+          'departments': [
+            {'id': 'd-product', 'name': '产品部', 'version': 1},
+            {'id': 'd-tech', 'name': '技术部', 'version': 1},
+          ],
+          'teams': [
+            {
+              'id': 't-experience',
+              'name': '体验团队',
+              'department_id': 'd-product',
+              'version': 1,
+            },
+            {
+              'id': 't-dev',
+              'name': '研发团队',
+              'department_id': 'd-tech',
+              'version': 1,
+            },
+          ],
+          'people': [
+            for (final person in rows('organization'))
+              Record(
+                id: person.id,
+                title: person.title,
+                subtitle: person.subtitle,
+                ownerId: person.ownerId,
+                version: person.version,
+                fields: {
+                  ...person.fields,
+                  'department_id': person.id == 'u3' ? 'd-tech' : 'd-product',
+                  'team_id': person.id == 'u3' ? 't-dev' : 't-experience',
+                },
+              ),
+          ],
+        },
+      );
+    }
+    if (resource == 'organization/policy') {
+      if (!session.administrator) {
+        throw const ApiFailure(FailureKind.forbidden, '仅管理员可配置');
+      }
+      return const Record(
+        id: 'policy',
+        title: '当前审核策略',
+        fields: {
+          'review_policy': {
+            'taskTeamReview': true,
+            'taskDepartmentReview': true,
+          },
+        },
+      );
+    }
     if (resource == 'organization/profile' &&
         !rows(resource).any((r) => r.id == id)) {
+      final person = rows('organization').where((r) => r.id == id).firstOrNull;
+      if (person == null) throw const ApiFailure(FailureKind.notFound, '成员不存在');
       rows(resource).add(
         Record(
           id: id,
-          title: session.name,
+          title: person.title,
           ownerId: id,
-          fields: {'姓名': session.name, '个人介绍': '认真工作，也记得好好生活。'},
+          fields: {
+            ...person.fields,
+            '姓名': person.title,
+            '个人介绍': person.fields['body'],
+          },
         ),
       );
     }
@@ -279,23 +406,9 @@ class MockRepository implements Repository {
       throw const ApiFailure(FailureKind.forbidden, '仅本人可见');
     }
     if (resource.startsWith('logs') &&
-        session.manager &&
-        item.ownerId != session.id) {
-      final entries = rows('logs'),
-          index = entries.indexWhere((r) => r.id == id);
-      entries[index] = Record(
-        id: item.id,
-        title: item.title,
-        subtitle: item.subtitle,
-        ownerId: item.ownerId,
-        version: item.version,
-        fields: {
-          ...item.fields,
-          'readBy':
-              '${session.name} · ${DateTime.now().toString().substring(0, 16)}',
-        },
-      );
-      return entries[index];
+        item.ownerId != session.id &&
+        !isSubmittedDiary(item)) {
+      throw const ApiFailure(FailureKind.forbidden, '草稿仅本人可见');
     }
     return item;
   }
@@ -356,6 +469,32 @@ class MockRepository implements Repository {
         (!session.manager || !session.dispatch)) {
       throw const ApiFailure(FailureKind.forbidden, '当前账号没有任务派发资格');
     }
+    if (resource == 'organization/admin') {
+      if (!session.administrator) {
+        throw const ApiFailure(FailureKind.forbidden, '仅管理员可配置');
+      }
+      if ('${v['reason'] ?? ''}'.trim().isEmpty || command.version == null) {
+        throw const ApiFailure(FailureKind.validation, '请读取当前版本并填写理由');
+      }
+      final request = Record(
+        id: 'org${DateTime.now().microsecondsSinceEpoch}',
+        title: '组织配置修改申请',
+        ownerId: session.id,
+        fields: {
+          'reviewState': '待审',
+          'targetResource': 'organization/admin',
+          'targetId': v['id'],
+          'candidate': {...v},
+          'reason': v['reason'],
+          'baseVersion': command.version,
+          'before': '当前配置继续生效',
+          'after': {...v},
+          'reviewEvents': <String>[],
+        },
+      );
+      rows('reviews').insert(0, request);
+      return request;
+    }
     if (resource == 'dashboard/company' && !session.manager) {
       throw const ApiFailure(FailureKind.forbidden, '没有公司发布权限');
     }
@@ -410,6 +549,25 @@ class MockRepository implements Repository {
     }
     final index = records.indexWhere((r) => r.id == id);
     final previous = index < 0 ? null : records[index];
+    if (resource == 'logs' && action == 'read') {
+      final diary = await detail('logs', id ?? '');
+      if (!isSubmittedDiary(diary)) {
+        throw const ApiFailure(FailureKind.forbidden, '草稿不能记录已读');
+      }
+      records[index] = Record(
+        id: diary.id,
+        title: diary.title,
+        subtitle: diary.subtitle,
+        ownerId: diary.ownerId,
+        version: diary.version,
+        fields: {
+          ...diary.fields,
+          'readBy':
+              '${session.name} · ${DateTime.now().toString().substring(0, 16)}',
+        },
+      );
+      return Record(id: diary.id, title: '演示阅读已登记', fields: const {'ok': true});
+    }
     if (previous != null &&
         ['dashboard/personal', 'private-notes'].contains(resource) &&
         previous.ownerId != session.id) {

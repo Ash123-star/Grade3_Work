@@ -1,3 +1,4 @@
+import 'support/local_test_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,7 +9,7 @@ void main() {
   testWidgets('logs use a single independent date and allow member selection', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = testContainer();
     addTearDown(container.dispose);
     container.read(periodProvider.notifier).state = '月';
     await tester.pumpWidget(
@@ -23,8 +24,8 @@ void main() {
     expect(find.text('日'), findsNothing);
     expect(find.text('周'), findsNothing);
     expect(find.text('月'), findsNothing);
-    expect(find.text('编辑已提交日志'), findsOneWidget);
-    expect(find.text('全部日期 · 按日期筛选'), findsOneWidget);
+    expect(find.text('申请修订今天日志'), findsOneWidget);
+    expect(find.text('全部日期'), findsOneWidget);
     expect(
       container
           .read(logDayRecordsProvider(('logs', 'u1')))
@@ -33,10 +34,10 @@ void main() {
           .length,
       3,
     );
-    await tester.tap(find.text('下属日志'));
+    await tester.tap(find.text('下属日志 ›'));
     await tester.pumpAndSettle();
     expect(find.text('选择下属'), findsOneWidget);
-    expect(find.text('编辑已提交日志'), findsNothing);
+    expect(find.text('申请修订今天日志'), findsNothing);
     container.read(logFilterDateProvider.notifier).state = DateTime.now()
         .subtract(const Duration(days: 1));
     await tester.pumpAndSettle();
@@ -63,7 +64,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final container = ProviderContainer();
+      final container = testContainer();
       addTearDown(container.dispose);
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -91,6 +92,8 @@ void main() {
       }
       await tester.tap(find.text('AI地图').last);
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('堵点风险'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('堵点风险'));
       await tester.pumpAndSettle();
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
@@ -103,7 +106,7 @@ void main() {
   testWidgets('AI task draft and existing focus editor are prefilled', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = testContainer();
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(
