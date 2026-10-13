@@ -12,7 +12,7 @@ Redis 密码使用字母、数字、下划线或连字符，建议随机生成�
 powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1
 ```
 
-首次运行缺少 `.env` 时，脚本创建空配置模板并提示填写。Flyway 自动执行三个追加式迁移，预置产品部、市场部、技术部。初始化管理员由环境变量创建并记录审计；重复启动不覆盖现有账号或密码。数据库已初始化后，更改环境变量不会更改既有数据库密码。
+首次运行缺少 `.env` 时，脚本创建空配置模板并提示填写。Flyway 自动执行四个追加式迁移，预置产品部、市场部、技术部，并建立日报任务关系、汇报环保护和审核自审约束。初始化管理员由环境变量创建并记录审计；重复启动不覆盖现有账号或密码。数据库已初始化后，更改环境变量不会更改既有数据库密码。
 
 | 服务 | 本机地址 | 说明 |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ docker compose --env-file deploy/backend/.env -f deploy/backend/compose.yaml dow
 
 ## 接口与并发
 
-详细请求示例见 `docs/backend-api.md`；机器契约由运行服务生成。分页 `{items,total,nextCursor}`，`cursor` 是从 0 开始的偏移量，`limit` 为 1–100。记录字段当前保留数据库的下划线命名，命令使用驼峰字段；前端须在 data 层映射，不能直接套用演示 command DTO。
+详细请求示例见 `docs/backend-interface.md`；机器契约由运行服务生成。分页 `{items,total,nextCursor}`，`cursor` 是从 0 开始的偏移量，`limit` 为 1–100。记录字段当前保留数据库的下划线命名，命令使用驼峰字段；前端须在 data 层映射，不能直接套用演示 command DTO。
 
 每个 HTTP 响应含 `X-Trace-Id`，错误体 `{code,message,traceId}`。未授权对象通常返回 404，明确的人员筛选越权返回 403。请求拒绝未知字段；新增记录 `version:0`，后续修改提交当前版本，冲突返回 409。审核申请含生效前值、候选值和审核链，最终通过前旧版生效。驳回原因必填，修订重提使用原业务修订入口，已提交日报的原内容和历史保留。
 

@@ -1,0 +1,68 @@
+package cn.workpanel.module.task.controller;
+
+import cn.workpanel.*;
+import cn.workpanel.module.review.application.ReviewApplicationService;
+
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+import java.util.*;
+
+@RestController
+@RequestMapping("/api/tasks")
+/** 任务接口。列表隐藏完成情况字段，生命周期通过详情 events 表达。 */
+public class TaskController {
+    final Db db; final Business business; final ReviewApplicationService reviews;
+    public TaskController(Db db,Business business,ReviewApplicationService reviews) { this.db=db; this.business=business; this.reviews=reviews; }
+    /** 分页查询范围内任务。支持 search、ownerId、date、period、cursor、limit；越权 ownerId 返回 403。 */
+    @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(defaultValue="") String search,@RequestParam(required=false) String ownerId,@RequestParam(required=false) String date,@RequestParam(defaultValue="day") String period) {
+        Actor a=Actor.current(r); Business.page(cursor,limit); var c=Business.taskScope(a); var args=new ArrayList<>(c.args()); String where=c.sql()+" AND t.title ILIKE ?"; args.add("%"+search+"%");
+        if(ownerId!=null) { var user=db.one("SELECT * FROM users WHERE id=? AND company_id=?",ownerId,a.company()); if(!a.canSeeUser(user)) throw ApiError.forbidden(); where+=" AND t.owner_id=?"; args.add(ownerId); }
+        if(date!=null) { var range=Business.range(date,period); where+=" AND t.deadline>=?::timestamptz AND t.deadline<?::timestamptz"; args.add(range.from().toString()); args.add(range.to().toString()); }
+        long total=db.count("SELECT count(*) FROM tasks t WHERE "+where,args.toArray()); args.add(limit); args.add(cursor);
+        return Map.of("items",db.rows("SELECT t.* FROM tasks t WHERE "+where+" ORDER BY t.deadline,t.id LIMIT ? OFFSET ?",args.toArray()).stream().map(t->Business.taskDto(db,t,false)).toList(),"total",total,"nextCursor",String.valueOf(cursor+limit));
+    }
+    /**
+     * 追加任务生命周期事件。
+     * 权限：负责人可接收/反馈，派发人或管理员可验收、归档、转派、改期和撤回。
+     * 请求：必须包含 type 和当前 version；TRANSFERRED 还需要 ownerId，RESCHEDULED 还需要 deadline，
+     * FEEDBACK/WITHDRAWN 需要 text。返回更新后的任务详情；版本冲突返回 409。
+     */
+    @PostMapping("/{id}/events") @Transactional
+    public Map<String,Object> event(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) {
+        Db.fields(b,"type","text","version","ownerId","deadline"); Actor a=Actor.current(r); var t=business.task(a,id,true); String type=Db.required(b,"type"),phase=Db.str(t,"phase"); int version=Db.version(b); boolean issuer=a.id().equals(t.get("issuer_id"))||a.admin(),owner=a.id().equals(t.get("owner_id"));
+        String next=switch(type) {
+            case "RECEIVED" -> { if(!owner||!phase.equals("DISPATCHED")) throw ApiError.forbidden(); yield "RECEIVED"; }
+            case "FEEDBACK" -> { if(db.count("SELECT count(*) FROM task_assignees WHERE task_id=? AND user_id=?",id,a.id())==0||!Set.of("RECEIVED","FEEDBACK").contains(phase)) throw ApiError.forbidden(); Db.required(b,"text"); yield "FEEDBACK"; }
+            case "ACCEPTED" -> { if(!issuer||!phase.equals("FEEDBACK")) throw ApiError.forbidden(); yield "ACCEPTED"; }
+            case "TRANSFERRED" -> { if(!issuer||Set.of("ACCEPTED","ARCHIVED","WITHDRAWN").contains(phase)) throw ApiError.forbidden(); String ownerId=Db.required(b,"ownerId"); var user=db.one("SELECT * FROM users WHERE id=? AND company_id=?",ownerId,a.company()); if(!a.canSeeUser(user)||!Db.str(user,"status").equals("ACTIVE")) throw ApiError.bad("INVALID_OWNER","负责人不存在或不可用"); yield phase; }
+            case "RESCHEDULED" -> { if(!issuer||Set.of("ACCEPTED","ARCHIVED","WITHDRAWN").contains(phase)) throw ApiError.forbidden(); String deadline=Db.required(b,"deadline"); try { if(!java.time.Instant.parse(deadline).isAfter(java.time.Instant.now())) throw ApiError.bad("INVALID_DEADLINE","截止时间必须晚于当前时间"); } catch(java.time.format.DateTimeParseException e) { throw ApiError.bad("INVALID_DEADLINE","截止时间必须为 ISO-8601 时间"); } yield phase; }
+            case "ARCHIVED" -> { if(!issuer||!phase.equals("ACCEPTED")) throw ApiError.forbidden(); yield "ARCHIVED"; }
+            case "WITHDRAWN" -> { if(!issuer||Set.of("ACCEPTED","ARCHIVED","WITHDRAWN").contains(phase)) throw ApiError.forbidden(); Db.required(b,"text"); yield "WITHDRAWN"; }
+            default -> throw ApiError.bad("INVALID_EVENT","不支持的任务事件");
+        };
+        if (type.equals("TRANSFERRED")) {
+            Db.conflict(db.update("UPDATE tasks SET owner_id=?,version=version+1 WHERE id=? AND version=?",Db.required(b,"ownerId"),id,version));
+            db.update("DELETE FROM task_assignees WHERE task_id=? AND kind='PRIMARY'",id);
+            db.update("INSERT INTO task_assignees(task_id,user_id,kind,company_id) VALUES (?,?, 'PRIMARY',?)",id,Db.required(b,"ownerId"),a.company());
+        } else if (type.equals("RESCHEDULED")) {
+            Db.conflict(db.update("UPDATE tasks SET deadline=?::timestamptz,version=version+1 WHERE id=? AND version=?",Db.required(b,"deadline"),id,version));
+        } else {
+            Db.conflict(db.update("UPDATE tasks SET phase=?,version=version+1 WHERE id=? AND version=?",next,id,version));
+        }
+        var eventBody=new LinkedHashMap<String,Object>();
+        for (String field: List.of("text","ownerId","deadline")) if (b.containsKey(field)) eventBody.put(field,b.get(field));
+        db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body) VALUES (?,?,?,?,?::jsonb)",a.company(),id,a.id(),type,db.write(eventBody));
+        db.audit(a,"TASK_EVENT",id,Map.of("phase",phase),Map.of("phase",next,"text",Db.str(b,"text")),type);
+        var recipients=new HashSet<String>(); recipients.add(Db.str(t,"issuer_id")); db.rows("SELECT user_id FROM task_assignees WHERE task_id=?",id).forEach(p->recipients.add(Db.str(p,"user_id")));
+        for(String recipient:recipients) db.notify(a,recipient,"TASK_EVENT",id,"task-event:"+id+":"+version+":"+recipient);
+        return Business.taskDto(db,business.task(a,id,false),true);
+    }
+    /** 提交已发布任务修订。需 version 和 reason；关键修改按策略进入审核，版本冲突返回 409。 */
+    @PostMapping("/{id}/revisions") @Transactional
+    public Map<String,Object> revision(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) {
+        Db.fields(b,"version","reason","candidate"); Actor a=Actor.current(r); a.requireDispatch(); var t=business.task(a,id,true); if(!a.id().equals(t.get("issuer_id"))&&!a.admin()) throw ApiError.forbidden(); if(Set.of("ARCHIVED","WITHDRAWN").contains(t.get("phase"))) throw ApiError.conflict();
+        if(!(b.get("candidate") instanceof Map<?,?>)) throw ApiError.bad("INVALID_CANDIDATE","candidate 必须为对象"); var c=cn.workpanel.module.task.TaskRevisionSupport.validate(db,a,id,db.read(db.write(b.get("candidate"))));
+        return reviews.create(a,"TASK",id,Db.version(b),db.read(t.get("body")),c,Db.required(b,"reason"));
+    }
+}

@@ -25,7 +25,7 @@
 
 后端变更的 13 项任务全部完成，规范已同步并归档至 [2026-10-09-implement-collaboration-backend](../openspec/changes/archive/2026-10-09-implement-collaboration-backend/)。归档后执行 `openspec.cmd validate --all --strict`，退出码 0，全部 6 个活动规范/变更通过，0 项失败。
 
-Docker 镜像 `workpanel-backend:local` 构建成功。`scripts/smoke-backend-image.ps1` 已验证镜像启动、三个 Flyway 迁移、OpenAPI 全部请求模式、首次登录强制改密及导图接口；随后以 PostgreSQL 自定义格式备份并恢复到另一个空库，恢复后管理员记录数为 1。运行日志 `server/target/image-smoke.log`。Compose（含 HTTPS profile）配置及四个 PowerShell 脚本语法校验通过。
+Docker 镜像 `workpanel-backend:local` 构建成功。`scripts/smoke-backend-image.ps1` 已验证镜像启动、四个 Flyway 迁移、OpenAPI 全部请求模式、首次登录强制改密及导图接口；随后以 PostgreSQL 自定义格式备份并恢复到另一个空库，恢复后管理员记录数为 1。运行日志 `server/target/image-smoke.log`。本次 V4 迁移新增的关系和约束需要在 Docker 环境重新执行完整验收。Compose（含 HTTPS profile）配置及四个 PowerShell 脚本语法校验通过。
 
 ## 实际限制
 
@@ -34,3 +34,11 @@ Docker 镜像 `workpanel-backend:local` 构建成功。`scripts/smoke-backend-im
 - 后端 AI worker 当前为单实例；多副本部署需增加任务租约、恢复及取消路由。
 - Windows 本机提交内存不足曾导致 JVM 退出；最终改用限额 Docker Maven 执行并通过，普通 Java 运行也已限制测试内存。
 - 现有独立数据包与本后端 Flyway 表结构不同，必须使用独立空库，不能原地覆盖已有数据基础包。
+## 架构迁移复核（2026-10-09）
+
+- `openspec.cmd validate --all --strict`：8 passed、0 failed。
+- `git diff --check`：通过（仅提示现有文件换行符转换）。
+- `mvn.cmd -f server/pom.xml -DskipTests compile`：通过，`BUILD SUCCESS`。
+- `mvn.cmd -f server/pom.xml test`：测试编译阶段已发现并修复迁移后的测试字段引用；最终测试运行受 Maven 网络权限和外部 PostgreSQL/Redis 环境限制，未取得集成测试通过证据。
+- `scripts/test-backend.ps1`：环境阻塞，当前执行器未安装 Docker（`docker is not recognized`）。
+- 因上述环境限制，本轮不能报告编译或集成测试通过；代码完成度以源码迁移和 OpenSpec 校验为准，待具备 Maven 网络和 Docker 后重新执行。
