@@ -9,6 +9,7 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/sunny_widgets.dart';
+import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
 export 'package:pandora_mobile/features/ai_map/ai_map_page.dart';
 
@@ -48,9 +49,30 @@ class DashboardPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              spec.$1,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .65),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: const Color(0xFFE4C6A5)),
+                  ),
+                  child: AppArtworkIcon(
+                    ['star', 'list-checks', 'sparkle', 'notebook'][index],
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  spec.$1,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             if (index == 3 && draftState.hasError)
@@ -160,6 +182,7 @@ class DashboardPage extends ConsumerWidget {
           SunnyWelcome(
             title: '你好，${user.name}',
             subtitle: '${dayLabel(DateTime.now())} · 从重要的事开始',
+            pet: CompanionPet.cat,
           ),
           const SizedBox(height: 20),
           for (var row = 0; row < 2; row++)
@@ -672,13 +695,13 @@ class ProfilePage extends ConsumerWidget {
                                 fontSize: 12,
                               ),
                             ),
-                          Text(
-                            user.role.label,
-                            style: const TextStyle(color: CuteTokens.muted),
-                          ),
+                          const SizedBox(height: 8),
+                          AppLabelBadge(user.role.label),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    const PetCompanion(pet: CompanionPet.dog, size: 52),
                   ],
                 ),
                 const SizedBox(height: 16),

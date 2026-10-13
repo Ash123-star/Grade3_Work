@@ -59,17 +59,26 @@ void notice(BuildContext context, String text, {bool success = false}) =>
     );
 
 class PageBody extends StatelessWidget {
-  const PageBody({super.key, required this.children, this.bottomPadding = 24});
+  const PageBody({
+    super.key,
+    required this.children,
+    this.bottomPadding = 24,
+    this.controller,
+    this.header,
+  });
   final List<Widget> children;
   final double bottomPadding;
+  final ScrollController? controller;
+  final Widget? header;
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.topCenter,
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 760),
       child: ListView(
+        controller: controller,
         padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
-        children: children,
+        children: [?header, ...children],
       ),
     ),
   );
@@ -90,19 +99,57 @@ class PageFrame extends StatelessWidget {
   final Widget? fab;
   final Widget? bottom;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(title), actions: actions),
-    body: SafeArea(child: child),
-    floatingActionButton: fab,
-    bottomNavigationBar: bottom == null
-        ? null
-        : Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(context).bottom,
+  Widget build(BuildContext context) {
+    final canGoBack = Navigator.of(context).canPop();
+    final header = canGoBack || (actions?.isNotEmpty ?? false)
+        ? ConstrainedBox(
+            key: const ValueKey('page-scroll-actions'),
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (canGoBack) const BackButton(),
+                Expanded(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: actions ?? const [],
+                  ),
+                ),
+              ],
             ),
-            child: bottom,
-          ),
-  );
+          )
+        : null;
+    final content = child;
+    return Scaffold(
+      body: SafeArea(
+        child: content is PageBody
+            ? PageBody(
+                controller: content.controller,
+                bottomPadding: content.bottomPadding,
+                header: header,
+                children: content.children,
+              )
+            : header == null
+            ? content
+            : NestedScrollView(
+                headerSliverBuilder: (_, _) => [
+                  SliverToBoxAdapter(child: header),
+                ],
+                body: content,
+              ),
+      ),
+      floatingActionButton: fab,
+      bottomNavigationBar: bottom == null
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: bottom,
+            ),
+    );
+  }
 }
 
 class DemoLabel extends StatelessWidget {

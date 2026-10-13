@@ -1069,19 +1069,68 @@ class _PeriodReportState extends ConsumerState<PeriodReport> {
                       padding: EdgeInsets.only(top: 8),
                       child: Text('按日历日期核对记录，包含周末；不作为考勤或工作评分。'),
                     ),
-                    for (final label in ['今日工作', '遇到的阻碍', '明日计划']) ...[
-                      SectionHeader(label == '今日工作' ? '工作回顾' : label),
-                      if (sources.isEmpty) const Text('暂无正式记录'),
-                      for (final item in sources)
-                        Text(
-                          '• ${item.fields[label] ?? '暂无记录'}',
-                          style: const TextStyle(height: 1.8),
+                    for (final (index, label) in [
+                      '今日工作',
+                      '遇到的阻碍',
+                      '明日计划',
+                    ].indexed)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: PaperSurface(
+                          color: [
+                            const Color(0xFFFFF0DA),
+                            CuteTokens.blue,
+                            CuteTokens.mint,
+                          ][index],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    [
+                                      Icons.edit_note,
+                                      Icons.info_outline,
+                                      Icons.event_outlined,
+                                    ][index],
+                                    size: 28,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      label == '今日工作' ? '工作回顾' : label,
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(
+                                height: 20,
+                                color: Color(0xFFE4C6A5),
+                              ),
+                              if (sources.isEmpty) const Text('暂无正式记录'),
+                              for (final item in sources)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Text(
+                                    '• ${item.fields[label] ?? '暂无记录'}',
+                                    style: const TextStyle(height: 1.8),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                    ],
+                      ),
                     const SectionHeader('源日报'),
                     for (final item in sources)
                       ListTile(
-                        contentPadding: EdgeInsets.zero,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        leading: const Icon(Icons.edit_note, size: 28),
                         title: Text(item.title),
                         subtitle: Text('${item.fields['businessDate']}'),
                         trailing: const Icon(Icons.chevron_right),

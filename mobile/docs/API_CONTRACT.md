@@ -16,7 +16,7 @@
 | 任务/通知读取 | task详情无phase但有sequence事件；通知字段is_read/recipient_id/type/object_id | 客户端按事件恢复生命周期和操作，REVISED重新接收；未知事件不猜动作。通知仅已知类型跳转真实目标。 |
 | 任务变更 | UI 提供旧值、候选输入及审核说明 | 转派/延期客户端改用已有 revisions 提交完整候选，经 HTTP 测试保留有效版；服务端独立审核/数据库仍未联调。退回补充无契约，真实UI禁提交。 |
 | 认证状态 | 登录返回status/must_change_password/expiresAt；GET auth/me；改密撤销全部会话，logout撤销当前会话 | 客户端已接待确认刷新、强制改密、到期/明确会话错误跳转、服务端退出和前台验证。原生安全凭证/启动me验证已接；验证前不挂载业务。网络失败明确重试，401/身份变化清理；普通对象403不误退出。真实Keystore/服务撤销仍待联调。 |
-| AI/上传/导出/反馈 | 正式AI作业、控制附件及同步CSV已有服务端契约；支持反馈尚无契约 | AI/附件/导出客户端接入及HTTP/UI测试，详见下方；支持反馈、真实服务/设备链路仍未完成。 |
+| AI/上传/导出/反馈 | 正式AI作业、受控附件及同步CSV已有服务端契约；支持反馈尚无契约。当前反馈列表通用映射可能请求 `GET /feedback`、详情可能请求 `GET /feedback/{id}`，但后端没有对应 Controller | AI/附件/导出客户端接入及HTTP/UI测试，详见下方；支持反馈查询/提交、真实服务/设备链路仍未完成。集中缺口登记见 [backend-interface-gaps.md](../../docs/backend-interface-gaps.md)。 |
 
 详细本地命令与证据见 [阶段3验收](stage-3-verification.md)。这些未完成项保留在独立变更的验收边界与本地 Issue 中，不宣称生产业务完成。
 

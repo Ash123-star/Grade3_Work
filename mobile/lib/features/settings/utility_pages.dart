@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart'
@@ -249,7 +250,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       ),
       'licenses' => (
         '素材与开源许可',
-        'OpenMoji，作者：HfG Schwäbisch Gmünd 及 OpenMoji contributors。来源：https://openmoji.org/ 。许可：CC BY-SA 4.0（https://creativecommons.org/licenses/by-sa/4.0/）。本项目原样使用六份 SVG，未修改图形。Flutter 组件许可可在下方查看。',
+        'Phosphor Icons：官方 phosphor-icons/core，MIT，导航与工作入口使用本地SVG。Forui 0.17.0：MIT，日历和角色标签沿用动漫橙主题。欢迎与个人页使用项目原创猫狗。用户已拒绝网络角色方案，当前界面不使用宝可梦角色图片。Untitled UI仅设计参考。\n\nOpenMoji，作者：HfG Schwäbisch Gmünd 及 OpenMoji contributors。来源：https://openmoji.org/ 。许可：CC BY-SA 4.0。原样使用六份SVG，未修改图形。',
       ),
       'history' => ('历史修订与已读', '已提交版本与待审候选内容分别展示，审核通过后更新正式记录。'),
       'report' => ('周报与月报', '按所选业务日期区间聚合已提交日报。AI 摘要为建议草稿，发布前请核对来源。'),
@@ -305,8 +306,10 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
             ),
           if (widget.kind == 'licenses')
             TextButton(
-              onPressed: () =>
-                  showLicensePage(context: context, applicationName: '潘多拉工作台'),
+              onPressed: () {
+                registerCuratedAssetLicenses();
+                showLicensePage(context: context, applicationName: '潘多拉工作台');
+              },
               child: const Text('组件许可证'),
             ),
           if (widget.kind == 'ai-usage') ...[

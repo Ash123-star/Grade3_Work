@@ -1,12 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cute_ui/cute_ui.dart'
-    hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
+import 'package:pandora_mobile/shared/curated_assets.dart';
 
 class CalendarEvent {
   const CalendarEvent(
@@ -22,7 +22,11 @@ class CalendarEvent {
   final int? start, end;
   bool get timed => start != null && end != null;
   Color get color =>
-      resource == 'tasks' ? const Color(0xFFFFE5D2) : CuteTokens.mint;
+      SunnyPalette.calendarEntries['$resource:${record.id}'.codeUnits.fold<int>(
+            0,
+            (sum, unit) => sum + unit,
+          ) %
+          SunnyPalette.calendarEntries.length];
   static String clock(int m) =>
       '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
   String get time => timed
@@ -87,9 +91,63 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
         );
       }
     }
-    List<CalendarEvent> onDay(DateTime d) =>
-        events.where((e) => sameDay(e.day, d)).toList()
-          ..sort((a, b) => (a.start ?? 1440).compareTo(b.start ?? 1440));
+    final selectedEvents = eventsOnDay(events, date);
+    void selectDay(DateTime day) {
+      final session = ref.read(sessionProvider);
+      ref.read(selectedDateProvider.notifier).state = day;
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (context) => Consumer(
+          builder: (context, sheetRef, _) {
+            final current = sheetRef.watch(sessionProvider);
+            if (!current.canReadBusiness ||
+                current.id != session.id ||
+                current.token != session.token) {
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('账号权限已变化，请关闭后重新查看'),
+              );
+            }
+            return FractionallySizedBox(
+              heightFactor: .75,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            dayHeading(day),
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '关闭当天记录',
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        _DayAgenda(date: day, events: eventsOnDay(events, day)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -101,7 +159,9 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
                 onPressed: () => setState(() => showTasks = !showTasks),
                 child: Text(
                   '${showTasks ? '●' : '○'} 任务',
-                  style: const TextStyle(color: Color(0xFFA7460E)),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
             ),
@@ -111,7 +171,9 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
                 onPressed: () => setState(() => showLogs = !showLogs),
                 child: Text(
                   '${showLogs ? '■' : '□'} 日志',
-                  style: const TextStyle(color: Color(0xFF246447)),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onTertiaryContainer,
+                  ),
                 ),
               ),
             ),
@@ -125,68 +187,258 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
             retry: () => ref.invalidate(datedRecordsProvider),
           )
         else if (period == '月') ...[
-          _MonthGrid(
+          _MonthGrid(date: date, events: events, onChanged: selectDay),
+          const SizedBox(height: 16),
+          _DayAgenda(date: date, events: selectedEvents),
+        ] else if (period == '周')
+          _WeekOverview(date: date, events: events, onChanged: selectDay)
+        else ...[
+          _WeekStrip(
             date: date,
-            events: events,
-            onChanged: (d) => ref.read(selectedDateProvider.notifier).state = d,
+            onChanged: (day) =>
+                ref.read(selectedDateProvider.notifier).state = day,
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${date.month}月${date.day}日 周${['一', '二', '三', '四', '五', '六', '日'][date.weekday - 1]}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Text(
-                '${onDay(date).length} 条记录',
-                style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (onDay(date).isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('这一天没有任务或日志，可选择其他日期'),
-            ),
-          for (final event in onDay(date))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _EventRow(event),
-            ),
-        ] else ...[
-          if (period == '日')
-            _WeekStrip(
-              date: date,
-              onChanged: (d) =>
-                  ref.read(selectedDateProvider.notifier).state = d,
-            ),
-          const SizedBox(height: 12),
-          Text(
-            period == '周' ? '周一至周日 · 横向滑动查看' : '未设时段与截止时点',
-            style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
-          ),
-          if (period == '日') ...[
-            for (final event in onDay(date).where((e) => !e.timed))
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: _EventRow(event),
-              ),
-          ],
-          const SizedBox(height: 12),
-          _TimeGrid(
-            key: ValueKey('$period:${date.year}-${date.month}-${date.day}'),
-            date: date,
-            week: period == '周',
-            events: events,
-          ),
+          _DayAgenda(date: date, events: selectedEvents),
         ],
       ],
+    );
+  }
+}
+
+const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+String dayHeading(DateTime day) =>
+    '${day.month}月${day.day}日 周${_weekdays[day.weekday - 1]}';
+
+List<CalendarEvent> eventsOnDay(List<CalendarEvent> events, DateTime day) =>
+    events.where((e) => sameDay(e.day, day)).toList()..sort((a, b) {
+      int minute(CalendarEvent e) =>
+          e.start ??
+          (e.resource == 'tasks' ? e.day.hour * 60 + e.day.minute : 1440);
+      final result = minute(a).compareTo(minute(b));
+      return result == 0 ? a.record.id.compareTo(b.record.id) : result;
+    });
+
+class _DayAgenda extends StatelessWidget {
+  const _DayAgenda({required this.date, required this.events});
+  final DateTime date;
+  final List<CalendarEvent> events;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        children: [
+          Text(
+            dayHeading(date),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          Text(
+            '${events.length} 条记录',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      if (events.isEmpty)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Text('这一天没有任务或日志，可选择其他日期'),
+        ),
+      for (final event in events)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _EventRow(event),
+        ),
+    ],
+  );
+}
+
+class _EventRow extends StatelessWidget {
+  const _EventRow(this.event);
+  final CalendarEvent event;
+  @override
+  Widget build(BuildContext context) => PaperSurface(
+    key: ValueKey('agenda:${event.resource}:${event.record.id}'),
+    onTap: () => openItem(context, event.resource, event.record.id),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: event.color,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            event.resource == 'tasks'
+                ? Icons.assignment_outlined
+                : Icons.edit_note,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                event.record.title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${event.resource == 'tasks' ? '任务' : '日志'} · ${event.time}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (event.record.subtitle.isNotEmpty ||
+                  event.record.fields['主负责人'] != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${event.record.fields['主负责人'] ?? event.record.subtitle}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+        ),
+        const Icon(Icons.chevron_right, size: 18),
+      ],
+    ),
+  );
+}
+
+/// Compact colored text is a preview; the whole date opens accessible full rows.
+class _EventPreview extends StatelessWidget {
+  const _EventPreview(this.event, {this.month = false});
+  final CalendarEvent event;
+  final bool month;
+  @override
+  Widget build(BuildContext context) => AppLabelBadge(
+    '${event.resource == 'tasks' ? '任' : '志'}·${event.record.title}',
+    color: event.color,
+    fontSize: month ? 10 : 12,
+    compact: month,
+  );
+}
+
+class _WeekOverview extends StatelessWidget {
+  const _WeekOverview({
+    required this.date,
+    required this.events,
+    required this.onChanged,
+  });
+  final DateTime date;
+  final List<CalendarEvent> events;
+  final ValueChanged<DateTime> onChanged;
+  @override
+  Widget build(BuildContext context) {
+    final first = DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).subtract(Duration(days: date.weekday - 1));
+    return PaperSurface(
+      key: const ValueKey('calendar-week-overview'),
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        children: [
+          for (var i = 0; i < 7; i++)
+            Builder(
+              builder: (context) {
+                final day = first.add(Duration(days: i));
+                final entries = eventsOnDay(events, day);
+                final selected = sameDay(day, date);
+                return Semantics(
+                  label: '${dayHeading(day)}，${entries.length}条记录，查看当天全部记录',
+                  selected: selected,
+                  child: InkWell(
+                    key: ValueKey('week-day:${day.weekday}'),
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => onChanged(day),
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 56),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 58,
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              color: selected ? SunnyPalette.orange : null,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(
+                              '周${_weekdays[i]}\n${day.month}/${day.day}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (entries.isEmpty)
+                                      Text(
+                                        '暂无记录',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      )
+                                    else
+                                      for (final event in entries.take(2))
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 2,
+                                          ),
+                                          child: SizedBox(
+                                            key: ValueKey(
+                                              'week-pill:${event.resource}:${event.record.id}',
+                                            ),
+                                            width: math.min(
+                                              156,
+                                              constraints.maxWidth,
+                                            ),
+                                            child: _EventPreview(event),
+                                          ),
+                                        ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          SizedBox(
+                            width: 32,
+                            child: Text(
+                              entries.length > 2
+                                  ? '+${entries.length - 2}'
+                                  : '${entries.length}',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 }
@@ -202,125 +454,114 @@ class _MonthGrid extends StatelessWidget {
   final ValueChanged<DateTime> onChanged;
   @override
   Widget build(BuildContext context) {
-    final first = DateTime(date.year, date.month),
-        start = first.subtract(Duration(days: first.weekday - 1));
+    final first = DateTime(date.year, date.month);
+    final start = first.subtract(Duration(days: first.weekday - 1));
     final weeks =
         ((first.weekday - 1 + DateTime(date.year, date.month + 1, 0).day) / 7)
             .ceil();
     final scale = MediaQuery.textScalerOf(context).scale(1);
     return PaperSurface(
-      padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
       child: Column(
         children: [
           Row(
             children: [
-              for (final label in ['一', '二', '三', '四', '五', '六', '日'])
+              for (final label in _weekdays)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
                       label,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: CuteTokens.muted,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
                 ),
             ],
           ),
-          for (var w = 0; w < weeks; w++)
+          for (var week = 0; week < weeks; week++)
             Row(
               children: [
                 for (var col = 0; col < 7; col++)
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        final day = start.add(Duration(days: w * 7 + col)),
-                            entries = events
-                                .where(
-                                  (e) => sameDay(
-                                    e.day,
-                                    start.add(Duration(days: w * 7 + col)),
-                                  ),
-                                )
-                                .toList();
-                        final selected = sameDay(day, date),
-                            today = sameDay(
-                              day,
-                              shanghaiWallTime(DateTime.now()),
-                            );
+                        final day = start.add(Duration(days: week * 7 + col));
+                        final entries = eventsOnDay(events, day);
+                        final currentMonth = day.month == date.month;
+                        final selected = sameDay(day, date);
+                        final today = sameDay(
+                          day,
+                          shanghaiWallTime(DateTime.now()),
+                        );
                         return Semantics(
-                          label:
-                              '${day.year}年${day.month}月${day.day}日${today ? '，今天' : ''}，${entries.where((e) => e.resource == 'tasks').length}项任务，${entries.where((e) => e.resource != 'tasks').length}份日志',
+                          label: currentMonth
+                              ? '${dayHeading(day)}${today ? '，今天' : ''}，${entries.length}条记录，查看当天全部记录'
+                              : null,
                           selected: selected,
-                          child: Material(
-                            color: selected
-                                ? const Color(0xFFFF8A24)
-                                : Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: today && !selected
-                                  ? const BorderSide(color: Color(0xFFFF8A24))
-                                  : BorderSide.none,
+                          child: InkWell(
+                            key: ValueKey(
+                              'month-day:${day.year}-${day.month}-${day.day}',
                             ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => onChanged(day),
-                              child: SizedBox(
-                                height: math.max(58, 44 * scale + 12),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 6,
-                                    horizontal: 1,
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Text(
-                                        '${day.day}',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: selected
-                                              ? FontWeight.w700
-                                              : FontWeight.normal,
-                                          color: day.month == date.month
-                                              ? CuteTokens.ink
-                                              : CuteTokens.muted,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      if (entries.isNotEmpty)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: selected
-                                                ? CuteTokens.cream
-                                                : entries.first.color,
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            entries.length > 1
-                                                ? '${entries.length}项'
-                                                : entries.first.resource ==
-                                                      'tasks'
-                                                ? '任务'
-                                                : '日志',
-                                            maxLines: 1,
-                                            style: const TextStyle(
-                                              fontSize: 9,
-                                              color: CuteTokens.ink,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: currentMonth ? () => onChanged(day) : null,
+                            child: Container(
+                              height: 108 * math.max(1, scale),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 1,
+                                vertical: 3,
                               ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: selected ? SunnyPalette.orange : null,
+                                borderRadius: BorderRadius.circular(14),
+                                border: today && !selected
+                                    ? Border.all(
+                                        color: SunnyPalette.primary,
+                                        width: 1.5,
+                                      )
+                                    : null,
+                              ),
+                              child: currentMonth
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          '${day.day}',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: selected || today
+                                                ? FontWeight.w700
+                                                : null,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        for (final event in entries.take(2))
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 3,
+                                            ),
+                                            child: _EventPreview(
+                                              event,
+                                              month: true,
+                                            ),
+                                          ),
+                                        if (entries.length > 2)
+                                          Text(
+                                            '+${entries.length - 2}',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                      ],
+                                    )
+                                  : const SizedBox.shrink(),
                             ),
                           ),
                         );
@@ -333,37 +574,6 @@ class _MonthGrid extends StatelessWidget {
       ),
     );
   }
-}
-
-class _EventRow extends StatelessWidget {
-  const _EventRow(this.event);
-  final CalendarEvent event;
-  @override
-  Widget build(BuildContext context) => PaperSurface(
-    color: event.color,
-    onTap: () => openItem(context, event.resource, event.record.id),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${event.time}  ${event.record.title}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${event.resource == 'tasks' ? '任务' : '日志'} · ${event.record.fields['主负责人'] ?? event.record.subtitle}',
-                style: const TextStyle(fontSize: 12, color: CuteTokens.muted),
-              ),
-            ],
-          ),
-        ),
-        const Icon(Icons.chevron_right, size: 18),
-      ],
-    ),
-  );
 }
 
 class _WeekStrip extends StatelessWidget {
@@ -379,370 +589,20 @@ class _WeekStrip extends StatelessWidget {
           Expanded(
             child: Semantics(
               selected: i == date.weekday - 1,
-              label:
-                  '${start.add(Duration(days: i)).year}年${start.add(Duration(days: i)).month}月${start.add(Duration(days: i)).day}日',
+              label: dayHeading(start.add(Duration(days: i))),
               child: TextButton(
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(0, 48),
                   backgroundColor: i == date.weekday - 1
-                      ? const Color(0xFFFFE5D2)
+                      ? SunnyPalette.orange
                       : null,
                 ),
                 onPressed: () => onChanged(start.add(Duration(days: i))),
                 child: Text(
-                  '${['一', '二', '三', '四', '五', '六', '日'][i]}\n${start.add(Duration(days: i)).day}',
+                  '${_weekdays[i]}\n${start.add(Duration(days: i)).day}',
                   textAlign: TextAlign.center,
                 ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _TimeGrid extends StatefulWidget {
-  const _TimeGrid({
-    super.key,
-    required this.date,
-    required this.week,
-    required this.events,
-  });
-  final DateTime date;
-  final bool week;
-  final List<CalendarEvent> events;
-  @override
-  State<_TimeGrid> createState() => _TimeGridState();
-}
-
-class _TimeGridState extends State<_TimeGrid> {
-  final vertical = ScrollController(initialScrollOffset: 8 * 72);
-  final headerHorizontal = ScrollController();
-  final gridHorizontal = ScrollController();
-  bool syncing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    headerHorizontal.addListener(() => sync(headerHorizontal, gridHorizontal));
-    gridHorizontal.addListener(() => sync(gridHorizontal, headerHorizontal));
-  }
-
-  void sync(ScrollController source, ScrollController target) {
-    if (syncing || !source.hasClients || !target.hasClients) return;
-    final offset = source.offset.clamp(0.0, target.position.maxScrollExtent);
-    if ((target.offset - offset).abs() < .5) return;
-    syncing = true;
-    target.jumpTo(offset);
-    syncing = false;
-  }
-
-  @override
-  void dispose() {
-    vertical.dispose();
-    headerHorizontal.dispose();
-    gridHorizontal.dispose();
-    super.dispose();
-  }
-
-  String get storageId =>
-      '${widget.week ? 'week' : 'day'}:${widget.date.year}-${widget.date.month}-${widget.date.day}';
-
-  @override
-  Widget build(BuildContext context) {
-    final first = widget.week
-        ? widget.date.subtract(Duration(days: widget.date.weekday - 1))
-        : widget.date;
-    final days = widget.week ? 7 : 1;
-    final scale = MediaQuery.textScalerOf(context).scale(1);
-    final dateHeight = math.max(36.0, 28 * scale);
-    final hasUntimed = widget.week && widget.events.any((e) => !e.timed);
-    final untimedHeight = hasUntimed ? 96.0 : 0.0;
-    return SizedBox(
-      height: 480,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = widget.week
-              ? math.max(128.0, 96 * scale)
-              : constraints.maxWidth - 48;
-          List<CalendarEvent> daily(DateTime day) =>
-              widget.events.where((e) => sameDay(e.day, day)).toList();
-          return Column(
-            children: [
-              // Keep context visible while the 24-hour grid scrolls.
-              SizedBox(
-                key: const ValueKey('calendar-sticky-header'),
-                height: dateHeight + untimedHeight,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 48,
-                      child: hasUntimed
-                          ? const Padding(
-                              padding: EdgeInsets.only(top: 40),
-                              child: Text(
-                                '未设\n时段',
-                                style: TextStyle(fontSize: 10),
-                              ),
-                            )
-                          : null,
-                    ),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        key: PageStorageKey('header:$storageId'),
-                        controller: headerHorizontal,
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (var i = 0; i < days; i++)
-                              SizedBox(
-                                width: width,
-                                height: dateHeight + untimedHeight,
-                                child: Builder(
-                                  builder: (context) {
-                                    final day = first.add(Duration(days: i));
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        SizedBox(
-                                          height: dateHeight,
-                                          child: Semantics(
-                                            header: true,
-                                            selected: sameDay(day, widget.date),
-                                            label:
-                                                '${day.year}年${day.month}月${day.day}日',
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 4,
-                                                    vertical: 4,
-                                                  ),
-                                              child: Text(
-                                                '${day.month}/${day.day} 周${['一', '二', '三', '四', '五', '六', '日'][day.weekday - 1]}',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        if (hasUntimed)
-                                          Expanded(
-                                            child: ListView(
-                                              key: PageStorageKey(
-                                                'untimed:$storageId:$i',
-                                              ),
-                                              padding: EdgeInsets.zero,
-                                              children: [
-                                                for (final e in daily(
-                                                  day,
-                                                ).where((e) => !e.timed))
-                                                  TextButton(
-                                                    style: TextButton.styleFrom(
-                                                      minimumSize: const Size(
-                                                        48,
-                                                        48,
-                                                      ),
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 4,
-                                                          ),
-                                                    ),
-                                                    onPressed: () => openItem(
-                                                      context,
-                                                      e.resource,
-                                                      e.record.id,
-                                                    ),
-                                                    child: Text(
-                                                      '${e.time} · ${e.record.title}',
-                                                      maxLines: 2,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: const TextStyle(
-                                                        fontSize: 11,
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: SingleChildScrollView(
-                  key: PageStorageKey('hours:$storageId'),
-                  controller: vertical,
-                  child: SizedBox(
-                    height: 24 * 72 + 24,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 48,
-                          height: 24 * 72 + 24,
-                          child: Stack(
-                            children: [
-                              for (var h = 0; h <= 24; h++)
-                                Positioned(
-                                  top: h * 72,
-                                  left: 0,
-                                  child: Text(
-                                    '${h.toString().padLeft(2, '0')}:00',
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      color: CuteTokens.muted,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            key: PageStorageKey('grid:$storageId'),
-                            controller: gridHorizontal,
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                for (var i = 0; i < days; i++)
-                                  SizedBox(
-                                    width: width,
-                                    height: 24 * 72 + 24,
-                                    child: eventColumn(
-                                      context,
-                                      first.add(Duration(days: i)),
-                                      daily(first.add(Duration(days: i))),
-                                      width,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget eventColumn(
-    BuildContext context,
-    DateTime day,
-    List<CalendarEvent> daily,
-    double width,
-  ) {
-    final timed = daily.where((e) => e.timed).toList()
-      ..sort((a, b) => a.start!.compareTo(b.start!));
-    final ends = <int>[], lanes = <int>[];
-    for (final e in timed) {
-      var lane = ends.indexWhere((end) => end <= e.start!);
-      if (lane < 0) {
-        lane = ends.length;
-        ends.add(e.end!);
-      } else {
-        ends[lane] = e.end!;
-      }
-      lanes.add(lane);
-    }
-    final count = math.max(1, ends.length);
-    final now = shanghaiWallTime(DateTime.now());
-    return Stack(
-      children: [
-        for (var h = 0; h <= 24; h++)
-          Positioned(
-            top: h * 72,
-            left: 0,
-            right: 0,
-            child: const Divider(height: 1),
-          ),
-        for (final (index, e) in timed.indexed)
-          Positioned(
-            top: e.start! * 1.2,
-            left: 4 + lanes[index] * (width - 8) / count,
-            width: (width - 8) / count - 4,
-            height: math.max(48, (e.end! - e.start!) * 1.2),
-            child: Material(
-              color: e.color,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => openItem(context, e.resource, e.record.id),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Text(
-                      '${e.time}\n${e.record.title}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        // A deadline is a point, never a fabricated meeting duration.
-        for (final e in daily.where((e) => !e.timed && e.resource == 'tasks'))
-          Positioned(
-            top: (e.day.hour * 60 + e.day.minute) * 1.2,
-            left: 4,
-            right: 4,
-            child: Semantics(
-              label: '${e.time}，${e.record.title}，截止时点',
-              child: Row(
-                children: [
-                  const Icon(Icons.circle, size: 8, color: Color(0xFFA7460E)),
-                  Expanded(
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      ),
-                      onPressed: () =>
-                          openItem(context, e.resource, e.record.id),
-                      child: Text(
-                        '${e.time} · ${e.record.title}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        if (sameDay(day, now))
-          Positioned(
-            top: (now.hour * 60 + now.minute) * 1.2,
-            left: 0,
-            right: 0,
-            child: Semantics(
-              label: '当前时间 ${CalendarEvent.clock(now.hour * 60 + now.minute)}',
-              child: const Divider(
-                height: 1,
-                color: Color(0xFFB33643),
-                thickness: 2,
               ),
             ),
           ),

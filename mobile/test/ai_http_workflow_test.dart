@@ -18,6 +18,7 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/ai_repository.dart';
 import 'package:pandora_mobile/features/ai_map/server_ai_page.dart';
 import 'package:pandora_mobile/features/ai_map/ai_job_pages.dart';
+import 'package:pandora_mobile/features/common/detail_pages.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_tools.dart';
 import 'package:go_router/go_router.dart';
@@ -1009,7 +1010,9 @@ void main() {
       await launch(t, '/ai/jobs/job/actions/0', productionRouter: true);
       await tapVisible(t, find.widgetWithText(ListTile, '发布依赖清单'));
       expect(adapter.requests.any((r) => r.path == '/tasks/task-1'), isTrue);
-      expect(find.text('任务详情'), findsOneWidget);
+      final detail = t.widget<DetailPage>(find.byType(DetailPage));
+      expect(detail.resource, 'tasks');
+      expect(detail.id, 'task-1');
       await close(t);
     },
   );
@@ -1079,9 +1082,11 @@ void main() {
       await t.runAsync(() async {
         final img = await render.toImage(pixelRatio: 1);
         final data = await img.toByteData(format: ui.ImageByteFormat.png);
-        File(
-          'docs/evidence/stage3-rebuild/$label.png',
-        ).writeAsBytesSync(data!.buffer.asUint8List());
+        final output = File(
+          '${const String.fromEnvironment('SCREENSHOT_OUTPUT', defaultValue: 'docs/evidence/stage3-rebuild')}/$label.png',
+        );
+        output.parent.createSync(recursive: true);
+        output.writeAsBytesSync(data!.buffer.asUint8List());
         img.dispose();
       });
       final scrollable = find.byType(Scrollable);

@@ -281,7 +281,7 @@ void main() {
       await t.tap(find.text('先核对发布依赖'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.text('建议与依据'), findsOneWidget);
+      expect(find.byType(AiJobPage), findsOneWidget);
       expect(adapter.requests.where((r) => r.method != 'GET'), isEmpty);
       await close(t);
     },

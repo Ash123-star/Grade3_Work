@@ -199,7 +199,7 @@ void main() {
       expect(find.text('接收任务'), findsNothing);
       await t.tap(find.text('安全返回'));
       await t.pumpAndSettle();
-      expect(find.widgetWithText(AppBar, '导图'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, '导图'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pumpAndSettle();
     },

@@ -21,11 +21,17 @@ class PaperSurface extends StatelessWidget {
     final layout = SunnyPaperTokens.of(context);
     return Material(
       color: color ?? Theme.of(context).colorScheme.surface,
+      elevation: 2,
+      shadowColor: const Color(0x2679502E),
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(layout.cardRadius),
-        side: outlined
-            ? BorderSide(color: Theme.of(context).colorScheme.outlineVariant)
-            : BorderSide.none,
+        side: BorderSide(
+          color: outlined
+              ? Theme.of(context).colorScheme.outline
+              : const Color(0xFFE4C6A5),
+          width: outlined ? 1.5 : 1.2,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

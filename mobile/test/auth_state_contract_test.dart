@@ -270,12 +270,12 @@ void main() {
     (t) async {
       final c = await launch(t);
       await login(t);
-      expect(find.text('等待归属确认'), findsOneWidget);
+      expect(find.text('你的员工申请已登记。管理员确认部门后，才能查看公司内部内容。'), findsOneWidget);
       expect(find.text('申请部门：技术部'), findsOneWidget);
       expect(c.read(sessionProvider).token, 'token-1');
       c.read(routerProvider).go('/item/tasks/protected');
       await settle(t);
-      expect(find.text('等待归属确认'), findsOneWidget);
+      expect(find.text('你的员工申请已登记。管理员确认部门后，才能查看公司内部内容。'), findsOneWidget);
       expect(
         adapter.requests.every((r) => r.path.startsWith('/auth/')),
         isTrue,
@@ -491,7 +491,7 @@ void main() {
       await t.pump(const Duration(seconds: 3));
       await settle(t);
       expect(c.read(sessionProvider).expired, isTrue);
-      expect(find.text('登录已失效'), findsOneWidget);
+      expect(find.text('请重新登录后继续。未提交的本地日志草稿会保留。'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       await close(t);
     },
@@ -518,7 +518,7 @@ void main() {
       adapter.meStatus = 200;
       await t.tap(find.text('重新验证登录'));
       await settle(t);
-      expect(find.text('等待归属确认'), findsOneWidget);
+      expect(find.text('你的员工申请已登记。管理员确认部门后，才能查看公司内部内容。'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       c.read(sessionProvider.notifier).state = active;
       c.read(routerProvider).go('/dashboard');

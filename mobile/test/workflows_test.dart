@@ -92,7 +92,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(AppBar, '导图'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '导图'), findsNothing);
     expect(find.byType(NavigationDestination), findsNWidgets(5));
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,

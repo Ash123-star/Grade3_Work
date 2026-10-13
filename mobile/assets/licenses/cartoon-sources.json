@@ -1,0 +1,58 @@
+[
+  {
+    "id": 133,
+    "name": "eevee",
+    "sha256": "33EA993D3478EE920062B0BF27792A045B3A2F75D941BDB8CB3912EF50B1FB44",
+    "blob": "4406687944d912eebb1436425ab443bd31f24491",
+    "source": "https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/other/official-artwork/133.png"
+  },
+  {
+    "id": 39,
+    "name": "jigglypuff",
+    "sha256": "2D8FA64258727708417495B5CA4D28A148628D962709F58235B9E0837EB41365",
+    "blob": "6dc8041bd8fcca7bda57ea77aba60b68f3da9a20",
+    "source": "https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/other/official-artwork/39.png"
+  },
+  {
+    "id": 175,
+    "name": "togepi",
+    "sha256": "F07F20755BE6232738AF651FCCD2524C6DBB47590F7D06613124D539448FA3EE",
+    "blob": "53d6fc7289f9dffad277abbb74ca3108edcfc2b9",
+    "source": "https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/other/official-artwork/175.png"
+  },
+  {
+    "id": 58,
+    "name": "growlithe",
+    "sha256": "05F90F8FEC5729EF41EE205ACF7D81A97E84CD6A82C5BABF6E4EACF5662EE57A",
+    "blob": "3f2a0b43ceedbc2066028105210852001badf331",
+    "source": "https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/other/official-artwork/58.png"
+  },
+  {
+    "id": 393,
+    "name": "piplup",
+    "sha256": "8914C4BEB5CA5F60A2FF4CD4D92DE52A632F3B20CD656D64CE16CF412A4FE94C",
+    "blob": "efdb7accd00c93cda73625a7894bbd5cdc48af75",
+    "source": "https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/other/official-artwork/393.png"
+  },
+  {
+    "id": 52,
+    "name": "meowth",
+    "sha256": "893353BAEC0DD1AC52A62AF4465D28660A959E18BEB21C17CD6CD9D3CB2D173C",
+    "blob": "a5034bc81122fa769b2aea02588eb8ab4fdeed8d",
+    "source": "https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/other/official-artwork/52.png"
+  },
+  {
+    "id": 143,
+    "name": "snorlax",
+    "sha256": "1AFD32E5F6053A50860D67C5D7CC3BC6CA9A174634097FE65880523A0A13A55A",
+    "blob": "8fa23606cbd1c6efdb76ab102c417394bedfcf93",
+    "source": "https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/other/official-artwork/143.png"
+  },
+  {
+    "id": 25,
+    "name": "pikachu",
+    "sha256": "759CEAFDB4B8D637DFCFE673CF672BC3C472354A3B2E7E0835D9CDCACD8D195D",
+    "blob": "16c1182c3747785aab301d6e801fba111ff759e2",
+    "source": "https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/other/official-artwork/25.png"
+  }
+]

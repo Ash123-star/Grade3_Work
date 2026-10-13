@@ -501,39 +501,32 @@ class _AiPageState extends ConsumerState<AiPage> {
           child: const Text('建议草稿'),
         ),
       ],
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
-          child: ListView(
-            controller: scroll,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: PageBody(
+        controller: scroll,
+        children: [
+          Wrap(
+            spacing: 8,
             children: [
-              Wrap(
-                spacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: const Text('个人发展'),
-                    selected: !company,
-                    onSelected: (_) => setState(() => company = false),
-                  ),
-                  if (user.manager)
-                    ChoiceChip(
-                      label: Text(switch (user.role) {
-                        UserRole.admin || UserRole.founder => '公司走向',
-                        UserRole.director => '部门走向',
-                        _ => '团队走向',
-                      }),
-                      selected: company,
-                      onSelected: (_) => setState(() => company = true),
-                    ),
-                ],
+              ChoiceChip(
+                label: const Text('个人发展'),
+                selected: !company,
+                onSelected: (_) => setState(() => company = false),
               ),
-              const SizedBox(height: 16),
-              content,
+              if (user.manager)
+                ChoiceChip(
+                  label: Text(switch (user.role) {
+                    UserRole.admin || UserRole.founder => '公司走向',
+                    UserRole.director => '部门走向',
+                    _ => '团队走向',
+                  }),
+                  selected: company,
+                  onSelected: (_) => setState(() => company = true),
+                ),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          content,
+        ],
       ),
     );
   }

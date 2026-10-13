@@ -429,7 +429,7 @@ void main() {
       await t.pumpWidget(widget);
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.text('等待归属确认'), findsWidgets);
+      expect(find.text('你的员工申请已登记。管理员确认部门后，才能查看公司内部内容。'), findsWidgets);
       expect(find.byType(NavigationBar), findsNothing);
       expect(adapter.requests.map((r) => r.path), [
         '/auth/me',
@@ -480,7 +480,7 @@ void main() {
             .read(DraftLocation.diary('u1', DateTime(2026, 10, 13))),
       );
       expect(draft!.fields['今日工作'], '本机失败仍保留');
-    expect(find.textContaining('草稿保存失败'), findsNothing);
+      expect(find.textContaining('草稿保存失败'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pump(const Duration(milliseconds: 300));
     },

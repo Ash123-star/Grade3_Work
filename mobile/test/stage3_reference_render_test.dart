@@ -224,7 +224,12 @@ void main() {
       await tester.runAsync(() async {
         final img = await render.toImage(pixelRatio: 1);
         final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-        final output = File('docs/evidence/stage3-rebuild/${screen.$1}.png');
+        // A separate evidence directory avoids overwriting images held by Windows previews.
+        const outputDirectory = String.fromEnvironment(
+          'SCREENSHOT_OUTPUT',
+          defaultValue: 'docs/evidence/stage3-rebuild',
+        );
+        final output = File('$outputDirectory/${screen.$1}.png');
         output.parent.createSync(recursive: true);
         output.writeAsBytesSync(bytes!.buffer.asUint8List());
         img.dispose();

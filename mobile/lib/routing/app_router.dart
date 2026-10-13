@@ -12,6 +12,7 @@ import 'package:pandora_mobile/features/common/catalog.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
 import 'package:pandora_mobile/features/dashboard/organization_browser.dart';
 import 'package:pandora_mobile/features/dashboard/own_profile_page.dart';
@@ -75,28 +76,28 @@ final routerProvider = Provider<GoRouter>((ref) {
               onDestinationSelected: (i) => shell.goBranch(i),
               destinations: const [
                 NavigationDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  selectedIcon: Icon(Icons.dashboard),
+                  icon: AppArtworkIcon('squares-four'),
+                  selectedIcon: AppArtworkIcon('squares-four', filled: true),
                   label: '导图',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.calendar_month_outlined),
-                  selectedIcon: Icon(Icons.calendar_month),
+                  icon: AppArtworkIcon('calendar-dots'),
+                  selectedIcon: AppArtworkIcon('calendar-dots', filled: true),
                   label: '视图',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.edit_note_outlined),
-                  selectedIcon: Icon(Icons.edit_note),
+                  icon: AppArtworkIcon('notebook'),
+                  selectedIcon: AppArtworkIcon('notebook', filled: true),
                   label: '日志',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.hub_outlined),
-                  selectedIcon: Icon(Icons.hub),
+                  icon: AppArtworkIcon('graph'),
+                  selectedIcon: AppArtworkIcon('graph', filled: true),
                   label: 'AI地图',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
+                  icon: AppArtworkIcon('user-circle'),
+                  selectedIcon: AppArtworkIcon('user-circle', filled: true),
                   label: '我的',
                 ),
               ],

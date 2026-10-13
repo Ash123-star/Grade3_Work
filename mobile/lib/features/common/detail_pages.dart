@@ -548,7 +548,10 @@ class _ListPageState extends ConsumerState<ListPage> {
                                   ),
                                 )
                               else
-                                const Icon(Icons.chevron_right, size: 18),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  size: 18,
+                                ),
                             ],
                           ),
                         ),
@@ -930,7 +933,9 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       color: CuteTokens.blue,
                       child: ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.insert_drive_file_outlined),
+                        leading: const Icon(
+                          Icons.insert_drive_file_outlined,
+                        ),
                         title: const Text('任务附件'),
                         subtitle: const Text('查看并保存文件'),
                         trailing: const Icon(Icons.download_outlined),

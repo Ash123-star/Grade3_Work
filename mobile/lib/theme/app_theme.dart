@@ -33,6 +33,7 @@ class SunnyPalette {
   static const blue = Color(0xFFE2F1FF);
   static const purple = Color(0xFFF1E7FF);
   static const orange = Color(0xFFFFE5D2);
+  static const calendarEntries = [orange, mint, blue, purple];
 }
 
 /// Semantic roles owned by the app, separate from immutable illustration colors.
