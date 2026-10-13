@@ -20,4 +20,4 @@
 - [x] 4.1 Final analyzer exit0, full Mock124/formal96 tests exit0, strict15 passed exit0, diffcheck exit0; new360dp/font1.5 recovery render inspected and original editor compared. NoAPK.
 - [x] 4.2 Update report, audit, API contract, README, local Issue and originalstage3 task3.6 reference; distinguish payload encryption/SQL and injected platform tests from device proof.
 - [ ] 4.3 Verify native AndroidKeystore/SQLite hooks, restart/lockscreen/backup exclusions and TalkBack on an available device without an APK build in this environment; current Windows Flutter tests do not prove native plugin deployment.
-- [ ] 4.4 Isolate mixedHCJ changes, associate remote Issue, commit/push and PR after safe ownership review; blocked by mixed user/history state and unavailablegh, no mixed push.
+- [x] 4.4 User explicitly authorized all current changes on HCJ; associate Issue #7, push ba7369a and create draft PR #9 via official GitHub API. Delivery: mobile/docs/hcj-delivery.md. Native device4.3 remains unverified.

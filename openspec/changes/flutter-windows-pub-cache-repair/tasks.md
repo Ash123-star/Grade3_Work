@@ -5,4 +5,4 @@
 - [x] 2.2 Verify all decoded package paths, Android plugin registration, unchanged lockfile, invalid path refusal and affected analysis/test compilation; document IDE restart and actual runtime boundary withoutAPK. Analysis/211Mock/181formal exit0; negativeASCII path leaves user env unchanged; generated secureStorage/JNI/plugin metadata checked; windows-startup-repair-verification.md.
 - [x] 2.3 Prepare official SQLite Android binaries through Release API with package SHA256, persistent ignored cache and hook cache seeding; original failed hook and x64/arm64/arm direct nativehooks success exit0, repeat cache preparation exit0, corrupt local binary rejected before hook cache; noAPK. Details in windows-startup-repair-verification.md.
 ## 3. Delivery
-- [ ] 3.1 Confirm Android Studio emulator startup on user machine; isolate changes and remote Issue/PR when mixed worktree permits.
+- [ ] 3.1 Confirm Android Studio emulator startup on user machine. Remote delivery portion completed with user authorization: Issue #8, ba7369a pushed to HCJ, draft PR #9; full task remains unchecked until actual IDE startup evidence. See mobile/docs/hcj-delivery.md.

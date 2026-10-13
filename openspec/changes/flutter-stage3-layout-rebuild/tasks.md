@@ -37,4 +37,4 @@
 - [x] 3.2 Verify Flutter test compilation with explicit exit code; do not build APK (user instruction).
 - [x] 3.3 Capture and visually compare sixteen actual Flutter screens (the approved core eight plus supporting evidence); record small-screen/text-scale evidence.
 - [x] 3.4 Update verification docs and OpenSpec validation; record remaining backend/device/remote gaps.
-- [ ] 3.5 Isolate this change, associate remote Issue, commit/push and create PR (blocked by mixed worktree and missing gh; do not overwrite user changes).
+- [x] 3.5 Deliver all current changes to HCJ under explicit user authorization: Issue #6, client commit ba7369a pushed, draft PR #9 (HCJ to main). Remote links and verification boundaries: mobile/docs/hcj-delivery.md. Product/device acceptance3.6 remains open; no merge or archive.

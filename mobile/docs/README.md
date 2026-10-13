@@ -11,6 +11,7 @@
 
 ## 实现进度与验收
 
+- [HCJ 远程交付记录](hcj-delivery.md)：提交、Issue、草稿 PR 与遗留验收。
 - [当前完成性审查](stage-3-completion-audit.md)：已实现、未验证与缺失项。
 - [页面验收记录](stage-3-verification.md)：最新结果在前，历史批次在后。
 - [实际 Flutter 截图](evidence/stage3-rebuild/)
