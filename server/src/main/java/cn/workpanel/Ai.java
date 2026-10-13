@@ -161,8 +161,8 @@ public class Ai {
 @RestController
 @RequestMapping("/api")
 class AiApi {
-    final Ai ai; final Db db; final Tasks tasks;
-    AiApi(Ai ai,Db db,Tasks tasks) { this.ai=ai; this.db=db; this.tasks=tasks; }
+    final Ai ai; final Db db; final cn.workpanel.module.task.TaskDispatchService tasks;
+    AiApi(Ai ai,Db db,cn.workpanel.module.task.TaskDispatchService tasks) { this.ai=ai; this.db=db; this.tasks=tasks; }
     @PostMapping("/ai/jobs") public Map<String,Object> create(HttpServletRequest r,@RequestBody Map<String,Object> b) { return ai.create(Actor.current(r),b); }
     @GetMapping("/ai/jobs/{id}") public Map<String,Object> get(HttpServletRequest r,@PathVariable String id) { Actor a=Actor.current(r); var job=ai.job(a,id); if(job.get("output") instanceof Map<?,?> o) ai.validateSources(a,db.read(db.write(o))); return job; }
     @DeleteMapping("/ai/jobs/{id}") public Map<String,Object> cancel(HttpServletRequest r,@PathVariable String id) { ai.cancel(Actor.current(r),id); return Map.of("ok",true); }
@@ -194,6 +194,6 @@ class AiApi {
     @PostMapping("/ai/jobs/{id}/confirm-task") public Map<String,Object> confirm(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b,@RequestHeader("Idempotency-Key") String key) {
         Db.fields(b,"actionIndex","task"); Actor a=Actor.current(r); a.requireDispatch(); var job=get(r,id); if(!job.get("state").equals("SUCCEEDED")) throw ApiError.conflict();
         var output=db.read(db.write(job.get("output"))); var actions=Ai.maps(output,"actions",3); if(!(b.get("actionIndex") instanceof Number n)||n.intValue()<0||n.intValue()>=actions.size()) throw ApiError.bad("INVALID_ACTION","行动索引无效");
-        if(!(b.get("task") instanceof Map<?,?>)) throw ApiError.bad("INVALID_TASK","需要人工确认的完整任务"); return tasks.create(a,db.read(db.write(b.get("task"))),key);
+        if(!(b.get("task") instanceof Map<?,?>)) throw ApiError.bad("INVALID_TASK","需要人工确认的完整任务"); return tasks.dispatch(a,db.read(db.write(b.get("task"))),key);
     }
 }

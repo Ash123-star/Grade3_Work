@@ -17,21 +17,6 @@ public class Tasks {
         long total=db.count("SELECT count(*) FROM tasks t WHERE "+where,args.toArray()); args.add(limit); args.add(cursor);
         return Map.of("items",db.rows("SELECT t.* FROM tasks t WHERE "+where+" ORDER BY t.deadline,t.id LIMIT ? OFFSET ?",args.toArray()).stream().map(t->Business.taskDto(db,t,false)).toList(),"total",total,"nextCursor",String.valueOf(cursor+limit));
     }
-    @GetMapping("/{id}") public Map<String,Object> detail(HttpServletRequest r,@PathVariable String id) { return Business.taskDto(db,business.task(Actor.current(r),id,false),true); }
-    @PostMapping @Transactional
-    public Map<String,Object> create(HttpServletRequest r,@RequestBody Map<String,Object> c,@RequestHeader("Idempotency-Key") String key) { return create(Actor.current(r),c,key); }
-    @Transactional
-    public Map<String,Object> create(Actor a,Map<String,Object> c,String key) {
-        c=new LinkedHashMap<>(c); c.putIfAbsent("urgency","NORMAL");
-        a.requireDispatch(); if(key.isBlank()||key.length()>128) throw ApiError.bad("IDEMPOTENCY_REQUIRED","需要 1–128 位幂等键"); Business.validateTask(db,a,c);
-        // 事务级锁把并发重放串行化；请求摘要用稳定 key 排序。
-        db.one("SELECT pg_advisory_xact_lock(hashtextextended(?,0))",a.id()+":"+key);
-        String hash=Db.hash(db.write(new TreeMap<>(c))); var old=db.rows("SELECT * FROM idempotency_keys WHERE actor_id=? AND key=?",a.id(),key);
-        if(!old.isEmpty()) { if(!old.getFirst().get("request_hash").equals(hash)) throw new ApiError(409,"IDEMPOTENCY_CONFLICT","同一幂等键内容不同"); return Business.taskDto(db,business.task(a,Db.str(old.getFirst(),"task_id"),false),true); }
-        String id=Db.id(); db.update("INSERT INTO tasks(id,company_id,owner_id,issuer_id,title,deadline,body) VALUES (?,?,?,?,?,?::timestamptz,?::jsonb)",id,a.company(),c.get("ownerId"),a.id(),c.get("title"),c.get("deadline"),db.write(c));
-        Business.assign(db,a,id,c); db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body) VALUES (?,?,?,'DISPATCHED',?::jsonb)",a.company(),id,a.id(),db.write(c));
-        db.update("INSERT INTO idempotency_keys VALUES (?,?,?,?,?)",a.company(),a.id(),key,hash,id); db.audit(a,"TASK_DISPATCHED",id,Map.of(),c,"派发任务"); return Business.taskDto(db,business.task(a,id,false),true);
-    }
     @PostMapping("/{id}/events") @Transactional
     public Map<String,Object> event(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) {
         Db.fields(b,"type","text","version"); Actor a=Actor.current(r); var t=business.task(a,id,true); String type=Db.required(b,"type"),phase=Db.str(t,"phase"); int version=Db.version(b); boolean issuer=a.id().equals(t.get("issuer_id"))||a.admin(),owner=a.id().equals(t.get("owner_id"));
@@ -53,7 +38,7 @@ public class Tasks {
     @PostMapping("/{id}/revisions") @Transactional
     public Map<String,Object> revision(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) {
         Db.fields(b,"version","reason","candidate"); Actor a=Actor.current(r); a.requireDispatch(); var t=business.task(a,id,true); if(!a.id().equals(t.get("issuer_id"))&&!a.admin()) throw ApiError.forbidden(); if(Set.of("ARCHIVED","WITHDRAWN").contains(t.get("phase"))) throw ApiError.conflict();
-        if(!(b.get("candidate") instanceof Map<?,?>)) throw ApiError.bad("INVALID_CANDIDATE","candidate 必须为对象"); var c=db.read(db.write(b.get("candidate"))); Business.validateTask(db,a,c);
+        if(!(b.get("candidate") instanceof Map<?,?>)) throw ApiError.bad("INVALID_CANDIDATE","candidate 必须为对象"); var c=cn.workpanel.module.task.TaskRevisionSupport.validate(db,a,id,db.read(db.write(b.get("candidate"))));
         return reviews.create(a,"TASK",id,Db.version(b),db.read(t.get("body")),c,Db.required(b,"reason"));
     }
 }

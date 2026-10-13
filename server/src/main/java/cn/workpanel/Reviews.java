@@ -116,10 +116,10 @@ public class Reviews {
             }
             case "TASK" -> {
                 var task=db.one("SELECT * FROM tasks WHERE id=? AND company_id=? FOR UPDATE",target,approver.company()); applicant.requireDispatch(); if(!applicant.id().equals(task.get("issuer_id"))&&!applicant.admin()) throw ApiError.forbidden(); if(Set.of("ARCHIVED","WITHDRAWN").contains(task.get("phase"))) throw ApiError.conflict();
-                Business.validateTask(db,applicant,c);
                 var former=db.rows("SELECT user_id FROM task_assignees WHERE task_id=?",target);
-                Db.conflict(db.update("UPDATE tasks SET title=?,owner_id=?,deadline=?::timestamptz,body=?::jsonb,phase='DISPATCHED',version=version+1 WHERE id=? AND version=?",c.get("title"),c.get("ownerId"),c.get("deadline"),db.write(c),target,v));
-                db.update("DELETE FROM task_assignees WHERE task_id=?",target); Business.assign(db,applicant,target,c);
+                Db.conflict(db.update("UPDATE tasks SET version=version+1 WHERE id=? AND version=?",target,v));
+                var d=cn.workpanel.module.task.TaskRevisionSupport.apply(db,applicant,target,c);
+                db.update("UPDATE tasks SET title=?,owner_id=?,deadline=?::timestamptz,body=?::jsonb,phase='DISPATCHED' WHERE id=?",d.title(),d.ownerId(),d.deadline(),db.write(d.body()),target);
                 db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body) VALUES (?,?,?,'REVISED',?::jsonb)",approver.company(),target,applicant.id(),db.write(c));
                 for(var recipient:former) db.notify(applicant,Db.str(recipient,"user_id"),"TASK_REVISED",target,"task-revised:"+target+":"+v+":"+recipient.get("user_id"));
             }
