@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
-import 'sunny_widgets.dart';
 import 'paper_layout.dart';
+import 'generated_assets.dart';
 
 class EmptyIllustration extends StatelessWidget {
   const EmptyIllustration({
@@ -25,7 +25,7 @@ class EmptyIllustration extends StatelessWidget {
         Center(
           child: !showCharacter
               ? const Icon(Icons.lock_outline, size: 40)
-              : const WorkBuddy(size: 56, pose: BuddyPose.empty),
+              : const TuantuanMascot('empty', size: 88),
         ),
         const SizedBox(height: 12),
         Text(
@@ -58,10 +58,7 @@ class ErrorPanel extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.error_outline,
-              color: Theme.of(context).colorScheme.error,
-            ),
+            const TuantuanIcon('error', size: 34),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -106,7 +103,7 @@ class RecordFailure extends StatelessWidget {
         children: [
           Text(title, style: Theme.of(context).textTheme.titleLarge),
           if (kind == FailureKind.timeout || kind == FailureKind.unavailable)
-            const Center(child: WorkBuddy(size: 56, pose: BuddyPose.retry)),
+            const Center(child: TuantuanMascot('error', size: 88)),
           const SizedBox(height: 12),
           Text('$error'),
           const SizedBox(height: 16),

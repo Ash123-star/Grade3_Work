@@ -8,7 +8,8 @@ import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
 import 'package:pandora_mobile/core/config.dart';
 import 'paper_layout.dart';
-import 'sunny_widgets.dart';
+import 'generated_assets.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 
@@ -34,13 +35,18 @@ void openForm(
 void notice(BuildContext context, String text, {bool success = false}) =>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: success
             ? Theme.of(context).colorScheme.tertiaryContainer
-            : null,
+            : Theme.of(context).colorScheme.errorContainer,
+        closeIconColor: Theme.of(context).colorScheme.onSurface,
+        showCloseIcon: true,
         content: success
             ? Row(
                 children: [
-                  const WorkBuddy(size: 28, pose: BuddyPose.success),
+                  const TuantuanMascot('success', size: 34),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -54,7 +60,13 @@ void notice(BuildContext context, String text, {bool success = false}) =>
                   ),
                 ],
               )
-            : Text(text),
+            : Row(
+                children: [
+                  const TuantuanIcon('error', size: 30),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(text)),
+                ],
+              ),
       ),
     );
 
@@ -71,14 +83,16 @@ class PageBody extends StatelessWidget {
   final ScrollController? controller;
   final Widget? header;
   @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.topCenter,
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
-      child: ListView(
-        controller: controller,
-        padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
-        children: [?header, ...children],
+  Widget build(BuildContext context) => TuantuanPaperBackdrop(
+    child: Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: ListView(
+          controller: controller,
+          padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
+          children: [?header, ...children],
+        ),
       ),
     ),
   );
@@ -200,41 +214,14 @@ class RecordList extends ConsumerWidget {
                       .map(
                         (item) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: PaperSurface(
+                          child: TuantuanRecordCard(
+                            icon: _resourceIcon(resource),
+                            accent: _resourceAccent(context, resource),
+                            title: item.title,
+                            subtitle: item.subtitle,
                             onTap: () => onTap != null
                                 ? onTap!(item)
                                 : openItem(context, resource, item.id),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.article_outlined,
-                                  color: CuteTokens.muted,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.title,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        item.subtitle,
-                                        style: const TextStyle(
-                                          color: CuteTokens.muted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Icon(Icons.chevron_right),
-                              ],
-                            ),
                           ),
                         ),
                       )
@@ -243,6 +230,26 @@ class RecordList extends ConsumerWidget {
         );
   }
 }
+
+String _resourceIcon(String resource) => switch (resource) {
+  'tasks' => 'task',
+  'logs' || 'logs/subordinates' => 'log',
+  'notifications' => 'notification',
+  'reviews' => 'approval',
+  'organization' => 'members',
+  'dashboard/company' || 'dashboard/personal' => 'mindmap',
+  _ => 'report',
+};
+
+Color _resourceAccent(BuildContext context, String resource) =>
+    switch (resource) {
+      'tasks' => SunnyPalette.orange,
+      'logs' || 'logs/subordinates' => SunnyPalette.coral,
+      'notifications' => SunnyPalette.blue,
+      'reviews' => SunnyPalette.purple,
+      'organization' => SunnyPalette.mint,
+      _ => Theme.of(context).colorScheme.surface,
+    };
 
 class DateControls extends ConsumerWidget {
   const DateControls({super.key});

@@ -34,3 +34,8 @@ flutter:
     - assets/phosphor/
     - assets/companions/
     - assets/licenses/
+    - assets/generated_ui/backgrounds/
+    - assets/generated_ui/decorations/
+    - assets/generated_ui/icons/
+    - assets/generated_ui/mascot/
+    - assets/generated_ui/references/

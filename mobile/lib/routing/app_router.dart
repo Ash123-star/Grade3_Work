@@ -12,7 +12,7 @@ import 'package:pandora_mobile/features/common/catalog.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
-import 'package:pandora_mobile/shared/curated_assets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
 import 'package:pandora_mobile/features/dashboard/organization_browser.dart';
 import 'package:pandora_mobile/features/dashboard/own_profile_page.dart';
@@ -76,28 +76,28 @@ final routerProvider = Provider<GoRouter>((ref) {
               onDestinationSelected: (i) => shell.goBranch(i),
               destinations: const [
                 NavigationDestination(
-                  icon: AppArtworkIcon('squares-four'),
-                  selectedIcon: AppArtworkIcon('squares-four', filled: true),
+                  icon: TuantuanIcon('mindmap', size: 26),
+                  selectedIcon: TuantuanIcon('mindmap', size: 26),
                   label: '导图',
                 ),
                 NavigationDestination(
-                  icon: AppArtworkIcon('calendar-dots'),
-                  selectedIcon: AppArtworkIcon('calendar-dots', filled: true),
+                  icon: TuantuanIcon('calendar', size: 26),
+                  selectedIcon: TuantuanIcon('calendar', size: 26),
                   label: '视图',
                 ),
                 NavigationDestination(
-                  icon: AppArtworkIcon('notebook'),
-                  selectedIcon: AppArtworkIcon('notebook', filled: true),
+                  icon: TuantuanIcon('log', size: 26),
+                  selectedIcon: TuantuanIcon('log', size: 26),
                   label: '日志',
                 ),
                 NavigationDestination(
-                  icon: AppArtworkIcon('graph'),
-                  selectedIcon: AppArtworkIcon('graph', filled: true),
+                  icon: TuantuanIcon('ai', size: 26),
+                  selectedIcon: TuantuanIcon('ai', size: 26),
                   label: 'AI地图',
                 ),
                 NavigationDestination(
-                  icon: AppArtworkIcon('user-circle'),
-                  selectedIcon: AppArtworkIcon('user-circle', filled: true),
+                  icon: TuantuanIcon('members', size: 26),
+                  selectedIcon: TuantuanIcon('members', size: 26),
                   label: '我的',
                 ),
               ],

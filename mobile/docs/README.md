@@ -4,7 +4,7 @@
 
 - [阶段0：需求范围](stage-0-requirements-scope.md)
 - [阶段1：路由与流程](stage-1-route-and-flow-design.md)
-- [阶段2：阳光纸张与动漫橙](stage-2-sunny-paper-design-system-plan.md)
+- [团团记账气质 UI 设计基线](tuantuan-ui-design-system.md)
 - [阶段3：页面布局与交互](stage-3-page-layout-and-interaction-design.md)
 - [原始八屏设计稿](../prototypes/ui-direction/)
 - [可运行页面原型](../prototypes/stage-3-pages/README.md)
@@ -23,8 +23,10 @@
 
 - [接口及契约边界](API_CONTRACT.md)
 - [原创人物与素材记录](sunny-companion-assets.md)
-- [主题参考研究](stage-2-ui-theme-research.md)
-- [UI 参考与技能记录](stage-2-ui-reference-and-skills.md)
+- [阶段2主题参考研究（历史）](stage-2-ui-theme-research.md)
+- [阶段2 UI 参考与技能记录（历史）](stage-2-ui-reference-and-skills.md)
+- [阶段2 阳光纸张规范（历史）](stage-2-sunny-paper-design-system-plan.md)
+- [image-2.5 素材生成提示词](image-2.5-ui-asset-generation-prompts.md)
 
 `screenshots/` 是早期截图，不能作为当前重建验收证据。阶段3 SVG/PNG 示意板是设计产物，不能替代实际 Flutter 截图。
 

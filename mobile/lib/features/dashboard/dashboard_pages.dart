@@ -10,6 +10,8 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
 export 'package:pandora_mobile/features/ai_map/ai_map_page.dart';
 
@@ -32,10 +34,10 @@ class DashboardPage extends ConsumerWidget {
         .where((r) => r.fields['read'] != true)
         .length;
     final specs = [
-      ('公司重点', CuteTokens.blue, 'dashboard/company'),
-      ('公司任务', const Color(0xFFFFE5D2), 'tasks'),
-      ('个人重点', const Color(0xFFF1E7FF), 'dashboard/personal'),
-      ('个人日志', CuteTokens.mint, 'logs'),
+      ('公司重点', SunnyPalette.blue, 'dashboard/company'),
+      ('公司任务', SunnyPalette.orange, 'tasks'),
+      ('个人重点', SunnyPalette.purple, 'dashboard/personal'),
+      ('个人日志', SunnyPalette.mint, 'logs'),
     ];
     Widget tile(int index) {
       final spec = specs[index];
@@ -57,11 +59,11 @@ class DashboardPage extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: .65),
                     borderRadius: BorderRadius.circular(13),
-                    border: Border.all(color: const Color(0xFFE4C6A5)),
+                    border: Border.all(color: const Color(0xFFD6E9DE)),
                   ),
-                  child: AppArtworkIcon(
-                    ['star', 'list-checks', 'sparkle', 'notebook'][index],
-                    size: 22,
+                  child: TuantuanIcon(
+                    ['mindmap', 'task', 'ai', 'log'][index],
+                    size: 46,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -151,9 +153,16 @@ class DashboardPage extends ConsumerWidget {
                   ),
                 ),
             const SizedBox(height: 8),
-            const Text(
-              '查看全部 →',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            const Row(
+              children: [
+                TuantuanStatusPill('查看全部', color: SunnyPalette.surface),
+                SizedBox(width: 4),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 16,
+                  color: SunnyPalette.muted,
+                ),
+              ],
             ),
           ],
         ),
@@ -179,10 +188,21 @@ class DashboardPage extends ConsumerWidget {
       child: PageBody(
         bottomPadding: 88,
         children: [
-          SunnyWelcome(
-            title: '你好，${user.name}',
-            subtitle: '${dayLabel(DateTime.now())} · 从重要的事开始',
-            pet: CompanionPet.cat,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const TuantuanDecoration('sparkle_pair', size: 42),
+              const SizedBox(width: 4),
+              Expanded(
+                child: SunnyWelcome(
+                  title: '你好，${user.name}',
+                  subtitle: '${dayLabel(DateTime.now())} · 从重要的事开始',
+                  mascotAsset: 'welcome',
+                ),
+              ),
+              const SizedBox(width: 4),
+              const TuantuanDecoration('leaf_cluster', size: 42),
+            ],
           ),
           const SizedBox(height: 20),
           for (var row = 0; row < 2; row++)
@@ -417,7 +437,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                         ],
                       ),
                     ),
-                    const WorkBuddy(size: 52, pose: BuddyPose.writing),
+                    const TuantuanMascot('welcome', size: 62),
                   ],
                 ),
               ),
@@ -701,7 +721,7 @@ class ProfilePage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const PetCompanion(pet: CompanionPet.dog, size: 52),
+                    const TuantuanDecoration('flower_sticker', size: 42),
                   ],
                 ),
                 const SizedBox(height: 16),

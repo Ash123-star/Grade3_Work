@@ -15,6 +15,7 @@ import 'package:pandora_mobile/shared/sunny_button.dart';
 import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/page_states.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/widgets.dart' show notice;
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 
@@ -42,14 +43,14 @@ void main() {
     expect(halfway.canvas, Color.lerp(original.canvas, Colors.black, .5));
     expect(halfway.buttonRadius, 22);
     expect(halfway.pressDuration.inMilliseconds, 200);
-    expect(theme.colorScheme.onPrimaryContainer, const Color(0xFF44210D));
+    expect(theme.colorScheme.onPrimaryContainer, const Color(0xFF246447));
     expect(theme.colorScheme.secondaryContainer, original.ai);
     expect(theme.colorScheme.tertiaryContainer, original.success);
     expect(
       theme.navigationBarTheme.iconTheme!.resolve({
         WidgetState.selected,
       })!.color,
-      const Color(0xFFA7460E),
+      const Color(0xFF319E7A),
     );
   });
 
@@ -148,7 +149,10 @@ void main() {
     t,
   ) async {
     await t.pumpWidget(host(const EmptyIllustration()));
-    expect(t.widget<WorkBuddy>(find.byType(WorkBuddy)).pose, BuddyPose.empty);
+    expect(
+      t.widget<TuantuanMascot>(find.byType(TuantuanMascot)).pose,
+      'empty',
+    );
     await t.pumpWidget(
       host(
         RecordFailure(
@@ -157,7 +161,10 @@ void main() {
         ),
       ),
     );
-    expect(t.widget<WorkBuddy>(find.byType(WorkBuddy)).pose, BuddyPose.retry);
+    expect(
+      t.widget<TuantuanMascot>(find.byType(TuantuanMascot)).pose,
+      'error',
+    );
     await t.pumpWidget(
       host(
         const EmptyIllustration(
@@ -167,7 +174,7 @@ void main() {
         ),
       ),
     );
-    expect(find.byType(WorkBuddy), findsNothing);
+    expect(find.byType(TuantuanMascot), findsNothing);
     expect(find.text('无权访问'), findsOneWidget);
   });
 
@@ -185,12 +192,15 @@ void main() {
     );
     notice(context, '草稿已加密保存到此设备', success: true);
     await t.pump();
-    expect(t.widget<WorkBuddy>(find.byType(WorkBuddy)).pose, BuddyPose.success);
+    expect(
+      t.widget<TuantuanMascot>(find.byType(TuantuanMascot)).pose,
+      'success',
+    );
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     await t.pump();
     notice(context, '修订已提交，等待复核');
     await t.pump();
-    expect(find.byType(WorkBuddy), findsNothing);
+    expect(find.byType(TuantuanMascot), findsNothing);
   });
 
   testWidgets('calendar type toggles expose changed accessibility state', (

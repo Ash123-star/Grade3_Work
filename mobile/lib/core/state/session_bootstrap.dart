@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import '../../data/local/session_store.dart';
 import '../../data/local/secure_values.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/repository.dart';
-import '../../shared/sunny_widgets.dart';
 import '../../theme/app_theme.dart';
 import '../config.dart';
 import '../errors/api_failure.dart';
@@ -204,11 +204,9 @@ class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Center(
-                      child: WorkBuddy(
-                        size: 76,
-                        pose: error == null
-                            ? BuddyPose.explaining
-                            : BuddyPose.retry,
+                      child: TuantuanMascot(
+                        error == null ? 'ai' : 'error',
+                        size: 96,
                       ),
                     ),
                     const SizedBox(height: 24),

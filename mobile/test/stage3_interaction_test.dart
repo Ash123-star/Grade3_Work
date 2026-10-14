@@ -10,7 +10,7 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
-import 'package:pandora_mobile/shared/sunny_widgets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_page.dart';
 
 void main() {
@@ -50,7 +50,7 @@ void main() {
       );
       expect(
         find.byWidgetPredicate(
-          (w) => w is WorkBuddy && w.pose == BuddyPose.success,
+          (w) => w is TuantuanMascot && w.pose == 'success',
         ),
         findsOneWidget,
       );

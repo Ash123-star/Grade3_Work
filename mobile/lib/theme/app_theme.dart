@@ -23,27 +23,30 @@ class PaperLayoutTokens extends ThemeExtension<PaperLayoutTokens> {
 
 /// App-owned semantic roles; cute_ui reads these through its theme extension.
 class SunnyPalette {
-  static const primary = Color(0xFFFF8A24);
-  static const onPrimary = Color(0xFF44210D);
-  static const paper = Color(0xFFFFF8EE);
-  static const surface = Color(0xFFFFFDF8);
-  static const ink = Color(0xFF3C3028);
-  static const muted = Color(0xFF756456);
-  static const mint = Color(0xFFDEF4E6);
-  static const blue = Color(0xFFE2F1FF);
+  static const primary = Color(0xFF55D8A5);
+  static const primaryStrong = Color(0xFF319E7A);
+  static const onPrimary = Color(0xFF193A2D);
+  static const paper = Color(0xFFFFFDF4);
+  static const surface = Color(0xFFFFFFFF);
+  static const ink = Color(0xFF43514B);
+  static const muted = Color(0xFF7F8B83);
+  static const mint = Color(0xFFE6FAEF);
+  static const blue = Color(0xFFDDF1FA);
   static const purple = Color(0xFFF1E7FF);
-  static const orange = Color(0xFFFFE5D2);
-  static const calendarEntries = [orange, mint, blue, purple];
+  static const orange = Color(0xFFFFF4B8);
+  static const coral = Color(0xFFFFE1E1);
+  static const brandOrange = Color(0xFFFF8A24);
+  static const calendarEntries = [coral, mint, blue, purple];
 }
 
 /// Semantic roles owned by the app, separate from immutable illustration colors.
 class SunnyPaperTokens extends ThemeExtension<SunnyPaperTokens> {
   const SunnyPaperTokens({
     this.canvas = SunnyPalette.paper,
-    this.pressed = const Color(0xFFF4770B),
-    this.actionEdge = const Color(0xFFC45E14),
+    this.pressed = const Color(0xFF319E7A),
+    this.actionEdge = const Color(0xFF247B5D),
     this.focus = const Color(0xFF8B4AC9),
-    this.warm = const Color(0xFFFFF0DA),
+    this.warm = const Color(0xFFFFF4B8),
     this.ai = SunnyPalette.purple,
     this.information = SunnyPalette.blue,
     this.success = SunnyPalette.mint,
@@ -137,23 +140,23 @@ ThemeData appTheme() {
     seedColor: SunnyPalette.primary,
     primary: SunnyPalette.primary,
     onPrimary: SunnyPalette.onPrimary,
-    primaryContainer: SunnyPalette.orange,
-    onPrimaryContainer: const Color(0xFF44210D),
+    primaryContainer: SunnyPalette.mint,
+    onPrimaryContainer: const Color(0xFF246447),
     secondary: const Color(0xFF7650B6),
     onSecondary: Colors.white,
     secondaryContainer: const Color(0xFFF1E7FF),
     onSecondaryContainer: const Color(0xFF7650B6),
-    tertiary: const Color(0xFF246447),
+    tertiary: const Color(0xFF319E7A),
     onTertiary: Colors.white,
-    tertiaryContainer: const Color(0xFFDEF4E6),
+    tertiaryContainer: SunnyPalette.mint,
     onTertiaryContainer: const Color(0xFF246447),
     surface: SunnyPalette.surface,
     onSurface: SunnyPalette.ink,
     onSurfaceVariant: SunnyPalette.muted,
-    outline: const Color(0xFF9D8268),
-    outlineVariant: const Color(0xFFEAD4BD),
-    error: const Color(0xFFB33643),
-    errorContainer: const Color(0xFFFFE3E6),
+    outline: const Color(0xFFB7CFC2),
+    outlineVariant: const Color(0xFFE1EEE7),
+    error: const Color(0xFFC94E5B),
+    errorContainer: SunnyPalette.coral,
   );
   return ThemeData(
     useMaterial3: true,
@@ -199,6 +202,38 @@ ThemeData appTheme() {
       side: BorderSide.none,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: SunnyPalette.ink,
+      contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: SunnyPalette.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      titleTextStyle: TextStyle(
+        color: SunnyPalette.ink,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+      ),
+      contentTextStyle: TextStyle(
+        color: SunnyPalette.muted,
+        fontSize: 15,
+        height: 1.5,
+      ),
+    ),
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: SunnyPalette.surface,
+      surfaceTintColor: Colors.transparent,
+      showDragHandle: true,
+      dragHandleColor: Color(0xFFB7CFC2),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      modalElevation: 8,
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: SunnyPalette.paper,
       foregroundColor: SunnyPalette.ink,
@@ -227,7 +262,7 @@ ThemeData appTheme() {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFFA7460E),
+        foregroundColor: SunnyPalette.ink,
         textStyle: const TextStyle(
           fontFamily: 'Roboto',
           fontSize: 16,
@@ -253,15 +288,15 @@ ThemeData appTheme() {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF9D8268), width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFFB7CFC2), width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFA7460E), width: 2),
+        borderSide: const BorderSide(color: Color(0xFF319E7A), width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFB33643), width: 2),
+        borderSide: const BorderSide(color: Color(0xFFC94E5B), width: 2),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -270,12 +305,12 @@ ThemeData appTheme() {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: SunnyPalette.surface,
-      indicatorColor: SunnyPalette.orange,
+      indicatorColor: SunnyPalette.mint,
       height: 76,
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
           color: states.contains(WidgetState.selected)
-              ? const Color(0xFFA7460E)
+              ? const Color(0xFF319E7A)
               : SunnyPalette.muted,
         ),
       ),
@@ -284,7 +319,7 @@ ThemeData appTheme() {
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: states.contains(WidgetState.selected)
-              ? const Color(0xFFA7460E)
+              ? const Color(0xFF319E7A)
               : SunnyPalette.muted,
         ),
       ),

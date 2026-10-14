@@ -10,43 +10,45 @@ import 'package:forui/forui.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
-import 'package:pandora_mobile/shared/curated_assets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'support/local_test_state.dart';
 
 void main() {
-  testWidgets('theme color and decorative input semantics stay local', (
+  testWidgets('generated UI assets keep sizing and decorative semantics local', (
     t,
   ) async {
     await t.pumpWidget(
       const MaterialApp(
         home: IconTheme(
           data: IconThemeData(color: Color(0xFFC45E14), size: 30),
-          child: Row(children: [AppArtworkIcon('cat'), PetCompanion()]),
+          child: Row(
+            children: [
+              TuantuanIcon('task', size: 30),
+              TuantuanMascot('welcome', size: 48),
+            ],
+          ),
         ),
       ),
     );
     await settleLocalIo(t);
-    final artwork = t.widget<SvgPicture>(
+    final artwork = t.widget<Image>(
       find.descendant(
-        of: find.byType(AppArtworkIcon),
-        matching: find.byType(SvgPicture),
+        of: find.byType(TuantuanIcon),
+        matching: find.byType(Image),
       ),
-    );
-    expect(
-      artwork.colorFilter,
-      const ColorFilter.mode(Color(0xFFC45E14), BlendMode.srcIn),
     );
     expect(artwork.width, 30);
     expect(
       find.descendant(
-        of: find.byType(PetCompanion),
+        of: find.byType(TuantuanMascot),
         matching: find.byType(IgnorePointer),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
-        of: find.byType(PetCompanion),
+        of: find.byType(TuantuanMascot),
         matching: find.byType(ExcludeSemantics),
       ),
       findsOneWidget,
@@ -77,7 +79,7 @@ void main() {
   );
 
   testWidgets(
-    'orange badges and pet decoration preserve narrow and scaled navigation',
+    'semantic badges and mascot decoration preserve narrow and scaled navigation',
     (t) async {
       final font = FontLoader('Roboto')
         ..addFont(
@@ -130,7 +132,7 @@ void main() {
               format: ui.ImageByteFormat.png,
             );
             final file = File(
-              'docs/evidence/restored-icons/$captureName-${width.toInt()}.png',
+              '${Directory.systemTemp.path}/pandora-ui-evidence/restored-icons/$captureName-${width.toInt()}.png',
             );
             file.parent.createSync(recursive: true);
             file.writeAsBytesSync(data!.buffer.asUint8List());
@@ -155,10 +157,10 @@ void main() {
           }
           expect(t.takeException(), isNull, reason: '$name $width');
           if (name == 'dashboard') {
-            expect(find.byType(PetCompanion), findsOneWidget);
+            expect(find.byType(TuantuanMascot), findsOneWidget);
             expect(
-              find.byType(AppArtworkIcon).evaluate().length,
-              greaterThanOrEqualTo(9),
+              find.byType(TuantuanIcon).evaluate().length,
+              greaterThanOrEqualTo(2),
             );
             expect(
               t
@@ -179,10 +181,10 @@ void main() {
                       ).badgeStyles.primary,
                     )
                     as FBadgeStyle;
-            expect(style.decoration.color, const Color(0xFFFFE5D2));
+            expect(style.decoration.color, SunnyPalette.orange);
             expect(
               find.ancestor(
-                of: find.byType(PetCompanion),
+                of: find.byType(TuantuanDecoration),
                 matching: find.byType(Row),
               ),
               findsWidgets,

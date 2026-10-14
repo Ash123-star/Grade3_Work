@@ -2,7 +2,7 @@ import 'package:pandora_mobile/shared/sunny_button.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pandora_mobile/shared/sunny_widgets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'providers.dart';
 import 'local_state.dart';
 import '../config.dart';
@@ -129,11 +129,9 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Center(
-                          child: WorkBuddy(
-                            size: 76,
-                            pose: check.hasError
-                                ? BuddyPose.retry
-                                : BuddyPose.explaining,
+                          child: TuantuanMascot(
+                            check.hasError ? 'error' : 'ai',
+                            size: 96,
                           ),
                         ),
                         const SizedBox(height: 24),

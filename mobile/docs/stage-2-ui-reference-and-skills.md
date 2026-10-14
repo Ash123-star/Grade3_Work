@@ -1,4 +1,6 @@
-# 阶段 2：已选视觉参考与 Flutter 设计工具
+# 阶段 2：已选视觉参考与 Flutter 设计工具（历史）
+
+> 历史文档：当前视觉基线已切换为[团团记账气质 UI 设计基线](tuantuan-ui-design-system.md)。本文保留工具和参考选择记录，不再指导新页面的颜色、角色或组件实现。
 
 更新：2026-10-12。方向已确定为阳光纸张、动漫橙、Q 版人物、圆润组件。本文替代旧等待选择及沿用薄荷绿建议；数值见 [新版规范](stage-2-sunny-paper-design-system-plan.md)，查阅证据见 [主题研究](stage-2-ui-theme-research.md)。
 

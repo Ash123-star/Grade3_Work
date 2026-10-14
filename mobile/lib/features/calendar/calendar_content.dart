@@ -7,6 +7,7 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 
 class CalendarEvent {
   const CalendarEvent(
@@ -273,11 +274,9 @@ class _EventRow extends StatelessWidget {
             color: event.color,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            event.resource == 'tasks'
-                ? Icons.assignment_outlined
-                : Icons.edit_note,
-            size: 20,
+          child: TuantuanIcon(
+            event.resource == 'tasks' ? 'task' : 'log',
+            size: 34,
           ),
         ),
         const SizedBox(width: 12),

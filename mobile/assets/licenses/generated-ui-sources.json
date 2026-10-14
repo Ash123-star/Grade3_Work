@@ -1,0 +1,19 @@
+{
+  "source_type": "user_provided_local_assets",
+  "received_at": "2026-10-14",
+  "source_path": "D:/Github/Grade3_Work/mobile/assets/resources",
+  "model": "image-2.5 (user-generated pack)",
+  "license_note": "User supplied the generated asset pack for this project. Retain the original files and review applicable model terms before public distribution.",
+  "third_party_brands_or_characters": [],
+  "derived_assets": {
+    "source": "装饰性素材.png",
+    "method": "4x4 grid crop using System.Drawing, preserving PNG alpha",
+    "output_directory": "mobile/assets/generated_ui/decorations"
+  },
+  "review": {
+    "transparent_background_checked": true,
+    "text_and_logo_checked": true,
+    "copyright_character_checked": true,
+    "approved_for_product": false
+  }
+}

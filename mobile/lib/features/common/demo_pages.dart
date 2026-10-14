@@ -8,8 +8,8 @@ import 'package:cute_ui/cute_ui.dart'
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
-import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/data/repositories/complete_list.dart';
 import 'package:pandora_mobile/shared/diary_task_links.dart';
@@ -627,13 +627,13 @@ class _GuidePageState extends State<GuidePage> {
     child: PageBody(
       children: [
         const SizedBox(height: 32),
-        WorkBuddy(
-          size: 100,
-          pose: step == 0
-              ? BuddyPose.welcome
+        TuantuanMascot(
+          step == 0
+              ? 'welcome'
               : step == 1
-              ? BuddyPose.writing
-              : BuddyPose.explaining,
+              ? 'empty'
+              : 'ai',
+          size: 120,
         ),
         const SizedBox(height: 24),
         Text(

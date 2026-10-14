@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 
 enum BuddyPose { welcome, writing, explaining, success, empty, retry }
 
@@ -289,24 +290,26 @@ class SunnyWelcome extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
-    this.color = const Color(0xFFFFF0DA),
+    this.color = const Color(0xFFE6FAEF),
     this.pose = BuddyPose.welcome,
     this.pet,
+    this.mascotAsset,
   });
   final String title, subtitle;
   final Color color;
   final BuddyPose pose;
   final CompanionPet? pet;
+  final String? mascotAsset;
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: const Color(0xFFE4C6A5), width: 1.2),
+      border: Border.all(color: const Color(0xFFB7CFC2), width: 1.2),
       boxShadow: const [
         BoxShadow(
-          color: Color(0x1279502E),
+          color: Color(0x143E6654),
           offset: Offset(0, 3),
           blurRadius: 8,
         ),
@@ -328,7 +331,9 @@ class SunnyWelcome extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        if (pet case final companion?)
+        if (mascotAsset case final asset?)
+          TuantuanMascot(asset, size: 96)
+        else if (pet case final companion?)
           PetCompanion(pet: companion)
         else
           WorkBuddy(size: 52, pose: pose),

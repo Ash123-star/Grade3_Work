@@ -11,8 +11,8 @@ import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
-import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/models/diary_task_links.dart';
@@ -1114,7 +1114,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                     ],
                   ),
                 ),
-                const WorkBuddy(size: 76),
+                const TuantuanMascot('welcome', size: 96),
               ],
             ),
             const SizedBox(height: 24),
@@ -1186,7 +1186,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const WorkBuddy(size: 40, pose: BuddyPose.writing),
+                const TuantuanMascot('welcome', size: 56),
               ],
             ),
             const SizedBox(height: 16),

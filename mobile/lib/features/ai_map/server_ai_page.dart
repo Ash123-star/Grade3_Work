@@ -438,6 +438,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
             title: '把下一步想清楚',
             subtitle: '先看建议，再核对来源',
             color: Color(0xFFF1E7FF),
+            mascotAsset: 'ai',
           ),
           const SizedBox(height: 12),
           if (error != null)

@@ -1,13 +1,13 @@
 # Flutter 阶段 3：页面布局与交互设计
 
-状态：沿用本文和两张八屏批准稿重建，已按OpenSpec2.25/2.26补齐日志显式阅读登记与原关系图依赖布局/来源行动阅读；最终验收及逐页原设计对应表见stage-3-verification.md。55单页Flutter证据，本地211Mock/181正式HTTP契约与分析通过。真实服务器/设备/供应商/远程交付未完成。原设计保持实施基线。
-日期：2026-10-12。设计主题固定为阳光纸张、动漫橙、原创 Q 版工作伙伴。
+状态：沿用本文和两张八屏批准稿重建，已按OpenSpec2.25/2.26补齐日志显式阅读登记与原关系图依赖布局/来源行动阅读；最终验收及逐页原设计对应表见stage-3-verification.md。55单页Flutter证据，本地211Mock/181正式HTTP契约与分析通过。真实服务器/设备/供应商/远程交付未完成。本文继续作为业务结构、导航、权限和页面行为参考，视觉样式以[团团记账气质 UI 设计基线](tuantuan-ui-design-system.md)为准。
+日期：2026-10-13。视觉主题已切换为团团记账式温暖卡通生产力 App，保留原创 Q 版角色和现有橙色作为局部品牌强调。
 
 ## 1. 本轮目标与依据
 
 本轮解决“每页该放什么、怎么排列、用户先看什么、下一步点哪里”。参照同类产品的信息架构（内容分组）、页面布局（空间排列）与交互模式（选择日期、编辑、返回等习惯），不复制竞品品牌、人物或素材。
 
-依据：根目录 `方案.md` 第 2～7 节、仓库 AGENTS.md、[阶段 0](stage-0-requirements-scope.md)、[阶段 1](stage-1-route-and-flow-design.md)、[阶段 2](stage-2-sunny-paper-design-system-plan.md)、`lib/features/common/catalog.dart` 与现有路由和数据层。
+依据：根目录 `方案.md` 第 2～7 节、仓库 AGENTS.md、[阶段 0](stage-0-requirements-scope.md)、[阶段 1](stage-1-route-and-flow-design.md)、[团团记账气质 UI 设计基线](tuantuan-ui-design-system.md)、`lib/features/common/catalog.dart` 与现有路由和数据层。
 
 范围：五个主页，以及认证、任务、日志、重点、AI、成员、审批、通知、统计、管理、设置、帮助和异常页的布局契约。设计阶段只修改文档和原型；用户现已授权按本方案重建全部 Flutter 页面布局。API、数据库和权限契约不因视觉设计改变。
 

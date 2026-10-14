@@ -14,6 +14,14 @@ Android Studio 打开 `mobile/` 后，运行配置选择 **UI Demo**（`.run/UI 
 D:\flutter\bin\flutter.bat run --dart-define=USE_MOCK=true
 ```
 
+生成可安装的 Mock APK 必须在构建时传入同一个编译期参数；仅在 Android Studio 的运行配置中切换后端地址不会改变 `AppConfig.mock`：
+
+```powershell
+D:\flutter\bin\flutter.bat build apk --release --dart-define=USE_MOCK=true
+```
+
+产物位于 `build/app/outputs/flutter-apk/app-release.apk`。当前交付副本为 `build/app/outputs/flutter-apk/pandora-mock-release.apk`。安装后不需要连接真实后端，数据来自本地 Mock Repository；Hot Reload 不会改变已编译 APK 的模式。
+
 真实联调选择 **Android Backend**，先启动后端（8080）。默认真实模式未登录时进入登录页是正常行为；Android 模拟器的 `localhost` 指向模拟器自身，访问电脑使用 `http://10.0.2.2:8080/api`。Android 默认开发地址已改为该地址；Web/桌面仍是 localhost。真机需通过 `API_BASE_URL` 指定电脑局域网地址或 HTTPS 服务。
 
 ```powershell
@@ -68,11 +76,11 @@ flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5175
 
 真实模式通过 `--dart-define=USE_MOCK=false --dart-define=API_BASE_URL=https://example.com/api` 启用，不会在 HTTP 失败时回退为虚假成功。请先按 docs/API_CONTRACT.md 对齐接口。鉴权、组织范围、审批路由和 AI 安全由服务端负责，客户端 guard 仅用于交互限制。
 
-## 当前 UI 设计基线（2026-10-12）
+## 当前 UI 设计基线（2026-10-13）
 
-用户已确定“阳光纸张 + 动漫橙 + Q 版人物 + 圆润组件”。后续实现以 [阶段 2 主题规范](docs/stage-2-sunny-paper-design-system-plan.md) 为唯一基线；参考与取舍见 [官方研究](docs/stage-2-ui-theme-research.md)，示意见 [风格板](docs/stage-2-anime-orange-style-board.svg)。
+后续实现以[团团记账气质 UI 设计基线](docs/tuantuan-ui-design-system.md)为唯一视觉基线：奶油纸张、薄荷主色、浅黄/珊瑚/浅蓝语义分区、圆角卡片、原创 Q 版小猪角色、彩色业务图标和克制动效。旧的“阳光纸张 + 动漫橙”文档保留为历史研究，不能继续作为新页面的视觉规范。素材生成规则见[image-2.5 素材提示词](docs/image-2.5-ui-asset-generation-prompts.md)。
 
-2026-10-13 已依 [阶段 3 设计](docs/stage-3-page-layout-and-interaction-design.md) 重建五个主页、连续日志编辑、任务时间线和审批对比布局，同时重排辅助表单、成员、设置和状态页，补齐验收成果、转派旧值、本人时间线与只读日志版本。正式附件、AI、管理/统计和安全草稿/会话恢复客户端已接现有契约；本批继续补齐原阶段2语义主题、主按钮完整状态、六姿态人物与橙色导航。[实际 Flutter 八屏截图](docs/evidence/stage3-rebuild/stage3-rebuild-contact-sheet.png)、[组件与六姿态](docs/evidence/stage3-rebuild/41-sunny-component-states.png) 与[验收记录](docs/stage-3-verification.md) 可对照原设计，最新命令结果以验收记录为准。本环境按用户要求不构建APK。[离线原型](prototypes/stage-3-pages/index.html) 是设计样例。帮助反馈/退回补充/精细AI范围缺少现有服务端契约，真实服务/数据库/设备尚未联调，不能视为线上能力完成。
+2026-10-13 已依 [阶段 3 设计](docs/stage-3-page-layout-and-interaction-design.md) 重建五个主页、连续日志编辑、任务时间线和审批对比布局，同时重排辅助表单、成员、设置和状态页，补齐验收成果、转派旧值、本人时间线与只读日志版本。正式附件、AI、管理/统计和安全草稿/会话恢复客户端已接现有契约；[实际 Flutter 八屏截图](docs/evidence/stage3-rebuild/stage3-rebuild-contact-sheet.png)、[组件与六姿态](docs/evidence/stage3-rebuild/41-sunny-component-states.png) 与[验收记录](docs/stage-3-verification.md)属于上一轮阳光纸张/动漫橙主题实现，不能证明团团记账新视觉已完成。团团记账风格目前处于设计基线和素材生成阶段，后续需按新文档重新迁移组件和页面。帮助反馈/退回补充/精细AI范围缺少现有服务端契约，真实服务/数据库/设备尚未联调，不能视为线上能力完成。
 
 ## 素材与许可
 
@@ -104,7 +112,7 @@ OpenMoji 通过 flutter_svg 从本地 assets 加载。作者、来源和 CC BY-S
 
 ## 当前正式页面接入（2026-10-13）
 
-阶段2阳光纸张/动漫橙、阶段3文档与两张参考板为UI基线；重做及验收记录见docs/stage-3-verification.md，历史演示记录不能证明正式服务完成。正式AI支持既有作业创建/SSE/状态/取消/重试、来源阅读、人工草稿编辑、显式任务确认、地图/用量；范围由服务端身份决定，未配置供应商显示明确错误，基础业务不依赖AI。附件上传/下载和头像使用真实受控ID/字节，CSV使用已有同步接口，均有客户端HTTP/UI验证；真实服务器、数据库和设备尚需联调。演示须显式USE_MOCK=true，固定建议不冒充正式结果。原生加密Drift草稿/精确旧稿迁移、安全会话与启动身份验证已编写并有本地测试，AndroidKeystore/原生SQLite仍待设备验收，见docs/secure-local-state-verification.md。浏览器不持久化安全材料，只保留当前运行会话；支持反馈仍缺服务器契约。不构建APK。
+团团记账气质 UI 基线与阶段3业务布局共同指导后续开发；上一轮阳光纸张/动漫橙实现及验收记录见docs/stage-3-verification.md，不能证明新视觉已完成，历史演示记录也不能证明正式服务完成。正式AI支持既有作业创建/SSE/状态/取消/重试、来源阅读、人工草稿编辑、显式任务确认、地图/用量；范围由服务端身份决定，未配置供应商显示明确错误，基础业务不依赖AI。附件上传/下载和头像使用真实受控ID/字节，CSV使用已有同步接口，均有客户端HTTP/UI验证；真实服务器、数据库和设备尚需联调。演示须显式USE_MOCK=true，固定建议不冒充正式结果。原生加密Drift草稿/精确旧稿迁移、安全会话与启动身份验证已编写并有本地测试，AndroidKeystore/原生SQLite仍待设备验收，见docs/secure-local-state-verification.md。浏览器不持久化安全材料，只保留当前运行会话；支持反馈仍缺服务器契约。不构建APK。
 
 2026-10-13 原设计补齐task2.20：日历/日志/报告完整分页、上海日期、正式日报聚合与草稿区分、周日期和未设时段固定上下文及滚动恢复已验收。最新144Mock/116formalHTTP、分析exit0，46单页截图；详见[验收记录](docs/stage-3-verification.md)。尚未完成真实服务/设备及产品契约缺口，不代表整体交付完成。
 
