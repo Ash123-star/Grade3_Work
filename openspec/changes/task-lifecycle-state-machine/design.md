@@ -25,7 +25,7 @@
 `读取范围(404) → 请求格式(400) → 角色(403) → 版本(409 VERSION_CONFLICT) → 状态(409 INVALID_TRANSITION)`。实现：`SELECT ... FOR UPDATE` 锁行后，在内存中比较 `version`，再判定状态，最后 `UPDATE ... WHERE id=? AND version=?` 作为二次保护。版本先于状态判定，保证持旧版本的客户端总是被提示刷新，而不是看到误导性的状态错误。
 
 ### 3. 转派、改期走候选修订
-新接口 `POST /api/tasks/{id}/reassignments {ownerId, version, reason}`、`POST /api/tasks/{id}/reschedules {deadline, version, reason}`：校验后调用现有 `Reviews.create(actor, kind, ...)`，`kind` 分别为 `TASK_REASSIGN`、`TASK_RESCHEDULE`；`candidate` 只含变化字段。`Reviews.apply` 对这两种 kind 及原 `TASK` 委托 `TaskRevisionService.apply(kind, ...)`。复核链计算沿用 `TASK` 的规则，不修改 `Reviews` 中的路由与策略代码，只在 kind 白名单和分派处增加两个分支。
+新接口 `POST /api/tasks/{id}/reassignments {ownerId, version, reason}`、`POST /api/tasks/{id}/reschedules {deadline, version, reason}`：校验后调用现有 `Reviews.create(actor, kind, ...)`，`kind` 分别为 `TASK_REASSIGN`、`TASK_RESCHEDULE`；`candidate` 只含变化字段。`Reviews.apply` 对这两种 kind 及原 `TASK` 委托 `TaskRevisionService.apply(kind, ...)`。复核链计算沿用 `TASK` 的规则，不修改 `Reviews` 中的路由与策略代码，只在 kind 白名单和分派处增加两个分支。由于 V4 已发布的 `review_requests_kind_valid` 不含这两个 kind，V10 必须以前向迁移替换该约束；不改写 V4。
 - 转派生效：锁任务 → 比较 `expected_version` → 状态非终态 → 新负责人仍有效 → 更新 `owner_id`、`task_assignees`（删除旧 PRIMARY、删除新负责人的 COLLABORATOR 行、插入新 PRIMARY）→ `phase='DISPATCHED'` → 事件 `REASSIGNED {fromOwnerId,toOwnerId,reason}`。
 - 改期生效：更新 `deadline` 与 `body.deadline`，保持 `phase`，事件 `RESCHEDULED {fromDeadline,toDeadline,reason}`。
 - 原 `TASK` 通用修订：保持现行为（内容替换），但不再改 `owner_id`/`deadline`——这两项必须走专门接口；通用修订候选中 `ownerId`、`deadline` 与当前值不同时返回 400 `USE_DEDICATED_REVISION`。通用修订生效时保持当前状态，不再强制回到 `DISPATCHED`。
@@ -50,7 +50,8 @@ V6 为 `task_events` 增加 `from_phase text`、`to_phase text`、`task_version 
 ## Migration Plan
 
 1. V6 只加列与替换约束，可在线执行；替换约束前确认无历史行违反新约束（新约束是旧约束的超集）。
-2. 回滚：旧代码不读取新列，新事件类型 `RETURNED/REASSIGNED/RESCHEDULED` 旧代码按普通事件展示；不提供向下迁移。
+2. V10 替换 `review_requests_kind_valid`，新约束是 V4 白名单的超集，保留所有既有复核记录。
+3. 回滚：旧代码不读取新列，新事件类型 `RETURNED/REASSIGNED/RESCHEDULED` 旧代码按普通事件展示；不提供向下迁移。
 
 ## Open Questions
 
