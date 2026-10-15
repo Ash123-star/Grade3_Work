@@ -6,6 +6,8 @@
 
 ## 运行
 
+2026-10-15 整合：真实模式 AI 地图工具栏的“长期记忆与发展分析”入口打开 `/ai/memory`，保留原有 AI 作业、建议编辑和人工确认流程。后端需要执行 V10/V11 记忆迁移，整合与验收边界见 `../docs/local-memory-integration.md`。
+
 ### UI 演示与真实后端启动（2026-10-12）
 
 Android Studio 打开 `mobile/` 后，运行配置选择 **UI Demo**（`.run/UI Demo.run.xml`），用于评审本轮界面，无需注册或启动后端。或者在现有 `main.dart` 配置的 Additional run args 填写 `--dart-define=USE_MOCK=true`。**必须停止后重新运行，Hot Reload 不会修改 dart-define。**

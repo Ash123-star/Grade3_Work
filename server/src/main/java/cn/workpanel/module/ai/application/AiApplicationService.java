@@ -81,7 +81,7 @@ public class AiApplicationService {
             var j=db.one("SELECT * FROM ai_jobs WHERE id=?",id); Actor a=currentOwner(j);
             var old=db.read(j.get("input")); var input=new LinkedHashMap<>(context(a,Db.required(old,"date"),Db.required(old,"period"))); options(input,old); db.update("UPDATE ai_jobs SET input=?::jsonb WHERE id=?",db.write(input),id);
             reserve=db.write(input).length()+maxTokens+1000L; budgetKey="workpanel:ai-budget:"+a.id()+":"+LocalDate.now(ZoneOffset.UTC);
-            long persisted=db.count("SELECT coalesce(sum(tokens),0) FROM ai_jobs WHERE owner_id=? AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",a.id());
+            long persisted=db.count("SELECT coalesce(sum(tokens),0) FROM ai_jobs WHERE owner_id=? AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",a.id())+db.count("SELECT coalesce(sum(tokens),0) FROM memory_model_calls WHERE company_id=? AND owner_id=? AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",a.company(),a.id());
             if(persisted+reserve>daily) { reserve=0; throw new ApiError(429,"AI_BUDGET","每日 AI 预算不足"); }
             Long budget=redis.execute(new DefaultRedisScript<>("local n=tonumber(redis.call('GET',KEYS[1]) or '0'); if n+tonumber(ARGV[1])>tonumber(ARGV[2]) then return -1 end; redis.call('INCRBY',KEYS[1],ARGV[1]); redis.call('EXPIRE',KEYS[1],172800); return n+tonumber(ARGV[1])",Long.class),List.of(budgetKey),String.valueOf(reserve),String.valueOf(daily));
             if(budget==null||budget<0) { reserve=0; throw new ApiError(429,"AI_BUDGET","每日 AI 预算不足"); }
@@ -143,7 +143,7 @@ public class AiApplicationService {
         output.put("generatedAt",Instant.now().toString()); output.put("draft",true); return output;
     }
     public static List<Map<String,Object>> maps(Map<String,Object> m,String key,int max) { if(!(m.get(key) instanceof List<?> list)||list.size()>max) throw ApiError.bad("AI_SCHEMA","AI 结构无效"); var result=new ArrayList<Map<String,Object>>(); for(Object item:list) { if(!(item instanceof Map<?,?>)) throw ApiError.bad("AI_SCHEMA","AI 结构无效"); @SuppressWarnings("unchecked") var row=(Map<String,Object>)item; result.add(row); } return result; }
-    static void validateRefs(Map<String,Object> m,Set<String> allowed,boolean required) { var ids=Business.strings(m,"sourceIds"); if(required&&ids.isEmpty()||!allowed.containsAll(ids)) throw ApiError.bad("AI_SOURCE","AI 来源无效"); }
+    public static void validateRefs(Map<String,Object> m,Set<String> allowed,boolean required) { var ids=Business.strings(m,"sourceIds"); if(required&&ids.isEmpty()||!allowed.containsAll(ids)) throw ApiError.bad("AI_SOURCE","AI 来源无效"); }
     public void validateSources(Actor a,Map<String,Object> output) { var refs=new HashSet<>(Business.strings(output,"sourceIds")); for(String kind:List.of("nodes","actions")) for(var item:maps(output,kind,10)) refs.addAll(Business.strings(item,"sourceIds")); for(String ref:refs) { if(ref.startsWith("task:")) business.task(a,ref.substring(5),false); else if(ref.startsWith("log:")) business.log(a,ref.substring(4),false); else if(ref.startsWith("item:")) db.one("SELECT id FROM dashboard_items WHERE id=? AND owner_id=? AND company_id=?",ref.substring(5),a.id(),a.company()); else throw ApiError.forbidden(); } }
     public void cancel(Actor a,String id) {
         job(a,id); int n=db.update("UPDATE ai_jobs SET state='CANCELLED',version=version+1,finished_at=now() WHERE id=? AND state IN ('QUEUED','RUNNING')",id); if(n==0) throw ApiError.conflict();

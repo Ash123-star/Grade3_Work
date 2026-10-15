@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** 真实 PostgreSQL/Redis + HTTP 端到端；只有外部 DeepSeek 使用模拟服务。 */
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties={
     "app.admin-account=integration-admin", "app.admin-password=Initial-test-password-2026",
-    "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.ai-timeout-seconds=2"
+    "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.ai-timeout-seconds=2", "app.memory-extract-enabled=false"
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -34,6 +34,11 @@ class BackendIntegrationTest {
     @Autowired cn.workpanel.module.message.application.MessageApplicationService messages;
     @Autowired Limiter limiter;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Autowired Memory memory;
+    @Autowired Rag rag;
+    @Autowired Development development;
+    @Autowired MemoryGraph memoryGraph;
+    @Autowired MemoryExtraction extraction;
     static final ObjectMapper JSON=new ObjectMapper();
     static final AtomicReference<String> providerMode=new AtomicReference<>("OK");
     static final AtomicInteger providerCalls=new AtomicInteger();
@@ -58,6 +63,13 @@ class BackendIntegrationTest {
                 String request=new String(exchange.getRequestBody().readAllBytes(),StandardCharsets.UTF_8); providerInput.set(request);
                 String mode=providerMode.get();
                 if(mode.equals("FAIL")||mode.equals("FAIL_FIRST")&&providerMode.compareAndSet("FAIL_FIRST","OK")) { exchange.sendResponseHeaders(503,-1); exchange.close(); return; }
+                if(!JSON.readTree(request).get("stream").asBoolean()) {
+                    JsonNode input=JSON.readTree(JSON.readTree(request).at("/messages/1/content").asText());
+                    String ref=input.has("sources")&&input.get("sources").size()>0?input.get("sources").get(0).get("id").asText():"";
+                    String json=input.has("sources")?JSON.writeValueAsString(Map.of("summary","根据有效成果探索技术实践","directions",List.of(Map.of("text",mode.equals("UNSUPPORTED_FACT")?"已获得高级架构师认证并提升了80%业绩":"尝试小模块设计","sourceIds",List.of(mode.equals("INVALID")?"forged":ref),"conditions",List.of("本人目标为技术方向"))),"gaps",List.of("独立设计验收记录"),"suggestions",List.of(Map.of("text","设计一个小模块","sourceIds",List.of(ref),"validation","记录评审与交付反馈")))):mode.startsWith("EXTRACT_")?JSON.writeValueAsString(Map.of("candidates",List.of(Map.of("content","有模块设计实践的观察","category","SKILL","quote",mode.equals("EXTRACT_INVALID")?"原文没有的伪证据":input.get("text").asText().substring(0,4),"selectionReason","原文包含设计经历")))):"{\"candidates\":[]}";
+                    byte[] reply=JSON.writeValueAsBytes(Map.of("choices",List.of(Map.of("message",Map.of("content",json))),"usage",Map.of("total_tokens",100)));
+                    exchange.getResponseHeaders().set("Content-Type","application/json");exchange.sendResponseHeaders(200,reply.length);exchange.getResponseBody().write(reply);exchange.close();return;
+                }
                 exchange.getResponseHeaders().set("Content-Type","text/event-stream; charset=UTF-8"); exchange.sendResponseHeaders(200,0);
                 try(var out=exchange.getResponseBody()) {
                     if(mode.equals("SLOW")) {
@@ -128,6 +140,14 @@ class BackendIntegrationTest {
         assertEquals("UP",get("/health",null).get("status").asText());
         var contract=get("/openapi",null); assertTrue(contract.has("paths")); assertEquals("#/components/schemas/TaskDraft",contract.at("/paths/~1api~1tasks/post/requestBody/content/application~1json/schema/$ref").asText());
         assertTrue(contract.at("/components/schemas/TaskDraft/properties/title").isObject()); assertEquals("/",contract.at("/servers/0/url").asText());
+        assertEquals("#/components/schemas/DevelopmentJob",contract.at("/paths/~1api~1ai-maps~1development~1jobs/post/responses/202/content/application~1json/schema/$ref").asText());
+        assertEquals("#/components/schemas/KnowledgeStatus",contract.at("/paths/~1api~1ai-memories~1knowledge-status/get/responses/200/content/application~1json/schema/$ref").asText());
+        assertEquals("#/components/schemas/MemoryForgetJob",contract.at("/paths/~1api~1ai-memories~1{id}/delete/responses/202/content/application~1json/schema/$ref").asText());
+        assertEquals("#/components/schemas/MemoryMutation",contract.at("/paths/~1api~1ai-memories/post/responses/200/content/application~1json/schema/$ref").asText());
+        assertEquals("#/components/schemas/DevelopmentFeedbackResult",contract.at("/paths/~1api~1ai-maps~1development~1{id}~1feedback/post/responses/200/content/application~1json/schema/$ref").asText());
+        assertEquals("#/components/schemas/KnowledgeIndexRebuild",contract.at("/paths/~1api~1ai-memories~1index-rebuild/post/responses/202/content/application~1json/schema/$ref").asText());
+        assertEquals("#/components/schemas/KnowledgeIndexRetry",contract.at("/paths/~1api~1ai-memories~1index-jobs~1{id}~1retry/post/responses/202/content/application~1json/schema/$ref").asText());
+        assertEquals("#/components/schemas/AiJobRequest",contract.at("/paths/~1api~1ai~1jobs/post/requestBody/content/application~1json/schema/$ref").asText());
         java.nio.file.Files.writeString(java.nio.file.Path.of("../docs/openapi.json"),JSON.writerWithDefaultPrettyPrinter().writeValueAsString(contract),StandardCharsets.UTF_8);
         call(401,"GET","/dashboard",null,null,null);
         login("integration-admin","Initial-test-password-2026"); ids.put("integration-admin",get("/auth/me","integration-admin").get("id").asText());
@@ -158,7 +178,10 @@ class BackendIntegrationTest {
         for(String who:List.of("alice","bob","leader","director","founder")) approve(register(who,who.equals("bob")||who.equals("founder")?"marketing":"product",ids.size()+1),who);
         var teamRequest=post("/organization/teams/revisions","integration-admin",Map.of("name","产品团队","departmentId","product","version",0,"reason","建立团队")); team=teamRequest.get("target_id").asText(); approve(teamRequest.get("id").asText(),"integration-admin");
         configure("alice",Map.of("teamId",team)); configure("reviewer",Map.of("teamId",team)); configure("leader",Map.of("teamId",team,"role","LEADER")); configure("director",Map.of("role","DIRECTOR")); configure("founder",Map.of("role","FOUNDER"));
-        assertEquals(2,get("/organization/people?dispatch=true","leader").get("total").asInt());
+        var dispatchPeople=get("/organization/people?dispatch=true","leader");
+        assertEquals(3,dispatchPeople.get("total").asInt());
+        var dispatchIds=new HashSet<String>(); dispatchPeople.get("items").forEach(person->dispatchIds.add(person.get("id").asText()));
+        assertEquals(Set.of(ids.get("alice"),ids.get("reviewer"),ids.get("leader")),dispatchIds);
         assertTrue(get("/organization/people?dispatch=true&search=市场","leader").get("items").isEmpty());
         call(403,"GET","/profiles/"+ids.get("bob"),"leader",null,null);
         call(400,"POST","/auth/register",null,Map.of("account","bad","password","短密码","phone","13800000099","name","bad","departmentId","product"),null);
@@ -260,7 +283,9 @@ class BackendIntegrationTest {
         messages.reminders(); long reminders=db.count("SELECT count(*) FROM outbox_events WHERE type='DEADLINE'"); messages.reminders(); assertEquals(reminders,db.count("SELECT count(*) FROM outbox_events WHERE type='DEADLINE'"));
         var stream=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/notifications/stream")).header("Authorization","Bearer "+tokens.get("alice")).header("Last-Event-ID","0").GET().build(),HttpResponse.BodyHandlers.ofInputStream());
         assertEquals(200,stream.statusCode()); try(var reader=new java.io.BufferedReader(new java.io.InputStreamReader(stream.body(),StandardCharsets.UTF_8))) { StringBuilder event=new StringBuilder(); String line; while((line=reader.readLine())!=null&&!line.isEmpty()) event.append(line).append('\n'); assertTrue(event.toString().contains("event:notification")); assertTrue(event.toString().contains("id:")); }
-        post("/notifications/read-all","alice",Map.of()); assertEquals(0,get("/notifications","alice").get("unread").asInt());
+        long existing=db.count("SELECT count(*) FROM notifications WHERE recipient_id=?",ids.get("alice"));
+        post("/notifications/read-all","alice",Map.of());
+        assertTrue(db.count("SELECT count(*) FROM notifications WHERE recipient_id=? AND is_read",ids.get("alice"))>=existing);
     }
     @Test @Order(8) void deepSeekDraftSourcesMapsAndExplicitConfirmation() throws Exception {
         providerMode.set("FAIL_FIRST"); int before=providerCalls.get(); long tasksBefore=db.count("SELECT count(*) FROM tasks");
@@ -307,5 +332,245 @@ class BackendIntegrationTest {
         call(404,"GET","/profiles/other-user","founder",null,null);
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->db.update("INSERT INTO tasks(id,company_id,owner_id,issuer_id,title,deadline,body) VALUES ('cross-tenant','default','other-user',?,'错误',now(),'{}')",ids.get("integration-admin")));
         assertTrue(get("/organization/audit","integration-admin").get("total").asInt()>0);
+    }
+    @Test @Order(11) void memoryKnowledgeRagPrivacyRevisionAndForget() throws Exception {
+        redis.delete("workpanel:api:"+ids.get("alice"));
+        memory.process();
+        Actor alice=Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("alice")));
+        var personal=new Memory.Scope("PERSONAL","SELF",alice.id());
+        long before=db.count("SELECT count(*) FROM memory_items WHERE owner_id=?",alice.id());
+        memory.backfill(Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("integration-admin"))),0,100);
+        memory.process();assertEquals(before,db.count("SELECT count(*) FROM memory_items WHERE owner_id=?",alice.id()));
+        var draft=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",LocalDate.parse(date).minusDays(1).toString(),"version",0,"body",Map.of("work","private-draft-should-not-enter-memory")),null);
+        memory.process();assertEquals(0,db.count("SELECT count(*) FROM memory_items WHERE source_type='LOG' AND source_id=?",draft.get("id").asText()));
+        call(403,"GET","/ai-memories?domain=PERSONAL&scopeId="+alice.id(),"founder",null,null);
+        call(403,"GET","/ai-maps/development?domain=ORGANIZATION","alice",null,null);
+        call(403,"GET","/ai-maps/development?domain=ORGANIZATION&scopeType=COMPANY&scopeId=other","founder",null,null);
+        var experience=post("/ai-memories","alice",Map.of("content","独立完成模块技术设计并获得评审反馈","category","OUTCOME","claimType","FACT"));
+        String mid=experience.get("id").asText();memory.process();
+        call(200,"PUT","/ai-memories/preferences/me","alice",Map.of("version",0,"explicitGoals","模块技术设计","responsePreferences","每周投入两小时"),null);
+        providerMode.set("OK");
+        String job=call(202,"POST","/ai-maps/development/jobs","alice",Map.of("domain","PERSONAL"),"development-test").get("id").asText();
+        assertEquals(job,call(202,"POST","/ai-maps/development/jobs","alice",Map.of("domain","PERSONAL"),"development-test").get("id").asText());
+        JsonNode result=waitDevelopment(job,"alice","SUCCEEDED");assertEquals("HYPOTHESIS",result.at("/output/directions/0/claimType").asText());
+        assertFalse(result.at("/output/sources").isEmpty());assertFalse(providerInput.get().contains("private-draft-should-not-enter-memory"));
+        assertTrue(result.at("/output/summary").asText().contains("仍需通过实践验证"));
+        assertFalse(providerInput.get().contains("never-send-private-note"));
+        providerMode.set("INVALID");
+        String invalid=call(202,"POST","/ai-maps/development/jobs","alice",Map.of("domain","PERSONAL"),"development-invalid-ref").get("id").asText();
+        assertEquals("FAILED",waitDevelopment(invalid,"alice","FAILED").get("state").asText());
+        providerMode.set("OK");
+        call(404,"GET","/ai-maps/development/jobs/"+job,"founder",null,null);
+        assertTrue(get("/ai-maps/development/"+job+"/evidence","alice").get("items").size()>0);
+        call(200,"POST","/ai-maps/development/"+job+"/feedback","alice",Map.of("itemKey","s1","type","UNHELPFUL"),"feedback-test");
+        assertEquals(1,db.count("SELECT count(*) FROM memory_feedback WHERE analysis_id=?",job));
+        db.update("UPDATE users SET role='LEADER' WHERE id=?",ids.get("alice"));
+        assertEquals("STALE",get("/ai-maps/development/jobs/"+job,"alice").get("state").asText());
+        call(409,"GET","/ai-maps/development/"+job+"/evidence","alice",null,null);
+        var stream=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/ai-maps/development/jobs/"+job+"/stream"))
+            .header("Authorization","Bearer "+tokens.get("alice")).GET().build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(200,stream.statusCode());
+        assertFalse(stream.body().contains("\"output\""));
+        db.update("UPDATE users SET role='EMPLOYEE' WHERE id=?",ids.get("alice"));
+        call(409,"POST","/ai-memories/"+mid+"/revisions","alice",Map.of("version",0,"candidate",Map.of("content","过期纠正")),null);
+        call(200,"PUT","/ai-memories/preferences/me","alice",Map.of("version",1,"explicitGoals","技术架构","responsePreferences","偏好实践"),null);
+        assertEquals("STALE",get("/ai-maps/development/jobs/"+job,"alice").get("state").asText());
+        var candidate=post("/ai-memories","alice",Map.of("content","积累模块设计经验","category","SKILL","claimType","OBSERVATION"));
+        assertEquals("CANDIDATE",candidate.get("status").asText());memory.process();
+        var knowledge=get("/ai-memories/knowledge-status","alice");
+        assertEquals(memory.eligible(alice,personal,false).size(),knowledge.get("memories").asInt());
+        assertTrue(knowledge.get("candidates").asInt()>0);
+        assertEquals(knowledge.get("memories").asInt(),knowledge.get("indexedMemories").asInt()+knowledge.get("indexingMemories").asInt());
+        assertEquals(0,db.count("SELECT count(*) FROM knowledge_chunks WHERE memory_id=?",candidate.get("id").asText()));
+        post("/ai-memories/"+candidate.get("id").asText()+"/confirm","alice",Map.of("version",1));memory.process();
+        assertEquals("OBSERVATION",memory.item(alice,candidate.get("id").asText()).get("claim_type"));
+        var org=post("/ai-memories","founder",Map.of("domain","ORGANIZATION","content","产品化交付方向","category","GOAL","claimType","FACT","reason","建立业务方向"));
+        String review=org.get("id").asText();assertEquals("PENDING",org.get("status").asText());call(403,"POST","/reviews/"+review+"/decision","founder",Map.of("approve",true),null);approve(review,"founder");
+        assertEquals("ACTIVE",db.one("SELECT status FROM memory_items WHERE id=?",org.get("target_id").asText()).get("status"));
+        var excluded=memory.eligible(alice,personal,false).stream().filter(m->m.get("source_type").equals("LOG")).findFirst().orElseThrow();
+        memory.forget(alice,Db.str(excluded,"id"),((Number)excluded.get("version")).intValue());memory.process();
+        memory.backfill(Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("integration-admin"))),0,100);memory.process();
+        assertTrue(memory.eligible(alice,personal,false).stream().noneMatch(m->m.get("source_type").equals("LOG")&&m.get("source_id").equals(excluded.get("source_id"))));
+        assertEquals(0,db.count("SELECT count(*) FROM knowledge_chunks c JOIN memory_items m ON m.id=c.memory_id WHERE m.status='DELETED'"));
+        var nohit=rag.retrieve(alice,personal,"完全不相关的量子医学目标");assertTrue(nohit.chunks().isEmpty());
+        assertTrue(nohit.paths().isEmpty());
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->db.update("INSERT INTO memory_items(id,company_id,domain,owner_id,scope_type,scope_id,category,claim_type,status,content,source_type,source_id,source_version,locator,provenance) VALUES ('bad-memory','default','PERSONAL','other-user','SELF','other-user','EXPERIENCE','FACT','ACTIVE','bad','MANUAL','bad',1,'self','SELF_REPORTED')"));
+        memoryGraph.project();
+        assertTrue(memoryGraph.available(),"真实 Neo4j 必须可用");
+        assertTrue(memoryGraph.paths(alice.company(),Set.of(mid),List.of(mid)).isEmpty());
+    }
+    @Test @Order(12) void extractedCandidatesNeedLiteralEvidenceAndConfirmation() throws Exception {
+        String day=LocalDate.parse(date).minusDays(3).toString();
+        String source=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",day,"version",0,"body",Map.of("work","独立设计订单模块并通过评审")),null).get("id").asText();
+        post("/logs/"+source+"/submit","alice",Map.of("version",1));
+        memory.process();
+        var job=db.one("SELECT * FROM memory_extraction_jobs WHERE source_id=?",source);
+        providerMode.set("EXTRACT_INVALID"); extraction.extract(job);
+        assertEquals("FAILED",db.one("SELECT state FROM memory_extraction_jobs WHERE source_id=?",source).get("state"));
+        assertEquals(0,db.count("SELECT count(*) FROM memory_items WHERE source_id=? AND status='CANDIDATE'",source));
+        memory.backfill(Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("integration-admin"))),0,100);
+        assertEquals("QUEUED",db.one("SELECT state FROM memory_extraction_jobs WHERE source_id=?",source).get("state"));
+        providerMode.set("EXTRACT_VALID");extraction.extract(db.one("SELECT * FROM memory_extraction_jobs WHERE source_id=?",source));
+        assertEquals("SUCCEEDED",db.one("SELECT state FROM memory_extraction_jobs WHERE source_id=?",source).get("state"));
+        var candidate=db.one("SELECT * FROM memory_items WHERE source_id=? AND status='CANDIDATE'",source);
+        String cid=Db.str(candidate,"id");assertEquals("OBSERVATION",candidate.get("claim_type"));
+        assertTrue(Db.str(candidate,"locator").contains("独立设计"));
+        memory.process(); assertEquals(0,db.count("SELECT count(*) FROM knowledge_chunks WHERE memory_id=?",cid));
+        var base=db.one("SELECT id FROM memory_items WHERE source_id=? AND status='ACTIVE' AND provenance='SELF_REPORTED'",source);
+        Actor alice=Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("alice")));
+        memoryGraph.project();assertTrue(memoryGraph.paths(alice.company(),Set.of(Db.str(base,"id"),cid),List.of(Db.str(base,"id"))).isEmpty());
+        post("/ai-memories/"+cid+"/confirm","alice",Map.of("version",1));memory.process();memoryGraph.project();
+        assertEquals(1,memoryGraph.paths(alice.company(),Set.of(Db.str(base,"id"),cid),List.of(Db.str(base,"id"))).size());
+        assertTrue(memoryGraph.paths(alice.company(),Set.of(Db.str(base,"id")),List.of(Db.str(base,"id"))).isEmpty());
+        var forgotten=memory.forget(alice,cid,2);memory.process();memoryGraph.project();
+        assertEquals("SUCCEEDED",get("/ai-memories/forget-jobs/"+forgotten.get("id"),"alice").get("state").asText());
+        assertTrue(memoryGraph.paths(alice.company(),Set.of(Db.str(base,"id"),cid),List.of(Db.str(base,"id"))).isEmpty());
+        providerMode.set("OK");
+    }
+    @Test @Order(13) void developmentOutputExpiresWhenAccountOrSourceChanges() throws Exception {
+        String source=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",LocalDate.parse(date).minusDays(5).toString(),"version",0,"body",Map.of("work","设计订单模块并完成接口评审")),null).get("id").asText();
+        post("/logs/"+source+"/submit","alice",Map.of("version",1)); memory.process();
+        var preference=get("/ai-memories/preferences/me","alice");
+        call(200,"PUT","/ai-memories/preferences/me","alice",Map.of("version",preference.get("version").asInt(),"explicitGoals","订单模块设计","responsePreferences",""),null);
+        String id=call(202,"POST","/ai-maps/development/jobs","alice",Map.of("domain","PERSONAL"),"source-revocation-test").get("id").asText();
+        var done=waitDevelopment(id,"alice","SUCCEEDED");
+        assertTrue(done.at("/output/sources").toString().contains("LOG"));
+        db.update("UPDATE users SET status='DISABLED' WHERE id=?",ids.get("alice"));
+        call(401,"GET","/ai-maps/development/jobs/"+id,"alice",null,null);
+        call(401,"GET","/ai-maps/development/"+id+"/evidence","alice",null,null);
+        call(401,"GET","/ai-maps/development/jobs/"+id+"/stream","alice",null,null);
+        db.update("UPDATE users SET status='ACTIVE' WHERE id=?",ids.get("alice"));
+        db.update("UPDATE daily_logs SET version=version+1,body='{"+"\"work\":\"订单模块设计已撤回\""+"}'::jsonb WHERE id=?",source);
+        assertEquals("STALE",get("/ai-maps/development/jobs/"+id,"alice").get("state").asText());
+        call(409,"GET","/ai-maps/development/"+id+"/evidence","alice",null,null);
+    }
+    @Test @Order(14) void indexRebuildSwitchesVersionsAndCannotReviveForgottenMemory() throws Exception {
+        Actor admin=Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("integration-admin")));
+        Actor alice=Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("alice")));
+        String memoryId=post("/ai-memories","alice",Map.of("content","跨项目接口设计与评审复盘","category","EXPERIENCE","claimType","FACT")).get("id").asText();
+        memory.process();
+        assertEquals(1,db.count("SELECT count(*) FROM knowledge_chunks WHERE memory_id=? AND chunker_version='v1'",memoryId));
+        String[] rebuild={""};
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(t->{
+            rebuild[0]=Db.str(memory.rebuildIndex(admin,"rebuild-version-test"),"id");
+            assertEquals("v1",db.one("SELECT active_version FROM knowledge_index_state WHERE company_id=?",alice.company()).get("active_version"));
+            assertEquals("BUILDING",db.one("SELECT state FROM knowledge_rebuild_jobs WHERE id=?",rebuild[0]).get("state"));
+        });
+        assertEquals(rebuild[0],call(202,"POST","/ai-memories/index-rebuild","integration-admin",null,"rebuild-version-test").get("id").asText());
+        call(403,"GET","/ai-memories/index-rebuild/"+rebuild[0],"alice",null,null);
+        for(int i=0;i<20&&db.count("SELECT count(*) FROM knowledge_rebuild_jobs WHERE id=? AND state='SUCCEEDED'",rebuild[0])==0;i++) memory.process();
+        assertEquals("SUCCEEDED",get("/ai-memories/index-rebuild/"+rebuild[0],"integration-admin").get("state").asText());
+        String active=Db.str(db.one("SELECT active_version FROM knowledge_index_state WHERE company_id=?",alice.company()),"active_version");
+        assertTrue(active.startsWith("v2:"));
+        assertEquals(0,db.count("SELECT count(*) FROM knowledge_chunks WHERE company_id=? AND chunker_version='v1'",alice.company()));
+        var evidence=rag.retrieve(alice,new Memory.Scope("PERSONAL","SELF",alice.id()),"跨项目接口设计");
+        assertTrue(evidence.chunks().stream().anyMatch(c->memoryId.equals(c.get("memory_id"))&&active.equals(c.get("chunker_version"))));
+        int version=((Number)memory.item(alice,memoryId).get("version")).intValue();
+        memory.forget(alice,memoryId,version);memory.process();
+        db.update("UPDATE knowledge_index_jobs SET state='QUEUED' WHERE company_id=? AND memory_id=? AND chunker_version='v1'",alice.company(),memoryId);
+        memory.process();memory.backfill(admin,0,100);memory.process();
+        assertEquals(0,db.count("SELECT count(*) FROM knowledge_chunks WHERE memory_id=?",memoryId));
+        assertTrue(rag.retrieve(alice,new Memory.Scope("PERSONAL","SELF",alice.id()),"跨项目接口设计").chunks().stream().noneMatch(c->memoryId.equals(c.get("memory_id"))));
+    }
+    @Test @Order(15) void failedIndexCanRetryWithoutBlockingOtherMemories() throws Exception {
+        String failing=post("/ai-memories","alice",Map.of("content","索引故障后的经验复盘","category","EXPERIENCE","claimType","FACT")).get("id").asText();
+        String healthy=post("/ai-memories","alice",Map.of("content","其他记忆继续建立索引","category","EXPERIENCE","claimType","FACT")).get("id").asText();
+        db.update("CREATE FUNCTION reject_test_chunk() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.memory_id='"+failing+"' THEN RAISE EXCEPTION 'test index failure'; END IF; RETURN NEW; END $$");
+        db.update("CREATE TRIGGER reject_test_chunk BEFORE INSERT ON knowledge_chunks FOR EACH ROW EXECUTE FUNCTION reject_test_chunk()");
+        String jobId=Db.str(db.one("SELECT id FROM knowledge_index_jobs WHERE memory_id=? ORDER BY created_at DESC LIMIT 1",failing),"id");
+        try {
+            memory.process();
+            assertEquals("FAILED",db.one("SELECT state FROM knowledge_index_jobs WHERE id=?",jobId).get("state"));
+            assertTrue(db.count("SELECT count(*) FROM knowledge_chunks WHERE memory_id=?",healthy)>0);
+            assertEquals(0,db.count("SELECT count(*) FROM knowledge_chunks WHERE memory_id=?",failing));
+            call(403,"POST","/ai-memories/index-jobs/"+jobId+"/retry","alice",null,null);
+        } finally {
+            db.update("DROP TRIGGER IF EXISTS reject_test_chunk ON knowledge_chunks");
+            db.update("DROP FUNCTION IF EXISTS reject_test_chunk()");
+        }
+        assertEquals("QUEUED",call(202,"POST","/ai-memories/index-jobs/"+jobId+"/retry","integration-admin",null,null).get("state").asText());
+        memory.process();
+        assertEquals("SUCCEEDED",db.one("SELECT state FROM knowledge_index_jobs WHERE id=?",jobId).get("state"));
+        assertTrue(db.count("SELECT count(*) FROM knowledge_chunks WHERE memory_id=?",failing)>0);
+    }
+    @Test @Order(16) void legalCitationDoesNotAuthorizeUnsupportedFact() throws Exception {
+        redis.delete("workpanel:memory-model:"+ids.get("alice"));
+        providerMode.set("UNSUPPORTED_FACT");
+        try {
+            String id=call(202,"POST","/ai-maps/development/jobs","alice",Map.of("domain","PERSONAL"),"unsupported-fact-test").get("id").asText();
+            var done=waitDevelopment(id,"alice","SUCCEEDED");
+            assertTrue(done.at("/output/sources").size()>0);
+            assertEquals(0,done.at("/output/directions").size());
+            assertEquals("INSUFFICIENT",done.at("/output/basisQuality").asText());
+            assertTrue(done.at("/output/gaps").toString().contains("缺少可核对"));
+            assertTrue(done.at("/output/retrieval/chunkerVersion").isTextual());
+        } finally { providerMode.set("OK"); }
+    }
+    @Test @Order(17) void graphTombstoneRejectsOutOfOrderCreateEvent() throws Exception {
+        Actor alice=Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("alice")));
+        String id=post("/ai-memories","alice",Map.of("content","订单接口架构设计","category","EXPERIENCE","claimType","FACT")).get("id").asText();
+        String other=post("/ai-memories","alice",Map.of("content","跨部门业务复盘","category","EXPERIENCE","claimType","FACT")).get("id").asText();
+        String edge=Db.id();db.update("INSERT INTO memory_relations(id,company_id,from_id,to_id) VALUES (?,?,?,?)",edge,alice.company(),id,other);
+        var old=db.one("SELECT * FROM memory_items WHERE id=?",id);
+        var oldEdge=db.one("SELECT * FROM memory_relations WHERE id=?",edge);
+        memory.process();memoryGraph.project();
+        var linked=rag.retrieve(alice,new Memory.Scope("PERSONAL","SELF",alice.id()),"订单接口架构");
+        assertTrue(linked.chunks().stream().anyMatch(c->other.equals(c.get("memory_id"))),"图路径应补充文本未命中的相邻记忆");
+        memory.forget(alice,id,((Number)old.get("version")).intValue());memory.process();memoryGraph.project();
+        memoryGraph.applyNodeEvent(old);
+        memoryGraph.applyRelationEvent(oldEdge);
+        try(var session=memoryGraph.driver.session()) {
+            var node=session.run("MATCH (m:Memory {company:$company,id:$id}) RETURN m.status AS status,m.version AS version",Map.of("company",alice.company(),"id",id)).single();
+            assertEquals("DELETED",node.get("status").asString());
+            assertEquals(((Number)old.get("version")).intValue()+1,node.get("version").asInt());
+            var relation=session.run("MATCH (:Memory {company:$company,id:$id})-[e:EVIDENCE {id:$edge}]->() RETURN e.status AS status,e.version AS version",Map.of("company",alice.company(),"id",id,"edge",edge)).single();
+            assertEquals("DELETED",relation.get("status").asString());
+            assertEquals(((Number)oldEdge.get("version")).intValue()+1,relation.get("version").asInt());
+        }
+        assertTrue(memoryGraph.paths(alice.company(),Set.of(id),List.of(id)).isEmpty());
+    }
+    @Test @Order(18) void annotatedChineseRetrievalEvaluation() throws Exception {
+        Actor alice=Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("alice")));
+        var scope=new Memory.Scope("PERSONAL","SELF",alice.id());
+        String a=post("/ai-memories","alice",Map.of("content","星桥结算协议完成评审","category","EXPERIENCE","claimType","FACT")).get("id").asText();
+        String b=post("/ai-memories","alice",Map.of("content","跨线需求澄清降低返工","category","LESSON","claimType","FACT")).get("id").asText();
+        String c=post("/ai-memories","alice",Map.of("content","交付三项自动化脚本","category","OUTCOME","claimType","FACT")).get("id").asText();
+        String d=post("/ai-memories","alice",Map.of("content","星环架构设计目标","category","GOAL","claimType","FACT")).get("id").asText();
+        String e=post("/ai-memories","alice",Map.of("content","参与云舟活动页开发","category","EXPERIENCE","claimType","FACT")).get("id").asText();
+        String f=post("/ai-memories","alice",Map.of("content","澜谷沟通复盘记录","category","LESSON","claimType","FACT")).get("id").asText();
+        db.update("INSERT INTO memory_relations(id,company_id,from_id,to_id) VALUES (?,?,?,?)",Db.id(),alice.company(),a,b);
+        memory.process();memoryGraph.project();
+        record Query(String text,Set<String> gold,String category) {}
+        var labels=List.of(new Query("星桥结算协议",Set.of(a,b),""),new Query("自动化脚本成果",Set.of(c),"OUTCOME"),new Query("云舟活动页",Set.of(e),""),new Query("澜谷沟通复盘",Set.of(f),"LESSON"),new Query("星环架构设计目标",Set.of(d),"GOAL"));
+        var corpus=db.rows("SELECT id,content,category FROM memory_items WHERE id IN (?,?,?,?,?,?)",a,b,c,d,e,f);
+        String active=Db.str(db.one("SELECT active_version FROM knowledge_index_state WHERE company_id=?",alice.company()),"active_version");
+        int goldCount=labels.stream().mapToInt(q->q.gold().size()).sum();
+        int keywordHits=0,tagHits=0,fulltextHits=0,graphHits=0;var latencies=new ArrayList<Long>();
+        for(var q:labels) {
+            var terms=Rag.tokens(q.text());
+            var keyword=corpus.stream().filter(m->Rag.score(Db.str(m,"content"),terms)>0).sorted(Comparator.<Map<String,Object>>comparingDouble(m->Rag.score(Db.str(m,"content"),terms)).reversed()).limit(5).map(m->Db.str(m,"id")).toList();
+            var tags=corpus.stream().filter(m->q.category().equals(m.get("category"))).limit(5).map(m->Db.str(m,"id")).toList();
+            String tsquery=String.join(" | ",terms.stream().map(t->"'"+t+"'").toList());
+            var fulltext=db.rows("SELECT memory_id FROM knowledge_chunks WHERE company_id=? AND chunker_version=? AND memory_id IN (?,?,?,?,?,?) AND search_text @@ to_tsquery('simple',?) ORDER BY ts_rank_cd(search_text,to_tsquery('simple',?)) DESC LIMIT 5",alice.company(),active,a,b,c,d,e,f,tsquery,tsquery).stream().map(m->Db.str(m,"memory_id")).toList();
+            long start=System.nanoTime();var retrieved=rag.retrieve(alice,scope,q.text());latencies.add((System.nanoTime()-start)/1_000_000);
+            var graph=retrieved.chunks().stream().limit(5).map(m->Db.str(m,"memory_id")).toList();
+            for(String id:q.gold()) { if(keyword.contains(id)) keywordHits++;if(tags.contains(id)) tagHits++;if(fulltext.contains(id)) fulltextHits++;if(graph.contains(id)) graphHits++; }
+        }
+        memoryGraph.healthy=false;
+        var degraded=rag.retrieve(alice,scope,"星桥结算协议");
+        assertTrue(degraded.degraded().contains("图谱暂不可用"));
+        assertFalse(degraded.chunks().stream().anyMatch(chunk->b.equals(chunk.get("memory_id"))));
+        memoryGraph.project();
+        assertTrue(memoryGraph.available());
+        Collections.sort(latencies);
+        var metrics=Map.of("queries",labels.size(),"goldEvidence",goldCount,"recallAt5",Map.of("keyword",(double)keywordHits/goldCount,"categoryTag",(double)tagHits/goldCount,"fulltext",(double)fulltextHits/goldCount,"textGraph",(double)graphHits/goldCount),"latencyMs",Map.of("median",latencies.get(latencies.size()/2),"p95",latencies.getLast()),"graphDegradedToText",true,"providerTokens",0);
+        java.nio.file.Files.writeString(java.nio.file.Path.of("../docs/ai-map-retrieval-metrics.json"),JSON.writerWithDefaultPrettyPrinter().writeValueAsString(metrics),StandardCharsets.UTF_8);
+        assertTrue(graphHits>=fulltextHits,"图谱补证不应降低标注集召回");
+        assertEquals(goldCount,graphHits,"受控标注集应全部召回");
+    }
+    JsonNode waitDevelopment(String id,String who,String expected) throws Exception {
+        long deadline=System.nanoTime()+Duration.ofSeconds(30).toNanos();
+        do {var value=get("/ai-maps/development/jobs/"+id,who);if(!Set.of("QUEUED","RUNNING").contains(value.get("state").asText())) {assertEquals(expected,value.get("state").asText(),value.toString());return value;}Thread.sleep(1000);}while(System.nanoTime()<deadline);
+        fail("发展分析未按期返回："+db.one("SELECT state,error FROM development_analyses WHERE id=?",id));return null;
     }
 }

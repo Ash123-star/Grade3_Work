@@ -14,3 +14,7 @@ deploy/backend/backups/
 # 本地对话产出，不上传 GitHub
 output/
 /node_modules/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/

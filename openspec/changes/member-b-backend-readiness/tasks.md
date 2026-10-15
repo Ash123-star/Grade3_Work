@@ -62,3 +62,5 @@
 
 ## 2026-10-15 main 合并适配
 认证迁移从未合入 main 的旧 V5 统一为 V10，保留 main V1–V9；V11 补齐 TASK_REASSIGN/TASK_RESCHEDULE 数据库约束。审核同时接入 TaskRevisionService 与 ReviewRepository。旧 lyb 数据库保留，升级说明见 docs/member-b-merge-upgrade.md。公共测试仍按用户要求不修改；完整验收结果以合并报告为准，历史33项通过不代表此次合并已全部通过。
+
+最新 main 64e2126：认证顺延 V12，远端 V10 已涵盖审核类型约束；B专项33项及V11→V12升级通过，严格校验28项通过。公共人数断言已由主线修复，但全套含Neo4j验收因Docker Hub下载超时未完成；Flutter依赖/真实联调、契约确认、完整分层和跨模块应用仍待完成，保留未勾选。详见 docs/member-b-merge-upgrade.md。

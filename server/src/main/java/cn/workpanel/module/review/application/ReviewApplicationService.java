@@ -22,7 +22,7 @@ public class ReviewApplicationService {
         Business.page(cursor,limit);
         return repository.list(actor,cursor,limit);
     }
-    static final Set<String> SUPPORTED_KINDS=Set.of("POLICY","MEMBERSHIP","REVIEWER","USER","DEPARTMENT","TEAM","COMPANY_ITEM","LOG","TASK","TASK_REASSIGN","TASK_RESCHEDULE");
+    static final Set<String> SUPPORTED_KINDS=Set.of("POLICY","MEMBERSHIP","REVIEWER","USER","DEPARTMENT","TEAM","COMPANY_ITEM","LOG","TASK","TASK_REASSIGN","TASK_RESCHEDULE","MEMORY");
     static final Set<String> TASK_KINDS=Set.of("TASK","TASK_REASSIGN","TASK_RESCHEDULE");
     final TaskRevisionService taskRevisions;
 
@@ -92,6 +92,14 @@ public class ReviewApplicationService {
         Actor applicant=Actor.from(db.one("SELECT * FROM users WHERE id=?",row.get("applicant_id")));
         if(!applicant.status().equals("ACTIVE")&&!kind.equals("MEMBERSHIP")) throw ApiError.forbidden();
         switch(kind) {
+            case "MEMORY" -> {
+                Memory memory=new Memory(db,new Business(db),this,null,false);
+                memory.scope(applicant,Db.required(c,"domain"),Db.required(c,"scopeType"),Db.required(c,"scopeId"));
+                var original=memory.item(applicant,target);
+                if(!original.get("domain").equals("ORGANIZATION")) throw ApiError.forbidden();
+                Db.conflict(db.update("UPDATE memory_items SET content=?,status='ACTIVE',version=version+1,updated_at=now() WHERE company_id=? AND id=? AND version=? AND status IN ('CANDIDATE','ACTIVE')",Db.required(c,"content"),approver.company(),target,v));
+                memory.snapshot(approver.company(),target);
+            }
             case "POLICY" -> {
                 applicant.requireAdmin(); Db.conflict(db.update("UPDATE companies SET review_policy=?::jsonb,version=version+1 WHERE id=? AND version=?",db.write(c),approver.company(),v));
             }
