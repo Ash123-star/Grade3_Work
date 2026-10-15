@@ -23,6 +23,7 @@ class ApiFailure implements Exception {
       404 => FailureKind.notFound,
       409 => FailureKind.conflict,
       400 || 422 => FailureKind.validation,
+      503 => FailureKind.unavailable,
       _ =>
         [
               DioExceptionType.connectionTimeout,

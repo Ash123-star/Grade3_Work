@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models.dart';
 import '../data/mock_repository.dart';
 import '../data/repository.dart';
+import '../data/sse_client.dart';
 import 'config.dart';
 
 final sessionProvider = StateProvider<Session>(
@@ -67,3 +68,18 @@ final logDayRecordsProvider=FutureProvider.autoDispose.family<PageResult,(String
 });
 
 final logFilterDateProvider=StateProvider<DateTime?>((ref)=>null);
+
+// SSE 接入点：mock 模式返回 null，页面流 provider 在该模式下产出空流。
+final sseClientProvider = Provider<SseClient?>((ref) {
+  if (AppConfig.mock) return null;
+  final session = ref.watch(sessionProvider);
+  return SseClient(AppConfig.baseUrl, session.token);
+});
+final notificationStreamProvider = StreamProvider.autoDispose<ServerEvent>((ref) {
+  final client = ref.watch(sseClientProvider);
+  return client == null ? const Stream<ServerEvent>.empty() : client.notifications();
+});
+final aiJobStreamProvider = StreamProvider.autoDispose.family<ServerEvent, String>((ref, jobId) {
+  final client = ref.watch(sseClientProvider);
+  return client == null ? const Stream<ServerEvent>.empty() : client.aiJob(jobId);
+});
