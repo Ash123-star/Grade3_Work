@@ -162,4 +162,34 @@ class AuthIntegrationTest {
             db.update("DROP SCHEMA " + schema + " CASCADE");
         }
     }
+
+    @Test void legacyV5AndV10ClonesUpgradeWithoutLosingUsersOrLoginProtection() throws Exception {
+        for(int oldVersion: List.of(5,10)) {
+            String schema="legacy_upgrade_"+UUID.randomUUID().toString().replace("-", "");
+            try {
+                org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target(oldVersion==5?"4":"9").load().migrate();
+                try(var connection=dataSource.getConnection();var statement=connection.createStatement()) {
+                    String previousSchema=connection.getSchema();
+                    try {
+                    connection.setSchema(schema);
+                    try(var resource=getClass().getResourceAsStream("/db/migration/V12__auth_login_protection.sql")) {
+                        statement.execute(new String(java.util.Objects.requireNonNull(resource).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));
+                    }
+                    statement.execute("INSERT INTO flyway_schema_history(installed_rank,version,description,type,script,checksum,installed_by,execution_time,success) SELECT max(installed_rank)+1,'"+oldVersion+"','auth login protection','SQL','V"+oldVersion+"__auth_login_protection.sql',-1773296244,current_user,0,true FROM flyway_schema_history");
+                    if(oldVersion==10) statement.execute("INSERT INTO flyway_schema_history(installed_rank,version,description,type,script,checksum,installed_by,execution_time,success) SELECT max(installed_rank)+1,'11','task review kinds','SQL','V11__task_review_kinds.sql',-1563727389,current_user,0,true FROM flyway_schema_history");
+                    } finally { connection.setSchema(previousSchema); }
+                }
+                db.update("INSERT INTO "+schema+".users(id,company_id,account,password_hash,phone,name,role,status) VALUES ('legacy','default','legacy','unchanged','13800000008','旧库保留','EMPLOYEE','PENDING')");
+                db.update("INSERT INTO "+schema+".auth_login_state(account_hash,failures) VALUES (?,3)",Db.hash("legacy"));
+                cn.workpanel.tools.LegacyAuthUpgrade.upgrade(dataSource,schema);
+                assertEquals("unchanged",db.one("SELECT password_hash FROM "+schema+".users WHERE id='legacy'").get("password_hash"));
+                assertEquals(3,db.count("SELECT failures FROM "+schema+".auth_login_state WHERE account_hash=?",Db.hash("legacy")));
+                assertEquals(12,db.count("SELECT count(*) FROM "+schema+".flyway_schema_history WHERE version IS NOT NULL AND success"));
+            } finally { db.update("DROP SCHEMA "+schema+" CASCADE"); }
+        }
+    }
+
+    @Test void legacyUpgradeRefusesOriginalDatabase() {
+        assertThrows(IllegalArgumentException.class, () -> cn.workpanel.tools.LegacyAuthUpgrade.upgrade(dataSource,"public"));
+    }
 }

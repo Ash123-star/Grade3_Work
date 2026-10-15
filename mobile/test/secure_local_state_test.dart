@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -528,7 +529,7 @@ void main() {
       ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
       (
         'MaterialIcons',
-        'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+        materialIconsFontPath,
       ),
     ]) {
       final loader = FontLoader(item.$1)

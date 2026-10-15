@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'support/local_test_state.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -623,7 +624,7 @@ void main() {
           Future.value(
             ByteData.sublistView(
               File(
-                'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+                materialIconsFontPath,
               ).readAsBytesSync(),
             ),
           ),

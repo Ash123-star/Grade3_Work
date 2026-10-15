@@ -64,3 +64,6 @@
 认证迁移从未合入 main 的旧 V5 统一为 V10，保留 main V1–V9；V11 补齐 TASK_REASSIGN/TASK_RESCHEDULE 数据库约束。审核同时接入 TaskRevisionService 与 ReviewRepository。旧 lyb 数据库保留，升级说明见 docs/member-b-merge-upgrade.md。公共测试仍按用户要求不修改；完整验收结果以合并报告为准，历史33项通过不代表此次合并已全部通过。
 
 最新 main 64e2126：认证顺延 V12，远端 V10 已涵盖审核类型约束；B专项33项及V11→V12升级通过，严格校验28项通过。公共人数断言已由主线修复，但全套含Neo4j验收因Docker Hub下载超时未完成；Flutter依赖/真实联调、契约确认、完整分层和跨模块应用仍待完成，保留未勾选。详见 docs/member-b-merge-upgrade.md。
+
+## 2026-10-16 第一阶段交付口径
+用户授权先提交推送阶段成果并创建草稿 PR，取代上文暂不推送指示。B 定向36项通过，完整回归、Flutter真实联调和旧库CLI端到端验收未完成；保持相关任务未勾选。审核SPI已实际接入；详细证据、启动步骤和剩余门槛见 docs/member-b-stage-one.md。草稿PR不表示可以合并或阶段展示最终验收通过。

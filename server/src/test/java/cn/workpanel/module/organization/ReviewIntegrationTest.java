@@ -116,4 +116,32 @@ class ReviewIntegrationTest extends MemberBHttpSupport {
         assertEquals("PENDING", db.one("SELECT state FROM review_steps WHERE request_id=? ORDER BY position LIMIT 1", id).get("state"));
         assertEquals(employee, db.one("SELECT name FROM users WHERE id=?", employee).get("name"));
     }
+
+    @Test void logModuleWriteFailureRollsBackBusinessDecisionAuditAndOutbox() throws Exception {
+        // 在业务 UPDATE 之后制造真实的历史版本唯一键冲突，验证跨模块事务而非仅输入校验。
+        db.update("UPDATE users SET department_id=NULL WHERE id=?", admin);
+        String log = cn.workpanel.Db.id();
+        var before = Map.<String,Object>of("work", "原日报");
+        var candidate = Map.<String,Object>of("work", "候选日报");
+        db.update("INSERT INTO daily_logs(id,company_id,owner_id,business_date,body,submitted,submitted_at) VALUES (?,?,?,CURRENT_DATE,?::jsonb,true,now())", log, company, admin, db.write(before));
+        db.update("INSERT INTO log_versions(company_id,log_id,version,body) VALUES (?,?,2,?::jsonb)", company, log, db.write(before));
+        var actor = cn.workpanel.Actor.from(db.one("SELECT * FROM users WHERE id=?", admin));
+        String id = (String) reviews.create(actor, "LOG", log, 1, before, candidate, "验证业务失败回滚").get("id");
+        String current = firstReviewer(id, admin);
+        var approver = cn.workpanel.Actor.from(db.one("SELECT * FROM users WHERE id=?", current));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> reviews.decide(approver, id, true, "同意"));
+        assertEquals(before, db.read(db.one("SELECT body FROM daily_logs WHERE id=?", log).get("body")));
+        assertEquals(1, db.count("SELECT version FROM daily_logs WHERE id=?", log));
+        assertEquals("PENDING", db.one("SELECT status FROM review_requests WHERE id=?", id).get("status"));
+        assertEquals("PENDING", db.one("SELECT state FROM review_steps WHERE request_id=?", id).get("state"));
+        assertEquals(0, db.count("SELECT count(*) FROM audit_records WHERE object_id IN (?,?) AND type IN ('REVISION_APPLIED','REVIEW_APPROVED')", log, id));
+        assertEquals(0, db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='REVIEW_APPROVED'", id));
+        // 清除故障后同一个申请可以成功一次；重复决定不能再次写入。
+        db.update("DELETE FROM log_versions WHERE log_id=? AND version=2", log);
+        approve(id, admin);
+        assertEquals(candidate, db.read(db.one("SELECT body FROM daily_logs WHERE id=?", log).get("body")));
+        call(409, "POST", "/reviews/" + id + "/decision", current, Map.of("approve", true));
+        assertEquals(1, db.count("SELECT count(*) FROM log_versions WHERE log_id=? AND version=2", log));
+        assertEquals(1, db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='REVIEW_APPROVED'", id));
+    }
 }
