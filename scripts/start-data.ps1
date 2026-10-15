@@ -8,7 +8,7 @@ if (!(Test-Path -LiteralPath $envFile)) {
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
     try {
         $secrets = @()
-        for ($i = 0; $i -lt 2; $i++) {
+        for ($i = 0; $i -lt 3; $i++) {
             $bytes = New-Object byte[] 32
             $rng.GetBytes($bytes)
             $secrets += ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
@@ -16,9 +16,15 @@ if (!(Test-Path -LiteralPath $envFile)) {
         $config = [IO.File]::ReadAllText((Join-Path $deploy '.env.example'))
         $config = $config.Replace('replace-with-a-random-secret', $secrets[0])
         $config = $config.Replace('replace-with-a-different-random-secret', $secrets[1])
+        $config = $config.Replace('replace-with-a-third-random-secret', $secrets[2])
         [IO.File]::WriteAllText($envFile, $config, (New-Object System.Text.UTF8Encoding($false)))
         Write-Host 'Created private deploy/.env with random credentials.'
     } finally { $rng.Dispose() }
+}
+if ([IO.File]::ReadAllText($envFile) -notmatch '(?m)^NEO4J_PASSWORD=.+$') {
+    $neoSecret = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
+    [IO.File]::AppendAllText($envFile, "`nNEO4J_PASSWORD=$neoSecret`nNEO4J_BOLT_PORT=57687`n", [Text.UTF8Encoding]::new($false))
+    Write-Host 'Added private Neo4j credentials for the existing deployment.'
 }
 if (!$SkipBuild) { & (Join-Path $PSScriptRoot 'build-data-packages.ps1') }
 $compose = @('compose', '--env-file', $envFile, '-f', $composeFile)
@@ -38,10 +44,10 @@ foreach ($legacyId in $legacyIds) {
     & docker rm $legacyId
     if ($LASTEXITCODE -ne 0) { throw 'Cannot remove stopped legacy container.' }
 }
-& docker @compose up -d --wait --wait-timeout 120 data
+& docker @compose up -d --wait --wait-timeout 240 data
 if ($LASTEXITCODE -ne 0) { throw 'Combined database startup failed.' }
 & (Join-Path $deploy 'postgresql/migrate.ps1') -ComposeFile $composeFile -EnvFile $envFile -Service data
 & (Join-Path $deploy 'redis/verify.ps1') -ComposeFile $composeFile -EnvFile $envFile -Service data
 & docker @compose ps
 if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect Docker services.' }
-Write-Host 'PostgreSQL migration complete; PostgreSQL and Redis running in one container.'
+Write-Host 'PostgreSQL migration complete; PostgreSQL, Redis and Neo4j running in one container.'

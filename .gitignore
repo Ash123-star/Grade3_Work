@@ -11,3 +11,7 @@ deploy/backend/backups/
 .agents/skills/project-development-gate/SKILL.md
 
 /node_modules/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/

@@ -42,3 +42,7 @@ Docker 镜像 `workpanel-backend:local` 构建成功。`scripts/smoke-backend-im
 - `mvn.cmd -f server/pom.xml test`：测试编译阶段已发现并修复迁移后的测试字段引用；最终测试运行受 Maven 网络权限和外部 PostgreSQL/Redis 环境限制，未取得集成测试通过证据。
 - `scripts/test-backend.ps1`：环境阻塞，当前执行器未安装 Docker（`docker is not recognized`）。
 - 因上述环境限制，本轮不能报告编译或集成测试通过；代码完成度以源码迁移和 OpenSpec 校验为准，待具备 Maven 网络和 Docker 后重新执行。
+
+## 2026-10-09 AI 地图增量
+
+本节覆盖新增长期记忆、RAG 和同容器 Neo4j；上文为既有后端历史验收。当前 `scripts/test-backend.ps1` 使用三数据库统一测试容器，最新测试数及双端验证以 `docs/ai-map-validation.md` 为准。真实 DeepSeek 已完成最小连接和本地预览分析，正式服务凭据仍需单独配置。

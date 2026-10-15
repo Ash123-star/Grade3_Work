@@ -1,39 +1,36 @@
 name: workpanel-backend
 services:
-  postgres:
-    image: postgres:16
+  data:
+    image: collaboration-data-runtime:local
+    build:
+      context: ..
+      dockerfile: runtime/Dockerfile
+    init: true
     restart: unless-stopped
+    stop_grace_period: 60s
     environment:
       POSTGRES_DB: workpanel
       POSTGRES_USER: workpanel
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?请设置 DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?Set NEO4J_PASSWORD}
       TZ: UTC
       PGTZ: UTC
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-55435}:5432"
+      - "127.0.0.1:${REDIS_PORT:-56382}:6379"
+      - "127.0.0.1:${NEO4J_BOLT_PORT:-57688}:7687"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U workpanel -d workpanel"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
-    entrypoint: ["/bin/sh", "/opt/redis/start.sh"]
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-56382}:6379"
-    volumes:
       - redis-data:/data
-      - ./redis:/opt/redis:ro
+      - neo4j-data:/var/lib/neo4j/data
+      - ../redis:/opt/redis:ro
     healthcheck:
-      test: ["CMD-SHELL", "test \"$$(/bin/sh /opt/redis/auth-cli.sh ping)\" = PONG"]
+      test: ["CMD", "/bin/sh", "/opt/runtime/health.sh"]
       interval: 5s
-      timeout: 3s
-      retries: 20
+      timeout: 6s
+      retries: 30
+      start_period: 40s
   api:
     image: workpanel-backend:${BACKEND_IMAGE_TAG:-local}
     build:
@@ -41,15 +38,13 @@ services:
       dockerfile: deploy/backend/Dockerfile
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
+      data:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/workpanel
+      DB_URL: jdbc:postgresql://data:5432/workpanel
       DB_USER: workpanel
       DB_PASSWORD: ${DB_PASSWORD:?请设置 DB_PASSWORD}
-      REDIS_HOST: redis
+      REDIS_HOST: data
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
       ADMIN_ACCOUNT: ${ADMIN_ACCOUNT:?请设置 ADMIN_ACCOUNT}
@@ -60,6 +55,9 @@ services:
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       AI_DAILY_TOKENS: ${AI_DAILY_TOKENS:-50000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      NEO4J_URI: bolt://data:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?Set NEO4J_PASSWORD}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
@@ -88,5 +86,6 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  neo4j-data:
   caddy-data:
   caddy-config:

@@ -1,0 +1,29 @@
+:root { font-family: system-ui, 'Microsoft YaHei', sans-serif; color: #253138; background: #f7f9f8; line-height: 1.55; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1120px; margin: auto; padding: 28px; }
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; border-bottom: 1px solid #cddbd5; padding-bottom: 12px; }
+h1 { margin: 5px 0; font-size: 30px; }
+h2 { font-size: 20px; line-height: 1.35; }
+h3 { font-size: 16px; }
+small { color: #5d6a72; }
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 16px 0; }
+button { min-height: 40px; padding: 7px 12px; border: 1px solid #a9c6ba; border-radius: 6px; background: #fff; color: #165747; font: inherit; cursor: pointer; margin: 3px; }
+button:hover { background: #e8f3ee; }
+button:disabled { opacity: .6; cursor: wait; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #c88631; }
+.primary { background: #185d4e; color: white; }
+.primary:hover { background: #104c3e; }
+.card { padding: 18px 0; margin: 0; border-bottom: 1px solid #dbe5df; }
+.login { max-width: 480px; padding: 22px; margin: 28px auto; background: white; border: 1px solid #cddbd5; border-radius: 6px; }
+label { display: block; margin: 11px 0; }
+input, textarea { display: block; width: 100%; font: inherit; padding: 9px; border: 1px solid #afc4bb; border-radius: 6px; background: #fff; }
+textarea { min-height: 80px; }
+article { padding: 12px 0; border-bottom: 1px solid #e1e9e5; }
+article:last-child { border-bottom: 0; }
+.error { background: #fff1e2; border-left: 4px solid #b46b26; padding: 10px; }
+.graph { height: 440px; }
+.mobile-path { display: none; }
+.vue-flow__node { width: 260px; white-space: normal; padding: 12px; background: #e8f3ee; border: 1px solid #85b6a2; border-radius: 6px; }
+.drawer { position: fixed; top: 0; right: 0; height: 100vh; width: min(480px,100%); padding: 20px; background: #fff; overflow: auto; box-shadow: -8px 0 30px #25313830; z-index: 10; }
+@media (max-width: 600px) { main { padding: 15px; } h1 { font-size: 24px; } .graph { height: auto; } .graph .vue-flow { display: none; } .mobile-path { display: block; } .mobile-path p { padding: 10px 0; border-bottom: 1px solid #e1e9e5; } }

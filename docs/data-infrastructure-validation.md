@@ -56,3 +56,9 @@ V001 源 SQL 合并内容 SHA256：`86e22dc2db2e275620ffdd60427e032c0f2602df685c
 组件 ZIP 重新构建，新增 data-runtime.zip，包含单容器 Compose、组合镜像源文件、两组件配置与完整启动/验证工具。私有密码及数据卷均不进入包。
 
 最新包核对：PostgreSQL 9 项、Redis 8 项、统一运行包 29 项；逐项字节内容与源文件一致，三个 SHA256 全部通过。重复执行启动入口仍只运行一个 data 容器，迁移跳过且 Redis 认证读写通过。归档前严格 OpenSpec 校验 7 项通过、0 失败。
+
+## 2026-10-09 三数据库升级验证
+
+前文保留原 PostgreSQL/Redis 基线的历史记录。本次 `ai-map-long-term-memory` 变更将官方 Neo4j 5.26 Community 加入同一 `data` 容器，并新增独立 `collaboration-data_neo4j-data` 卷。`docker compose ... up --wait` 的联合健康检查通过。
+
+`scripts/verify-data-lifecycle.ps1` 分别停止 Redis、PostgreSQL、Neo4j，三个进程退出均触发容器整体重启；Redis 测试键和 Neo4j 测试节点在三次恢复后保留。数据库备份恢复及 AI 地图接口验证见 `docs/ai-map-validation.md`。正式部署需另行配置监控与管理员信息。
