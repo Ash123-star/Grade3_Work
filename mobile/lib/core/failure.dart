@@ -17,6 +17,8 @@ class ApiFailure implements Exception {
   final String message;
   final String? traceId;
   factory ApiFailure.fromDio(DioException e) {
+    final data = e.response?.data;
+    final code = data is Map ? data['code']?.toString() : null;
     final kind = switch (e.response?.statusCode) {
       401 => FailureKind.unauthorized,
       403 => FailureKind.forbidden,
@@ -32,14 +34,20 @@ class ApiFailure implements Exception {
             ? FailureKind.timeout
             : FailureKind.server,
     };
-    final message = switch (kind) {
-      FailureKind.unauthorized => '登录已失效，请重新登录',
-      FailureKind.forbidden => '你没有访问这项内容的权限',
-      FailureKind.notFound => '内容不存在或已被移除',
-      FailureKind.conflict => '内容已有新版本，请刷新后再提交',
-      FailureKind.validation => '请检查填写的内容',
-      FailureKind.timeout => '连接超时，请稍后重试',
-      _ => '服务暂时不可用，请稍后重试',
+    final message = switch (code) {
+      'AI_NOT_CONFIGURED' => 'DeepSeek 尚未配置，已有记忆仍可查看',
+      'AI_BUDGET' => '今日 AI 预算已用尽，请稍后再试',
+      'AI_PROVIDER_FAILED' => '模型服务暂时不可用，请稍后重试',
+      'MEMORY_SOURCE_STALE' => '来源已有新版本，请刷新分析与证据',
+      _ => switch (kind) {
+        FailureKind.unauthorized => '登录已失效，请重新登录',
+        FailureKind.forbidden => '你没有访问这项内容的权限',
+        FailureKind.notFound => '内容不存在或已被移除',
+        FailureKind.conflict => '内容已有新版本，请刷新后再提交',
+        FailureKind.validation => '请检查填写的内容',
+        FailureKind.timeout => '连接超时，请稍后重试',
+        _ => '服务暂时不可用，请稍后重试',
+      },
     };
     return ApiFailure(
       kind,

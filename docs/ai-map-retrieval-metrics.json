@@ -1,0 +1,16 @@
+{
+  "queries" : 5,
+  "providerTokens" : 0,
+  "latencyMs" : {
+    "median" : 150,
+    "p95" : 300
+  },
+  "goldEvidence" : 6,
+  "recallAt5" : {
+    "fulltext" : 0.8333333333333334,
+    "categoryTag" : 0.5,
+    "textGraph" : 1.0,
+    "keyword" : 0.8333333333333334
+  },
+  "graphDegradedToText" : true
+}

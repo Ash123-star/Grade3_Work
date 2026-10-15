@@ -34,3 +34,7 @@ Docker 镜像 `workpanel-backend:local` 构建成功。`scripts/smoke-backend-im
 - 后端 AI worker 当前为单实例；多副本部署需增加任务租约、恢复及取消路由。
 - Windows 本机提交内存不足曾导致 JVM 退出；最终改用限额 Docker Maven 执行并通过，普通 Java 运行也已限制测试内存。
 - 现有独立数据包与本后端 Flyway 表结构不同，必须使用独立空库，不能原地覆盖已有数据基础包。
+
+## 2026-10-09 AI 地图增量
+
+本节覆盖新增长期记忆、RAG 和同容器 Neo4j；上文为既有后端历史验收。当前 `scripts/test-backend.ps1` 使用三数据库统一测试容器，最新测试数及双端验证以 `docs/ai-map-validation.md` 为准。真实 DeepSeek 已完成最小连接和本地预览分析，正式服务凭据仍需单独配置。

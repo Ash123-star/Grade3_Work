@@ -69,12 +69,12 @@ void main() {
       }
       await tester.tap(find.text('AI地图').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('堵点风险'));
-      await tester.pumpAndSettle();
+      expect(find.text('成长与发展地图'), findsOneWidget);
+      expect(find.text('堵点风险'), findsNothing);
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
       await tester.pumpAndSettle();
       expect(find.text('日'), findsNothing);
-      expect(find.text('行动规划'), findsOneWidget);
+      expect(find.text('行动规划'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

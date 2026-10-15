@@ -78,7 +78,7 @@ public class Ai {
             var j=db.one("SELECT * FROM ai_jobs WHERE id=?",id); Actor a=currentOwner(j);
             var old=db.read(j.get("input")); var input=new LinkedHashMap<>(context(a,Db.required(old,"date"),Db.required(old,"period"))); options(input,old); db.update("UPDATE ai_jobs SET input=?::jsonb WHERE id=?",db.write(input),id);
             reserve=db.write(input).length()+maxTokens+1000L; budgetKey="workpanel:ai-budget:"+a.id()+":"+LocalDate.now(ZoneOffset.UTC);
-            long persisted=db.count("SELECT coalesce(sum(tokens),0) FROM ai_jobs WHERE owner_id=? AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",a.id());
+            long persisted=db.count("SELECT coalesce(sum(tokens),0) FROM ai_jobs WHERE owner_id=? AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",a.id())+db.count("SELECT coalesce(sum(tokens),0) FROM memory_model_calls WHERE company_id=? AND owner_id=? AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",a.company(),a.id());
             if(persisted+reserve>daily) { reserve=0; throw new ApiError(429,"AI_BUDGET","每日 AI 预算不足"); }
             Long budget=redis.execute(new DefaultRedisScript<>("local n=tonumber(redis.call('GET',KEYS[1]) or '0'); if n+tonumber(ARGV[1])>tonumber(ARGV[2]) then return -1 end; redis.call('INCRBY',KEYS[1],ARGV[1]); redis.call('EXPIRE',KEYS[1],172800); return n+tonumber(ARGV[1])",Long.class),List.of(budgetKey),String.valueOf(reserve),String.valueOf(daily));
             if(budget==null||budget<0) { reserve=0; throw new ApiError(429,"AI_BUDGET","每日 AI 预算不足"); }

@@ -17,7 +17,7 @@ public class Messages {
     @Scheduled(fixedDelay=2000) @Transactional
     public void deliver() {
         if(!enabled) return;
-        for(var e:db.rows("SELECT * FROM outbox_events WHERE delivered_at IS NULL ORDER BY created_at LIMIT 100 FOR UPDATE SKIP LOCKED")) {
+        for(var e:db.rows("SELECT * FROM outbox_events WHERE delivered_at IS NULL AND type<>'MEMORY_SOURCE' ORDER BY created_at LIMIT 100 FOR UPDATE SKIP LOCKED")) {
             db.update("INSERT INTO notifications(id,company_id,recipient_id,type,object_id,body) VALUES (?,?,?,?,?,?::jsonb) ON CONFLICT(id) DO NOTHING",e.get("id"),e.get("company_id"),e.get("recipient_id"),e.get("type"),e.get("object_id"),db.write(e.get("body")));
             db.update("UPDATE outbox_events SET delivered_at=now() WHERE id=?",e.get("id"));
         }

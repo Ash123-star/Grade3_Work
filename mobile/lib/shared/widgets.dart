@@ -23,15 +23,20 @@ void notice(BuildContext context, String text) =>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
 class PageBody extends StatelessWidget {
-  const PageBody({super.key, required this.children});
+  const PageBody({
+    super.key,
+    required this.children,
+    this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 96),
+  });
   final List<Widget> children;
+  final EdgeInsetsGeometry padding;
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.topCenter,
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 760),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
+        padding: padding,
         children: children,
       ),
     ),

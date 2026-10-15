@@ -8,3 +8,7 @@ deploy/postgresql/.env
 deploy/redis/.env
 deploy/dist/
 deploy/backend/backups/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/

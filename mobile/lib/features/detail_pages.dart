@@ -21,6 +21,18 @@ class _ListPageState extends ConsumerState<ListPage> {
   @override
   Widget build(BuildContext context) {
     final resource = widget.resource;
+    final dashboardList = const [
+      'dashboard/company',
+      'tasks',
+      'dashboard/personal',
+      'logs',
+    ].contains(resource);
+    final hasStatus = const [
+      'notifications',
+      'tasks',
+      'reviews',
+      'feedback',
+    ].contains(resource) || resource.startsWith('logs');
     final data = ref.watch(recordsProvider(resource));
     return PageFrame(
       title: resourceTitles[resource] ?? '记录',
@@ -60,6 +72,9 @@ class _ListPageState extends ConsumerState<ListPage> {
           ),
       ],
       child: PageBody(
+        padding: dashboardList
+            ? const EdgeInsets.fromLTRB(16, 8, 16, 24)
+            : const EdgeInsets.fromLTRB(20, 8, 20, 96),
         children: [
           const DemoLabel(),
           if (resource == 'logs/subordinates')
@@ -142,6 +157,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                   .toList();
               if (items.isEmpty) return const EmptyIllustration();
               return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: items
                     .map(
                       (r) => Padding(
@@ -179,37 +195,41 @@ class _ListPageState extends ConsumerState<ListPage> {
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 8),
-                              Text(r.subtitle),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  if (resource == 'notifications')
-                                    StatusPill(
-                                      r.fields['read'] == true ? '已读' : '未读',
-                                      color: r.fields['read'] == true
-                                          ? CuteTokens.blue
-                                          : CuteTokens.yellow,
-                                    ),
-                                  if (resource == 'tasks') ...[
-                                    StatusPill(
-                                      '${r.fields['status'] ?? '待接收'}',
-                                    ),
-                                    StatusPill(
-                                      '${r.fields['紧急程度'] ?? '普通'}',
-                                      color: CuteTokens.yellow,
-                                    ),
-                                  ],
-                                  if (resource == 'reviews')
-                                    StatusPill('${r.fields['reviewState']}'),
-                                  if (resource.startsWith('logs') ||
-                                      resource == 'feedback')
-                                    StatusPill(
-                                      '${r.fields['status'] ?? '已提交'}',
-                                    ),
-                                ],
+                              Text(
+                                r.subtitle,
+                                style: const TextStyle(color: CuteTokens.muted),
                               ),
+                              if (hasStatus) const SizedBox(height: 8),
+                              if (hasStatus)
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    if (resource == 'notifications')
+                                      StatusPill(
+                                        r.fields['read'] == true ? '已读' : '未读',
+                                        color: r.fields['read'] == true
+                                            ? CuteTokens.blue
+                                            : CuteTokens.yellow,
+                                      ),
+                                    if (resource == 'tasks') ...[
+                                      StatusPill(
+                                        '${r.fields['status'] ?? '待接收'}',
+                                      ),
+                                      StatusPill(
+                                        '${r.fields['紧急程度'] ?? '普通'}',
+                                        color: CuteTokens.yellow,
+                                      ),
+                                    ],
+                                    if (resource == 'reviews')
+                                      StatusPill('${r.fields['reviewState']}'),
+                                    if (resource.startsWith('logs') ||
+                                        resource == 'feedback')
+                                      StatusPill(
+                                        '${r.fields['status'] ?? '已提交'}',
+                                      ),
+                                  ],
+                                ),
                               if (resource == 'tasks')
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),

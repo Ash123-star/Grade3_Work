@@ -1,4 +1,4 @@
-# PostgreSQL 与 Redis 部署
+# PostgreSQL、Redis 与 Neo4j 部署
 
 ## 运行
 
@@ -8,16 +8,17 @@
 powershell -ExecutionPolicy Bypass -File scripts/start-data.ps1
 ```
 
-首次生成私有 `deploy/.env`（两个独立的 256 位随机密码），构建组件包、统一运行包和组合镜像，在一个容器中同时启动 PostgreSQL 与 Redis，再显式执行迁移并验证认证。已有双容器部署会先停止并移除本次旧容器，继续挂载原数据卷。后续重复命令沿用已有密码及数据卷。凭据从本机 `.env` 读取，不提交 Git，不输出或打入 ZIP。
+首次生成私有 `deploy/.env`（三个独立的随机密码），构建组件包和组合镜像，在一个容器中同时启动 PostgreSQL、Redis 与 Neo4j，再显式执行基础迁移并验证认证。已有双容器部署保留原数据卷；Neo4j 使用新独立卷。凭据从本机 `.env` 读取，不提交 Git，不输出或打入 ZIP。
 
 | 服务 | 本机地址 | 容器内地址 | 用途 |
 |---|---|---|---|
 | PostgreSQL 16 | 127.0.0.1:55432 | data:5432 | collaboration 数据库，collaboration_owner 用户 |
 | Redis 7 | 127.0.0.1:56379 | data:6379 | 缓存、会话、限流 |
+| Neo4j 5.26 Community | 127.0.0.1:57687 | data:7687 | 可重建关系投影 |
 
-Docker Compose 项目默认 `collaboration-data`，只有一个服务 `data`、一个容器 `collaboration-data-data-1`，组合镜像 `collaboration-data-runtime:local`。容器中运行 PostgreSQL 与 Redis 两个必要的数据库进程，入口负责停止信号和进程退出联动，Docker init 回收子进程。任一数据库退出，另一进程也会优雅停止，容器按 unless-stopped 策略重启。
+Docker Compose 项目默认 `collaboration-data`，只有一个服务 `data`、一个容器 `collaboration-data-data-1`，组合镜像 `collaboration-data-runtime:local`。入口管理三个数据库进程；任一进程退出就停止其他进程并让容器重启。联合健康检查要求 PostgreSQL、Redis 和 Neo4j 均可用。
 
-具名卷 `collaboration-data_postgres-data`、`collaboration-data_redis-data` 保持分开持久化；不会使用其他项目已有容器或卷。改变端口或密码在部署前修改 `.env`；数据库已初始化后不能仅改 `.env` 实现密码轮换。
+具名卷 `collaboration-data_postgres-data`、`collaboration-data_redis-data` 和 `collaboration-data_neo4j-data` 分开持久化；不会使用其他项目已有容器或卷。改变端口或密码在部署前修改 `.env`；数据库已初始化后不能仅改 `.env` 实现密码轮换。
 
 ```powershell
 docker compose --env-file deploy/.env -f deploy/compose.yaml ps
@@ -25,7 +26,7 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml logs --tail 50
 docker compose --env-file deploy/.env -f deploy/compose.yaml down
 ```
 
-停止不带 `-v`，保留数据。再次执行启动入口即可恢复。当前只部署数据基础；移动端仍是演示，不代表 Spring Boot API 已接通。
+停止不带 `-v`，保留数据。再次执行启动入口即可恢复。Spring Boot 另用 Flyway V4 迁移自己的 `workpanel` 库；不可把服务器迁移应用到基础设施的 `collaboration` 库。
 
 ## 文件与数据契约
 
@@ -33,7 +34,7 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml down
 - `deploy/postgresql/migrations/V001__initial_schema.sql`：唯一 V001 执行入口；全部语句在同一事务内，包含迁移锁、版本表和内容校验。
 - `deploy/dist/postgresql.zip`、`redis.zip`：组件源文件和工具分别打包；默认部署入口仍只启动一个容器。
 - `deploy/dist/data-runtime.zip`、`SHA256SUMS.txt`：统一单容器运行包及三个 ZIP 的 SHA256 清单；解压后在根目录执行 scripts/start-data.ps1。包内不含本地凭据或数据卷。
-- `deploy/runtime/`：从官方 PostgreSQL/Redis 镜像组合的 Dockerfile、双进程入口和联合健康检查。
+- `deploy/runtime/`：从官方 PostgreSQL、Redis、Neo4j 及 Java 运行时组合的 Dockerfile、三进程入口和联合健康检查。
 - `scripts/verify-data.ps1`：真实数据库约束、迁移重跑、校验漂移、失败回滚、Redis 认证和重启持久化验证。
 
 | 业务域 | 表 |
@@ -60,8 +61,8 @@ DeepSeek 密钥仅保存在后续服务端环境，不进入数据库。ai_jobs 
 
 ## 验证入口
 
-`powershell -ExecutionPolicy Bypass -File scripts/verify-data.ps1` 用于本次新初始化的本地环境：验证默认种子计数，临时事务检查业务约束，创建后删除隔离测试数据库，并重启唯一的数据容器检查两个数据库持久化。已扩展组织或投入业务使用的环境应采用针对现有数据的验收，不直接使用默认种子计数断言。只检查迁移与约束、不重启时加 `-SkipRestart`。
+`powershell -ExecutionPolicy Bypass -File scripts/verify-data.ps1` 用于本次新初始化的本地环境：验证默认种子计数、约束、迁移和 Redis 认证。三数据库进程退出联动使用 `scripts/verify-data-lifecycle.ps1`；此命令会短暂中断数据服务。已扩展组织或投入业务使用的环境不应直接使用默认种子计数断言。
 
 实际执行结果见 `docs/data-infrastructure-validation.md`。
 
-单容器进程联动验证入口为 `powershell -ExecutionPolicy Bypass -File scripts/verify-data-lifecycle.ps1`。它在本地验收环境分别停止 Redis、PostgreSQL 主进程，验证容器自动重启、两个服务同时恢复健康和测试键持久化；执行期间短暂中断两个数据库。
+单容器进程联动验证入口为 `powershell -ExecutionPolicy Bypass -File scripts/verify-data-lifecycle.ps1`。它在本地验收环境分别停止 Redis、PostgreSQL 和 Neo4j，验证容器自动重启、三个服务恢复健康和测试键持久化。
