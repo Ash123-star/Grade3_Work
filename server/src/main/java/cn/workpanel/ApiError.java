@@ -11,7 +11,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import java.util.Map;
 
 public class ApiError extends RuntimeException {
-    final int status; final String code;
+    public final int status; public final String code;
     public ApiError(int status,String code,String message) { super(message); this.status=status; this.code=code; }
     public static ApiError bad(String code,String message) { return new ApiError(400,code,message); }
     public static ApiError forbidden() { return new ApiError(403,"FORBIDDEN","不在授权范围内"); }
