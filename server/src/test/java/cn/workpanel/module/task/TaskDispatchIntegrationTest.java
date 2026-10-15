@@ -22,8 +22,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * 业务操作全部经由 HTTP 接口。
  */
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties={
-    "app.admin-account=dispatch-it-admin", "app.admin-password=Dispatch-it-password-2026",
-    "app.admin-phone=13900000002", "app.deepseek-key=local-mock-only", "app.jobs-enabled=false"
+    // 与全仓端到端测试复用同一个临时数据库时，必须采用同一初始管理员，避免测试顺序导致登录夹具不一致。
+    "app.admin-account=integration-admin", "app.admin-password=Initial-test-password-2026",
+    "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.jobs-enabled=false"
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TaskDispatchIntegrationTest {
@@ -56,8 +57,10 @@ class TaskDispatchIntegrationTest {
         user("pending",company,"EMPLOYEE","d1","t1","PENDING",false);
         user("disabled",company,"EMPLOYEE","d1","t1","DISABLED",false);
         user("muted",company,"LEADER","d1","t1","ACTIVE",false);
-        user("admin",company,"ADMIN",null,null,"ACTIVE",true);
+        user("reviewer",company,"EMPLOYEE","d1","t1","ACTIVE",false);
         user("outsider",other,"LEADER","d1","t1","ACTIVE",true);
+        // 专用转派/改期申请由公司复核人最终生效；日志修订还会经过直属团队和部门复核。
+        jdbc.update("UPDATE users SET company_reviewer=true WHERE id=?",id.get("reviewer"));
     }
 
     void user(String who,String c,String role,String dept,String team,String status,boolean dispatch) {
@@ -265,7 +268,7 @@ class TaskDispatchIntegrationTest {
     // 6.3 非法状态与校验
     @Test void invalidRequestsLeaveNothing() throws Exception {
         long tasks=companyTasks(), keys=count("SELECT count(*) FROM idempotency_keys WHERE company_id=?",company);
-        for(var e:Map.of("phase","ACCEPTED","version",3,"completion","100%","status","DONE","issuerId",id.get("admin")).entrySet()) {
+        for(var e:Map.of("phase","ACCEPTED","version",3,"completion","100%","status","DONE","issuerId",id.get("reviewer")).entrySet()) {
             var b=body("服务端字段","alice"); b.put(e.getKey(),e.getValue()); assertEquals("SERVER_MANAGED_FIELD",error(400,"leader",b,key()),e.getKey());
         }
         var unknown=body("未知字段","alice"); unknown.put("color","red"); assertEquals("UNKNOWN_FIELD",error(400,"leader",unknown,key()));
@@ -294,7 +297,7 @@ class TaskDispatchIntegrationTest {
             var r=call(404,"GET","/tasks/"+t,who,null,null); assertEquals("NOT_FOUND",r.get("code").asText(),who);
             assertFalse(r.has("title")||r.has("events")||r.has("fields"),who);
         }
-        for(String who:List.of("leader","alice","amy","director","admin")) assertEquals(t,call(200,"GET","/tasks/"+t,who,null,null).get("id").asText(),who);
+        for(String who:List.of("leader","alice","amy","director")) assertEquals(t,call(200,"GET","/tasks/"+t,who,null,null).get("id").asText(),who);
     }
 
     // 6.5 附件与回滚
@@ -340,5 +343,110 @@ class TaskDispatchIntegrationTest {
         assertEquals("NOT_FOUND",error(404,"leader",body("待审核","pending"),key()));
         assertEquals("NOT_FOUND",error(404,"leader",body("停用","alice","disabled"),key()));
         assertEquals(tasks,companyTasks());
+    }
+
+    /** 转派和改期在复核通过前不生效；最终生效使用申请时版本，过期申请不得覆盖后来变更。 */
+    @Test void approvedReassignmentAndRescheduleRespectReviewAndVersion() throws Exception {
+        String taskId=dispatch("leader",body("复核转派改期","alice"),key()).get("id").asText();
+        String newDeadline=LocalDate.now(ZoneId.of("Asia/Shanghai")).plusDays(10).atTime(18,0)
+                .atZone(ZoneId.of("Asia/Shanghai")).toOffsetDateTime().toString();
+        event(taskId,"alice","RECEIVED",1,null);
+
+        var reassignment=call(200,"POST","/tasks/"+taskId+"/reassignments","leader",
+                Map.of("ownerId",id.get("amy"),"version",2,"reason","负责人调整"),null);
+        assertEquals(id.get("alice"),db.one("SELECT owner_id FROM tasks WHERE id=?",taskId).get("owner_id"));
+        assertEquals(2,((Number)db.one("SELECT version FROM tasks WHERE id=?",taskId).get("version")).intValue());
+        approveTaskRevision(reassignment.get("id").asText());
+        var reassigned=db.one("SELECT owner_id,phase,version FROM tasks WHERE id=?",taskId);
+        assertEquals(id.get("amy"),reassigned.get("owner_id"));
+        assertEquals("DISPATCHED",reassigned.get("phase"));
+        assertEquals(3,((Number)reassigned.get("version")).intValue());
+        call(404,"GET","/tasks/"+taskId,"alice",null,null);
+        call(200,"GET","/tasks/"+taskId,"amy",null,null);
+        assertEquals("REASSIGNED",db.one("SELECT type FROM task_events WHERE task_id=? ORDER BY sequence DESC LIMIT 1",taskId).get("type"));
+
+        var reschedule=call(200,"POST","/tasks/"+taskId+"/reschedules","leader",
+                Map.of("deadline",newDeadline,"version",3,"reason","排期调整"),null);
+        assertEquals(OffsetDateTime.parse(deadline).toInstant(),((java.sql.Timestamp)db.one("SELECT deadline FROM tasks WHERE id=?",taskId).get("deadline")).toInstant());
+        approveTaskRevision(reschedule.get("id").asText());
+        var rescheduled=db.one("SELECT phase,version,deadline FROM tasks WHERE id=?",taskId);
+        assertEquals("DISPATCHED",rescheduled.get("phase"));
+        assertEquals(4,((Number)rescheduled.get("version")).intValue());
+        assertEquals(OffsetDateTime.parse(newDeadline).toInstant(),((java.sql.Timestamp)rescheduled.get("deadline")).toInstant());
+        assertEquals("RESCHEDULED",db.one("SELECT type FROM task_events WHERE task_id=? ORDER BY sequence DESC LIMIT 1",taskId).get("type"));
+
+        String staleTask=dispatch("leader",body("过期改期申请","alice"),key()).get("id").asText();
+        var stale=call(200,"POST","/tasks/"+staleTask+"/reschedules","leader",
+                Map.of("deadline",newDeadline,"version",1,"reason","等待复核"),null);
+        event(staleTask,"alice","RECEIVED",1,null);
+        call(200,"POST","/reviews/"+stale.get("id").asText()+"/decision","muted",Map.of("approve",true,"reason","同意"),null);
+        call(200,"POST","/reviews/"+stale.get("id").asText()+"/decision","director",Map.of("approve",true,"reason","同意"),null);
+        var conflict=call(409,"POST","/reviews/"+stale.get("id").asText()+"/decision","reviewer",
+                Map.of("approve",true,"reason","版本已过期"),null);
+        assertEquals("VERSION_CONFLICT",conflict.get("code").asText());
+        assertEquals("RECEIVED",db.one("SELECT phase FROM tasks WHERE id=?",staleTask).get("phase"));
+        assertEquals(2,((Number)db.one("SELECT version FROM tasks WHERE id=?",staleTask).get("version")).intValue());
+    }
+
+    /** 日报草稿、提交、修订、下属可见性、已读评语和任务关联在真实 HTTP/数据库链路中保持一致。 */
+    @Test void dailyLogWorkflowKeepsDraftPrivateAndHistoryConsistent() throws Exception {
+        String date=LocalDate.now(ZoneId.of("Asia/Shanghai")).plusDays(45).toString();
+        String taskId=dispatch("leader",body("日报关联任务","alice"),key()).get("id").asText();
+        var firstBody=new LinkedHashMap<String,Object>();
+        firstBody.put("work","完成初稿"); firstBody.put("tomorrow","继续联调"); firstBody.put("taskIds",List.of(taskId,taskId));
+        var draft=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",0,"body",firstBody),null);
+        String logId=draft.get("id").asText();
+        assertFalse(draft.get("submitted").asBoolean()); assertEquals(1,draft.get("version").asInt());
+        assertEquals(1,count("SELECT count(*) FROM daily_logs WHERE owner_id=? AND business_date=?::date",id.get("alice"),date));
+        assertEquals(1,count("SELECT count(*) FROM log_tasks WHERE company_id=? AND log_id=?",company,logId));
+        call(404,"GET","/logs/"+logId,"leader",null,null);
+        assertTrue(call(200,"GET","/logs/subordinates?ownerId="+id.get("alice")+"&date="+date,"leader",null,null).get("items").isEmpty());
+
+        var secondBody=new LinkedHashMap<String,Object>(firstBody); secondBody.put("work","覆盖后的草稿");
+        var updated=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",1,"body",secondBody),null);
+        assertEquals(logId,updated.get("id").asText()); assertEquals(2,updated.get("version").asInt());
+        var stale=call(409,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",1,"body",firstBody),null);
+        assertEquals("VERSION_CONFLICT",stale.get("code").asText());
+
+        var submitted=call(200,"POST","/logs/"+logId+"/submit","alice",Map.of("version",2),null);
+        assertTrue(submitted.get("submitted").asBoolean()); assertEquals(3,submitted.get("version").asInt());
+        assertEquals(1,count("SELECT count(*) FROM log_versions WHERE log_id=?",logId));
+        call(200,"GET","/logs/"+logId,"leader",null,null);
+        assertTrue(call(200,"GET","/logs/subordinates?ownerId="+id.get("alice")+"&date="+date,"leader",null,null).get("items").size()>0);
+        assertTrue(call(200,"POST","/logs/"+logId+"/read","leader",null,null).get("ok").asBoolean());
+        call(200,"POST","/logs/"+logId+"/comments","leader",Map.of("text","请继续保持"),null);
+        assertEquals(1,call(200,"GET","/logs/"+logId+"/comments","leader",null,null).size());
+
+        var candidate=new LinkedHashMap<String,Object>(secondBody); candidate.put("work","审核后的修订");
+        var revision=call(200,"POST","/logs/"+logId+"/revisions","alice",Map.of("version",3,"body",candidate,"reason","补充进展"),null);
+        approveLogRevision(revision.get("id").asText());
+        var revised=call(200,"GET","/logs/"+logId,"alice",null,null);
+        assertEquals(4,revised.get("version").asInt()); assertEquals("审核后的修订",revised.get("body").get("work").asText());
+        var versions=call(200,"GET","/logs/"+logId+"/versions","leader",null,null);
+        assertEquals(List.of(3,4),versions.findValuesAsText("version").stream().map(Integer::parseInt).toList());
+
+        var currentBody=new LinkedHashMap<String,Object>(candidate); currentBody.put("work","先通过的修订");
+        var staleBody=new LinkedHashMap<String,Object>(candidate); staleBody.put("work","过期修订");
+        var current=call(200,"POST","/logs/"+logId+"/revisions","alice",Map.of("version",4,"body",currentBody,"reason","再次补充"),null);
+        var staleRevision=call(200,"POST","/logs/"+logId+"/revisions","alice",Map.of("version",4,"body",staleBody,"reason","并发申请"),null);
+        approveLogRevision(current.get("id").asText());
+        call(200,"POST","/reviews/"+staleRevision.get("id").asText()+"/decision","leader",Map.of("approve",true,"reason","同意"),null);
+        call(200,"POST","/reviews/"+staleRevision.get("id").asText()+"/decision","director",Map.of("approve",true,"reason","同意"),null);
+        var staleApproval=call(409,"POST","/reviews/"+staleRevision.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","版本过期"),null);
+        assertEquals("VERSION_CONFLICT",staleApproval.get("code").asText());
+        assertEquals("先通过的修订",call(200,"GET","/logs/"+logId,"alice",null,null).get("body").get("work").asText());
+    }
+
+    private void approveLogRevision(String reviewId) throws Exception {
+        call(200,"POST","/reviews/"+reviewId+"/decision","leader",Map.of("approve",true,"reason","同意"),null);
+        call(200,"POST","/reviews/"+reviewId+"/decision","director",Map.of("approve",true,"reason","同意"),null);
+        call(200,"POST","/reviews/"+reviewId+"/decision","reviewer",Map.of("approve",true,"reason","同意"),null);
+    }
+
+    private void approveTaskRevision(String reviewId) throws Exception {
+        // 申请人 leader 不能自审；同团队另一位 active leader 负责第一步团队复核。
+        call(200,"POST","/reviews/"+reviewId+"/decision","muted",Map.of("approve",true,"reason","同意"),null);
+        call(200,"POST","/reviews/"+reviewId+"/decision","director",Map.of("approve",true,"reason","同意"),null);
+        call(200,"POST","/reviews/"+reviewId+"/decision","reviewer",Map.of("approve",true,"reason","同意"),null);
     }
 }
