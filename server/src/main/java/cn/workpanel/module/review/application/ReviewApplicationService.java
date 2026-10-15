@@ -1,8 +1,9 @@
 package cn.workpanel.module.review.application;
 
 import cn.workpanel.*;
-import cn.workpanel.module.log.controller.LogController;
+import cn.workpanel.module.log.LogTaskLinks;
 import cn.workpanel.module.organization.controller.OrganizationController;
+import cn.workpanel.module.task.TaskRevisionService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
@@ -12,10 +13,13 @@ import java.util.*;
 
 @org.springframework.stereotype.Service
 public class ReviewApplicationService {
-    final Db db;
-    public ReviewApplicationService(Db db) { this.db=db; }
+    static final Set<String> SUPPORTED_KINDS=Set.of("POLICY","MEMBERSHIP","REVIEWER","USER","DEPARTMENT","TEAM","COMPANY_ITEM","LOG","TASK","TASK_REASSIGN","TASK_RESCHEDULE");
+    static final Set<String> TASK_KINDS=Set.of("TASK","TASK_REASSIGN","TASK_RESCHEDULE");
+    final Db db; final TaskRevisionService taskRevisions;
+    public ReviewApplicationService(Db db,TaskRevisionService taskRevisions) { this.db=db; this.taskRevisions=taskRevisions; }
     @Transactional
     public Map<String,Object> create(Actor a,String kind,String target,int version,Object before,Map<String,Object> candidate,String reason) {
+        if(!SUPPORTED_KINDS.contains(kind)) throw ApiError.bad("REVIEW_KIND","不支持的复核类型");
         if(reason.isBlank()) throw ApiError.bad("REASON_REQUIRED","关键变更需填写理由");
         String id=Db.id(); db.update("INSERT INTO review_requests(id,company_id,applicant_id,kind,target_id,expected_version,before_value,candidate,reason) VALUES (?,?,?,?,?,?,?::jsonb,?::jsonb,?)",id,a.company(),a.id(),kind,target,version,db.write(before),db.write(candidate),reason);
         route(a,id,kind); db.audit(a,"REVIEW_REQUESTED",id,before,candidate,reason);
@@ -25,8 +29,8 @@ public class ReviewApplicationService {
         var reviewers=new LinkedHashSet<String>();
         var policy=db.read(db.one("SELECT review_policy FROM companies WHERE id=?",a.company()).get("review_policy"));
         if(!Set.of("MEMBERSHIP","REVIEWER").contains(kind)) {
-            if(!a.team().isBlank()&&(!kind.equals("TASK")||Boolean.TRUE.equals(policy.get("taskTeamReview")))) first(reviewers,a,"role='LEADER' AND team_id=?",a.team());
-            if(!a.department().isBlank()&&(!kind.equals("TASK")||Boolean.TRUE.equals(policy.get("taskDepartmentReview")))) first(reviewers,a,"role='DIRECTOR' AND department_id=?",a.department());
+            if(!a.team().isBlank()&&(!TASK_KINDS.contains(kind)||Boolean.TRUE.equals(policy.get("taskTeamReview")))) first(reviewers,a,"role='LEADER' AND team_id=?",a.team());
+            if(!a.department().isBlank()&&(!TASK_KINDS.contains(kind)||Boolean.TRUE.equals(policy.get("taskDepartmentReview")))) first(reviewers,a,"role='DIRECTOR' AND department_id=?",a.department());
         }
         var company=db.rows("SELECT id FROM users WHERE company_id=? AND status='ACTIVE' AND company_reviewer=true AND id<>?"+(Set.of("MEMBERSHIP","REVIEWER").contains(kind)?" AND role='ADMIN'":"")+" ORDER BY id LIMIT 1",a.company(),a.id());
         if(!company.isEmpty()) reviewers.add(Db.str(company.getFirst(),"id"));
@@ -117,16 +121,21 @@ public class ReviewApplicationService {
                 Business.validateLog(db,applicant,c);
                 Db.conflict(db.update("UPDATE daily_logs SET body=?::jsonb,version=version+1 WHERE id=? AND submitted AND version=?",db.write(c),target,v));
                 db.update("INSERT INTO log_versions(company_id,log_id,version,body) VALUES (?,?,?,?::jsonb)",approver.company(),target,v+1,db.write(c));
-                LogController.syncTaskLinks(db, approver.company(), target, c);
+                LogTaskLinks.validateAndSync(db, applicant, target, c);
             }
             case "TASK" -> {
                 var task=db.one("SELECT * FROM tasks WHERE id=? AND company_id=? FOR UPDATE",target,approver.company()); applicant.requireDispatch(); if(!applicant.id().equals(task.get("issuer_id"))&&!applicant.admin()) throw ApiError.forbidden(); if(Set.of("ARCHIVED","WITHDRAWN").contains(task.get("phase"))) throw ApiError.conflict();
-                var former=db.rows("SELECT user_id FROM task_assignees WHERE task_id=?",target);
-                Db.conflict(db.update("UPDATE tasks SET version=version+1 WHERE id=? AND version=?",target,v));
-                var d=cn.workpanel.module.task.TaskRevisionSupport.apply(db,applicant,target,c);
-                db.update("UPDATE tasks SET title=?,owner_id=?,deadline=?::timestamptz,body=?::jsonb,phase='DISPATCHED' WHERE id=?",d.title(),d.ownerId(),d.deadline(),db.write(d.body()),target);
-                db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body) VALUES (?,?,?,'REVISED',?::jsonb)",approver.company(),target,applicant.id(),db.write(c));
-                for(var recipient:former) db.notify(applicant,Db.str(recipient,"user_id"),"TASK_REVISED",target,"task-revised:"+target+":"+v+":"+recipient.get("user_id"));
+                taskRevisions.applyGeneric(db,applicant,task,v,c);
+            }
+            case "TASK_REASSIGN" -> {
+                var task=db.one("SELECT * FROM tasks WHERE id=? AND company_id=? FOR UPDATE",target,approver.company());
+                if(!applicant.id().equals(task.get("issuer_id"))&&!applicant.admin()) throw ApiError.forbidden();
+                taskRevisions.applyReassignment(db,applicant,task,v,c,Db.str(row,"reason"));
+            }
+            case "TASK_RESCHEDULE" -> {
+                var task=db.one("SELECT * FROM tasks WHERE id=? AND company_id=? FOR UPDATE",target,approver.company());
+                if(!applicant.id().equals(task.get("issuer_id"))&&!applicant.admin()) throw ApiError.forbidden();
+                taskRevisions.applyReschedule(db,applicant,task,v,c,Db.str(row,"reason"));
             }
             default -> throw ApiError.bad("REVIEW_KIND","不支持的复核类型");
         }

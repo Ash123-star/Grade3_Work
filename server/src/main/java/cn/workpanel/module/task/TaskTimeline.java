@@ -12,7 +12,14 @@ public final class TaskTimeline {
         db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body) VALUES (?,?,?,?,?::jsonb)",a.company(),taskId,a.id(),type,db.write(body));
     }
 
+    /** 记录由生命周期状态机生效的事件快照；历史事件的三个快照列保持为空。 */
+    public static void append(Db db,Actor a,String taskId,String type,Object body,
+            String fromPhase,String toPhase,int taskVersion) {
+        db.update("INSERT INTO task_events(company_id,task_id,actor_id,type,body,from_phase,to_phase,task_version) VALUES (?,?,?,?,?::jsonb,?,?,?)",
+                a.company(),taskId,a.id(),type,db.write(body),fromPhase,toPhase,taskVersion);
+    }
+
     public static List<Map<String,Object>> list(Db db,String taskId) {
-        return db.rows("SELECT sequence,actor_id,type,body,created_at FROM task_events WHERE task_id=? ORDER BY sequence",taskId);
+        return db.rows("SELECT sequence,actor_id,type,body,from_phase,to_phase,task_version,created_at FROM task_events WHERE task_id=? ORDER BY sequence",taskId);
     }
 }

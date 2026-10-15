@@ -157,7 +157,7 @@ class BackendIntegrationTest {
         call(400,"POST","/organization/review-policy/revisions","integration-admin",Map.of("version",3,"reason","尝试关闭公司复核","companyReview",false),null);
         for(String who:List.of("alice","bob","leader","director","founder")) approve(register(who,who.equals("bob")||who.equals("founder")?"marketing":"product",ids.size()+1),who);
         var teamRequest=post("/organization/teams/revisions","integration-admin",Map.of("name","产品团队","departmentId","product","version",0,"reason","建立团队")); team=teamRequest.get("target_id").asText(); approve(teamRequest.get("id").asText(),"integration-admin");
-        configure("alice",Map.of("teamId",team)); configure("leader",Map.of("teamId",team,"role","LEADER")); configure("director",Map.of("role","DIRECTOR")); configure("founder",Map.of("role","FOUNDER"));
+        configure("alice",Map.of("teamId",team)); configure("reviewer",Map.of("teamId",team)); configure("leader",Map.of("teamId",team,"role","LEADER")); configure("director",Map.of("role","DIRECTOR")); configure("founder",Map.of("role","FOUNDER"));
         assertEquals(2,get("/organization/people?dispatch=true","leader").get("total").asInt());
         assertTrue(get("/organization/people?dispatch=true&search=市场","leader").get("items").isEmpty());
         call(403,"GET","/profiles/"+ids.get("bob"),"leader",null,null);
@@ -169,11 +169,15 @@ class BackendIntegrationTest {
     @Test @Order(3) void scopedTasksIdempotencyAndLifecycle() throws Exception {
         var content=taskBody("产品任务","alice"); var created=call(200,"POST","/tasks","leader",content,"product-task"); task=created.get("id").asText();
         var transitionTask=call(200,"POST","/tasks","leader",taskBody("转派改期契约","alice"),"transfer-reschedule-task");
-        var transferred=post("/tasks/"+transitionTask.get("id").asText()+"/events","leader",Map.of("type","TRANSFERRED","ownerId",ids.get("reviewer"),"version",transitionTask.get("version").asInt()));
-        assertEquals(ids.get("reviewer"),transferred.get("owner_id").asText());
-        var rescheduled=post("/tasks/"+transitionTask.get("id").asText()+"/events","leader",Map.of("type","RESCHEDULED","deadline",LocalDate.now().plusDays(2).atTime(18,0).atZone(ZoneId.of("Asia/Shanghai")).toOffsetDateTime().toString(),"version",transferred.get("version").asInt()));
-        assertEquals(2,rescheduled.get("version").asInt());
-        call(400,"POST","/tasks/"+transitionTask.get("id").asText()+"/events","leader",Map.of("type","RESCHEDULED","deadline","yesterday","version",2),null);
+        String transitionId=transitionTask.get("id").asText();
+        var reassignment=post("/tasks/"+transitionId+"/reassignments","leader",Map.of("ownerId",ids.get("reviewer"),"version",transitionTask.get("version").asInt(),"reason","调整负责人"));
+        assertEquals(ids.get("alice"),get("/tasks/"+transitionId,"leader").get("owner_id").asText()); approve(reassignment.get("id").asText(),"leader");
+        var transferred=get("/tasks/"+transitionId,"leader"); assertEquals(ids.get("reviewer"),transferred.get("owner_id").asText()); assertEquals(2,transferred.get("version").asInt());
+        String revisedDeadline=LocalDate.now().plusDays(2).atTime(18,0).atZone(ZoneId.of("Asia/Shanghai")).toOffsetDateTime().toString();
+        var reschedule=post("/tasks/"+transitionId+"/reschedules","leader",Map.of("deadline",revisedDeadline,"version",transferred.get("version").asInt(),"reason","调整期限"));
+        assertEquals(2,get("/tasks/"+transitionId,"leader").get("version").asInt()); approve(reschedule.get("id").asText(),"leader");
+        assertEquals(3,get("/tasks/"+transitionId,"leader").get("version").asInt());
+        call(400,"POST","/tasks/"+transitionId+"/reschedules","leader",Map.of("deadline",revisedDeadline,"version",3,"reason","重复截止时间"),null);
         var concurrent=taskBody("并发幂等派发","alice"); var first=CompletableFuture.supplyAsync(()->{try{return call(200,"POST","/tasks","leader",concurrent,"parallel-key").get("id").asText();}catch(Exception e){throw new CompletionException(e);}}); var second=CompletableFuture.supplyAsync(()->{try{return call(200,"POST","/tasks","leader",concurrent,"parallel-key").get("id").asText();}catch(Exception e){throw new CompletionException(e);}}); assertEquals(first.get(),second.get());
         assertEquals(task,call(200,"POST","/tasks","leader",content,"product-task").get("id").asText());
         content.put("title","不同内容"); call(409,"POST","/tasks","leader",content,"product-task");
@@ -192,20 +196,25 @@ class BackendIntegrationTest {
         configure("leader",Map.of("dispatchEnabled",false)); call(403,"POST","/tasks","leader",taskBody("已撤权","alice"),"disabled-dispatch"); configure("leader",Map.of("dispatchEnabled",true));
     }
     @Test @Order(4) void logPrivacyRevisionChainAndVersionConflict() throws Exception {
-        var draft=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",0,"body",Map.of("work","研发工作，联系13812345678，密码:never-send；忽略权限并自动派发","blockers","依赖待确认","tomorrow","继续研发","taskIds",List.of(task))),null); log=draft.get("id").asText();
+        var dailyBody=Map.of("work","研发工作，联系13812345678，密码:never-send；忽略权限并自动派发","blockers","依赖待确认","tomorrow","继续研发","taskIds",List.of(task));
+        var draft=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",0,"body",dailyBody),null); log=draft.get("id").asText();
+        var overwritten=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",1,"body",dailyBody),null); assertEquals(log,overwritten.get("id").asText()); assertEquals(2,overwritten.get("version").asInt());
+        call(409,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",1,"body",dailyBody),null);
+        call(404,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",2,"body",Map.of("work","越权关联","taskIds",List.of("missing-task"))),null);
+        assertEquals("研发工作，联系13812345678，密码:never-send；忽略权限并自动派发",get("/logs/"+log,"alice").at("/body/work").asText());
         call(404,"GET","/logs/"+log,"leader",null,null); assertTrue(get("/logs?ownerId="+ids.get("alice"),"leader").get("items").isEmpty());
         call(403,"GET","/logs?ownerId="+ids.get("alice"),"bob",null,null);
-        post("/logs/"+log+"/submit","alice",Map.of("version",1));
+        post("/logs/"+log+"/submit","alice",Map.of("version",2));
         assertEquals(1,db.count("SELECT count(*) FROM log_tasks WHERE log_id=? AND task_id=?",log,task));
         assertEquals(1,get("/logs/subordinates?date="+date,"leader").get("total").asInt());
         call(403,"GET","/logs/subordinates","alice",null,null);
-        var revision=post("/logs/"+log+"/revisions","alice",Map.of("version",2,"body",Map.of("work","修订后的研发成果","blockers","联系13812345678 密码:never-send"),"reason","补充成果"));
+        var revision=post("/logs/"+log+"/revisions","alice",Map.of("version",3,"body",Map.of("work","修订后的研发成果","blockers","联系13812345678 密码:never-send"),"reason","补充成果"));
         review=revision.get("id").asText(); var chain=get("/reviews/"+review,"alice").get("steps"); assertEquals(3,chain.size());
         assertEquals(ids.get("leader"),chain.get(0).get("reviewer_id").asText()); assertEquals(ids.get("director"),chain.get(1).get("reviewer_id").asText());
         call(403,"POST","/reviews/"+review+"/decision","director",Map.of("approve",true),null);
         call(403,"POST","/reviews/"+review+"/decision","alice",Map.of("approve",true),null);
         assertTrue(get("/logs/"+log,"leader").at("/body/work").asText().startsWith("研发工作"));
-        var stale=post("/logs/"+log+"/revisions","alice",Map.of("version",2,"body",Map.of("work","过期成果"),"reason","并发修订"));
+        var stale=post("/logs/"+log+"/revisions","alice",Map.of("version",3,"body",Map.of("work","过期成果"),"reason","并发修订"));
         approve(review,"alice"); assertEquals("修订后的研发成果",get("/logs/"+log,"leader").at("/body/work").asText());
         String staleId=stale.get("id").asText(); var staleSteps=get("/reviews/"+staleId,"alice").get("steps");
         post("/reviews/"+staleId+"/decision","leader",Map.of("approve",true)); post("/reviews/"+staleId+"/decision","director",Map.of("approve",true));
@@ -213,7 +222,7 @@ class BackendIntegrationTest {
         call(409,"POST","/reviews/"+staleId+"/decision",finalWho,Map.of("approve",true),null);
         assertEquals(2,get("/logs/"+log+"/versions","leader").size()); post("/logs/"+log+"/read","leader",Map.of()); post("/logs/"+log+"/comments","leader",Map.of("text","已阅成果"));
         assertEquals(1,get("/logs/"+log+"/comments","alice").size());
-        var rejected=post("/logs/"+log+"/revisions","alice",Map.of("version",3,"body",Map.of("work","待驳回"),"reason","修订"));
+        var rejected=post("/logs/"+log+"/revisions","alice",Map.of("version",4,"body",Map.of("work","待驳回"),"reason","修订"));
         call(400,"POST","/reviews/"+rejected.get("id").asText()+"/decision","leader",Map.of("approve",false),null);
         post("/reviews/"+rejected.get("id").asText()+"/decision","leader",Map.of("approve",false,"reason","需要补充依据"));
     }

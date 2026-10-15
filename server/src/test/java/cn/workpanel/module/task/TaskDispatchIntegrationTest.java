@@ -98,16 +98,109 @@ class TaskDispatchIntegrationTest {
         var b=new LinkedHashMap<String,Object>(Map.of("type",type,"version",version)); if(text!=null) b.put("text",text); call(200,"POST","/tasks/"+taskId+"/events",who,b,null);
     }
     int version(String taskId,String who) throws Exception { return call(200,"GET","/tasks/"+taskId,who,null,null).get("version").asInt(); }
+
+    JsonNode list(int status,String query,String who) throws Exception { return call(status,"GET","/tasks?"+query,who,null,null); }
+
+    /** 任务列表只使用白名单投影，不因不同生命周期泄露状态、完成或正文。 */
+    @Test void taskListUsesSafeProjectionAndOrganizationScope() throws Exception {
+        String prefix="list-safe-"+UUID.randomUUID();
+        String alice=dispatch("leader",body(prefix+"-alice","alice"),key()).get("id").asText();
+        String amy=dispatch("leader",body(prefix+"-amy","amy"),key()).get("id").asText();
+        event(alice,"alice","RECEIVED",1,null);
+        var leaderPage=list(200,"search="+prefix+"&limit=10","leader");
+        assertEquals(2,leaderPage.get("total").asInt());
+        assertEquals(Set.of(alice,amy),Set.of(leaderPage.get("items").get(0).get("id").asText(),leaderPage.get("items").get(1).get("id").asText()));
+        Set<String> allowed=Set.of("id","owner_id","issuer_id","title","deadline","version","created_at");
+        for(JsonNode item:leaderPage.get("items")) {
+            var names=new HashSet<String>(); item.fieldNames().forEachRemaining(names::add);
+            assertEquals(allowed,names);
+            for(String hidden:List.of("phase","status","completion","progress","done","accepted","archived","withdrawn","body","events")) assertFalse(item.has(hidden),hidden);
+        }
+        var alicePage=list(200,"search="+prefix+"&limit=10","alice");
+        assertEquals(1,alicePage.get("total").asInt()); assertEquals(alice,alicePage.get("items").get(0).get("id").asText());
+    }
+
+    /** 越权负责人筛选和分页同样不能成为任务存在性探测通道。 */
+    @Test void taskListRejectsOutOfScopeOwnerAndPaginatesVisibleTasks() throws Exception {
+        String prefix="list-page-"+UUID.randomUUID();
+        dispatch("leader",body(prefix+"-one","alice"),key()); dispatch("leader",body(prefix+"-two","amy"),key());
+        var first=list(200,"search="+prefix+"&limit=1&cursor=0","leader");
+        var second=list(200,"search="+prefix+"&limit=1&cursor=1","leader");
+        assertEquals(2,first.get("total").asInt()); assertEquals(2,second.get("total").asInt());
+        assertNotEquals(first.get("items").get(0).get("id").asText(),second.get("items").get(0).get("id").asText());
+        assertEquals("1",first.get("nextCursor").asText());
+        var forbidden=list(403,"ownerId="+id.get("carl"),"leader"); assertEquals("FORBIDDEN",forbidden.get("code").asText()); assertFalse(forbidden.has("items"));
+        var hidden=list(404,"ownerId="+id.get("outsider"),"leader"); assertEquals("NOT_FOUND",hidden.get("code").asText()); assertFalse(hidden.has("items"));
+        var invalid=list(400,"date=not-a-date","leader"); assertEquals("INVALID_DATE",invalid.get("code").asText()); assertFalse(invalid.has("items"));
+    }
     // 6.1 正常生命周期与时间线
     @Test void lifecycleTimeline() throws Exception {
         var created=dispatch("leader",body("生命周期任务","alice","amy"),key()); String t=created.get("id").asText();
         assertEquals(1,created.get("version").asInt()); assertEquals("DISPATCHED",db.one("SELECT phase FROM tasks WHERE id=?",t).get("phase"));
         var first=created.get("events").get(0);
-        event(t,"alice","RECEIVED",1,null); event(t,"alice","FEEDBACK",2,"提交成果"); event(t,"leader","ACCEPTED",3,null); event(t,"leader","ARCHIVED",4,null);
+        assertTrue(first.get("from_phase").isNull()); assertEquals("DISPATCHED",first.get("to_phase").asText()); assertEquals(1,first.get("task_version").asInt());
+        event(t,"alice","RECEIVED",1,null); event(t,"amy","FEEDBACK",2,"协作反馈"); event(t,"leader","RETURNED",3,"请补充依据"); event(t,"alice","FEEDBACK",4,"补充完成"); event(t,"leader","ACCEPTED",5,null); event(t,"leader","ARCHIVED",6,null);
         var events=call(200,"GET","/tasks/"+t,"alice",null,null).get("events");
-        assertEquals(List.of("DISPATCHED","RECEIVED","FEEDBACK","ACCEPTED","ARCHIVED"),events.findValuesAsText("type"));
+        assertEquals(List.of("DISPATCHED","RECEIVED","FEEDBACK","RETURNED","FEEDBACK","ACCEPTED","ARCHIVED"),events.findValuesAsText("type"));
         assertEquals(first,events.get(0)); assertEquals(id.get("leader"),events.get(0).get("actor_id").asText());
-        long prev=-1; for(var e:events) { assertTrue(e.get("sequence").asLong()>prev); prev=e.get("sequence").asLong(); }
+        long prev=-1; for(int i=0;i<events.size();i++) { var e=events.get(i); assertTrue(e.get("sequence").asLong()>prev); prev=e.get("sequence").asLong(); assertEquals(i+1,e.get("task_version").asInt()); }
+        assertEquals("RECEIVED",events.get(3).get("from_phase").asText()); assertEquals("RECEIVED",events.get(3).get("to_phase").asText());
+        assertEquals("INVALID_TRANSITION",call(409,"POST","/tasks/"+t+"/events","leader",Map.of("type","WITHDRAWN","version",7,"text","终态撤回"),null).get("code").asText());
+        assertEquals("INVALID_TRANSITION",call(409,"POST","/tasks/"+t+"/reassignments","leader",Map.of("ownerId",id.get("amy"),"version",7,"reason","终态转派"),null).get("code").asText());
+        assertEquals("INVALID_TRANSITION",call(409,"POST","/tasks/"+t+"/reschedules","leader",Map.of("deadline",deadline,"version",7,"reason","终态改期"),null).get("code").asText());
+    }
+
+    /** 非法状态、越权、未知动作和旧版本均不可改变任务或追加时间线。 */
+    @Test void lifecycleRejectsInvalidTransitionsVersionsAndUnauthorizedActors() throws Exception {
+        String t=dispatch("leader",body("生命周期拒绝","alice","amy"),key()).get("id").asText();
+        assertEquals("INVALID_TRANSITION",call(409,"POST","/tasks/"+t+"/events","alice",Map.of("type","FEEDBACK","version",1,"text","跳过接收"),null).get("code").asText());
+        assertEquals("FORBIDDEN",call(403,"POST","/tasks/"+t+"/events","amy",Map.of("type","RECEIVED","version",1),null).get("code").asText());
+        assertEquals("INVALID_EVENT",call(400,"POST","/tasks/"+t+"/events","alice",Map.of("type","UNKNOWN","version",1),null).get("code").asText());
+        event(t,"alice","RECEIVED",1,null);
+        assertEquals("FORBIDDEN",call(403,"POST","/tasks/"+t+"/events","director",Map.of("type","ACCEPTED","version",2),null).get("code").asText());
+        assertEquals("FORBIDDEN",call(403,"POST","/tasks/"+t+"/events","alice",Map.of("type","ACCEPTED","version",2),null).get("code").asText());
+        assertEquals("NOT_FOUND",call(404,"POST","/tasks/"+t+"/events","leader2",Map.of("type","RECEIVED","version",2),null).get("code").asText());
+        assertEquals("INVALID_FIELD",call(400,"POST","/tasks/"+t+"/events","alice",Map.of("type","FEEDBACK","version",2),null).get("code").asText());
+        assertEquals("INVALID_VERSION",call(400,"POST","/tasks/"+t+"/events","alice",Map.of("type","FEEDBACK","text","缺版本"),null).get("code").asText());
+        event(t,"amy","FEEDBACK",2,"协作成果");
+        assertEquals("VERSION_CONFLICT",call(409,"POST","/tasks/"+t+"/events","leader",Map.of("type","ACCEPTED","version",2),null).get("code").asText());
+        assertEquals(3,count("SELECT count(*) FROM task_events WHERE task_id=?",t));
+        assertEquals("FEEDBACK",db.one("SELECT phase FROM tasks WHERE id=?",t).get("phase"));
+    }
+
+    /** 相同版本的并发反馈/撤回只能有一方提交成功，另一方必须返回版本冲突。 */
+    @Test void concurrentLifecycleActionsAllowExactlyOneWriter() throws Exception {
+        String t=dispatch("leader",body("并发生命周期","alice"),key()).get("id").asText();
+        event(t,"alice","RECEIVED",1,null);
+        var pool=Executors.newFixedThreadPool(2);
+        try {
+            var feedback=pool.submit(()->send("POST","/tasks/"+t+"/events","alice",Map.of("type","FEEDBACK","version",2,"text","并发反馈"),null));
+            var withdrawal=pool.submit(()->send("POST","/tasks/"+t+"/events","leader",Map.of("type","WITHDRAWN","version",2,"text","并发撤回"),null));
+            var statuses=List.of(feedback.get(20,TimeUnit.SECONDS).statusCode(),withdrawal.get(20,TimeUnit.SECONDS).statusCode());
+            assertEquals(1,statuses.stream().filter(code->code==200).count());
+            assertEquals(1,statuses.stream().filter(code->code==409).count());
+            assertEquals(3,count("SELECT count(*) FROM task_events WHERE task_id=?",t));
+            assertEquals(3,((Number)db.one("SELECT version FROM tasks WHERE id=?",t).get("version")).intValue());
+        } finally { pool.shutdownNow(); }
+    }
+
+    /** 事件插入失败时，生命周期更新与版本增加必须在同一事务中回滚。 */
+    @Test void lifecycleEventInsertFailureRollsBackTaskUpdate() throws Exception {
+        String t=dispatch("leader",body("事件失败回滚","alice"),key()).get("id").asText();
+        String function="reject_task_event_"+UUID.randomUUID().toString().replace("-","");
+        String trigger="reject_task_event_trigger_"+UUID.randomUUID().toString().replace("-","");
+        jdbc.execute("CREATE FUNCTION "+function+"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test task event failure'; END; $$");
+        jdbc.execute("CREATE TRIGGER "+trigger+" BEFORE INSERT ON task_events FOR EACH ROW WHEN (NEW.task_id = '"+t+"') EXECUTE FUNCTION "+function+"()");
+        try {
+            var response=send("POST","/tasks/"+t+"/events","alice",Map.of("type","RECEIVED","version",1),null);
+            assertTrue(response.statusCode()>=400,response.body());
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS "+trigger+" ON task_events");
+            jdbc.execute("DROP FUNCTION IF EXISTS "+function+"()");
+        }
+        var task=db.one("SELECT phase,version FROM tasks WHERE id=?",t);
+        assertEquals("DISPATCHED",task.get("phase")); assertEquals(1,((Number)task.get("version")).intValue());
+        assertEquals(1,count("SELECT count(*) FROM task_events WHERE task_id=?",t));
     }
 
     // 1.2 / 时间线篡改被数据库拒绝

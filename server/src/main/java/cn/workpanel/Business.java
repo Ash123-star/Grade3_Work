@@ -29,9 +29,9 @@ public class Business {
         if(c.containsKey("hours")) { try { double h=Double.parseDouble(c.get("hours").toString()); if(!Double.isFinite(h)||h<0||h>24) throw new NumberFormatException(); } catch(Exception e) { throw ApiError.bad("INVALID_HOURS","工时范围 0–24"); } }
         Business b=new Business(db); for(String id:strings(c,"taskIds")) b.task(a,id,false);
     }
-    /** 列表项（detail=false）仍由 Tasks.list 使用，直到 task-list-query 变更迁出。 */
+    /** 旧调用方的列表项统一使用任务列表白名单；详情才包含正文和时间线。 */
     public static Map<String,Object> taskDto(Db db,Map<String,Object> t,boolean detail) {
-        return cn.workpanel.module.task.TaskView.of(db,t,detail?cn.workpanel.module.task.TaskTimeline.list(db,Db.str(t,"id")):null);
+        return detail?cn.workpanel.module.task.TaskView.of(db,t,cn.workpanel.module.task.TaskTimeline.list(db,Db.str(t,"id"))):cn.workpanel.module.task.TaskListView.of(t);
     }
     public static Map<String,Object> logDto(Db db,Map<String,Object> l) { var m=new LinkedHashMap<>(l); m.put("body",db.read(l.get("body"))); return m; }
     public record Range(Instant from,Instant to,LocalDate first,LocalDate end,String period) {}
