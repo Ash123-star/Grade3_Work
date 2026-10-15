@@ -7,6 +7,30 @@ import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/local/draft_store.dart';
 import 'local_state.dart';
+import 'package:pandora_mobile/data/sse_client.dart';
+
+final sseClientProvider = Provider<SseClient?>((ref) {
+  final session = ref.watch(sessionProvider);
+  if (AppConfig.mock || !session.canReadBusiness) return null;
+  final client = SseClient(AppConfig.baseUrl, session.token);
+  ref.onDispose(() => client.dio.close(force: true));
+  return client;
+});
+final sseNotificationStreamProvider = StreamProvider.autoDispose<ServerEvent>((
+  ref,
+) {
+  final client = ref.watch(sseClientProvider);
+  return client == null
+      ? const Stream<ServerEvent>.empty()
+      : client.notifications();
+});
+final aiJobStreamProvider = StreamProvider.autoDispose
+    .family<ServerEvent, String>((ref, jobId) {
+      final client = ref.watch(sseClientProvider);
+      return client == null
+          ? const Stream<ServerEvent>.empty()
+          : client.aiJob(jobId);
+    });
 
 final sessionProvider = StateProvider<Session>(
   (ref) => AppConfig.mock

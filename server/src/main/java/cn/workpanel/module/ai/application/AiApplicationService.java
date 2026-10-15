@@ -1,7 +1,7 @@
 package cn.workpanel.module.ai.application;
 
 import cn.workpanel.*;
-import cn.workpanel.module.task.controller.TaskController;
+import cn.workpanel.module.task.TaskDispatchService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
@@ -165,8 +165,8 @@ public class AiApplicationService {
 @RequestMapping("/api")
 /** AI 与 AI 地图 HTTP 适配器。模型只生成带来源草稿，确认后才调用普通任务流程。 */
 class AiHttpController {
-    final AiApplicationService ai; final Db db; final TaskController tasks;
-    AiHttpController(AiApplicationService ai,Db db,TaskController tasks) { this.ai=ai; this.db=db; this.tasks=tasks; }
+    final AiApplicationService ai; final Db db; final TaskDispatchService tasks;
+    AiHttpController(AiApplicationService ai,Db db,TaskDispatchService tasks) { this.ai=ai; this.db=db; this.tasks=tasks; }
     /** 创建 AI 异步草稿。请求为 date、period、action 等业务筛选；服务端先按范围脱敏；未配置供应商返回 503。 */
     @PostMapping("/ai/jobs") public Map<String,Object> create(HttpServletRequest r,@RequestBody Map<String,Object> b) { return ai.create(Actor.current(r),b); }
     /** 查询本人 AI job。来源失权时重新校验并拒绝返回；跨用户读取返回 404/403。 */
@@ -208,9 +208,6 @@ class AiHttpController {
     @PostMapping("/ai/jobs/{id}/confirm-task") public Map<String,Object> confirm(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b,@RequestHeader("Idempotency-Key") String key) {
         Db.fields(b,"actionIndex","task"); Actor a=Actor.current(r); a.requireDispatch(); var job=get(r,id); if(!job.get("state").equals("SUCCEEDED")) throw ApiError.conflict();
         var output=db.read(db.write(job.get("output"))); var actions=AiApplicationService.maps(output,"actions",3); if(!(b.get("actionIndex") instanceof Number n)||n.intValue()<0||n.intValue()>=actions.size()) throw ApiError.bad("INVALID_ACTION","行动索引无效");
-        if(!(b.get("task") instanceof Map<?,?>)) throw ApiError.bad("INVALID_TASK","需要人工确认的完整任务"); return tasks.create(a,db.read(db.write(b.get("task"))),key);
+        if(!(b.get("task") instanceof Map<?,?>)) throw ApiError.bad("INVALID_TASK","需要人工确认的完整任务"); return tasks.dispatch(a,db.read(db.write(b.get("task"))),key);
     }
 }
-
-
-

@@ -25,6 +25,7 @@ class ApiFailure implements Exception {
       403 => FailureKind.forbidden,
       404 => FailureKind.notFound,
       409 => FailureKind.conflict,
+      503 => FailureKind.unavailable,
       400 || 422 => FailureKind.validation,
       _ =>
         [

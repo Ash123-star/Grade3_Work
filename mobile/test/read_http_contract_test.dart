@@ -246,7 +246,7 @@ void main() {
       adapter.versionStatus = 503;
       final record = await repo.detail('logs', 'log-1');
       expect(record.fields['今日工作'], '当前生效正文');
-      expect(record.fields['versionsError'], failure(FailureKind.server));
+      expect(record.fields['versionsError'], failure(FailureKind.unavailable));
       expect(record.fields.containsKey('versions'), isFalse);
       adapter.commentStatus = 403;
       await expectLater(

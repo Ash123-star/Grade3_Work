@@ -86,6 +86,29 @@ class HttpRepository implements Repository {
   }
   final Dio dio;
 
+  Future<Response<T>> _getWithRetry<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    const backoff = [Duration(milliseconds: 300), Duration(milliseconds: 900)];
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await dio.get<T>(path, queryParameters: queryParameters);
+      } on DioException catch (error) {
+        final transient =
+            error.response?.statusCode == 503 ||
+            const [
+              DioExceptionType.connectionError,
+              DioExceptionType.connectionTimeout,
+              DioExceptionType.receiveTimeout,
+              DioExceptionType.sendTimeout,
+            ].contains(error.type);
+        if (attempt >= backoff.length || !transient) rethrow;
+        await Future<void>.delayed(backoff[attempt]);
+      }
+    }
+  }
+
   @override
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
@@ -476,10 +499,12 @@ class HttpRepository implements Repository {
         return PageResult([summary], total: 1);
       }
       if (resource == 'auth/departments') {
-        final response = await dio.get<List<dynamic>>('/auth/departments');
+        final response = await _getWithRetry<List<dynamic>>(
+          '/auth/departments',
+        );
         return _page(response.data ?? <dynamic>[]);
       }
-      final response = await dio.get<Map<String, dynamic>>(
+      final response = await _getWithRetry<Map<String, dynamic>>(
         _pathForList(resource),
         queryParameters: {
           ..._query(query),
@@ -503,7 +528,7 @@ class HttpRepository implements Repository {
           'organization/policy' => '/organization/review-policy',
           _ => '/analytics',
         };
-        final response = await dio.get<Map<String, dynamic>>(
+        final response = await _getWithRetry<Map<String, dynamic>>(
           path,
           queryParameters: resource == 'analytics'
               ? {'date': id, 'period': ownerId ?? 'week'}
@@ -559,7 +584,7 @@ class HttpRepository implements Repository {
         'private-notes' => '/private-notes',
         _ => '/$resource/${Uri.encodeComponent(id)}',
       };
-      final response = await dio.get<dynamic>(path);
+      final response = await _getWithRetry<dynamic>(path);
       if (resource == 'private-notes' || resource == 'ai-maps') {
         final page = _page(response.data);
         return page.items.firstWhere(
