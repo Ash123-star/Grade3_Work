@@ -154,7 +154,7 @@ AI 地图 → 分析 → 来源详情 → 编辑建议 → 人工确认 → 创�
 
 2026-10-12 用户已确定 **阳光纸张 + 动漫橙 + Q 版人物 + 圆润温和组件**。旧蓝绿、薄荷绿主主题与小圆角方案退出实施基线。
 
-唯一详细规范见 [阶段 2 新版主题规范](../mobile/docs/stage-2-sunny-paper-design-system-plan.md)，官方参考见 [主题研究](../mobile/docs/stage-2-ui-theme-research.md)，视觉示意见 [动漫橙风格板](../mobile/docs/stage-2-anime-orange-style-board.svg)。
+当前视觉基线见 [团团记账气质 UI 设计基线](../mobile/docs/tuantuan-ui-design-system.md)；阶段2阳光纸张/动漫橙方案已退出并清理，不再作为实现依据。
 
 ### 当前主题基线
 

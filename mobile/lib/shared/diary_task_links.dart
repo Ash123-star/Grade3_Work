@@ -85,7 +85,7 @@ class DiaryTaskLinksEditor extends ConsumerWidget {
                   ? null
                   : () async {
                       final captured = ref.read(sessionProvider);
-                      final selected = await showModalBottomSheet<List<String>>(
+                      final selected = await showTuantuanBottomSheet<List<String>>(
                         context: context,
                         isScrollControlled: true,
                         showDragHandle: true,

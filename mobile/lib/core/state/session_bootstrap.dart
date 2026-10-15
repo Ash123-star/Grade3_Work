@@ -194,44 +194,46 @@ class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
         child: child!,
       ),
       home: Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: TuantuanMascot(
-                        error == null ? 'ai' : 'error',
-                        size: 96,
+        body: TuantuanPaperBackdrop(
+          child: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: TuantuanMascot(
+                          error == null ? 'ai' : 'error',
+                          size: 96,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      working ? '正在恢复登录' : '暂时无法恢复登录',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('确认账号状态后进入工作台。本机加密草稿按账号保留。'),
-                    const SizedBox(height: 24),
-                    if (working) const LinearProgressIndicator(),
-                    if (error != null) ...[
-                      Text(error!),
+                      const SizedBox(height: 24),
+                      Text(
+                        working ? '正在恢复登录' : '暂时无法恢复登录',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
                       const SizedBox(height: 16),
-                      SunnyPrimaryButton(
-                        onPressed: working ? null : restore,
-                        child: const Text('重新验证登录'),
-                      ),
-                      OutlinedButton(
-                        onPressed: working ? null : clear,
-                        child: const Text('清除本机登录信息'),
-                      ),
-                      const Text('清除后需要重新登录；此操作不会删除草稿。'),
+                      const Text('确认账号状态后进入工作台。本机加密草稿按账号保留。'),
+                      const SizedBox(height: 24),
+                      if (working) const LinearProgressIndicator(),
+                      if (error != null) ...[
+                        Text(error!),
+                        const SizedBox(height: 16),
+                        SunnyPrimaryButton(
+                          onPressed: working ? null : restore,
+                          child: const Text('重新验证登录'),
+                        ),
+                        OutlinedButton(
+                          onPressed: working ? null : clear,
+                          child: const Text('清除本机登录信息'),
+                        ),
+                        const Text('清除后需要重新登录；此操作不会删除草稿。'),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

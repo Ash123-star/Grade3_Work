@@ -187,7 +187,7 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
   Future<void> reload() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => TuantuanDialog(
         title: const Text('重新读取当前配置？'),
         content: const Text('会清除本页未提交的修改与理由。取消可继续保留输入。'),
         actions: [

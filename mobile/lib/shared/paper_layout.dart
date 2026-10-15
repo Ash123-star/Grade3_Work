@@ -11,17 +11,37 @@ class PaperSurface extends StatelessWidget {
     this.outlined = false,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
+    this.texture,
+    this.cornerDecoration,
+    this.textureOpacity = .16,
+    this.skin,
   });
   final Widget child;
   final Color? color;
   final bool outlined;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
+  final String? texture;
+  final String? cornerDecoration;
+  final double textureOpacity;
+  final String? skin;
   @override
   Widget build(BuildContext context) {
     final layout = SunnyPaperTokens.of(context);
-    return Material(
-      color: color ?? Theme.of(context).colorScheme.surface,
+    final base = color ?? Theme.of(context).colorScheme.surface;
+    final paper =
+        texture ??
+        TuantuanAssets.textures[base == SunnyPalette.purple
+            ? 'lavenderCloud'
+            : base == SunnyPalette.coral
+            ? 'coralDots'
+            : base == SunnyPalette.mint
+            ? 'mintGrid'
+            : 'paper'];
+    final surfaceSkin =
+        skin ?? TuantuanAssets.detailSections[TuantuanAssets.tone(base)]!;
+    final surface = Material(
+      color: base,
       elevation: onTap == null ? 0 : 1,
       shadowColor: const Color(0x183E6654),
       surfaceTintColor: Colors.transparent,
@@ -35,23 +55,56 @@ class PaperSurface extends StatelessWidget {
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: padding, child: child),
+      child: Stack(
+        children: [
+          Positioned.fill(child: TuantuanSkin(surfaceSkin)),
+          if (paper != null)
+            Positioned.fill(
+              child: TuantuanArt(
+                paper,
+                fit: BoxFit.cover,
+                opacity: textureOpacity,
+              ),
+            ),
+          if (cornerDecoration != null)
+            Positioned(
+              right: 10,
+              bottom: 8,
+              child: TuantuanArt(
+                cornerDecoration!,
+                width: 42,
+                height: 42,
+                opacity: .8,
+              ),
+            ),
+          InkWell(
+            onTap: onTap,
+            child: Padding(padding: padding, child: child),
+          ),
+        ],
       ),
     );
+    return surface;
   }
 }
 
 class TuantuanIconTile extends StatelessWidget {
-  const TuantuanIconTile({super.key, required this.icon, this.color});
+  const TuantuanIconTile({
+    super.key,
+    required this.icon,
+    this.color,
+    this.skin = 'cream',
+    this.size = 48,
+  });
   final String icon;
   final Color? color;
+  final String skin;
+  final double size;
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 48,
-    height: 48,
+    width: size,
+    height: size,
     padding: const EdgeInsets.all(4),
     decoration: BoxDecoration(
       color: color ?? Theme.of(context).colorScheme.surface,
@@ -65,7 +118,18 @@ class TuantuanIconTile extends StatelessWidget {
         ),
       ],
     ),
-    child: TuantuanIcon(icon, size: 40),
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        if (TuantuanAssets.buttonSkins[skin] != null)
+          TuantuanSkin(
+            TuantuanAssets.buttonSkins[skin == 'cream' && color != null
+                ? TuantuanAssets.tone(color)
+                : skin]!,
+          ),
+        TuantuanIcon(icon, size: size - 14),
+      ],
+    ),
   );
 }
 
@@ -78,15 +142,22 @@ class TuantuanRecordCard extends StatelessWidget {
     this.trailing,
     this.accent = SunnyPalette.mint,
     this.onTap,
+    this.texture,
+    this.cornerDecoration,
   });
   final String icon, title, subtitle;
   final Widget? trailing;
   final Color accent;
   final VoidCallback? onTap;
+  final String? texture;
+  final String? cornerDecoration;
 
   @override
   Widget build(BuildContext context) => PaperSurface(
     onTap: onTap,
+    texture: texture,
+    skin: TuantuanAssets.detailSections[TuantuanAssets.tone(accent)],
+    cornerDecoration: cornerDecoration,
     padding: const EdgeInsets.all(14),
     child: Row(
       children: [
@@ -134,7 +205,6 @@ class TuantuanStatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     constraints: const BoxConstraints(minHeight: 28),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(99),
@@ -145,19 +215,31 @@ class TuantuanStatusPill extends StatelessWidget {
         ),
       ),
     ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
+    child: Stack(
       children: [
-        if (icon != null) ...[
-          Icon(icon, size: 15, color: SunnyPalette.ink),
-          const SizedBox(width: 4),
-        ],
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: SunnyPalette.ink,
+        Positioned.fill(
+          child: TuantuanSkin(
+            TuantuanAssets.buttonSkins[TuantuanAssets.tone(color)]!,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 15, color: SunnyPalette.ink),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: SunnyPalette.ink,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -177,7 +259,8 @@ class PillTabs extends StatelessWidget {
   final ValueChanged<int> onChanged;
   @override
   Widget build(BuildContext context) => PaperSurface(
-    color: SunnyPaperTokens.of(context).warm,
+    color: const Color(0xFFFFF5C8),
+    texture: TuantuanAssets.textures['warmSparkle'],
     padding: const EdgeInsets.all(4),
     child: Row(
       children: [
@@ -187,27 +270,58 @@ class PillTabs extends StatelessWidget {
               selected: index == selected,
               child: Material(
                 color: index == selected
-                    ? Theme.of(context).colorScheme.primary
+                    ? SunnyPalette.brandOrange
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(24),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(24),
                   onTap: () => onChanged(index),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 8,
+                  child: Stack(
+                    children: [
+                      if (index == selected)
+                        Positioned.fill(
+                          child: TuantuanSkin(
+                            TuantuanAssets.selectionSkins['coral']!,
+                          ),
                         ),
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (index == selected) ...[
+                                  const Icon(
+                                    Icons.check_rounded,
+                                    size: 16,
+                                    color: Color(0xFF482506),
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Flexible(
+                                  child: Text(
+                                    label,
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: index == selected
+                                          ? const Color(0xFF482506)
+                                          : SunnyPalette.ink,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -215,6 +329,105 @@ class PillTabs extends StatelessWidget {
           ),
       ],
     ),
+  );
+}
+
+/// A real Material chip with a supplied raster skin and a non-color check mark.
+class TuantuanFilterChip extends StatelessWidget {
+  const TuantuanFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+  final Widget label;
+  final bool selected;
+  final ValueChanged<bool> onSelected;
+  @override
+  Widget build(BuildContext context) => Stack(
+    alignment: Alignment.center,
+    children: [
+      Positioned.fill(
+        child: TuantuanSkin(
+          TuantuanAssets.selectionSkins[selected ? 'coral' : 'cream']!,
+        ),
+      ),
+      ChoiceChip(
+        label: label,
+        selected: selected,
+        onSelected: onSelected,
+        showCheckmark: true,
+        backgroundColor: Colors.transparent,
+        selectedColor: Colors.transparent,
+        side: BorderSide.none,
+        surfaceTintColor: Colors.transparent,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+        materialTapTargetSize: MaterialTapTargetSize.padded,
+      ),
+    ],
+  );
+}
+
+/// Material confirmation retains native focus, semantics and scroll handling.
+class TuantuanDialog extends StatelessWidget {
+  const TuantuanDialog({super.key, this.title, this.content, this.actions});
+  final Widget? title, content;
+  final List<Widget>? actions;
+  @override
+  Widget build(BuildContext context) => Dialog(
+    backgroundColor: Colors.transparent,
+    child: Stack(
+      children: [
+        Positioned.fill(
+          child: TuantuanSkin(TuantuanAssets.feedbackSkins['modal']!),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(10),
+          child: AlertDialog(
+            backgroundColor: SunnyPalette.surface,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            insetPadding: EdgeInsets.zero,
+            title: title,
+            content: content,
+            actions: actions,
+            titleTextStyle: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Shared sheet skin, while the original sheet body owns height and scrolling.
+Future<T?> showTuantuanBottomSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isScrollControlled = false,
+  bool? showDragHandle,
+  bool useSafeArea = false,
+}) => showModalBottomSheet<T>(
+  context: context,
+  isScrollControlled: isScrollControlled,
+  showDragHandle: showDragHandle,
+  useSafeArea: useSafeArea,
+  builder: (context) {
+    final body = builder(context);
+    return body is TuantuanSheet ? body : TuantuanSheet(child: body);
+  },
+);
+
+class TuantuanSheet extends StatelessWidget {
+  const TuantuanSheet({super.key, required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      Positioned.fill(
+        child: TuantuanSkin(TuantuanAssets.feedbackSkins['sheet']!),
+      ),
+      child,
+    ],
   );
 }
 

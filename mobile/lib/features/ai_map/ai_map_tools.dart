@@ -266,7 +266,7 @@ class _ServerAiGraphPageState extends AiProtectedState<ServerAiGraphPage> {
 
   void nodeDetails(Map<String, dynamic> node) {
     final job = jobs['${node['job_id']}']!;
-    showModalBottomSheet<void>(
+    showTuantuanBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -294,6 +294,7 @@ class _ServerAiGraphPageState extends AiProtectedState<ServerAiGraphPage> {
                     Text(
                       '${node['body']['title']}',
                       style: const TextStyle(
+                        fontFamily: AppTypography.displayFamily,
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                       ),
@@ -560,7 +561,11 @@ class _ServerAiGraphPageState extends AiProtectedState<ServerAiGraphPage> {
             const SizedBox(height: 20),
             const Text(
               '节点列表 · 与关系图相同内容',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontFamily: AppTypography.displayFamily,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             for (final node in visible)
               ListTile(

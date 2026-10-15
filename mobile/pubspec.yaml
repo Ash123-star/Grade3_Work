@@ -30,7 +30,14 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
+  fonts:
+    - family: TuantuanDisplay
+      fonts:
+        - asset: assets/fonts/GenSenRoundedTW-B.ttf
+          weight: 700
   assets:
+    - assets/icon_desktop.png
+    - assets/icon_splash.png
     - assets/phosphor/
     - assets/companions/
     - assets/licenses/
@@ -39,3 +46,17 @@ flutter:
     - assets/generated_ui/icons/
     - assets/generated_ui/mascot/
     - assets/generated_ui/references/
+    - assets/generated_ui/new_pack/textures/
+    - assets/generated_ui/new_pack/decorations/
+    - assets/generated_ui/new_pack/surfaces/cards/
+    - assets/generated_ui/new_pack/surfaces/card_corners/
+    - assets/generated_ui/new_pack/surfaces/detail_sections/
+    - assets/generated_ui/new_pack/surfaces/metric_card/
+    - assets/generated_ui/new_pack/surfaces/feedback/
+    - assets/generated_ui/new_pack/controls/button_skins/
+    - assets/generated_ui/new_pack/controls/selection_skins/
+    - assets/generated_ui/new_pack/calendar/cells/
+    - assets/generated_ui/new_pack/calendar/record_pills/
+    - assets/generated_ui/new_pack/backgrounds/illustration_layers/
+    - assets/generated_ui/new_pack/ai/
+    - assets/generated_ui/new_pack/skins/

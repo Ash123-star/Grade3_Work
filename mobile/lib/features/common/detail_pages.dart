@@ -7,6 +7,7 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'catalog.dart';
@@ -14,6 +15,7 @@ import 'form_page.dart';
 import '../../core/state/live_notifications.dart';
 import '../../shared/diary_task_links.dart';
 import '../../shared/diary_read_receipt.dart';
+import '../../shared/generated_assets.dart';
 
 class ListPage extends ConsumerStatefulWidget {
   const ListPage(this.resource, {super.key});
@@ -239,7 +241,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                 if (user.manager)
                   TextButton.icon(
                     onPressed: () async {
-                      final p = await showModalBottomSheet<Record>(
+                      final p = await showTuantuanBottomSheet<Record>(
                         context: context,
                         isScrollControlled: true,
                         builder: (_) => const PersonPicker(),
@@ -270,7 +272,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                           : ['全部', '日志', '任务', '组织'])
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
+                      child: TuantuanFilterChip(
                         label: Text(value),
                         selected: filter == value,
                         onSelected: (_) => setState(() => filter = value),
@@ -548,10 +550,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                                   ),
                                 )
                               else
-                                const Icon(
-                                  Icons.chevron_right,
-                                  size: 18,
-                                ),
+                                const Icon(Icons.chevron_right, size: 18),
                             ],
                           ),
                         ),
@@ -647,7 +646,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     if (action == 'archive') {
       final yes = await showDialog<bool>(
         context: context,
-        builder: (c) => AlertDialog(
+        builder: (c) => TuantuanDialog(
           title: const Text('确认归档？'),
           content: const Text('归档后将结束本次工作安排。'),
           actions: [
@@ -723,16 +722,26 @@ class _DetailPageState extends ConsumerState<DetailPage> {
   );
   Widget section(String title, dynamic value) => Padding(
     padding: const EdgeInsets.only(top: 20),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 10),
-        Text(_value(value), style: const TextStyle(fontSize: 15, height: 1.7)),
-      ],
+    child: PaperSurface(
+      skin:
+          TuantuanAssets.detailSections[title.contains('私人') ? 'warm' : 'blue'],
+      color: title.contains('私人') ? SunnyPalette.orange : SunnyPalette.paper,
+      texture: TuantuanAssets.textures['paper'],
+      cornerDecoration: TuantuanAssets.cardCorners['mint'],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _value(value),
+            style: const TextStyle(fontSize: 15, height: 1.7),
+          ),
+        ],
+      ),
     ),
   );
   String _value(dynamic value) {
@@ -864,13 +873,27 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     for (final entry in secondary.entries)
                       PopupMenuItem(value: entry.value, child: Text(entry.key)),
                   ],
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Center(
-                      child: Text(
-                        '更多 …',
-                        style: TextStyle(color: CuteTokens.muted),
-                      ),
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: SunnyPalette.orange,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE4D395)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '更多',
+                          style: TextStyle(
+                            color: SunnyPalette.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(Icons.more_horiz_rounded, size: 20),
+                      ],
                     ),
                   ),
                 ),
@@ -906,6 +929,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 Text(
                   item.title,
                   style: const TextStyle(
+                    fontFamily: AppTypography.displayFamily,
                     fontSize: 26,
                     fontWeight: FontWeight.w700,
                   ),
@@ -933,9 +957,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       color: CuteTokens.blue,
                       child: ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.insert_drive_file_outlined,
-                        ),
+                        leading: const Icon(Icons.insert_drive_file_outlined),
                         title: const Text('任务附件'),
                         subtitle: const Text('查看并保存文件'),
                         trailing: const Icon(Icons.download_outlined),
@@ -1005,6 +1027,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 Text(
                   item.title,
                   style: const TextStyle(
+                    fontFamily: AppTypography.displayFamily,
                     fontSize: 21,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1150,6 +1173,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 Text(
                   item.title,
                   style: const TextStyle(
+                    fontFamily: AppTypography.displayFamily,
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1299,6 +1323,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 Text(
                   item.title,
                   style: const TextStyle(
+                    fontFamily: AppTypography.displayFamily,
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1335,6 +1360,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 Text(
                   item.title,
                   style: const TextStyle(
+                    fontFamily: AppTypography.displayFamily,
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1504,37 +1530,64 @@ class OwnPrivateNote extends ConsumerWidget {
         ],
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SectionHeader('我的私人备注'),
-        const Text(
-          '仅本人可见，不进入公开资料、下属工作台或 AI 来源。',
-          style: TextStyle(fontSize: 12, color: CuteTokens.muted),
-        ),
-        const SizedBox(height: 12),
-        ref
-            .watch(itemProvider(('private-notes', id)))
-            .when(
-              loading: () => const LinearProgressIndicator(),
-              error: (e, _) => e is ApiFailure && e.kind == FailureKind.notFound
-                  ? const Text('暂无私人备注')
-                  : RecordFailure(
-                      e,
-                      retry: () =>
-                          ref.invalidate(itemProvider(('private-notes', id))),
-                    ),
-              data: (note) => PaperSurface(
-                child: Text(
-                  '${note.fields['备注'] ?? note.fields['body'] ?? ''}',
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: PaperSurface(
+        color: SunnyPalette.orange,
+        cornerDecoration: TuantuanAssets.cardCorners['warm'],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                TuantuanIconTile(
+                  icon: 'log',
+                  color: SunnyPalette.orange,
+                  size: 36,
                 ),
-              ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '我的私人备注',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                  ),
+                ),
+                Icon(Icons.lock_outline_rounded, size: 18),
+              ],
             ),
-        TextButton(
-          onPressed: () => openForm(context, 'note', id: id),
-          child: const Text('编辑私人备注'),
+            const SizedBox(height: 12),
+            const Text(
+              '仅本人可见，不进入公开资料、下属工作台或 AI 来源。',
+              style: TextStyle(fontSize: 12, color: CuteTokens.muted),
+            ),
+            const SizedBox(height: 12),
+            ref
+                .watch(itemProvider(('private-notes', id)))
+                .when(
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) =>
+                      e is ApiFailure && e.kind == FailureKind.notFound
+                      ? const Text('暂无私人备注')
+                      : RecordFailure(
+                          e,
+                          retry: () => ref.invalidate(
+                            itemProvider(('private-notes', id)),
+                          ),
+                        ),
+                  data: (note) => PaperSurface(
+                    child: Text(
+                      '${note.fields['备注'] ?? note.fields['body'] ?? ''}',
+                    ),
+                  ),
+                ),
+            OutlinedButton.icon(
+              onPressed: () => openForm(context, 'note', id: id),
+              icon: const Icon(Icons.edit_note_rounded, size: 20),
+              label: const Text('编辑私人备注'),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

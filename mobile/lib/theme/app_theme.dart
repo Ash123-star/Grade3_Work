@@ -22,6 +22,15 @@ class PaperLayoutTokens extends ThemeExtension<PaperLayoutTokens> {
 }
 
 /// App-owned semantic roles; cute_ui reads these through its theme extension.
+class AppTypography {
+  static const displayFamily = 'TuantuanDisplay';
+  static const display = TextStyle(
+    fontFamily: displayFamily,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0,
+  );
+}
+
 class SunnyPalette {
   static const primary = Color(0xFF55D8A5);
   static const primaryStrong = Color(0xFF319E7A);
@@ -163,18 +172,21 @@ ThemeData appTheme() {
     fontFamily: 'Roboto',
     textTheme: const TextTheme(
       headlineSmall: TextStyle(
+        fontFamily: AppTypography.displayFamily,
         fontSize: 24,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       titleLarge: TextStyle(
+        fontFamily: AppTypography.displayFamily,
         fontSize: 20,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       titleMedium: TextStyle(
+        fontFamily: AppTypography.displayFamily,
         fontSize: 16,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       bodyLarge: TextStyle(fontSize: 16, height: 1.5, letterSpacing: 0),
@@ -187,7 +199,7 @@ ThemeData appTheme() {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: SunnyPalette.muted,
+        foregroundColor: SunnyPalette.primaryStrong,
         minimumSize: const Size(48, 48),
       ),
     ),
@@ -199,8 +211,20 @@ ThemeData appTheme() {
     extensions: const [CuteTokens(), PaperLayoutTokens(), SunnyPaperTokens()],
     chipTheme: ChipThemeData(
       shape: const StadiumBorder(),
-      side: BorderSide.none,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      side: const BorderSide(color: Color(0xFFD9CBAD)),
+      color: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? SunnyPalette.brandOrange
+            : SunnyPalette.surface,
+      ),
+      labelStyle: const TextStyle(
+        fontFamily: 'Roboto',
+        color: Color(0xFF482506),
+        fontWeight: FontWeight.w600,
+      ),
+      checkmarkColor: const Color(0xFF482506),
+      showCheckmark: true,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
@@ -214,6 +238,7 @@ ThemeData appTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       titleTextStyle: TextStyle(
+        fontFamily: AppTypography.displayFamily,
         color: SunnyPalette.ink,
         fontSize: 20,
         fontWeight: FontWeight.w700,
@@ -240,9 +265,10 @@ ThemeData appTheme() {
       centerTitle: false,
       scrolledUnderElevation: 0,
       titleTextStyle: TextStyle(
-        fontFamily: 'Roboto',
+        fontFamily: AppTypography.displayFamily,
         fontSize: 26,
         fontWeight: FontWeight.w700,
+        letterSpacing: 0,
         color: SunnyPalette.ink,
       ),
     ),

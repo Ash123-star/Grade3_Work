@@ -6,7 +6,6 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
-import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 
 class CalendarEvent {
@@ -23,11 +22,7 @@ class CalendarEvent {
   final int? start, end;
   bool get timed => start != null && end != null;
   Color get color =>
-      SunnyPalette.calendarEntries['$resource:${record.id}'.codeUnits.fold<int>(
-            0,
-            (sum, unit) => sum + unit,
-          ) %
-          SunnyPalette.calendarEntries.length];
+      resource == 'tasks' ? SunnyPalette.blue : SunnyPalette.coral;
   static String clock(int m) =>
       '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
   String get time => timed
@@ -96,7 +91,7 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
     void selectDay(DateTime day) {
       final session = ref.read(sessionProvider);
       ref.read(selectedDateProvider.notifier).state = day;
-      showModalBottomSheet<void>(
+      showTuantuanBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -113,35 +108,40 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
             }
             return FractionallySizedBox(
               heightFactor: .75,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            dayHeading(day),
-                            style: Theme.of(context).textTheme.titleMedium,
+              child: TuantuanSheet(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              dayHeading(day),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          tooltip: '关闭当天记录',
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
+                          IconButton(
+                            tooltip: '关闭当天记录',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        _DayAgenda(date: day, events: eventsOnDay(events, day)),
-                      ],
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          _DayAgenda(
+                            date: day,
+                            events: eventsOnDay(events, day),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
@@ -318,12 +318,40 @@ class _EventPreview extends StatelessWidget {
   final CalendarEvent event;
   final bool month;
   @override
-  Widget build(BuildContext context) => AppLabelBadge(
-    '${event.resource == 'tasks' ? '任' : '志'}·${event.record.title}',
-    color: event.color,
-    fontSize: month ? 10 : 12,
-    compact: month,
-  );
+  Widget build(BuildContext context) {
+    final label = month
+        ? event.record.title
+        : '${event.resource == 'tasks' ? '任务' : '日志'}·${event.record.title}';
+    return Container(
+      key: month
+          ? ValueKey('month-label:${event.resource}:${event.record.id}')
+          : null,
+      decoration: BoxDecoration(
+        color: event.color,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Color.alphaBlend(
+            SunnyPalette.primaryStrong.withValues(alpha: .16),
+            event.color,
+          ),
+        ),
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: month ? 2 : 8,
+        vertical: month ? 1 : 5,
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: month ? 11 : 12,
+          height: 1.15,
+          color: SunnyPalette.ink,
+        ),
+      ),
+    );
+  }
 }
 
 class _WeekOverview extends StatelessWidget {
@@ -459,118 +487,182 @@ class _MonthGrid extends StatelessWidget {
         ((first.weekday - 1 + DateTime(date.year, date.month + 1, 0).day) / 7)
             .ceil();
     final scale = MediaQuery.textScalerOf(context).scale(1);
-    return PaperSurface(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              for (final label in _weekdays)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          for (var week = 0; week < weeks; week++)
-            Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PaperSurface(
+          key: const ValueKey('calendar-month-grid'),
+          skin: TuantuanAssets.surfaces['warm'],
+          padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(
               children: [
-                for (var col = 0; col < 7; col++)
-                  Expanded(
-                    child: Builder(
-                      builder: (context) {
-                        final day = start.add(Duration(days: week * 7 + col));
-                        final entries = eventsOnDay(events, day);
-                        final currentMonth = day.month == date.month;
-                        final selected = sameDay(day, date);
-                        final today = sameDay(
-                          day,
-                          shanghaiWallTime(DateTime.now()),
-                        );
-                        return Semantics(
-                          label: currentMonth
-                              ? '${dayHeading(day)}${today ? '，今天' : ''}，${entries.length}条记录，查看当天全部记录'
-                              : null,
-                          selected: selected,
-                          child: InkWell(
-                            key: ValueKey(
-                              'month-day:${day.year}-${day.month}-${day.day}',
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: currentMonth ? () => onChanged(day) : null,
-                            child: Container(
-                              height: 108 * math.max(1, scale),
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 1,
-                                vertical: 3,
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 2,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: selected ? SunnyPalette.orange : null,
-                                borderRadius: BorderRadius.circular(14),
-                                border: today && !selected
-                                    ? Border.all(
-                                        color: SunnyPalette.primary,
-                                        width: 1.5,
-                                      )
-                                    : null,
-                              ),
-                              child: currentMonth
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        Text(
-                                          '${day.day}',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: selected || today
-                                                ? FontWeight.w700
-                                                : null,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        for (final event in entries.take(2))
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 3,
-                                            ),
-                                            child: _EventPreview(
-                                              event,
-                                              month: true,
-                                            ),
-                                          ),
-                                        if (entries.length > 2)
-                                          Text(
-                                            '+${entries.length - 2}',
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                      ],
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
+                Row(
+                  children: [
+                    for (final label in _weekdays)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            label,
+                            key: ValueKey('month-weekday:$label'),
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                  ],
+                ),
+                for (var week = 0; week < weeks; week++)
+                  Row(
+                    children: [
+                      for (var col = 0; col < 7; col++)
+                        Expanded(
+                          child: Builder(
+                            builder: (context) {
+                              final day = start.add(
+                                Duration(days: week * 7 + col),
+                              );
+                              final entries = eventsOnDay(events, day);
+                              final currentMonth = day.month == date.month;
+                              final selected = sameDay(day, date);
+                              final today = sameDay(
+                                day,
+                                shanghaiWallTime(DateTime.now()),
+                              );
+                              return Semantics(
+                                label: currentMonth
+                                    ? '${dayHeading(day)}${today ? '，今天' : ''}，${entries.length}条记录，查看当天全部记录'
+                                    : null,
+                                selected: selected,
+                                child: InkWell(
+                                  key: ValueKey(
+                                    'month-day:${day.year}-${day.month}-${day.day}',
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: currentMonth
+                                      ? () => onChanged(day)
+                                      : null,
+                                  child: LayoutBuilder(
+                                    builder: (context, cellConstraints) {
+                                      // Reserve actual scaled line heights, not
+                                      // a tall fixed box for every date.
+                                      final contentHeight =
+                                          13 * 1.15 * scale +
+                                          2 * (11 * 1.15 * scale + 2) +
+                                          9;
+                                      final cellHeight = math.max(
+                                        cellConstraints.maxWidth * 1.18,
+                                        contentHeight + 14,
+                                      );
+                                      return Container(
+                                        height: cellHeight,
+                                        margin: const EdgeInsets.symmetric(
+                                          horizontal: 1,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: selected
+                                              ? SunnyPalette.orange
+                                              : null,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: today && !selected
+                                              ? Border.all(
+                                                  color: SunnyPalette.primary,
+                                                  width: 1.5,
+                                                )
+                                              : null,
+                                        ),
+                                        child: Stack(
+                                          children: [
+                                            if (currentMonth)
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.fromLTRB(
+                                                      1,
+                                                      3,
+                                                      1,
+                                                      3,
+                                                    ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment
+                                                          .stretch,
+                                                  children: [
+                                                    FittedBox(
+                                                      fit: BoxFit.scaleDown,
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Text(
+                                                            '${day.day}',
+                                                            style: TextStyle(
+                                                              fontSize: 13,
+                                                              height: 1.15,
+                                                              fontWeight:
+                                                                  selected ||
+                                                                      today
+                                                                  ? FontWeight
+                                                                        .w700
+                                                                  : null,
+                                                            ),
+                                                          ),
+                                                          if (entries.length >
+                                                              2) ...[
+                                                            const SizedBox(
+                                                              width: 2,
+                                                            ),
+                                                            Text(
+                                                              '+${entries.length - 2}',
+                                                              style: const TextStyle(
+                                                                fontSize: 9,
+                                                                height: 1.15,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 3),
+                                                    for (final event
+                                                        in entries.take(2))
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsets.only(
+                                                              bottom: 2,
+                                                            ),
+                                                        child: _EventPreview(
+                                                          event,
+                                                          month: true,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
                   ),
               ],
             ),
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 }

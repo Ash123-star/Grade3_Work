@@ -144,7 +144,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               : () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
-                    builder: (dialog) => AlertDialog(
+                    builder: (dialog) => TuantuanDialog(
                       title: const Text('退出登录？'),
                       content: const Text('本机草稿将按账号保留。'),
                       actions: [

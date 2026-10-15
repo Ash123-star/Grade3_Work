@@ -452,7 +452,7 @@ void main() {
       });
       await settleHttp(t);
       expect(find.widgetWithText(FilledButton, '查看成果并验收'), findsNothing);
-      await t.tap(find.text('更多 …'));
+      await t.tap(find.byTooltip('更多操作'));
       await t.pumpAndSettle();
       expect(find.text('转派任务'), findsNothing);
       await closeUi(t);

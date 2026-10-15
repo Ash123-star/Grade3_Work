@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
+import 'generated_assets.dart';
 
 /// Stage2 action with a soft lower edge, retaining Material input and semantics.
 class SunnyPrimaryButton extends StatefulWidget {
@@ -134,9 +135,32 @@ class _SunnyPrimaryButtonState extends State<SunnyPrimaryButton> {
                     : scheme.onPrimary,
               ),
               overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+              backgroundBuilder: (context, buttonStates, child) => Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (!buttonStates.contains(WidgetState.disabled))
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(
+                          tokens.buttonRadius,
+                        ),
+                        child: TuantuanSkin(
+                          TuantuanAssets.buttonSkins['mint']!,
+                          opacity: pressed ? .8 : 1,
+                        ),
+                      ),
+                    ),
+                  ?child,
+                ],
+              ),
               shape: WidgetStatePropertyAll(
                 RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(tokens.buttonRadius),
+                  side: BorderSide(
+                    color: enabled
+                        ? tokens.actionEdge.withValues(alpha: .3)
+                        : tokens.disabled,
+                  ),
                 ),
               ),
               minimumSize: const WidgetStatePropertyAll(Size(48, 52)),

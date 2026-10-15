@@ -119,55 +119,57 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
         Offstage(offstage: showCheck, child: widget.child),
         if (check != null && showCheck)
           Scaffold(
-            body: SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: TuantuanMascot(
-                            check.hasError ? 'error' : 'ai',
-                            size: 96,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          check.hasError ? '暂时无法确认登录状态' : '正在确认登录状态',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text('确认账号状态后继续。本机草稿仍按原账号保留。'),
-                        const SizedBox(height: 24),
-                        if (check.isLoading) const LinearProgressIndicator(),
-                        if (check.hasError) ...[
-                          Text(
-                            '${check.error}',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+            body: TuantuanPaperBackdrop(
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(
+                            child: TuantuanMascot(
+                              check.hasError ? 'error' : 'ai',
+                              size: 96,
                             ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            check.hasError ? '暂时无法确认登录状态' : '正在确认登录状态',
+                            style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           const SizedBox(height: 16),
-                          SunnyPrimaryButton(
-                            onPressed: exiting ? null : validate,
-                            child: const Text('重新验证登录'),
-                          ),
-                          OutlinedButton(
-                            onPressed: exiting ? null : exit,
-                            child: Text(exiting ? '正在退出…' : '退出登录'),
-                          ),
-                        ],
-                        if (exitError != null)
-                          Text(
-                            exitError!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+                          const Text('确认账号状态后继续。本机草稿仍按原账号保留。'),
+                          const SizedBox(height: 24),
+                          if (check.isLoading) const LinearProgressIndicator(),
+                          if (check.hasError) ...[
+                            Text(
+                              '${check.error}',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                             ),
-                          ),
-                      ],
+                            const SizedBox(height: 16),
+                            SunnyPrimaryButton(
+                              onPressed: exiting ? null : validate,
+                              child: const Text('重新验证登录'),
+                            ),
+                            OutlinedButton(
+                              onPressed: exiting ? null : exit,
+                              child: Text(exiting ? '正在退出…' : '退出登录'),
+                            ),
+                          ],
+                          if (exitError != null)
+                            Text(
+                              exitError!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

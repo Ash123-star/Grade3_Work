@@ -10,6 +10,7 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/data/repositories/complete_list.dart';
 import 'package:pandora_mobile/shared/diary_task_links.dart';
@@ -342,7 +343,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                               color: row == 0
                                   ? CuteTokens.blue
                                   : CuteTokens.mint,
-                              onTap: () => showModalBottomSheet<void>(
+                              onTap: () => showTuantuanBottomSheet<void>(
                                 context: context,
                                 showDragHandle: true,
                                 builder: (sheet) => SafeArea(
@@ -353,6 +354,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                                       Text(
                                         metric.$1,
                                         style: const TextStyle(
+                                          fontFamily: AppTypography.displayFamily,
                                           fontSize: 20,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -378,6 +380,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                                   Text(
                                     metric.$2,
                                     style: const TextStyle(
+                                      fontFamily: AppTypography.displayFamily,
                                       fontSize: 21,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -638,7 +641,11 @@ class _GuidePageState extends State<GuidePage> {
         const SizedBox(height: 24),
         Text(
           pages[step].$2,
-          style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            fontFamily: AppTypography.displayFamily,
+            fontSize: 27,
+            fontWeight: FontWeight.w700,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),

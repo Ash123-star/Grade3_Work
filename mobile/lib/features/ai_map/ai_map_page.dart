@@ -10,6 +10,8 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'server_ai_page.dart';
 
 class AiActionDraft {
@@ -81,7 +83,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     final userId = ref.read(sessionProvider).id;
     final result = await showDialog<AiActionDraft>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => TuantuanDialog(
         title: Text(item == null ? '添加行动' : '编辑行动'),
         content: SizedBox(
           width: 420,
@@ -155,42 +157,48 @@ class _AiPageState extends ConsumerState<AiPage> {
           ];
   }
 
-  void openSources(Record item) => showModalBottomSheet<void>(
+  void openSources(Record item) => showTuantuanBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (sheet) => SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '建议依据',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              Text(AppConfig.mock ? '预设建议与显式来源链接，用于流程演示。' : '请核对来源后再作决策。'),
-              Text(
-                '生成时间：${_generated(item)}',
-                style: const TextStyle(color: CuteTokens.muted),
-              ),
-              for (final path in _sourcePaths(item))
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    path.contains('/logs/') ? '来源 · 工作日志' : '来源 · 工作任务',
+    builder: (sheet) => TuantuanSheet(
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '建议依据',
+                  style: TextStyle(
+                    fontFamily: AppTypography.displayFamily,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(sheet);
-                    context.push(path);
-                  },
                 ),
-              if (_sourcePaths(item).isEmpty)
-                const Text('缺少来源，建议尚未证实，不能据此创建任务。'),
-            ],
+                const SizedBox(height: 12),
+                Text(AppConfig.mock ? '预设建议与显式来源链接，用于流程演示。' : '请核对来源后再作决策。'),
+                Text(
+                  '生成时间：${_generated(item)}',
+                  style: const TextStyle(color: CuteTokens.muted),
+                ),
+                for (final path in _sourcePaths(item))
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      path.contains('/logs/') ? '来源 · 工作日志' : '来源 · 工作任务',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(sheet);
+                      context.push(path);
+                    },
+                  ),
+                if (_sourcePaths(item).isEmpty)
+                  const Text('缺少来源，建议尚未证实，不能据此创建任务。'),
+              ],
+            ),
           ),
         ),
       ),
@@ -280,6 +288,7 @@ class _AiPageState extends ConsumerState<AiPage> {
               Text(
                 page.items.length >= 3 ? '今天优先处理的三件事' : '建议先处理',
                 style: const TextStyle(
+                  fontFamily: AppTypography.displayFamily,
                   fontSize: 21,
                   fontWeight: FontWeight.w700,
                 ),
@@ -294,23 +303,52 @@ class _AiPageState extends ConsumerState<AiPage> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: PaperSurface(
+                    skin: TuantuanAssets.surfaces[['warm', 'blue', 'mint'][i]],
+                    color: [
+                      SunnyPalette.orange,
+                      SunnyPalette.blue,
+                      SunnyPalette.mint,
+                    ][i],
+                    texture: TuantuanAssets
+                        .textures[['warmSparkle', 'paper', 'mintGrid'][i]],
+                    cornerDecoration:
+                        TuantuanAssets.cardCorners[['warm', 'blue', 'mint'][i]],
                     onTap: () => openSources(item),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: [
-                            const Color(0xFFFFE5D2),
-                            CuteTokens.blue,
-                            CuteTokens.mint,
-                          ][i],
-                          child: Text(
-                            '${i + 1}',
-                            style: const TextStyle(
-                              color: CuteTokens.ink,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              TuantuanArt(
+                                TuantuanAssets.aiAssets[[
+                                  'priority',
+                                  'sources',
+                                  'confirm',
+                                ][i]]!,
+                              ),
+                              Align(
+                                alignment: Alignment.bottomRight,
+                                child: CircleAvatar(
+                                  radius: 9,
+                                  backgroundColor: [
+                                    const Color(0xFFFFE5D2),
+                                    CuteTokens.blue,
+                                    CuteTokens.mint,
+                                  ][i],
+                                  child: Text(
+                                    '${i + 1}',
+                                    style: const TextStyle(
+                                      color: CuteTokens.ink,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -375,6 +413,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                 ],
               ),
               PaperSurface(
+                skin: TuantuanAssets.metric,
                 color: const Color(0xFFFFF0DA),
                 onTap: () => context.push('/ai/graph'),
                 child: const Row(
@@ -397,6 +436,11 @@ class _AiPageState extends ConsumerState<AiPage> {
                           ),
                         ],
                       ),
+                    ),
+                    TuantuanArt(
+                      '${TuantuanAssets.newPack}/ai/relation_map.png',
+                      width: 50,
+                      height: 50,
                     ),
                     Icon(Icons.chevron_right, size: 18),
                   ],
@@ -496,33 +540,47 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
     return PageFrame(
       title: 'AI地图',
-      actions: [
-        TextButton(
-          onPressed: () => context.push('/ai-usage'),
-          child: const Text('建议草稿'),
-        ),
-      ],
       child: PageBody(
         controller: scroll,
         children: [
-          Wrap(
-            spacing: 8,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ChoiceChip(
-                label: const Text('个人发展'),
-                selected: !company,
-                onSelected: (_) => setState(() => company = false),
-              ),
-              if (user.manager)
-                ChoiceChip(
-                  label: Text(switch (user.role) {
-                    UserRole.admin || UserRole.founder => '公司走向',
-                    UserRole.director => '部门走向',
-                    _ => '团队走向',
-                  }),
-                  selected: company,
-                  onSelected: (_) => setState(() => company = true),
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    TuantuanFilterChip(
+                      label: const Text('个人发展'),
+                      selected: !company,
+                      onSelected: (_) => setState(() => company = false),
+                    ),
+                    if (user.manager)
+                      TuantuanFilterChip(
+                        label: Text(switch (user.role) {
+                          UserRole.admin || UserRole.founder => '公司走向',
+                          UserRole.director => '部门走向',
+                          _ => '团队走向',
+                        }),
+                        selected: company,
+                        onSelected: (_) => setState(() => company = true),
+                      ),
+                  ],
                 ),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: () => context.push('/ai-usage'),
+                style: TextButton.styleFrom(
+                  backgroundColor: SunnyPalette.orange,
+                ),
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                label: const Text(
+                  '建议草稿',
+                  style: TextStyle(color: SunnyPalette.ink, fontSize: 12),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),

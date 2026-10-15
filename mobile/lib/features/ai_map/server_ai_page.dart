@@ -11,6 +11,8 @@ import 'package:pandora_mobile/data/repositories/ai_repository.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/sunny_widgets.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 
 final latestAiJobProvider = StateProvider.family<String?, String>(
   (ref, account) => null,
@@ -319,60 +321,67 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
   Future<void> filters() async {
     var selectedDate = date;
     var selectedPeriod = period;
-    final chosen = await showModalBottomSheet<bool>(
+    final chosen = await showTuantuanBottomSheet<bool>(
       context: context,
       showDragHandle: true,
       builder: (sheet) => StatefulBuilder(
-        builder: (sheet, update) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  '分析日期与周期',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final value = await showDatePicker(
-                      context: sheet,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                    );
-                    if (sheet.mounted && value != null) {
-                      update(() => selectedDate = value);
-                    }
-                  },
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  label: Text(aiDate(selectedDate)),
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final (value, name) in [
-                      ('day', '日报'),
-                      ('week', '周报'),
-                      ('month', '月报'),
-                    ])
-                      ChoiceChip(
-                        label: Text(name),
-                        selected: selectedPeriod == value,
-                        onSelected: (_) => update(() => selectedPeriod = value),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text('服务端按账号授权筛选任务、正式日志和个人重点。应用筛选不会自动生成新作业。'),
-                const SizedBox(height: 16),
-                SunnyPrimaryButton(
-                  onPressed: () => Navigator.pop(sheet, true),
-                  child: const Text('应用筛选'),
-                ),
-              ],
+        builder: (sheet, update) => TuantuanSheet(
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    '分析日期与周期',
+                    style: TextStyle(
+                      fontFamily: AppTypography.displayFamily,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final value = await showDatePicker(
+                        context: sheet,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
+                      );
+                      if (sheet.mounted && value != null) {
+                        update(() => selectedDate = value);
+                      }
+                    },
+                    icon: const Icon(Icons.calendar_today_outlined),
+                    label: Text(aiDate(selectedDate)),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final (value, name) in [
+                        ('day', '日报'),
+                        ('week', '周报'),
+                        ('month', '月报'),
+                      ])
+                        TuantuanFilterChip(
+                          label: Text(name),
+                          selected: selectedPeriod == value,
+                          onSelected: (_) =>
+                              update(() => selectedPeriod = value),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('服务端按账号授权筛选任务、正式日志和个人重点。应用筛选不会自动生成新作业。'),
+                  const SizedBox(height: 16),
+                  SunnyPrimaryButton(
+                    onPressed: () => Navigator.pop(sheet, true),
+                    child: const Text('应用筛选'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -454,6 +463,16 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TuantuanArt(
+                      TuantuanAssets.aiAssets[current!.state == 'FAILED'
+                          ? 'warning'
+                          : 'thinking']!,
+                      width: 68,
+                      height: 60,
+                    ),
+                  ),
                   Text(switch (current!.state) {
                     'QUEUED' => '已排队，等待生成',
                     'RUNNING' => connected ? '正在接收分析，结果尚未确认' : '服务端仍在生成，可刷新状态',
@@ -516,6 +535,15 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: PaperSurface(
+                  skin: TuantuanAssets
+                      .surfaces[['warm', 'blue', 'mint'][index % 3]],
+                  color: [
+                    SunnyPalette.orange,
+                    SunnyPalette.blue,
+                    SunnyPalette.mint,
+                  ][index % 3],
+                  cornerDecoration: TuantuanAssets
+                      .cardCorners[['warm', 'blue', 'mint'][index % 3]],
                   onTap: () =>
                       openJob('/ai/jobs/${encode(job.id)}/actions/$index'),
                   child: Row(

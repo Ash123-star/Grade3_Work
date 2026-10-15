@@ -12,6 +12,7 @@ import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/data/models/attachments.dart';
@@ -381,7 +382,7 @@ class _FormPageState extends ConsumerState<FormPage> {
   }
 
   Future<void> selectPerson(String field) async {
-    final result = await showModalBottomSheet<Record>(
+    final result = await showTuantuanBottomSheet<Record>(
       context: context,
       isScrollControlled: true,
       builder: (_) => PersonPicker(
@@ -683,7 +684,7 @@ class _FormPageState extends ConsumerState<FormPage> {
     if (['withdraw', 'disable'].contains(widget.kind)) {
       final yes = await showDialog<bool>(
         context: context,
-        builder: (c) => AlertDialog(
+        builder: (c) => TuantuanDialog(
           title: Text(spec.title),
           content: const Text('确认执行此操作？'),
           actions: [
@@ -904,7 +905,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                 : () async {
                     final yes = await showDialog<bool>(
                       context: context,
-                      builder: (c) => AlertDialog(
+                      builder: (c) => TuantuanDialog(
                         title: const Text('重新读取最新版本？'),
                         content: const Text(
                           '编辑区将替换为最新内容。本机已保存的草稿保留，不会自动提交或覆盖服务器。',
@@ -1101,6 +1102,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                             ? '把工作理清楚，\n从今天开始。'
                             : '和团队一起，\n把事情做好。',
                         style: const TextStyle(
+                          fontFamily: AppTypography.displayFamily,
                           fontSize: 27,
                           fontWeight: FontWeight.w700,
                           height: 1.4,

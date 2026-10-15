@@ -23,9 +23,6 @@
 
 - [接口及契约边界](API_CONTRACT.md)
 - [原创人物与素材记录](sunny-companion-assets.md)
-- [阶段2主题参考研究（历史）](stage-2-ui-theme-research.md)
-- [阶段2 UI 参考与技能记录（历史）](stage-2-ui-reference-and-skills.md)
-- [阶段2 阳光纸张规范（历史）](stage-2-sunny-paper-design-system-plan.md)
 - [image-2.5 素材生成提示词](image-2.5-ui-asset-generation-prompts.md)
 
 `screenshots/` 是早期截图，不能作为当前重建验收证据。阶段3 SVG/PNG 示意板是设计产物，不能替代实际 Flutter 截图。
@@ -34,6 +31,6 @@
 
 源代码放 `lib/`，测试放 `test/`，设计原型放 `prototypes/`，验收文档和截图放 `docs/`。后续命令日志统一输出到 `mobile/.diagnostics/`，如 `.diagnostics/analyze.log`、`.diagnostics/mock.log`、`.diagnostics/http.log`，该目录被Git忽略。只保留正在排查的失败日志和最新结果，排查后可清理；命令、明确退出码、环境、结果与限制必须写入验收文档。
 
-2026-10-13整理删除根目录100份历史过程日志及9个临时下载/诊断文件，保留验收报告、测试和55张单页渲染证据。历史报告中的日志名称仅说明当时执行记录，原始日志已清理，不再作为可读取附件。
+历史阳光纸张/动漫橙视觉方案与命令过程日志、临时诊断输出已清理；当前视觉基线、页面布局、接口边界及验收结论保留在对应文档中。历史报告中的日志名称仅说明当时执行记录，不能作为可读取附件。
 
 `.dart_tool/`、`build/`、`.flutter-plugins-dependencies` 是工具生成内容，`.idea/` 是本地IDE配置，保留。`.native-cache/` 保存已校验的SQLite原生库，用于解决下载超时，保留；Flutter clean后运行仓库`scripts/prepare-flutter-sqlite.ps1`预热钩子缓存。

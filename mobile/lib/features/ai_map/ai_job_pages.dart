@@ -12,6 +12,7 @@ import 'package:pandora_mobile/features/common/form_page.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'server_ai_page.dart';
 
 class AiJobPage extends ConsumerStatefulWidget {
@@ -89,7 +90,7 @@ class _AiJobPageState extends AiProtectedState<AiJobPage> {
   Future<void> reload() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => TuantuanDialog(
         title: const Text('重新读取分析草稿'),
         content: const Text('重新读取会替换未保存的正文和建议，是否继续？'),
         actions: [
@@ -224,6 +225,7 @@ class _AiJobPageState extends AiProtectedState<AiJobPage> {
                     const Text(
                       '分析正文',
                       style: TextStyle(
+                        fontFamily: AppTypography.displayFamily,
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
@@ -266,7 +268,11 @@ class _AiJobPageState extends AiProtectedState<AiJobPage> {
               const SizedBox(height: 16),
               const Text(
                 '依据与不确定性',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  fontFamily: AppTypography.displayFamily,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 10),
               Text(value.summary, style: const TextStyle(height: 1.7)),
@@ -372,7 +378,7 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
   }
 
   Future<void> pickPerson(bool collaborator) async {
-    final selected = await showModalBottomSheet<Record>(
+    final selected = await showTuantuanBottomSheet<Record>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -434,7 +440,7 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
     }
     final approved = await showDialog<bool>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => TuantuanDialog(
         title: const Text('确认派发任务'),
         content: Text(
           '将“${title.text.trim()}”派发给${owner!.title}。建议来源与负责人需由你核实。',

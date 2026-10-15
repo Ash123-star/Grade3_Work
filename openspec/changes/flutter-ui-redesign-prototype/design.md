@@ -2,7 +2,7 @@
 
 ## Context
 
-已确认主题是阳光纸张、动漫橙、Q 版人物、圆润温和。详细规范为 mobile/docs/stage-2-sunny-paper-design-system-plan.md，官方参考为同目录 stage-2-ui-theme-research.md。本轮替代旧棕橙/薄荷绿、小圆角和等待主题选择方案。
+本变更实施时确认的主题是阳光纸张、动漫橙、Q 版人物、圆润温和；该历史主题现已由 `mobile/docs/tuantuan-ui-design-system.md` 中的团团记账气质 UI 基线取代。阶段2详细方案和参考文档已清理。本轮当时替代旧棕橙/薄荷绿、小圆角和等待主题选择方案。
 
 ## Goals / Non-Goals
 

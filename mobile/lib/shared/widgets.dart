@@ -1,3 +1,5 @@
+export 'paper_layout.dart'
+    show TuantuanDialog, TuantuanSheet, showTuantuanBottomSheet;
 export 'page_states.dart';
 export 'sunny_button.dart';
 import 'page_states.dart';
@@ -37,36 +39,63 @@ void notice(BuildContext context, String text, {bool success = false}) =>
       SnackBar(
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: success
-            ? Theme.of(context).colorScheme.tertiaryContainer
-            : Theme.of(context).colorScheme.errorContainer,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: success
+                ? SunnyPalette.primaryStrong.withValues(alpha: .3)
+                : const Color(0xFFE0A3A3),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         closeIconColor: Theme.of(context).colorScheme.onSurface,
         showCloseIcon: true,
-        content: success
-            ? Row(
-                children: [
-                  const TuantuanMascot('success', size: 34),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      text,
-                      style: TextStyle(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onTertiaryContainer,
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : Row(
-                children: [
-                  const TuantuanIcon('error', size: 30),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(text)),
-                ],
+        content: Stack(
+          children: [
+            Positioned.fill(
+              child: TuantuanSkin(
+                TuantuanAssets.feedbackSkins[success ? 'success' : 'error']!,
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: success
+                  ? Row(
+                      children: [
+                        const TuantuanMascot('success', size: 34),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            text,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onTertiaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        const Icon(
+                          Icons.error_rounded,
+                          color: SunnyPalette.brandOrange,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            text,
+                            style: const TextStyle(color: SunnyPalette.ink),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -145,12 +174,14 @@ class PageFrame extends StatelessWidget {
                 children: content.children,
               )
             : header == null
-            ? content
-            : NestedScrollView(
-                headerSliverBuilder: (_, _) => [
-                  SliverToBoxAdapter(child: header),
-                ],
-                body: content,
+            ? TuantuanPaperBackdrop(child: content)
+            : TuantuanPaperBackdrop(
+                child: NestedScrollView(
+                  headerSliverBuilder: (_, _) => [
+                    SliverToBoxAdapter(child: header),
+                  ],
+                  body: content,
+                ),
               ),
       ),
       floatingActionButton: fab,
@@ -289,7 +320,7 @@ class DateControls extends ConsumerWidget {
                       : '${date.month}月${date.day}日${period == '周' ? ' · 本周' : ''}',
                   style: const TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w900,
                     color: CuteTokens.ink,
                   ),
                 ),

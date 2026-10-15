@@ -45,38 +45,40 @@ class DashboardPage extends ConsumerWidget {
           ? memberRecordsProvider((spec.$3, user.id))
           : recordsProvider(spec.$3);
       return PaperSurface(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+        skin: TuantuanAssets
+            .surfaces[['blue', 'warm', 'lavender', 'mint'][index]],
         color: spec.$2,
+        cornerDecoration: TuantuanAssets
+            .cardCorners[['blue', 'warm', 'lavender', 'mint'][index]],
         onTap: () =>
             index == 3 ? context.go('/logs') : openList(context, spec.$3),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .65),
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(color: const Color(0xFFD6E9DE)),
-                  ),
-                  child: TuantuanIcon(
-                    ['mindmap', 'task', 'ai', 'log'][index],
-                    size: 46,
-                  ),
+                TuantuanIconTile(
+                  icon: ['mindmap', 'task', 'ai', 'log'][index],
+                  color: spec.$2,
+                  size: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                      ? 36
+                      : 40,
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  spec.$1,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    spec.$1,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             if (index == 3 && draftState.hasError)
               TextButton(
                 onPressed: () => ref.invalidate(todayDraftProvider(user.id)),
@@ -113,7 +115,7 @@ class DashboardPage extends ConsumerWidget {
                     children: [
                       if (page.items.isEmpty && !(index == 3 && draft != null))
                         const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
+                          padding: EdgeInsets.symmetric(vertical: 12),
                           child: Text('暂无记录'),
                         ),
                       for (final item in page.items.take(
@@ -129,6 +131,7 @@ class DashboardPage extends ConsumerWidget {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -152,7 +155,7 @@ class DashboardPage extends ConsumerWidget {
                     ],
                   ),
                 ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             const Row(
               children: [
                 TuantuanStatusPill('查看全部', color: SunnyPalette.surface),
@@ -171,12 +174,6 @@ class DashboardPage extends ConsumerWidget {
 
     return PageFrame(
       title: '导图',
-      actions: [
-        TextButton(
-          onPressed: () => openList(context, 'notifications'),
-          child: Text('消息 ${unread ?? '—'}'),
-        ),
-      ],
       fab: user.manager && user.dispatch
           ? FloatingActionButton(
               heroTag: 'dashboard-dispatch',
@@ -188,26 +185,26 @@ class DashboardPage extends ConsumerWidget {
       child: PageBody(
         bottomPadding: 88,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const TuantuanDecoration('sparkle_pair', size: 42),
-              const SizedBox(width: 4),
-              Expanded(
-                child: SunnyWelcome(
-                  title: '你好，${user.name}',
-                  subtitle: '${dayLabel(DateTime.now())} · 从重要的事开始',
-                  mascotAsset: 'welcome',
-                ),
+          SunnyWelcome(
+            title: '你好，${user.name}',
+            subtitle: '${dayLabel(DateTime.now())} · 从重要的事开始',
+            mascotAsset: 'welcome',
+            action: TextButton.icon(
+              onPressed: () => openList(context, 'notifications'),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: .8),
               ),
-              const SizedBox(width: 4),
-              const TuantuanDecoration('leaf_cluster', size: 42),
-            ],
+              icon: const Icon(Icons.notifications_none_rounded, size: 18),
+              label: Text(
+                '消息 ${unread ?? '—'}',
+                style: const TextStyle(color: SunnyPalette.ink),
+              ),
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           for (var row = 0; row < 2; row++)
             Padding(
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.only(bottom: 12),
               child: IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -220,6 +217,7 @@ class DashboardPage extends ConsumerWidget {
               ),
             ),
           PaperSurface(
+            skin: TuantuanAssets.metric,
             onTap: () {
               ref.read(selectedDateProvider.notifier).state = DateTime.now();
               context.go('/view');
@@ -540,6 +538,7 @@ class _DiaryRow extends StatelessWidget {
                   Text(
                     '${d?.day ?? '—'}',
                     style: const TextStyle(
+                      fontFamily: AppTypography.displayFamily,
                       fontSize: 27,
                       fontWeight: FontWeight.w700,
                     ),
@@ -638,19 +637,32 @@ class ProfilePage extends ConsumerWidget {
     final profile = ref.watch(itemProvider(('organization/profile', user.id)));
     final unread = ref.watch(recordsProvider('notifications'));
     final reviews = ref.watch(recordsProvider('reviews'));
-    Widget link(String title, VoidCallback tap) => Column(
-      children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          trailing: const Icon(Icons.chevron_right, size: 18),
-          onTap: tap,
-        ),
-        const Divider(height: 1),
-      ],
+    Widget link(String title, VoidCallback tap) => ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      leading: TuantuanIconTile(
+        icon: switch (title) {
+          '消息中心' => 'notification',
+          '工作统计' => 'report',
+          '审批中心' || '我的申请' => 'approval',
+          '设置' => 'settings',
+          '帮助与反馈' => 'help',
+          '审计记录' => 'log',
+          _ => 'members',
+        },
+        color: SunnyPalette.mint,
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: const Icon(Icons.chevron_right, size: 18),
+      subtitle: Text(switch (title) {
+        '消息中心' => '任务、审批与工作提醒',
+        '工作统计' => '查看授权范围内的工作数据',
+        '审批中心' || '我的申请' => '核对版本与审核进度',
+        '下属工作台' => '查看团队成员的工作概览',
+        '组织与成员' => '查看组织范围和人员资料',
+        '组织与权限' => '组织配置与权限申请',
+        _ => '查看变更与操作记录',
+      }, style: Theme.of(context).textTheme.bodySmall),
+      onTap: tap,
     );
     Widget metric(String title, String caption, VoidCallback tap) => Expanded(
       child: InkWell(
@@ -702,6 +714,7 @@ class ProfilePage extends ConsumerWidget {
                           Text(
                             user.name,
                             style: const TextStyle(
+                              fontFamily: AppTypography.displayFamily,
                               fontSize: 22,
                               fontWeight: FontWeight.w700,
                             ),
@@ -721,7 +734,7 @@ class ProfilePage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const TuantuanDecoration('flower_sticker', size: 42),
+                    const TuantuanDecoration('paper_clip', size: 36),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -759,34 +772,58 @@ class ProfilePage extends ConsumerWidget {
             ),
           ),
           const SectionHeader('工作'),
-          link('消息中心', () => openList(context, 'notifications')),
-          if (user.manager) link('工作统计', () => context.push('/me/statistics')),
-          link(
-            user.manager ? '审批中心' : '我的申请',
-            () => context.push('/me/reviews'),
+          PaperSurface(
+            padding: const EdgeInsets.all(10),
+            color: SunnyPalette.blue,
+            cornerDecoration: TuantuanAssets.cardCorners['blue'],
+            child: Column(
+              children: [
+                link('消息中心', () => openList(context, 'notifications')),
+                const Divider(height: 1),
+                if (user.manager)
+                  link('工作统计', () => context.push('/me/statistics')),
+                if (user.manager) const Divider(height: 1),
+                link(
+                  user.manager ? '审批中心' : '我的申请',
+                  () => context.push('/me/reviews'),
+                ),
+              ],
+            ),
           ),
           if (user.manager) ...[
             const SectionHeader('管理'),
-            link('下属工作台', () => context.push('/me/team')),
-            link('组织与成员', () => context.push('/me/organization')),
-          ],
-          if (user.administrator) ...[
-            link('组织与权限', () => context.push('/me/admin')),
-            link('审计记录', () => openList(context, 'audit')),
+            PaperSurface(
+              padding: const EdgeInsets.all(10),
+              color: SunnyPalette.mint,
+              cornerDecoration: TuantuanAssets.cardCorners['mint'],
+              child: Column(
+                children: [
+                  link('下属工作台', () => context.push('/me/team')),
+                  const Divider(height: 1),
+                  link('组织与成员', () => context.push('/me/organization')),
+                  if (user.administrator) ...[
+                    const Divider(height: 1),
+                    link('组织与权限', () => context.push('/me/admin')),
+                    const Divider(height: 1),
+                    link('审计记录', () => openList(context, 'audit')),
+                  ],
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton(
-                onPressed: () => context.push('/me/settings'),
-                child: const Text('设置'),
-              ),
-              TextButton(
-                onPressed: () => context.push('/me/help'),
-                child: const Text('帮助与反馈'),
-              ),
-            ],
+          TuantuanRecordCard(
+            icon: 'settings',
+            title: '设置',
+            subtitle: '偏好与隐私',
+            onTap: () => context.push('/me/settings'),
+          ),
+          const SizedBox(height: 12),
+          TuantuanRecordCard(
+            icon: 'help',
+            title: '帮助与反馈',
+            subtitle: '使用指南',
+            onTap: () => context.push('/me/help'),
           ),
           const DemoLabel(),
         ],

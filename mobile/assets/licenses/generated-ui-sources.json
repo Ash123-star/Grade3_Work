@@ -6,14 +6,45 @@
   "license_note": "User supplied the generated asset pack for this project. Retain the original files and review applicable model terms before public distribution.",
   "third_party_brands_or_characters": [],
   "derived_assets": {
-    "source": "装饰性素材.png",
-    "method": "4x4 grid crop using System.Drawing, preserving PNG alpha",
-    "output_directory": "mobile/assets/generated_ui/decorations"
+    "source": "mobile/assets/new/*.png",
+    "method": "Python Pillow/NumPy deterministic bounded crops, checkerboard edge cleanup, normalized skins",
+    "output_directory": "mobile/assets/generated_ui/new_pack",
+    "manifest": "mobile/assets/generated_ui/new_pack/manifest.json",
+    "asset_count": 126,
+    "source_originals_retained": true
   },
   "review": {
     "transparent_background_checked": true,
     "text_and_logo_checked": true,
     "copyright_character_checked": true,
-    "approved_for_product": false
+    "approved_for_product": false,
+    "notes": "User-provided generated visuals are local product assets; confirm public distribution/model terms before release."
+  },
+  "application_icon": {
+    "path": "mobile/assets/icon_desktop.png",
+    "source_type": "user_provided_local_asset",
+    "usage": "Android launcher icon, native launch placeholder, Flutter splash animation",
+    "sha256": "33e308029bf85cdb679621ab714c7a7f6165c1843fb97e769620e44d30e252dc"
+  },
+  "font_assets": {
+    "status": "bundled offline",
+    "family": "TuantuanDisplay",
+    "files": [
+      {
+        "path": "mobile/assets/fonts/GenSenRounded2-B.ttc",
+        "source": "https://github.com/ButTaiwan/gensen-font/blob/master/ttc/GenSenRounded2-B.ttc",
+        "license": "OFL-1.1",
+        "sha256": "54e994cf59e2afc13ea48435ab872602518779870d323b006cf9d320803f178d",
+        "usage": "原始字体集合，保留用于来源和许可追溯"
+      },
+      {
+        "path": "mobile/assets/fonts/GenSenRoundedTW-B.ttf",
+        "source": "https://github.com/ButTaiwan/gensen-font/blob/master/otf/TW/GenSenRounded2TW-B.otf",
+        "license": "OFL-1.1",
+        "sha256": "a009f335ab26d0c7e9e60f50dda67dfb74e4d46babb3ea954e9f5a97710b68ee",
+        "usage": "Flutter 离线主标题、重点分区标题和核心数字"
+      }
+    ],
+    "usage": "GenSen Rounded TW 粗体用于主标题、重点分区标题和核心数字；正文与日期仍使用系统字体"
   }
 }

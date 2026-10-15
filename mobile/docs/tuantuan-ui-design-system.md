@@ -384,12 +384,7 @@ Toast 文案必须对应真实结果：请求失败不能显示成功，保存�
 
 ## 11. 当前文档关系
 
-本文档是当前视觉设计基线。早期“阳光纸张 + 动漫橙”阶段文档保留为历史研究和验收记录，不再指导新页面的颜色、角色或组件设计：
-
-- [阶段 2 主题研究（历史）](stage-2-ui-theme-research.md)
-- [阶段 2 参考与技能（历史）](stage-2-ui-reference-and-skills.md)
-- [阶段 2 阳光纸张规范（历史）](stage-2-sunny-paper-design-system-plan.md)
-- [阶段 3 页面布局与交互](stage-3-page-layout-and-interaction-design.md)继续作为业务结构、导航、权限和页面行为参考；其视觉部分以本文档为准。
+本文档是当前唯一视觉设计基线。早期“阳光纸张 + 动漫橙”方案文档和风格板已清理；页面业务结构、导航、权限与行为仍以[阶段 3 页面布局与交互](stage-3-page-layout-and-interaction-design.md)为参考，视觉部分以本文档为准。
 
 ## 12. 当前资源落盘和裁剪记录
 

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
@@ -149,20 +150,23 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     width: (MediaQuery.sizeOf(context).width.clamp(0, 760) - 44) / 2,
     child: PaperSurface(
-      onTap: () => showModalBottomSheet<void>(
+      skin: TuantuanAssets.metric,
+      onTap: () => showTuantuanBottomSheet<void>(
         context: context,
         showDragHandle: true,
-        builder: (_) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 16),
-                Text(explain),
-              ],
+        builder: (_) => TuantuanSheet(
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 16),
+                  Text(explain),
+                ],
+              ),
             ),
           ),
         ),
@@ -172,7 +176,19 @@ class _Metric extends StatelessWidget {
         children: [
           Text(title),
           const SizedBox(height: 12),
-          Text(value, style: Theme.of(context).textTheme.headlineSmall),
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                softWrap: false,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
           const Text('查看口径 ›'),
         ],
