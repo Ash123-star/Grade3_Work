@@ -148,9 +148,9 @@ class AuthIntegrationTest {
         assertEquals(1, db.count("SELECT count(*) FROM auth_login_state WHERE account_hash=?", Db.hash(account + "-unknown")));
     }
 
-    @Test void migrationUpgradesExistingV4SchemaWithoutChangingUsers() {
+    @Test void migrationUpgradesExistingMainV9SchemaWithoutChangingUsers() {
         String schema = "auth_upgrade_" + UUID.randomUUID().toString().replace("-", "");
-        var flyway = org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("4").load();
+        var flyway = org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("9").load();
         try {
             flyway.migrate();
             db.update("INSERT INTO " + schema + ".users(id,company_id,account,password_hash,phone,name,role,status) VALUES ('existing','default','existing',?,'13800000009','升级保留','EMPLOYEE','PENDING')", passwords.encode(PASSWORD));

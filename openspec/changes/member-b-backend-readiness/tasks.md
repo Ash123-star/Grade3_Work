@@ -59,3 +59,6 @@
 
 - 功能实现、验证和非作者审阅完成后再考虑合并；规划阶段不自动合并。
 - 经验收后同步主规格，核对实现一致性并归档，执行严格校验；不能用本次提案完成代替 initial-product 的功能完成。
+
+## 2026-10-15 main 合并适配
+认证迁移从未合入 main 的旧 V5 统一为 V10，保留 main V1–V9；V11 补齐 TASK_REASSIGN/TASK_RESCHEDULE 数据库约束。审核同时接入 TaskRevisionService 与 ReviewRepository。旧 lyb 数据库保留，升级说明见 docs/member-b-merge-upgrade.md。公共测试仍按用户要求不修改；完整验收结果以合并报告为准，历史33项通过不代表此次合并已全部通过。

@@ -2,6 +2,7 @@ package cn.workpanel.module.organization;
 
 import cn.workpanel.Db;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,18 +19,28 @@ import static org.junit.jupiter.api.Assertions.*;
 class MemberBEndToEndTest extends MemberBHttpSupport {
     @Autowired BCryptPasswordEncoder encoder;
     static final String PASSWORD = "End-to-end-password-2026";
+    java.util.List<String> previousReviewers;
     @BeforeEach @Override public void fixture() {
         company = "default"; department = "product"; otherDepartment = "engineering";
-        admin = Db.str(db.one("SELECT id FROM users WHERE account='integration-admin'"), "id");
+        // 注册固定进入默认公司，临时隔离其他测试的审核人，结束后恢复其职责。
+        previousReviewers = db.rows("SELECT id FROM users WHERE company_id=? AND company_reviewer=true", company).stream().map(row -> Db.str(row,"id")).toList();
+        db.update("UPDATE users SET company_reviewer=false WHERE company_id=? AND company_reviewer=true", company);
+        admin = user(company, department, "", "ADMIN", true);
+        db.update("UPDATE users SET password_hash=?,must_change_password=true,department_id=NULL WHERE id=?", encoder.encode("Initial-test-password-2026"), admin);
         reviewer = user(company, department, "", "ADMIN", true);
         db.update("UPDATE users SET password_hash=? WHERE id=?", encoder.encode(PASSWORD), reviewer);
     }
+    @AfterEach void restoreReviewers() {
+        db.update("UPDATE users SET company_reviewer=false WHERE id IN (?,?)", admin, reviewer);
+        if (previousReviewers != null) for (String id : previousReviewers) db.update("UPDATE users SET company_reviewer=true WHERE id=?", id);
+    }
     @Test void registerLoginConfirmAndApproveOrganizationChangeWithRealSessions() throws Exception {
-        var adminLogin = call(200, "POST", "/auth/login", admin, Map.of("account", "integration-admin", "password", "Initial-test-password-2026"));
+        String adminAccount = Db.str(db.one("SELECT account FROM users WHERE id=?", admin), "account");
+        var adminLogin = call(200, "POST", "/auth/login", admin, Map.of("account", adminAccount, "password", "Initial-test-password-2026"));
         tokens.put(admin, adminLogin.get("token").asText());
         call(403, "GET", "/organization", admin, null);
         call(200, "POST", "/auth/password", admin, Map.of("oldPassword", "Initial-test-password-2026", "newPassword", PASSWORD));
-        tokens.put(admin, call(200, "POST", "/auth/login", admin, Map.of("account", "integration-admin", "password", PASSWORD)).get("token").asText());
+        tokens.put(admin, call(200, "POST", "/auth/login", admin, Map.of("account", adminAccount, "password", PASSWORD)).get("token").asText());
         var reviewerAccount = db.one("SELECT account FROM users WHERE id=?", reviewer).get("account");
         tokens.put(reviewer, call(200, "POST", "/auth/login", reviewer, Map.of("account", reviewerAccount, "password", PASSWORD)).get("token").asText());
         String account = "e2e-" + UUID.randomUUID().toString().substring(0, 12);

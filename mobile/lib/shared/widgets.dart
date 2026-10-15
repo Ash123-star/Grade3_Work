@@ -1,16 +1,31 @@
+export 'paper_layout.dart'
+    show TuantuanDialog, TuantuanSheet, showTuantuanBottomSheet;
+export 'page_states.dart';
+export 'sunny_button.dart';
+import 'page_states.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cute_ui/cute_ui.dart';
-import '../core/config.dart';
-import '../core/providers.dart';
-import '../data/models.dart';
+import 'package:cute_ui/cute_ui.dart'
+    hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
+import 'package:pandora_mobile/core/config.dart';
+import 'paper_layout.dart';
+import 'generated_assets.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
 
 String encode(String value) => Uri.encodeComponent(value);
 void openList(BuildContext context, String resource) =>
     context.push('/list/${encode(resource)}');
-void openItem(BuildContext context, String resource, String id) =>
-    context.push('/item/${encode(resource)}/${encode(id)}');
+void openItem(
+  BuildContext context,
+  String resource,
+  String id, {
+  String? ownerId,
+}) => context.push(
+  '/item/${encode(resource)}/${encode(id)}${ownerId == null ? '' : '?ownerId=${encode(ownerId)}'}',
+);
 void openForm(
   BuildContext context,
   String form, {
@@ -19,20 +34,94 @@ void openForm(
 }) => context.push(
   '/form/$form${id == null ? '' : '?id=${encode(id)}&version=${version ?? 1}'}',
 );
-void notice(BuildContext context, String text) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+void notice(BuildContext context, String text, {bool success = false}) =>
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: success
+                ? SunnyPalette.primaryStrong.withValues(alpha: .3)
+                : const Color(0xFFE0A3A3),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        closeIconColor: Theme.of(context).colorScheme.onSurface,
+        showCloseIcon: true,
+        content: Stack(
+          children: [
+            Positioned.fill(
+              child: TuantuanSkin(
+                TuantuanAssets.feedbackSkins[success ? 'success' : 'error']!,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: success
+                  ? Row(
+                      children: [
+                        const TuantuanMascot('success', size: 34),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            text,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onTertiaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        const Icon(
+                          Icons.error_rounded,
+                          color: SunnyPalette.brandOrange,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            text,
+                            style: const TextStyle(color: SunnyPalette.ink),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
 
 class PageBody extends StatelessWidget {
-  const PageBody({super.key, required this.children});
+  const PageBody({
+    super.key,
+    required this.children,
+    this.bottomPadding = 24,
+    this.controller,
+    this.header,
+  });
   final List<Widget> children;
+  final double bottomPadding;
+  final ScrollController? controller;
+  final Widget? header;
   @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.topCenter,
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
-        children: children,
+  Widget build(BuildContext context) => TuantuanPaperBackdrop(
+    child: Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: ListView(
+          controller: controller,
+          padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
+          children: [?header, ...children],
+        ),
       ),
     ),
   );
@@ -45,17 +134,67 @@ class PageFrame extends StatelessWidget {
     required this.child,
     this.actions,
     this.fab,
+    this.bottom,
   });
   final String title;
   final Widget child;
   final List<Widget>? actions;
   final Widget? fab;
+  final Widget? bottom;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(title), actions: actions),
-    body: SafeArea(child: child),
-    floatingActionButton: fab,
-  );
+  Widget build(BuildContext context) {
+    final canGoBack = Navigator.of(context).canPop();
+    final header = canGoBack || (actions?.isNotEmpty ?? false)
+        ? ConstrainedBox(
+            key: const ValueKey('page-scroll-actions'),
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (canGoBack) const BackButton(),
+                Expanded(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: actions ?? const [],
+                  ),
+                ),
+              ],
+            ),
+          )
+        : null;
+    final content = child;
+    return Scaffold(
+      body: SafeArea(
+        child: content is PageBody
+            ? PageBody(
+                controller: content.controller,
+                bottomPadding: content.bottomPadding,
+                header: header,
+                children: content.children,
+              )
+            : header == null
+            ? TuantuanPaperBackdrop(child: content)
+            : TuantuanPaperBackdrop(
+                child: NestedScrollView(
+                  headerSliverBuilder: (_, _) => [
+                    SliverToBoxAdapter(child: header),
+                  ],
+                  body: content,
+                ),
+              ),
+      ),
+      floatingActionButton: fab,
+      bottomNavigationBar: bottom == null
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: bottom,
+            ),
+    );
+  }
 }
 
 class DemoLabel extends StatelessWidget {
@@ -63,10 +202,13 @@ class DemoLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppConfig.mock
       ? const Padding(
-          padding: EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.only(top: 8, bottom: 8),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: StatusPill('演示数据 · 未连接企业服务'),
+            child: Text(
+              '演示数据 · 未连接企业服务',
+              style: TextStyle(fontSize: 11, color: CuteTokens.muted),
+            ),
           ),
         )
       : const SizedBox.shrink();
@@ -103,41 +245,14 @@ class RecordList extends ConsumerWidget {
                       .map(
                         (item) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: CuteCard(
+                          child: TuantuanRecordCard(
+                            icon: _resourceIcon(resource),
+                            accent: _resourceAccent(context, resource),
+                            title: item.title,
+                            subtitle: item.subtitle,
                             onTap: () => onTap != null
                                 ? onTap!(item)
                                 : openItem(context, resource, item.id),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.article_outlined,
-                                  color: CuteTokens.muted,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.title,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        item.subtitle,
-                                        style: const TextStyle(
-                                          color: CuteTokens.muted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Icon(Icons.chevron_right),
-                              ],
-                            ),
                           ),
                         ),
                       )
@@ -147,26 +262,47 @@ class RecordList extends ConsumerWidget {
   }
 }
 
+String _resourceIcon(String resource) => switch (resource) {
+  'tasks' => 'task',
+  'logs' || 'logs/subordinates' => 'log',
+  'notifications' => 'notification',
+  'reviews' => 'approval',
+  'organization' => 'members',
+  'dashboard/company' || 'dashboard/personal' => 'mindmap',
+  _ => 'report',
+};
+
+Color _resourceAccent(BuildContext context, String resource) =>
+    switch (resource) {
+      'tasks' => SunnyPalette.orange,
+      'logs' || 'logs/subordinates' => SunnyPalette.coral,
+      'notifications' => SunnyPalette.blue,
+      'reviews' => SunnyPalette.purple,
+      'organization' => SunnyPalette.mint,
+      _ => Theme.of(context).colorScheme.surface,
+    };
+
 class DateControls extends ConsumerWidget {
   const DateControls({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final date = ref.watch(selectedDateProvider),
         period = ref.watch(periodProvider);
+    void move(int direction) =>
+        ref.read(selectedDateProvider.notifier).state = period == '月'
+        ? DateTime(date.year, date.month + direction, 1)
+        : date.add(Duration(days: direction * (period == '周' ? 7 : 1)));
     return Column(
       children: [
         Row(
           children: [
             IconButton(
               tooltip: '上一个$period',
-              onPressed: () =>
-                  ref.read(selectedDateProvider.notifier).state = period == '月'
-                  ? DateTime(date.year, date.month - 1, 1)
-                  : date.subtract(Duration(days: period == '周' ? 7 : 1)),
+              onPressed: () => move(-1),
               icon: const Icon(Icons.chevron_left),
             ),
             Expanded(
-              child: TextButton.icon(
+              child: TextButton(
                 onPressed: () async {
                   final next = await showDatePicker(
                     context: context,
@@ -178,40 +314,32 @@ class DateControls extends ConsumerWidget {
                     ref.read(selectedDateProvider.notifier).state = next;
                   }
                 },
-                icon: const Icon(Icons.calendar_today_outlined),
-                label: Text('${date.year}年${date.month}月${date.day}日'),
+                child: Text(
+                  period == '月'
+                      ? '${date.year}年${date.month}月'
+                      : '${date.month}月${date.day}日${period == '周' ? ' · 本周' : ''}',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: CuteTokens.ink,
+                  ),
+                ),
               ),
             ),
             IconButton(
               tooltip: '下一个$period',
-              onPressed: () =>
-                  ref.read(selectedDateProvider.notifier).state = period == '月'
-                  ? DateTime(date.year, date.month + 1, 1)
-                  : date.add(Duration(days: period == '周' ? 7 : 1)),
+              onPressed: () => move(1),
               icon: const Icon(Icons.chevron_right),
             ),
           ],
         ),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: '日', label: Text('日')),
-            ButtonSegment(value: '周', label: Text('周')),
-            ButtonSegment(value: '月', label: Text('月')),
-          ],
-          selected: {period},
-          onSelectionChanged: (s) =>
-              ref.read(periodProvider.notifier).state = s.first,
+        PillTabs(
+          labels: const ['日', '周', '月'],
+          selected: ['日', '周', '月'].indexOf(period),
+          onChanged: (i) =>
+              ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
         ),
         const SizedBox(height: 8),
-        Text(() {
-          final range = BusinessRange(date, period);
-          final a = range.from.add(const Duration(hours: 8)),
-              b = range.to
-                  .add(const Duration(hours: 8))
-                  .subtract(const Duration(days: 1));
-          return '${a.month}月${a.day}日 — ${b.month}月${b.day}日';
-        }(), style: const TextStyle(color: CuteTokens.muted)),
-        const SizedBox(height: 16),
       ],
     );
   }

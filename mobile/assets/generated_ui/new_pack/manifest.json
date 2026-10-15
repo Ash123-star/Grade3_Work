@@ -1,0 +1,2516 @@
+[
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      160,
+      40,
+      465,
+      575
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/cards/card_mint.png",
+    "size": [
+      426,
+      513
+    ],
+    "sha256": "586c9dc679275eb9b0bcf1fe6439a7f315a8fbab8a56fa62aba8619e3dfaf5d0",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      640,
+      40,
+      475,
+      575
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/cards/card_warm.png",
+    "size": [
+      424,
+      513
+    ],
+    "sha256": "c0b1130e6bcab9becbecc73c779815711aed43eae05aae4a34cb2d377fb56c69",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      15,
+      620,
+      420,
+      585
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/cards/card_blue.png",
+    "size": [
+      380,
+      505
+    ],
+    "sha256": "d96357a70a20a2afa548588711ca64f8e371bfc271d1f1964f0916581bd687db",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      435,
+      620,
+      400,
+      585
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/cards/card_lavender.png",
+    "size": [
+      382,
+      505
+    ],
+    "sha256": "54148421e4e38dcdf80721d68d04ac46e097eb231dad31948ee2b7fd2fa0eaca",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      835,
+      620,
+      415,
+      585
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/cards/card_coral.png",
+    "size": [
+      379,
+      505
+    ],
+    "sha256": "8950681a60336fc351939d235a902ff1657a032391e1da41cf471001ef5fa911",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      15,
+      35,
+      395,
+      455
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/mint_corner.png",
+    "size": [
+      394,
+      410
+    ],
+    "sha256": "645b7fc5b004cd2d8e89886cc8b2978c9df8dc8b24dee92c102aa5547ce89ce1",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      430,
+      35,
+      395,
+      455
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/warm_corner.png",
+    "size": [
+      385,
+      409
+    ],
+    "sha256": "8d250c10f8fa357d4f47b7301fc8335176433ec1681bb9a5808b0528d49c075e",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      840,
+      35,
+      395,
+      455
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/blue_corner.png",
+    "size": [
+      393,
+      390
+    ],
+    "sha256": "9fe96b177e8804fe1d949f22040561ee14847d0922611b15b9bde2ec34a8969a",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      15,
+      510,
+      395,
+      440
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/lavender_corner.png",
+    "size": [
+      393,
+      409
+    ],
+    "sha256": "a11c55bf1e0e603049334be469c6a10b5e36d8723ae463528f201064a47ae91c",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      430,
+      510,
+      395,
+      440
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/coral_corner.png",
+    "size": [
+      383,
+      410
+    ],
+    "sha256": "36bf3fbaf8c28e7b5a9071dd4681bedbdd23474657dcc8ed12ad4a2a7f129d89",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      840,
+      510,
+      395,
+      440
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/green_corner.png",
+    "size": [
+      394,
+      393
+    ],
+    "sha256": "33af1ccf3f1a87d778b8f39f91be8b0fcb557d007daa7a9caf07cfb88434b5fa",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      15,
+      950,
+      330,
+      270
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/blue_blob.png",
+    "size": [
+      261,
+      191
+    ],
+    "sha256": "f1c7e0211b0e2197b62ebfea7d310ff59a62a7143cb0f210837a2c0072cb5d95",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      390,
+      950,
+      300,
+      270
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/lavender_wave.png",
+    "size": [
+      300,
+      204
+    ],
+    "sha256": "536ffe6e45378e651422df0d2d0f46e919432e6e5554a3382f44593515176a7b",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      730,
+      950,
+      260,
+      270
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/mint_arc.png",
+    "size": [
+      260,
+      210
+    ],
+    "sha256": "4cb18cb356fac5bf1ea4a8d12e514e62c9729089cc9e72e06a65938735318de2",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      990,
+      950,
+      260,
+      270
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/card_corners/coral_swirl.png",
+    "size": [
+      229,
+      217
+    ],
+    "sha256": "94ba0433aba30036bbcd3ec9d75c4ab21ea65a2b46fbc5973ae45e65e8c1adec",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      20,
+      155,
+      600,
+      290
+    ],
+    "edge_cleanup": false,
+    "output": "controls/button_skins/button_mint.png",
+    "size": [
+      580,
+      242
+    ],
+    "sha256": "1c05b91aff78b518ee0d9e3c41953a054e7c8e3eec03fa338dcefab55dca0818",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      635,
+      155,
+      605,
+      290
+    ],
+    "edge_cleanup": false,
+    "output": "controls/button_skins/button_coral.png",
+    "size": [
+      581,
+      243
+    ],
+    "sha256": "356f5d5122dca7010ddfe42534971d5887ec1e39ab8bdb8ef016b5b1dd28985a",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      20,
+      475,
+      600,
+      300
+    ],
+    "edge_cleanup": false,
+    "output": "controls/button_skins/button_lavender.png",
+    "size": [
+      581,
+      250
+    ],
+    "sha256": "1a4fa7100c187d169f5ed8a82219d3ad587166dddb5a0908849d85a88b667c7b",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      635,
+      475,
+      605,
+      300
+    ],
+    "edge_cleanup": false,
+    "output": "controls/button_skins/button_warm.png",
+    "size": [
+      581,
+      250
+    ],
+    "sha256": "e988e3804829e8f39fc31f77bcd5404e6b860efa7e505ac4d36e8f69d4dc239d",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      20,
+      795,
+      600,
+      300
+    ],
+    "edge_cleanup": false,
+    "output": "controls/button_skins/button_blue.png",
+    "size": [
+      581,
+      252
+    ],
+    "sha256": "07dfebc4c3f332a376d5321bb55d3d19276cf0e6789ebfbe87b178b3a5a14db2",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      635,
+      795,
+      605,
+      300
+    ],
+    "edge_cleanup": false,
+    "output": "controls/button_skins/button_cream.png",
+    "size": [
+      581,
+      252
+    ],
+    "sha256": "3589a4d1aee48688e805f3b6e6ae5269a7a519fad400671bdbd7ef102692660c",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      35,
+      55,
+      585,
+      335
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/detail_sections/detail_mint.png",
+    "size": [
+      565,
+      296
+    ],
+    "sha256": "a8ee36e23ebc2f8d511dce03f574822257218350d14906aec73d6a8fe3c8f6a5",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      635,
+      55,
+      585,
+      335
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/detail_sections/detail_warm.png",
+    "size": [
+      568,
+      295
+    ],
+    "sha256": "c0d69512213bd851b2c15d25ec31845eef82b79ba7ed2a9974df551bfa733f89",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      35,
+      430,
+      585,
+      335
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/detail_sections/detail_blue.png",
+    "size": [
+      564,
+      310
+    ],
+    "sha256": "030439aa62966a49e0e3fcfcef8b742874ea789823cfd7bd3b74c6283c9c31fe",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      635,
+      430,
+      585,
+      335
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/detail_sections/detail_lavender.png",
+    "size": [
+      566,
+      310
+    ],
+    "sha256": "c79e08dfa93fbe177cbb77c570ceca1c4485abce834c8c7340ee40cf5ff422b5",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      35,
+      805,
+      1185,
+      350
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/detail_sections/detail_coral.png",
+    "size": [
+      1157,
+      333
+    ],
+    "sha256": "b5744f81ce5460b1ad912c4aa8518dbc692a7b3acb6cc5c130b6b129d21aa544",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      35,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_coral.png",
+    "size": [
+      495,
+      208
+    ],
+    "sha256": "ad7ff5d587526ae0cd22da6ff05c7a73c47207171450497acccc99b041f42231",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      35,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_mint.png",
+    "size": [
+      483,
+      200
+    ],
+    "sha256": "70288443ae8c52f60e7fb7b21cc25c26ca49440df6b9edaa4c3301f191f15079",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      270,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_lavender.png",
+    "size": [
+      497,
+      204
+    ],
+    "sha256": "be790de220e3a1877512d37dc5e19cdc9947e125edf956bc499ec4f8c4092c0b",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      270,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_cream.png",
+    "size": [
+      484,
+      200
+    ],
+    "sha256": "f92f241554fbc38cfdd084fffe5c13290125acb76b1a9e3df0fd6535b29e2dec",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      505,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_coral_wave.png",
+    "size": [
+      508,
+      219
+    ],
+    "sha256": "5dcea1dd460cc05676e4637b4cdd40fdf98ae5b8f5cee989f0ac6f8fd7e22073",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      505,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_mint_leaf.png",
+    "size": [
+      508,
+      214
+    ],
+    "sha256": "2f355dc396454b96a26e5e9856371c18a344e8d5958028f9942b88b9a76db173",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      740,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_lavender_tail.png",
+    "size": [
+      507,
+      196
+    ],
+    "sha256": "c8e35fe42017be6c83eeca5615228967144485e6d7b1ad1fd9796a9adeec3413",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      740,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_warm.png",
+    "size": [
+      491,
+      195
+    ],
+    "sha256": "ae07f63488c46dde15d0e5c0e13603dfcb082ac46cb79aa8920ef628a07a9052",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      975,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_blue.png",
+    "size": [
+      498,
+      186
+    ],
+    "sha256": "74d4e9f402542654c46ec8ecf17ca975134f27b442f46100cf1a80136fbdb756",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      975,
+      540,
+      220
+    ],
+    "edge_cleanup": false,
+    "output": "controls/selection_skins/filter_pink.png",
+    "size": [
+      493,
+      197
+    ],
+    "sha256": "4ab4e22821f18faa182b8801869dbfed81dd0f2813c3341885061ceb465607fe",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      735,
+      845,
+      247,
+      288
+    ],
+    "edge_cleanup": false,
+    "output": "calendar/cells/cell_selected.png",
+    "size": [
+      247,
+      271
+    ],
+    "sha256": "447074a3386a40cdbafd19aec6ad32e20c773c435291fdd4e186b047c5e6f741",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      980,
+      875,
+      115,
+      80
+    ],
+    "edge_cleanup": false,
+    "output": "calendar/record_pills/pill_green.png",
+    "size": [
+      115,
+      68
+    ],
+    "sha256": "e4caf9eaa1bd65bb698f0ea15f06e4c584764099ec09eb961e97a41e48d10b96",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      1100,
+      875,
+      140,
+      80
+    ],
+    "edge_cleanup": false,
+    "output": "calendar/record_pills/pill_red.png",
+    "size": [
+      121,
+      69
+    ],
+    "sha256": "0a6d95c7e50bf54c0997a610dce575379c9458f43ef7d173b55afd5623eeb289",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      980,
+      960,
+      115,
+      80
+    ],
+    "edge_cleanup": false,
+    "output": "calendar/record_pills/pill_purple.png",
+    "size": [
+      115,
+      72
+    ],
+    "sha256": "3a791fb88c2b75a673e5c3dc3221590344b61c528e0b3c044b4a0d7c0f836213",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      1100,
+      960,
+      140,
+      80
+    ],
+    "edge_cleanup": false,
+    "output": "calendar/record_pills/pill_blue.png",
+    "size": [
+      124,
+      71
+    ],
+    "sha256": "6a68af6675125e405b76794063c739cd6ee048c4638b5b1479c7b10aed31cdbc",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      980,
+      1050,
+      115,
+      75
+    ],
+    "edge_cleanup": false,
+    "output": "calendar/record_pills/pill_yellow.png",
+    "size": [
+      115,
+      72
+    ],
+    "sha256": "db4a108a7b0657e76514807e2da96c3f105d42f986ffc0a6283d80fed0922578",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      35,
+      1030,
+      290,
+      125
+    ],
+    "edge_cleanup": false,
+    "output": "calendar/record_pills/pill_blue_large.png",
+    "size": [
+      255,
+      103
+    ],
+    "sha256": "7ccef42f7712bdcb65ee7d6cc7957451cff976ecc2a5f79adbcd2c4e332f1297",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      350,
+      1030,
+      290,
+      125
+    ],
+    "edge_cleanup": false,
+    "output": "calendar/record_pills/pill_yellow_large.png",
+    "size": [
+      248,
+      103
+    ],
+    "sha256": "b99284b5ac0fcd29b1820256d12463af0d2660aeab0d2e238256c431d6e282eb",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      67,
+      76,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/paper.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "71d5d439de28964d047e708c3e1833042aa5663f8f14722798e2651d634c835d",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      377,
+      76,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/coral_dots.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "2902b0eb8e5a0ce0ba1a393c9b80d36367e4f4a95aeeee6f0c83b262f1caf3b8",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      687,
+      76,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/mint_grid.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "78a59f38d1d60bb91fd46c142edae0e39b83c32461411537d99227e4651d1f92",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      997,
+      76,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/coral_diagonal.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "0573ac348ace50ec4261ea7ce662663382dc00c167dcf18839f8b8933ccb5b1e",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      67,
+      376,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/warm_sparkle.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "f7e0f13464e5f8b6c61ec4b253ef01ca3a2e8e339aa3d185cfcf7adf47a80aab",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      377,
+      376,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/blue_swirl.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "1f0ec362868f2ea0ddc66e077136169a27dfdc333e85485a5205b7af632da231",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      687,
+      376,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/lavender_cloud.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "04b56cd659dc46ab039219ac01bfb0e162999fc27ca7ddba8f0819d599980a4f",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      997,
+      376,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/mint_wave.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "d234ef9e0c5921cb423d28bdbc56c1944204a78a2899c708c88196a5ea6e0566",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      67,
+      676,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/paper_alt.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "b9d0a068cf999bccbf4d482ae742143d50782b4c7c9c05681b80304e04ea8f86",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      377,
+      676,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/coral_dots_alt.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "21f3904c9ef1e9e49961e2b0f99236269e1bdc4f49fd6c2a6711edc38ac740b8",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      687,
+      676,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/mint_grid_alt.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "4b34808b5f0f5b4b26da54c7c4b2fecbfc11ce2032d1570f1c1c814520d0f721",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      997,
+      676,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/coral_diagonal_alt.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "3177ff0aa58bd31a759018e784980a0652a51c31d49112ff3eed323ac129351e",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      67,
+      976,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/warm_sparkle_alt.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "226fc6d57e8056deab43e9f0cc7918dcef8c55e1b320c7f74e8703ccc90cd9a9",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      377,
+      976,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/blue_swirl_alt.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "b89bd103a24be2855811eb75a67679b0f1847b9ec43512eac6c6f5c8867309d2",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      687,
+      976,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/lavender_cloud_alt.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "f00e73962aaf468e4c5730119a8120c4ba509ee22989715efeb9c230b957a9f9",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "纹理.jpg",
+    "source_sha256": "8f2c2439cd5ac25a674c23f82ac196f923fb0a1855385f23062a946c4a17632f",
+    "crop": [
+      997,
+      976,
+      178,
+      178
+    ],
+    "edge_cleanup": false,
+    "output": "textures/mint_wave_alt.png",
+    "size": [
+      178,
+      178
+    ],
+    "sha256": "e621aa7c366aedfedd1ce079cdfb5251634b14ba3aea138ba18b01a982279dc1",
+    "alpha_extrema": [
+      255,
+      255
+    ]
+  },
+  {
+    "source": "AI 建议卡.png",
+    "source_sha256": "57bd6cfae59d30a93c200264f7b59d6cb03d973b754522406e6bd2791cb90161",
+    "crop": [
+      35,
+      95,
+      360,
+      330
+    ],
+    "edge_cleanup": false,
+    "output": "ai/thinking_cluster.png",
+    "size": [
+      317,
+      240
+    ],
+    "sha256": "39503ad8eede8461b534c6f7f14f9f6d8c6e4843ae87879836e55fbdbaaad6f6",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "AI 建议卡.png",
+    "source_sha256": "57bd6cfae59d30a93c200264f7b59d6cb03d973b754522406e6bd2791cb90161",
+    "crop": [
+      390,
+      95,
+      420,
+      330
+    ],
+    "edge_cleanup": false,
+    "output": "ai/source_cloud.png",
+    "size": [
+      334,
+      253
+    ],
+    "sha256": "27376df2feeb4de6f8aeae1a064898971ff2bd03d6e1c7cd6903e652ceb326f7",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "AI 建议卡.png",
+    "source_sha256": "57bd6cfae59d30a93c200264f7b59d6cb03d973b754522406e6bd2791cb90161",
+    "crop": [
+      820,
+      95,
+      395,
+      330
+    ],
+    "edge_cleanup": false,
+    "output": "ai/relation_map.png",
+    "size": [
+      315,
+      277
+    ],
+    "sha256": "4fe452f18e65ddd27e2c0282b23631b214441aff435c156a966ec7bb6f524382",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "AI 建议卡.png",
+    "source_sha256": "57bd6cfae59d30a93c200264f7b59d6cb03d973b754522406e6bd2791cb90161",
+    "crop": [
+      35,
+      450,
+      360,
+      350
+    ],
+    "edge_cleanup": false,
+    "output": "ai/priority_badge.png",
+    "size": [
+      303,
+      275
+    ],
+    "sha256": "22dd424ba49f2a709ed54220bbcb29febe91b97eabe07644d6d150aadc25af04",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "AI 建议卡.png",
+    "source_sha256": "57bd6cfae59d30a93c200264f7b59d6cb03d973b754522406e6bd2791cb90161",
+    "crop": [
+      440,
+      450,
+      360,
+      350
+    ],
+    "edge_cleanup": false,
+    "output": "ai/confirm.png",
+    "size": [
+      287,
+      250
+    ],
+    "sha256": "2d52c0a08b3fe3ddfb17789781cbbb103fd18f72954e00cc69207963d245d71c",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "AI 建议卡.png",
+    "source_sha256": "57bd6cfae59d30a93c200264f7b59d6cb03d973b754522406e6bd2791cb90161",
+    "crop": [
+      825,
+      450,
+      390,
+      350
+    ],
+    "edge_cleanup": false,
+    "output": "ai/warning.png",
+    "size": [
+      287,
+      264
+    ],
+    "sha256": "0e1d9cfeb6384d9253820249d32b90be3c2f83b895486bc08ab996832245383c",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "AI 建议卡.png",
+    "source_sha256": "57bd6cfae59d30a93c200264f7b59d6cb03d973b754522406e6bd2791cb90161",
+    "crop": [
+      390,
+      815,
+      430,
+      380
+    ],
+    "edge_cleanup": false,
+    "output": "ai/thinking_mascot.png",
+    "size": [
+      369,
+      301
+    ],
+    "sha256": "88e2809d3b902b5cc04f7fb09746f3daaba98d7ae8d5befc1c0b0654acd377f2",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "弹窗、底部弹层和 Toast 皮肤.png",
+    "source_sha256": "f25141241d3b4792847c8ed1b73813a445cab049ae17e2c103ee5f1bd62f93cb",
+    "crop": [
+      30,
+      90,
+      690,
+      490
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/feedback/modal_panel.png",
+    "size": [
+      671,
+      490
+    ],
+    "sha256": "f48aed175ba917a07eb2a8084df0a364ceed820f3ef7adc6f1c497cca3d3750f",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "弹窗、底部弹层和 Toast 皮肤.png",
+    "source_sha256": "f25141241d3b4792847c8ed1b73813a445cab049ae17e2c103ee5f1bd62f93cb",
+    "crop": [
+      760,
+      90,
+      450,
+      160
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/feedback/toast_success.png",
+    "size": [
+      440,
+      146
+    ],
+    "sha256": "51310db2d48413f946682b5d9216797c833803600848aa398a50add335133a8c",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "弹窗、底部弹层和 Toast 皮肤.png",
+    "source_sha256": "f25141241d3b4792847c8ed1b73813a445cab049ae17e2c103ee5f1bd62f93cb",
+    "crop": [
+      760,
+      270,
+      450,
+      160
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/feedback/toast_warning.png",
+    "size": [
+      441,
+      157
+    ],
+    "sha256": "bda3518bbdb4fe7f1507ebaad5a4cbf7a8d3d534b6c87be191bd96f34d8d52d6",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "弹窗、底部弹层和 Toast 皮肤.png",
+    "source_sha256": "f25141241d3b4792847c8ed1b73813a445cab049ae17e2c103ee5f1bd62f93cb",
+    "crop": [
+      760,
+      450,
+      450,
+      160
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/feedback/toast_error.png",
+    "size": [
+      442,
+      148
+    ],
+    "sha256": "ab6802e13760bf2390268942867ab5fac7752fcd573e9a862be82019cf946372",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "弹窗、底部弹层和 Toast 皮肤.png",
+    "source_sha256": "f25141241d3b4792847c8ed1b73813a445cab049ae17e2c103ee5f1bd62f93cb",
+    "crop": [
+      35,
+      650,
+      1180,
+      490
+    ],
+    "edge_cleanup": true,
+    "output": "surfaces/feedback/bottom_sheet.png",
+    "size": [
+      1157,
+      490
+    ],
+    "sha256": "cb2c3a7182a4cd456cd6e3fb3fa078f19bd9a153956c5ecdc1c37d88209971a8",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "卡通背景插画层.png",
+    "source_sha256": "d7441de1bde684a5318ef4d5f29ee3ad528b7e1822f5d25eaf6a421173b4cab4",
+    "crop": [
+      0,
+      0,
+      360,
+      360
+    ],
+    "edge_cleanup": false,
+    "output": "backgrounds/illustration_layers/workspace_top_left.png",
+    "size": [
+      318,
+      333
+    ],
+    "sha256": "0ec2048d4d131aecd7d170c030d45086a0c2960fdcae40b7f7fe82104f0efa1f",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "卡通背景插画层.png",
+    "source_sha256": "d7441de1bde684a5318ef4d5f29ee3ad528b7e1822f5d25eaf6a421173b4cab4",
+    "crop": [
+      870,
+      0,
+      384,
+      390
+    ],
+    "edge_cleanup": false,
+    "output": "backgrounds/illustration_layers/workspace_top_right.png",
+    "size": [
+      384,
+      390
+    ],
+    "sha256": "dbeb3639c48489bdbcdfa559589b28e4b36aabd94e0804d9f12ff12274601ee7",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "卡通背景插画层.png",
+    "source_sha256": "d7441de1bde684a5318ef4d5f29ee3ad528b7e1822f5d25eaf6a421173b4cab4",
+    "crop": [
+      0,
+      820,
+      380,
+      434
+    ],
+    "edge_cleanup": false,
+    "output": "backgrounds/illustration_layers/workspace_bottom_left.png",
+    "size": [
+      380,
+      395
+    ],
+    "sha256": "6c13f808cd90362745681edac6a53e5ada4a21907b3f828624dd39c212829f17",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "卡通背景插画层.png",
+    "source_sha256": "d7441de1bde684a5318ef4d5f29ee3ad528b7e1822f5d25eaf6a421173b4cab4",
+    "crop": [
+      850,
+      735,
+      404,
+      519
+    ],
+    "edge_cleanup": false,
+    "output": "backgrounds/illustration_layers/workspace_bottom_right.png",
+    "size": [
+      404,
+      519
+    ],
+    "sha256": "3bc0edfea115dd7eb1a29beec46974896203f5da1e58c7989ff31ff411e5c4f2",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "指标卡背景.png",
+    "source_sha256": "f554ebc97d666ce699df324b8e1b9d54d392a95752fce7d200a9e2df06069e91",
+    "crop": [
+      20,
+      160,
+      984,
+      700
+    ],
+    "edge_cleanup": false,
+    "output": "surfaces/metric_card/metric_card_warm.png",
+    "size": [
+      938,
+      632
+    ],
+    "sha256": "9ebcb58b0c76da9966a7a99ffb931c9fa9bb86422cc306d3550e54cc386afdbd",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      15,
+      35,
+      155,
+      150
+    ],
+    "edge_cleanup": false,
+    "output": "decorations/mint_corner.png",
+    "size": [
+      153,
+      111
+    ],
+    "sha256": "7dc39a72e84d225f618bd6edd3e2b3baf0101c06d486bba1c56635b8b8fd2744",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      430,
+      35,
+      155,
+      150
+    ],
+    "edge_cleanup": false,
+    "output": "decorations/warm_corner.png",
+    "size": [
+      154,
+      110
+    ],
+    "sha256": "cecdaba1902ae832a54fb31df9ada44c5bfe0a4c9fa91a44c937bcbe68cc3139",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      1030,
+      35,
+      205,
+      155
+    ],
+    "edge_cleanup": false,
+    "output": "decorations/blue_corner.png",
+    "size": [
+      203,
+      96
+    ],
+    "sha256": "06d92ce98df37a21df7252d3d18e22caa69a1b0e67a05e9d6b84e521e48a23cc",
+    "alpha_extrema": [
+      0,
+      253
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      15,
+      510,
+      180,
+      145
+    ],
+    "edge_cleanup": false,
+    "output": "decorations/lavender_corner.png",
+    "size": [
+      178,
+      140
+    ],
+    "sha256": "e35d95c3cfeee1ecb45d8489b35a06017f237602211085dd10b07e813150c40f",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      430,
+      510,
+      180,
+      145
+    ],
+    "edge_cleanup": false,
+    "output": "decorations/coral_corner.png",
+    "size": [
+      178,
+      140
+    ],
+    "sha256": "e5d392426b9dc0d17b295a513a24631b5ec8f975cb340a94ba07bd1cfa560e04",
+    "alpha_extrema": [
+      0,
+      254
+    ]
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      160,
+      40,
+      465,
+      575
+    ],
+    "derived_from": "surfaces/cards/card_mint.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/card_mint.png",
+    "size": [
+      240,
+      300
+    ],
+    "sha256": "6e21443a2082e2c4fbfa346d27f508621d6894b787ed502da94d723ca1fbe2ed"
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      640,
+      40,
+      475,
+      575
+    ],
+    "derived_from": "surfaces/cards/card_warm.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/card_warm.png",
+    "size": [
+      240,
+      300
+    ],
+    "sha256": "eedad809ea4fe3e816c637e7995b3e5b92ad8bd21dc0300442ef812d331501b3"
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      15,
+      620,
+      420,
+      585
+    ],
+    "derived_from": "surfaces/cards/card_blue.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/card_blue.png",
+    "size": [
+      240,
+      300
+    ],
+    "sha256": "097068dfa61ed413c6f4882a0f59bd162209a358aedaf33aa9b411bb0cdf3c5f"
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      435,
+      620,
+      400,
+      585
+    ],
+    "derived_from": "surfaces/cards/card_lavender.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/card_lavender.png",
+    "size": [
+      240,
+      300
+    ],
+    "sha256": "fdd3fc438bb20d530f08d244a751b3eff552d12f7bd154452f51e3a76390f9bc"
+  },
+  {
+    "source": "卡片边框.png",
+    "source_sha256": "3344ad56a0e24e0104c03fc6098267ea010f57a69ada01836f2b296c60a4a7cb",
+    "crop": [
+      835,
+      620,
+      415,
+      585
+    ],
+    "derived_from": "surfaces/cards/card_coral.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/card_coral.png",
+    "size": [
+      240,
+      300
+    ],
+    "sha256": "42e9c0b879883b58383ad21187cd33f12a7c0d2b90551c8502902da049b8a0ab"
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      15,
+      35,
+      395,
+      455
+    ],
+    "derived_from": "surfaces/card_corners/mint_corner.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/mint_corner.png",
+    "size": [
+      240,
+      260
+    ],
+    "sha256": "b111877ae4967ab071c755e8025c7fd3cd4106511bdf69ddd43e01f1ded83b2c"
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      430,
+      35,
+      395,
+      455
+    ],
+    "derived_from": "surfaces/card_corners/warm_corner.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/warm_corner.png",
+    "size": [
+      240,
+      260
+    ],
+    "sha256": "6f12d70d1049dc4000f32f47ad9f18a160e56ade6a35255715fbb6b23dbf8846"
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      840,
+      35,
+      395,
+      455
+    ],
+    "derived_from": "surfaces/card_corners/blue_corner.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/blue_corner.png",
+    "size": [
+      240,
+      260
+    ],
+    "sha256": "be3a9d5dd75be2dbbe06f6b43da86fb18883ed00b64ef154460772f2a7b19f49"
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      15,
+      510,
+      395,
+      440
+    ],
+    "derived_from": "surfaces/card_corners/lavender_corner.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/lavender_corner.png",
+    "size": [
+      240,
+      260
+    ],
+    "sha256": "bb78c36b801bb37dc2d8198b3aec35db09587d0fe2fe44552ca41717eafd4f6b"
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      430,
+      510,
+      395,
+      440
+    ],
+    "derived_from": "surfaces/card_corners/coral_corner.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/coral_corner.png",
+    "size": [
+      240,
+      260
+    ],
+    "sha256": "26677b1f519b0233d910f6658fe97e0fc4240acab2a056f951d9806f0300ca7a"
+  },
+  {
+    "source": "卡片角落叠加装饰.png",
+    "source_sha256": "fb96dba05aaff93aff1a49872fb91397fe42e4d1c9c97e5c99b88c8c1b3a84dc",
+    "crop": [
+      840,
+      510,
+      395,
+      440
+    ],
+    "derived_from": "surfaces/card_corners/green_corner.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/green_corner.png",
+    "size": [
+      240,
+      260
+    ],
+    "sha256": "37c964f5d656f1108db6a71f20f9ea231c391d4881f88122fcaeca137cbbb751"
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      20,
+      155,
+      600,
+      290
+    ],
+    "derived_from": "controls/button_skins/button_mint.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/button_mint.png",
+    "size": [
+      300,
+      130
+    ],
+    "sha256": "bbb70cf2ab58ca763953854eaed6d13ba5bd9f38df19bfaab6ab7fe989cbe517"
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      635,
+      155,
+      605,
+      290
+    ],
+    "derived_from": "controls/button_skins/button_coral.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/button_coral.png",
+    "size": [
+      300,
+      130
+    ],
+    "sha256": "486fbf5399420247f4c06eadda52651bde2a17941fbfa473d1750f53b697eba5"
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      20,
+      475,
+      600,
+      300
+    ],
+    "derived_from": "controls/button_skins/button_lavender.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/button_lavender.png",
+    "size": [
+      300,
+      130
+    ],
+    "sha256": "1f9fef9b23b08b8e17b856d492182994b2030c227edda458a278cd67ee2e2ad8"
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      635,
+      475,
+      605,
+      300
+    ],
+    "derived_from": "controls/button_skins/button_warm.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/button_warm.png",
+    "size": [
+      300,
+      130
+    ],
+    "sha256": "c1ad00b2cbfefdb57e77495cbdbe80c14a2e8ce1ef603c30b2ba78562b49f364"
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      20,
+      795,
+      600,
+      300
+    ],
+    "derived_from": "controls/button_skins/button_blue.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/button_blue.png",
+    "size": [
+      300,
+      130
+    ],
+    "sha256": "e49f06b5791aaa6a2eff6f73f24243e6147a1751e9dad2e65ae47448cb2120e4"
+  },
+  {
+    "source": "图标托盘和按钮皮肤.png",
+    "source_sha256": "02b10c97db23e91ddef74c344c41ce0bb3990292c489a60ae3f428a74f9df20c",
+    "crop": [
+      635,
+      795,
+      605,
+      300
+    ],
+    "derived_from": "controls/button_skins/button_cream.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/button_cream.png",
+    "size": [
+      300,
+      130
+    ],
+    "sha256": "488e73ea7ae0c26bd2dac834b3f0150f5282cd0fd77439d832437f0aa4d4b73f"
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      35,
+      55,
+      585,
+      335
+    ],
+    "derived_from": "surfaces/detail_sections/detail_mint.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/detail_mint.png",
+    "size": [
+      360,
+      190
+    ],
+    "sha256": "77fd73f117736b8f28b5b9549564c27004d107e5a083885d4b9a8a9db1a342e0"
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      635,
+      55,
+      585,
+      335
+    ],
+    "derived_from": "surfaces/detail_sections/detail_warm.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/detail_warm.png",
+    "size": [
+      360,
+      190
+    ],
+    "sha256": "47523e476a706a237a349788be443938ad1e43755cab14f3ab117fa5dabded78"
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      35,
+      430,
+      585,
+      335
+    ],
+    "derived_from": "surfaces/detail_sections/detail_blue.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/detail_blue.png",
+    "size": [
+      360,
+      190
+    ],
+    "sha256": "d35271211c02c93013893d06ebecd54f2c0b5e800ef8dd5583fb62d9f5fd0a91"
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      635,
+      430,
+      585,
+      335
+    ],
+    "derived_from": "surfaces/detail_sections/detail_lavender.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/detail_lavender.png",
+    "size": [
+      360,
+      190
+    ],
+    "sha256": "448535e039ecec58a0ee4ed066fb30c6a4f1e34a9213c2e797c5d52c0ed3ba3b"
+  },
+  {
+    "source": "详情页装饰.png",
+    "source_sha256": "67aad8e8bbd493c3d26a9b1d416eaa225f791bb6cbcabb21ce2530c2db29e3eb",
+    "crop": [
+      35,
+      805,
+      1185,
+      350
+    ],
+    "derived_from": "surfaces/detail_sections/detail_coral.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/detail_coral.png",
+    "size": [
+      360,
+      190
+    ],
+    "sha256": "340fc7ebf80a6f6fc8dc5856767c6baa3a550b881832cf67cb824930c0de369d"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      35,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_coral.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_coral.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "6d4991bcb075a6b99efb90aa06d9da53a4d2e0e62e6d1b1403a1994958c448d2"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      35,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_mint.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_mint.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "6a46ff48d0182dc115425ca0c1a3063b650c180f80992109828cc0418a2092a5"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      270,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_lavender.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_lavender.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "3e47ed8cbc5c3e89527424b2ec970ddd11e1ac700e232330d3dcb50e2ed1311c"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      270,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_cream.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_cream.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "ec5c2566aa1c4b00ee8f00c73abb357a2a7302a7027ee72e0157d654edf98701"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      505,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_coral_wave.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_coral_wave.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "b11ee841e31eac07462645b6a49e9bbc180e9ee222eb070581f69ae80cfb5133"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      505,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_mint_leaf.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_mint_leaf.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "113dbdddbf388c5ea8ddcfec7faa20e4f65b8045881a51e0350d175e0fc21d3a"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      740,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_lavender_tail.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_lavender_tail.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "eeffb8ba2e0df3f91e151cd0c87b4b97c31a8a099d9b7dd757edd4b37dd83fc2"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      740,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_warm.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_warm.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "73b263d692c6529d6f07bed69610639faf593d08ea4a4b16e6b4be62e35534ea"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      75,
+      975,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_blue.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_blue.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "3834ef7b3875b4fc0db71696ec98299591b4df899756201d4907d63b83bf2ea4"
+  },
+  {
+    "source": "选中态和筛选器皮肤.png",
+    "source_sha256": "5307b337295023ca808f08b435b06f6b8ebee03fca6b4e5698a9d11deca8c4fb",
+    "crop": [
+      650,
+      975,
+      540,
+      220
+    ],
+    "derived_from": "controls/selection_skins/filter_pink.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/filter_pink.png",
+    "size": [
+      300,
+      120
+    ],
+    "sha256": "62bd56b4ce8928bfa5f638e3bf1df5042e0df740d72f54de668948db96bf4867"
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      735,
+      845,
+      247,
+      288
+    ],
+    "derived_from": "calendar/cells/cell_selected.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/cell_selected.png",
+    "size": [
+      240,
+      280
+    ],
+    "sha256": "aa3eebd35d9a5af0ae87a11d39eb37aca56cdd63ecf25e0c8e2cb6fa2da34cd2"
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      980,
+      875,
+      115,
+      80
+    ],
+    "derived_from": "calendar/record_pills/pill_green.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/pill_green.png",
+    "size": [
+      240,
+      100
+    ],
+    "sha256": "796893a84e7b5ec057bb446728c46bfb83f62ea40fe53f78f2fb7a06d475042a"
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      1100,
+      875,
+      140,
+      80
+    ],
+    "derived_from": "calendar/record_pills/pill_red.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/pill_red.png",
+    "size": [
+      240,
+      100
+    ],
+    "sha256": "5dfc151c2c8b0eb73e225d8d27234b8685c07988918ffc309801b0b44a220153"
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      980,
+      960,
+      115,
+      80
+    ],
+    "derived_from": "calendar/record_pills/pill_purple.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/pill_purple.png",
+    "size": [
+      240,
+      100
+    ],
+    "sha256": "279b70e5beb28081a64f03a23da6b2408582ead545cc9e9c0bc5669ee417f710"
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      1100,
+      960,
+      140,
+      80
+    ],
+    "derived_from": "calendar/record_pills/pill_blue.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/pill_blue.png",
+    "size": [
+      240,
+      100
+    ],
+    "sha256": "5bf1b2c199e04c5e5c6c2e6e4caec0edca2f429d66f183ff7babc70762451159"
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      980,
+      1050,
+      115,
+      75
+    ],
+    "derived_from": "calendar/record_pills/pill_yellow.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/pill_yellow.png",
+    "size": [
+      240,
+      100
+    ],
+    "sha256": "9cbfa0b3e71e043c5c2f732adf8a0cdfcc912ec9e7b4d15124c56d19628309f8"
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      35,
+      1030,
+      290,
+      125
+    ],
+    "derived_from": "calendar/record_pills/pill_blue_large.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/pill_blue_large.png",
+    "size": [
+      240,
+      100
+    ],
+    "sha256": "54975f52d209d75095b1e985c6bb3f36a506a8a63ce594d9d15d9c7153fa1f5b"
+  },
+  {
+    "source": "日历.png",
+    "source_sha256": "eeb0ee32e70c01a8be3c174a7c49168dda1d9d1734f2f527099b96239e95095b",
+    "crop": [
+      350,
+      1030,
+      290,
+      125
+    ],
+    "derived_from": "calendar/record_pills/pill_yellow_large.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/pill_yellow_large.png",
+    "size": [
+      240,
+      100
+    ],
+    "sha256": "5dab89df730653f30c07e82ba64ffb59ca2e6363a7d6d9d926516b11c9a20144"
+  },
+  {
+    "source": "弹窗、底部弹层和 Toast 皮肤.png",
+    "source_sha256": "f25141241d3b4792847c8ed1b73813a445cab049ae17e2c103ee5f1bd62f93cb",
+    "crop": [
+      760,
+      90,
+      450,
+      160
+    ],
+    "derived_from": "surfaces/feedback/toast_success.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/toast_success.png",
+    "size": [
+      360,
+      160
+    ],
+    "sha256": "11326a781a0c6081b1027ae10e170e267286c4c871a33f7251490cf69aeec0aa"
+  },
+  {
+    "source": "弹窗、底部弹层和 Toast 皮肤.png",
+    "source_sha256": "f25141241d3b4792847c8ed1b73813a445cab049ae17e2c103ee5f1bd62f93cb",
+    "crop": [
+      760,
+      270,
+      450,
+      160
+    ],
+    "derived_from": "surfaces/feedback/toast_warning.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/toast_warning.png",
+    "size": [
+      360,
+      160
+    ],
+    "sha256": "7ab975d24c31782b62ccb9baf6975dfbd042168ec508beec6b84aa5ef1c6ea37"
+  },
+  {
+    "source": "弹窗、底部弹层和 Toast 皮肤.png",
+    "source_sha256": "f25141241d3b4792847c8ed1b73813a445cab049ae17e2c103ee5f1bd62f93cb",
+    "crop": [
+      760,
+      450,
+      450,
+      160
+    ],
+    "derived_from": "surfaces/feedback/toast_error.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/toast_error.png",
+    "size": [
+      360,
+      160
+    ],
+    "sha256": "663a3ec70e5c8e6a7cd2c2c75bee84df6b541b887b6720fb90a37074ac341d93"
+  },
+  {
+    "source": "指标卡背景.png",
+    "source_sha256": "f554ebc97d666ce699df324b8e1b9d54d392a95752fce7d200a9e2df06069e91",
+    "crop": [
+      20,
+      160,
+      984,
+      700
+    ],
+    "derived_from": "surfaces/metric_card/metric_card_warm.png",
+    "transform": "normalized-nine-slice",
+    "output": "skins/metric_card_warm.png",
+    "size": [
+      360,
+      220
+    ],
+    "sha256": "9901d9532f5215d07635679bf718c2ee5fde469d88dccc7a6f7399746d67b4c0"
+  }
+]

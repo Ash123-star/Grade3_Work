@@ -1,5 +1,6 @@
 server/target/
 deploy/backend/.env
+deploy/backend/.env.merged
 *.log
 server/.data/
 docs/openapi.generated.json
@@ -12,3 +13,4 @@ deploy/backend/backups/
 
 # 本地对话产出，不上传 GitHub
 output/
+/node_modules/
