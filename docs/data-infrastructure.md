@@ -29,6 +29,8 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml down
 
 ## 文件与数据契约
 
+后端运行时数据库以 `server/src/main/resources/db/migration/` 为唯一基线，当前追加到 V4。`deploy/postgresql/` 的 UUID 数据包用于独立数据基础设施验收，不能直接作为 Spring Boot 后端数据库，也不能与 Flyway 迁移混用。后端字段详细说明见 [database-schema.md](database-schema.md)。
+
 - `deploy/postgresql/sql/`：组织权限、工作数据、复核消息 AI、索引种子四段 SQL。
 - `deploy/postgresql/migrations/V001__initial_schema.sql`：唯一 V001 执行入口；全部语句在同一事务内，包含迁移锁、版本表和内容校验。
 - `deploy/dist/postgresql.zip`、`redis.zip`：组件源文件和工具分别打包；默认部署入口仍只启动一个容器。

@@ -59,6 +59,12 @@
 
 `POST /ai/jobs` 创建异步草稿，`GET/DELETE /ai/jobs/{id}` 查询或取消，`POST /ai/jobs/{id}/retry` 重试，`PUT /ai/jobs/{id}/draft` 按版本编辑，`GET /ai/jobs/{id}/stream` 读取 SSE，`GET /ai/usage` 查看用量。`GET /ai-maps` 和 `POST /ai-maps/edges` 管理本人范围内地图。`POST /ai/jobs/{id}/confirm-task` 必须带幂等键，确认后重新走任务派发权限和事务；AI 失败返回 job 状态，不影响普通任务和日志。
 
+## Flutter 接口缺口（待完成）
+
+当前 Flutter 与后端路径的逐项核对见 [backend-interface-gaps.md](backend-interface-gaps.md)。当前没有反馈 Controller；通用反馈资源可能请求 `GET /feedback` 或 `GET /feedback/{id}`，正式提交会明确提示未接入。任务退回补充、日志阅读人员清单、AI 显式范围筛选和 AI 确认时的 job/output 原子版本条件也尚未形成完整服务端契约。
+
+这些内容只是后续工作登记，不是已发布接口。具体 URL、请求/响应字段、权限、状态、幂等和迁移必须先通过独立 OpenSpec 设计，再同步运行时 SpringDoc、`docs/openapi.json` 和 Flutter/Web 客户端。
+
 ## 调用示例
 
 ```http

@@ -1,0 +1,5 @@
+schema: spec-driven
+goal: 建立可替换、低耦合的 Flutter 应用目录与依赖边界
+affected_areas:
+  - mobile/lib
+  - mobile/test
