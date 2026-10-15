@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import '../core/failure.dart';
+import '../core/errors/api_failure.dart';
 
 /// 单条 Server-Sent Event：事件名、序号与拼接后的数据。
 class ServerEvent {

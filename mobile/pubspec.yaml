@@ -16,9 +16,47 @@ dependencies:
   file_picker: ^10.3.0
   cute_ui:
     path: packages/cute_ui
+  drift: ^2.35.2
+  sqlite3: 3.5.1
+  cryptography: ^2.9.0
+  flutter_secure_storage: 10.0.0
+  path_provider: ^2.1.6
+  path: ^1.9.1
+  forui: 0.17.0
+  flutter_svg: ^2.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
+  fonts:
+    - family: TuantuanDisplay
+      fonts:
+        - asset: assets/fonts/GenSenRoundedTW-B.ttf
+          weight: 700
+  assets:
+    - assets/icon_desktop.png
+    - assets/icon_splash.png
+    - assets/phosphor/
+    - assets/companions/
+    - assets/licenses/
+    - assets/generated_ui/backgrounds/
+    - assets/generated_ui/decorations/
+    - assets/generated_ui/icons/
+    - assets/generated_ui/mascot/
+    - assets/generated_ui/references/
+    - assets/generated_ui/new_pack/textures/
+    - assets/generated_ui/new_pack/decorations/
+    - assets/generated_ui/new_pack/surfaces/cards/
+    - assets/generated_ui/new_pack/surfaces/card_corners/
+    - assets/generated_ui/new_pack/surfaces/detail_sections/
+    - assets/generated_ui/new_pack/surfaces/metric_card/
+    - assets/generated_ui/new_pack/surfaces/feedback/
+    - assets/generated_ui/new_pack/controls/button_skins/
+    - assets/generated_ui/new_pack/controls/selection_skins/
+    - assets/generated_ui/new_pack/calendar/cells/
+    - assets/generated_ui/new_pack/calendar/record_pills/
+    - assets/generated_ui/new_pack/backgrounds/illustration_layers/
+    - assets/generated_ui/new_pack/ai/
+    - assets/generated_ui/new_pack/skins/

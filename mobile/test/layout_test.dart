@@ -1,11 +1,12 @@
+import 'support/local_test_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/app.dart';
-import 'package:pandora_mobile/core/providers.dart';
-import 'package:pandora_mobile/data/models.dart';
-import 'package:pandora_mobile/features/catalog.dart';
+import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/features/common/catalog.dart';
 
 void main() {
   for (final config in [
@@ -21,7 +22,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       SharedPreferences.setMockInitialValues({});
-      final container = ProviderContainer(
+      final container = testContainer(
         overrides: [
           sessionProvider.overrideWith(
             (ref) => const Session(role: UserRole.admin),
@@ -40,25 +41,39 @@ void main() {
       final router = container.read(routerProvider);
       final routes = [
         '/dashboard',
-        '/profile',
+        '/logs/subordinates',
+        '/me/reviews',
+        '/me/reviews/1',
+        '/ai/graph',
+        '/me',
+        '/me/profile',
         '/ai',
         '/logs',
-        '/calendar',
-        '/settings',
-        '/admin',
-        '/help',
+        '/view',
+        '/view/day',
+        '/view/week',
+        '/view/month',
+        '/me/settings',
+        '/me/admin',
+        '/me/help',
+        '/me/team',
+        '/me/organization',
+        '/me/team/u2',
+        '/me/team/u2/logs',
         '/guide',
-        '/analytics',
+        '/me/statistics',
         '/privacy',
         '/licenses',
         '/history',
+        '/history/1/version/1',
+        '/history/1/version/99',
         '/conflict',
         '/report',
         '/ai-usage',
         '/export',
-        '/pending',
-        '/disabled',
-        '/expired',
+        '/auth/pending',
+        '/auth/disabled',
+        '/auth/expired',
         for (final resource in resourceTitles.keys)
           '/list/${Uri.encodeComponent(resource)}',
         for (final resource in resourceTitles.keys)

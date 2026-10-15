@@ -1,0 +1,170 @@
+[
+  {
+    "file": "squares-four.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "64789418cd0bd78e9814756d27641523b56b43da",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/squares-four.svg",
+    "sha256": "F70D6B20E08E028AB5B1714077681910A2431092CF7A23B82366DDAEC554AB87"
+  },
+  {
+    "file": "squares-four-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "57eef7616f34d3d806af7cacc9dbe8ed403f3099",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/squares-four-fill.svg",
+    "sha256": "728B2DBFA447EC3FEC54F0F8B3B52CEC573C51DA00C00A6D73F699027758340C"
+  },
+  {
+    "file": "calendar-dots.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "e55bdad6a35f8e6dc7c5629667494073746eee06",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/calendar-dots.svg",
+    "sha256": "7911BA8E60AFD4506BDC5FCEF0549A9C1BC22C0439D1D946507116DFD8ACF3D9"
+  },
+  {
+    "file": "calendar-dots-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "d82e441d66b525102aa2b9b17126e935ef86cab8",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/calendar-dots-fill.svg",
+    "sha256": "7A5ABB011BF3A4DAB9C09986047FA9DE5C32243B715818240895A2FE38FD6CAA"
+  },
+  {
+    "file": "notebook.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "25d72879f574dbcf936b4ab697974d0ca9c97dc1",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/notebook.svg",
+    "sha256": "508BE681B27A34B9388E748CA4B8800B4531A38BFB7D6CB390546CBA6EA90208"
+  },
+  {
+    "file": "notebook-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "632b2054a8c26cf2e9756be013f74a49dfed29f6",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/notebook-fill.svg",
+    "sha256": "E58B383D37D18CE45302B0AD6C49D8EBCA752E98BA40A75DFE0321583B8B8DE0"
+  },
+  {
+    "file": "graph.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "350b0bd201a366a9045a08325effc4a1adc81cbc",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/graph.svg",
+    "sha256": "0A863BD9D39960EB220400400332EE1B3ADA0E6CE309B89B202BB0784E4E28AA"
+  },
+  {
+    "file": "graph-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "152ec0833b9b1ca21d3dabd2b8308f3ef0f8a6cc",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/graph-fill.svg",
+    "sha256": "73EEA2682FD6C43D58D448107BD01C65CD662C3890BEA8D28B39964031BDD110"
+  },
+  {
+    "file": "user-circle.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "485fd0de7cd47fc86abacc9de848f7f5d8acd596",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/user-circle.svg",
+    "sha256": "5AEE25838C1915058940900DF322AFC36B76F4EA7E48499C33603CF121258B2A"
+  },
+  {
+    "file": "user-circle-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "b7b03c29758b5fc610b4989f718d0fc85dd36205",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/user-circle-fill.svg",
+    "sha256": "4E16CDBA116195993E6398BB097E7C4B354FB129FAFDF2B56FD4B7C069F440D3"
+  },
+  {
+    "file": "sparkle.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "f64e8d10ab208816555549d8f16611a284f4f900",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/sparkle.svg",
+    "sha256": "9E2C17A26564098CB48DD95737A83C742156F755F13CEDAA30F9D864D0E3EB76"
+  },
+  {
+    "file": "sparkle-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "f684eccbbcbbb4237382a5f27c88927ade749898",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/sparkle-fill.svg",
+    "sha256": "9872A9255717F4ECC0F01B028B9436042E0F49391E4CE7A57F61AA466684FAD1"
+  },
+  {
+    "file": "bell.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "bc9f9a1fba3ea60ae9b6387fa51213d57c78cbe0",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/bell.svg",
+    "sha256": "439B02C746FF59945B6175C6D327113CA3F7A729A43D5BCAFB278A0F11EE34B5"
+  },
+  {
+    "file": "bell-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "6f6a3573b00907213f2e5c165064f6983ce4efcb",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/bell-fill.svg",
+    "sha256": "26437565EDC7418A2C326A74078FB4519AA2316E84FCF1ADEFBDD1B2C89F4AC5"
+  },
+  {
+    "file": "cat.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "c620f97196f2df91631bdd9f24666e9f09f09eb2",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/cat.svg",
+    "sha256": "71123EFB9241BBE923E7ABE04608E89532984B9178FAE6DCF56AC1024140B83B"
+  },
+  {
+    "file": "cat-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "1d65bb742075d0f0f786c25ee29298e017c090d4",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/cat-fill.svg",
+    "sha256": "F9CAFCE8B2488785831E8FA4A4EB1B9EFCB7C291FAA0162FAA6CC3C07594ED49"
+  },
+  {
+    "file": "dog.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "cdbb0cbdac3e001276606d2063ab0104491e7a9c",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/dog.svg",
+    "sha256": "DDE2577CBE425EE4962C99714B7116989325D7DC96B3DE5354F4BB88149F8637"
+  },
+  {
+    "file": "dog-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "7fc15e3e51fa4fc84868b20cfe352cb786214a6e",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/dog-fill.svg",
+    "sha256": "E2E2B1F336BA876EE984EB971747FD7E8D9BEF93D3EA080C340DBAD9B0A26114"
+  },
+  {
+    "file": "star.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "4e640f4895f9b27bbcc29d23ee98ce70e8b7da1c",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/star.svg",
+    "sha256": "165CD96E51D60442FB9C7AA89592FA6EF28F22D18368C85771BE302C2E977101"
+  },
+  {
+    "file": "star-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "50c668bd294984b575316d37e9072a05007cb8c6",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/star-fill.svg",
+    "sha256": "42451B34121B695BDAAB88FDCF3EACEC9CDA9AC36D222349609426DCB9F04B48"
+  },
+  {
+    "file": "list-checks.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "9d1c071c5d67442203e708ea68be5e6385c4f42d",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/list-checks.svg",
+    "sha256": "B2D11FC95DE627D6ABE9FEECED5F7E0CDCE3CCDF8D9F9D2334D596B8B5CC5CC4"
+  },
+  {
+    "file": "list-checks-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "d7a8f346aed2b57bde72c95d7fbd99a3678947f9",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/list-checks-fill.svg",
+    "sha256": "EEFE95747F02E0AA9F183C75AAC7FFDF87F69317CD775C383A606344CC7C78AE"
+  },
+  {
+    "file": "pencil-line.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "2e258aa0e88455fa1ddda2046a2553d22bac8606",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/pencil-line.svg",
+    "sha256": "A397BE7C6A6428A897244D55BC9693C0CEAA880056057F9B372768E866BD7C37"
+  },
+  {
+    "file": "pencil-line-fill.svg",
+    "commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+    "blob": "c25346b3b55351dc65f554803f8fdc6a8ab408a0",
+    "source": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/fill/pencil-line-fill.svg",
+    "sha256": "E91CF3971819B34C75C3E69C2C701CAFCCC265123F950E9F8BBDC08F3406155C"
+  }
+]
