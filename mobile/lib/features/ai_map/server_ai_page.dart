@@ -405,6 +405,11 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
     return PageFrame(
       title: 'AI地图',
       actions: [
+        IconButton(
+          onPressed: () => context.push('/ai/memory'),
+          tooltip: '长期记忆与发展分析',
+          icon: const Icon(Icons.psychology_outlined),
+        ),
         TextButton(
           onPressed: () => context.push('/ai/usage'),
           child: const Text('用量'),
