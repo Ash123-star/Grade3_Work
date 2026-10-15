@@ -1084,7 +1084,7 @@ void main() {
         final img = await render.toImage(pixelRatio: 1);
         final data = await img.toByteData(format: ui.ImageByteFormat.png);
         final output = File(
-          '${const String.fromEnvironment('SCREENSHOT_OUTPUT', defaultValue: 'docs/evidence/stage3-rebuild')}/$label.png',
+          '${const String.fromEnvironment('SCREENSHOT_OUTPUT', defaultValue: '../output/flutter-evidence')}/$label.png',
         );
         output.parent.createSync(recursive: true);
         output.writeAsBytesSync(data!.buffer.asUint8List());

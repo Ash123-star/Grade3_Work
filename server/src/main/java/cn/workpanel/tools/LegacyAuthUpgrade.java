@@ -29,14 +29,14 @@ public final class LegacyAuthUpgrade {
             throw new IllegalArgumentException("Refusing original database; restore to a new workpanel_lyb_upgrade_<12 hex> database first");
         String history=schema+".flyway_schema_history";
         new TransactionTemplate(new DataSourceTransactionManager(source)).executeWithoutResult(tx -> {
-            var rows=jdbc.queryForList("SELECT version,script,checksum,success FROM "+history+" WHERE version IN ('5','10','11','12') FOR UPDATE");
-            var auth=rows.stream().filter(r -> ("V5__auth_login_protection.sql".equals(r.get("script")) || "V10__auth_login_protection.sql".equals(r.get("script")))).toList();
+            var rows=jdbc.queryForList("SELECT version,script,checksum,success FROM "+history+" WHERE version IN ('5','10','11','12','13') FOR UPDATE");
+            var auth=rows.stream().filter(r -> ("V5__auth_login_protection.sql".equals(r.get("script")) || "V10__auth_login_protection.sql".equals(r.get("script")) || "V12__auth_login_protection.sql".equals(r.get("script")))).toList();
             if(auth.size()!=1 || !Integer.valueOf(-1773296244).equals(auth.getFirst().get("checksum")) || !Boolean.TRUE.equals(auth.getFirst().get("success")))
                 throw new IllegalStateException("Unknown legacy auth migration; no conversion performed");
-            if(rows.stream().anyMatch(r -> "12".equals(r.get("version"))))
-                throw new IllegalStateException("V12 already exists; refuse ambiguous history");
+            if(rows.stream().anyMatch(r -> "13".equals(r.get("version"))))
+                throw new IllegalStateException("V13 already exists; refuse ambiguous history");
             // 同一个已执行脚本只移动版本号；保留校验和、执行人、时间与已有登录防护数据。
-            jdbc.update("UPDATE "+history+" SET version='12',script='V12__auth_login_protection.sql' WHERE script=?",auth.getFirst().get("script"));
+            jdbc.update("UPDATE "+history+" SET version='13',script='V13__auth_login_protection.sql' WHERE script=?",auth.getFirst().get("script"));
             for(var row:rows) if("V11__task_review_kinds.sql".equals(row.get("script"))) {
                 if(!Integer.valueOf(-1563727389).equals(row.get("checksum")) || !Boolean.TRUE.equals(row.get("success")))
                     throw new IllegalStateException("Unknown legacy task review constraint migration");

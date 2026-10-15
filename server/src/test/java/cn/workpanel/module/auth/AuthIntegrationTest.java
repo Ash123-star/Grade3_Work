@@ -148,9 +148,9 @@ class AuthIntegrationTest {
         assertEquals(1, db.count("SELECT count(*) FROM auth_login_state WHERE account_hash=?", Db.hash(account + "-unknown")));
     }
 
-    @Test void migrationUpgradesExistingMainV11SchemaWithoutChangingUsers() {
+    @Test void migrationUpgradesExistingMainV12SchemaWithoutChangingUsers() {
         String schema = "auth_upgrade_" + UUID.randomUUID().toString().replace("-", "");
-        var flyway = org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("11").load();
+        var flyway = org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("12").load();
         try {
             flyway.migrate();
             db.update("INSERT INTO " + schema + ".users(id,company_id,account,password_hash,phone,name,role,status) VALUES ('existing','default','existing',?,'13800000009','升级保留','EMPLOYEE','PENDING')", passwords.encode(PASSWORD));
@@ -164,15 +164,15 @@ class AuthIntegrationTest {
     }
 
     @Test void legacyV5AndV10ClonesUpgradeWithoutLosingUsersOrLoginProtection() throws Exception {
-        for(int oldVersion: List.of(5,10)) {
+        for(int oldVersion: List.of(5,10,12)) {
             String schema="legacy_upgrade_"+UUID.randomUUID().toString().replace("-", "");
             try {
-                org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target(oldVersion==5?"4":"9").load().migrate();
+                org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target(oldVersion==5?"4":oldVersion==10?"9":"11").load().migrate();
                 try(var connection=dataSource.getConnection();var statement=connection.createStatement()) {
                     String previousSchema=connection.getSchema();
                     try {
                     connection.setSchema(schema);
-                    try(var resource=getClass().getResourceAsStream("/db/migration/V12__auth_login_protection.sql")) {
+                    try(var resource=getClass().getResourceAsStream("/db/migration/V13__auth_login_protection.sql")) {
                         statement.execute(new String(java.util.Objects.requireNonNull(resource).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));
                     }
                     statement.execute("INSERT INTO flyway_schema_history(installed_rank,version,description,type,script,checksum,installed_by,execution_time,success) SELECT max(installed_rank)+1,'"+oldVersion+"','auth login protection','SQL','V"+oldVersion+"__auth_login_protection.sql',-1773296244,current_user,0,true FROM flyway_schema_history");
@@ -184,7 +184,7 @@ class AuthIntegrationTest {
                 cn.workpanel.tools.LegacyAuthUpgrade.upgrade(dataSource,schema);
                 assertEquals("unchanged",db.one("SELECT password_hash FROM "+schema+".users WHERE id='legacy'").get("password_hash"));
                 assertEquals(3,db.count("SELECT failures FROM "+schema+".auth_login_state WHERE account_hash=?",Db.hash("legacy")));
-                assertEquals(12,db.count("SELECT count(*) FROM "+schema+".flyway_schema_history WHERE version IS NOT NULL AND success"));
+                assertEquals(13,db.count("SELECT count(*) FROM "+schema+".flyway_schema_history WHERE version IS NOT NULL AND success"));
             } finally { db.update("DROP SCHEMA "+schema+" CASCADE"); }
         }
     }
@@ -192,4 +192,16 @@ class AuthIntegrationTest {
     @Test void legacyUpgradeRefusesOriginalDatabase() {
         assertThrows(IllegalArgumentException.class, () -> cn.workpanel.tools.LegacyAuthUpgrade.upgrade(dataSource,"public"));
     }
+    @Test void browserPreflightAllowsConfiguredOriginAndRejectsForeignOrigin() throws Exception {
+        for(String origin:List.of("http://localhost:5173","https://untrusted.example")) {
+            var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/auth/login"))
+                .header("Origin",origin).header("Access-Control-Request-Method","POST")
+                .header("Access-Control-Request-Headers","content-type,authorization")
+                .method("OPTIONS",HttpRequest.BodyPublishers.noBody()).build();
+            var response=HttpClient.newHttpClient().send(request,HttpResponse.BodyHandlers.ofString());
+            assertEquals(origin.equals("http://localhost:5173")?200:403,response.statusCode());
+            assertEquals(origin.equals("http://localhost:5173")?Optional.of(origin):Optional.empty(),response.headers().firstValue("Access-Control-Allow-Origin"));
+        }
+    }
+
 }

@@ -522,7 +522,7 @@ void main() {
         final rendered = await boundary.toImage(pixelRatio: 1);
         final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
         await File(
-          'docs/evidence/stage3-rebuild/52-notification-recovery-large.png',
+          '../output/flutter-evidence/52-notification-recovery-large.png',
         ).writeAsBytes(png!.buffer.asUint8List());
         rendered.dispose();
       });

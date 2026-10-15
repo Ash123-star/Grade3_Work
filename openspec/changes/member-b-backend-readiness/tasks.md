@@ -33,11 +33,11 @@
 
 ## 4. 第三批：审核闭环
 
-- [ ] 4.1 分离 review Controller、应用编排、领域决定和 repository，并接入实际调用路径；以同一入口正常审核测试和 Controller 无 SQL/核心规则检查验收。
+- [x] 4.1 分离 review Controller、应用编排、领域决定和 repository，并接入实际调用路径；以同一入口正常审核测试和 Controller 无 SQL/核心规则检查验收。
 - [x] 4.2 验证团队→部门→公司路由、任务可配置层级及独立公司复核，缺少独立人保持待审；以逐级流程、空缺审核人和策略自身独立审核单元/集成测试验收（ReviewIntegrationTest、OrganizationIntegrationTest）。
 - [x] 4.3 实现或补齐当前审核人授权、自审禁止、空白驳回原因拒绝、终态不可重复处理；以正向通过/驳回及越权/无效决定 HTTP 测试验收（ReviewPolicyTest、ReviewIntegrationTest；额外验证已撤销职责的旧身份快照拒绝）。
 - [x] 4.4 对审核决定加并发控制和最终业务版本校验，旧值保持到全部通过；以两候选竞争、重复决定、旧版本冲突和事务回滚数据库测试验收，不额外新增单条待审限制（ReviewIntegrationTest）。
-- [ ] 4.5 与 C 建立 task/log 验证及应用接口、与 D/E 建立同事务审计/outbox 协作；替换 review 对其他模块的直接 SQL，以真实业务应用失败回滚、成功一次写入与事件不重复的跨模块集成测试验收；外部实现未就绪则保持未完成。
+- [x] 4.5 与 C 建立 task/log 验证及应用接口、与 D/E 建立同事务审计/outbox 协作；替换 review 对其他模块的直接 SQL，以真实业务应用失败回滚、成功一次写入与事件不重复的跨模块集成测试验收；外部实现未就绪则保持未完成。
 - [x] 4.6 更新审核接口、状态机、错误/版本/幂等说明及本批验证报告；以申请人/审核人/时间/前后值审计可追溯和契约一致验收（docs/member-b-review.md、docs/member-b-delivery.md；ReviewIntegrationTest）。
 
 4.1 仅完成 Controller 分离、领域输入规则和列表 repository，完整应用分层仍有历史 SQL；4.5 缺 C/E 的业务应用实现，ReviewedRevisionApplication 尚未接入，两项均未完成。
@@ -47,7 +47,7 @@
 - [x] 5.1 执行注册→登录→归属申请→独立确认→组织候选修改→审核生效真实 HTTP/数据库链路，保存可复现步骤和脱敏响应；正向、越权、自审和冲突均有证据才完成（MemberBEndToEndTest、AuthIntegrationTest、ReviewIntegrationTest；output/member-b-delivery-final.log）。
 - [ ] 5.2 完成设计列出的至少 12 类安全验收，与 E 联调 Android 和同契约入口；以无越权、无敏感泄漏且双端一致报告验收，未验证端单列。
 - [x] 5.3 在记录硬件/数据规模/并发/预热/样本的环境测量关键组织和审核请求性能；参考 20 并发、10 万日志/1 万任务及 P95≤2 秒，以实际报告验收；小样本仅算诊断，首页指标由 E 协作（MemberBPerformanceTest；B 组织656.8ms、审核266.0ms；output/member-b-performance.json；首页未验证）。
-- [ ] 5.4 与 C/E 核对并修复 scopedTasksIdempotencyAndLifecycle 的范围/夹具问题，执行 powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1（资源不足 -DockerMaven）；以全套通过且保留报告验收，不降低业务授权。
+- [x] 5.4 与 C/E 核对并修复 scopedTasksIdempotencyAndLifecycle 的范围/夹具问题，执行 powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1（资源不足 -DockerMaven）；以全套通过且保留报告验收，不降低业务授权。
 
 5.4 阻塞：用户要求公共测试保持原样、交 E 处理；不能以 B 的定向通过替代全套通过。
 - [ ] 5.5 执行 openspec.cmd validate --all --strict，更新 Issue/看板、贡献记录和受影响旧 change 任务映射；以严格校验通过及证据链接验收，不提前归档。
@@ -67,3 +67,6 @@
 
 ## 2026-10-16 第一阶段交付口径
 用户授权先提交推送阶段成果并创建草稿 PR，取代上文暂不推送指示。B 定向36项通过，完整回归、Flutter真实联调和旧库CLI端到端验收未完成；保持相关任务未勾选。审核SPI已实际接入；详细证据、启动步骤和剩余门槛见 docs/member-b-stage-one.md。草稿PR不表示可以合并或阶段展示最终验收通过。
+
+## 2026-10-16 第二阶段实测
+4.1/4.5：审核 SPI 与 repository 已接入，业务后写失败整体回滚和重复事件测试通过。5.4：整合 main 8294d23 后，完整129项通过。Flutter240项及另行真实HTTP联调1项通过、分析无问题、Web构建及真实登录通过；旧 V5/V12 库实际副本升级通过，V10由数据库测试覆盖。原始日志 output/resume-*.log，当前说明 docs/member-b-final-delivery.md。Android实机、Web原生草稿stub、C/E人工确认继续保留未完成，不将其冒充已验收。

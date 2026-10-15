@@ -187,7 +187,7 @@ void main() {
     for (final (status, kind) in [
       (401, FailureKind.unauthorized),
       (403, FailureKind.forbidden),
-      (503, FailureKind.server),
+      (503, FailureKind.unavailable),
     ]) {
       adapter.readStatus = status;
       await expectLater(
@@ -438,7 +438,7 @@ void main() {
       final bitmap = await boundary.toImage(pixelRatio: 1);
       final png = await bitmap.toByteData(format: ui.ImageByteFormat.png);
       await File(
-        'docs/evidence/stage3-rebuild/54-diary-reading-recovery-large.png',
+        '../output/flutter-evidence/54-diary-reading-recovery-large.png',
       ).writeAsBytes(png!.buffer.asUint8List());
       bitmap.dispose();
     });

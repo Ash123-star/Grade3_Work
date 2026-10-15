@@ -586,8 +586,11 @@ void main() {
       a.emptyDiary = false;
       a.failDiary = true;
       await t.tap(find.text('重新检查'));
-      await settleLocalIo(t);
-      expect(find.text('加载未完成'), findsOneWidget);
+      // 等待实际 HTTP 重试退避（300ms + 900ms）结束再检查失败状态。
+      for (var attempt = 0; attempt < 3; attempt++) {
+        await settleLocalIo(t);
+      }
+      expect(find.text('暂时无法连接'), findsOneWidget);
       expect(find.textContaining('服务器暂无'), findsNothing);
       for (final kind in ['owner', 'date', 'forbidden']) {
         a.failDiary = false;
@@ -681,7 +684,7 @@ void main() {
         final rendered = await boundary.toImage(pixelRatio: 1);
         final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
         await File(
-          'docs/evidence/stage3-rebuild/$name.png',
+          '../output/flutter-evidence/$name.png',
         ).writeAsBytes(png!.buffer.asUint8List());
         rendered.dispose();
       });

@@ -228,7 +228,7 @@ void main() {
         // A separate evidence directory avoids overwriting images held by Windows previews.
         const outputDirectory = String.fromEnvironment(
           'SCREENSHOT_OUTPUT',
-          defaultValue: 'docs/evidence/stage3-rebuild',
+          defaultValue: '../output/flutter-evidence',
         );
         final output = File('$outputDirectory/${screen.$1}.png');
         output.parent.createSync(recursive: true);

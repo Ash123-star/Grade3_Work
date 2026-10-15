@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([int]$Port=8080,[switch]$SkipBuild)
+param([int]$Port=8080,[switch]$SkipBuild,[ValidatePattern('^[a-zA-Z0-9_]+$')][string]$DatabaseName='workpanel')
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $dir=Join-Path $root 'output/stage-demo'
@@ -44,7 +44,7 @@ try {
     docker compose -p pandora-stage -f deploy/backend/compose.yaml --env-file $envFile up -d --wait data
     if($LASTEXITCODE -ne 0){throw '展示数据库未就绪。原开发卷不会被删除。'}
     foreach($line in Get-Content -LiteralPath $envFile){
-        if($line -match '^([A-Z_]+)=(.*)$'){
+        if($line -match '^([A-Z_][A-Z0-9_]*)=(.*)$'){
             $key=$Matches[1];$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')
             [Environment]::SetEnvironmentVariable($key,$Matches[2],'Process')
         }
@@ -52,9 +52,9 @@ try {
     foreach($key in @('DB_URL','DB_USER','REDIS_HOST','REDIS_PORT','NEO4J_URI','SERVER_PORT')){
         if(-not $saved.ContainsKey($key)){$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
     }
-    $env:DB_URL="jdbc:postgresql://127.0.0.1:$env:POSTGRES_PORT/workpanel";$env:DB_USER='workpanel'
+    $env:DB_URL="jdbc:postgresql://127.0.0.1:$env:POSTGRES_PORT/$DatabaseName";$env:DB_USER='workpanel'
     $env:REDIS_HOST='127.0.0.1';$env:NEO4J_URI="bolt://127.0.0.1:$env:NEO4J_BOLT_PORT";$env:SERVER_PORT="$Port"
-    $process=Start-Process -FilePath $java -ArgumentList '-Xms64m','-Xmx384m','-XX:+UseSerialGC','-jar',('"'+(Join-Path $dir 'app.jar')+'"') `
+    $process=Start-Process -FilePath $java -ArgumentList '-Xms64m','-Xmx384m','-XX:+UseSerialGC','-jar',('"'+(Join-Path $dir 'app.jar')+'"'),('--app.cors-origins='+$env:CORS_ORIGINS) `
         -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $dir 'api.log') -RedirectStandardError (Join-Path $dir 'api-error.log') -PassThru
     $process.Id | Set-Content -LiteralPath (Join-Path $dir 'api.pid')
     $healthy=$false

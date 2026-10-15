@@ -649,7 +649,7 @@ void main() {
           final img = await render.toImage(pixelRatio: 1);
           final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
           File(
-            'docs/evidence/stage3-rebuild/$label.png',
+            '../output/flutter-evidence/$label.png',
           ).writeAsBytesSync(bytes!.buffer.asUint8List());
           img.dispose();
         });
@@ -681,7 +681,7 @@ void main() {
         final img = await render.toImage(pixelRatio: 1);
         final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
         File(
-          'docs/evidence/stage3-rebuild/30-server-statistics.png',
+          '../output/flutter-evidence/30-server-statistics.png',
         ).writeAsBytesSync(bytes!.buffer.asUint8List());
         img.dispose();
       });

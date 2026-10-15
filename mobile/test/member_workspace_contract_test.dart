@@ -407,7 +407,7 @@ void main() {
         final rendered = await boundary.toImage(pixelRatio: 1);
         final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
         await File(
-          'docs/evidence/stage3-rebuild/$name.png',
+          '../output/flutter-evidence/$name.png',
         ).writeAsBytes(png!.buffer.asUint8List());
         rendered.dispose();
       });

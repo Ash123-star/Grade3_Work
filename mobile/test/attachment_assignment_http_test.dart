@@ -671,7 +671,7 @@ void main() {
           final img = await render.toImage(pixelRatio: 1);
           final data = await img.toByteData(format: ui.ImageByteFormat.png);
           File(
-            'docs/evidence/stage3-rebuild/$label.png',
+            '../output/flutter-evidence/$label.png',
           ).writeAsBytesSync(data!.buffer.asUint8List());
           img.dispose();
         });

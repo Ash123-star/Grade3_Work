@@ -1,3 +1,7 @@
+# 当前版本说明（2026-10-16）
+
+已整合 main 8294d23；主线 V12 审核约束保留，认证为 V13。以下历史批次记录保留追溯，当前验收和运行步骤以 member-b-final-delivery.md 为准。
+
 # lyb 合并 main 后的运行与迁移
 
 当前合并 main 64e2126（此前批次为 0aada7e），保留远端任务、日报和客户端功能，同时保留 B 的认证、组织与审核安全校验。审核服务同时注入 ReviewRepository 和 TaskRevisionService，任务修订使用远端实现。

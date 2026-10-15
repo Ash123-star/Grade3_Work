@@ -352,7 +352,7 @@ void main() {
         final bitmap = await boundary.toImage(pixelRatio: 1);
         final png = await bitmap.toByteData(format: ui.ImageByteFormat.png);
         await File(
-          'docs/evidence/stage3-rebuild/55-ai-hierarchy-large.png',
+          '../output/flutter-evidence/55-ai-hierarchy-large.png',
         ).writeAsBytes(png!.buffer.asUint8List());
         bitmap.dispose();
       });
