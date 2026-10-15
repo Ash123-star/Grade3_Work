@@ -144,7 +144,7 @@ class TaskDispatchIntegrationTest {
         assertEquals(List.of("DISPATCHED","RECEIVED","FEEDBACK","RETURNED","FEEDBACK","ACCEPTED","ARCHIVED"),events.findValuesAsText("type"));
         assertEquals(first,events.get(0)); assertEquals(id.get("leader"),events.get(0).get("actor_id").asText());
         long prev=-1; for(int i=0;i<events.size();i++) { var e=events.get(i); assertTrue(e.get("sequence").asLong()>prev); prev=e.get("sequence").asLong(); assertEquals(i+1,e.get("task_version").asInt()); }
-        assertEquals("RECEIVED",events.get(3).get("from_phase").asText()); assertEquals("RECEIVED",events.get(3).get("to_phase").asText());
+        assertEquals("FEEDBACK",events.get(3).get("from_phase").asText()); assertEquals("RECEIVED",events.get(3).get("to_phase").asText());
         assertEquals("INVALID_TRANSITION",call(409,"POST","/tasks/"+t+"/events","leader",Map.of("type","WITHDRAWN","version",7,"text","终态撤回"),null).get("code").asText());
         assertEquals("INVALID_TRANSITION",call(409,"POST","/tasks/"+t+"/reassignments","leader",Map.of("ownerId",id.get("amy"),"version",7,"reason","终态转派"),null).get("code").asText());
         assertEquals("INVALID_TRANSITION",call(409,"POST","/tasks/"+t+"/reschedules","leader",Map.of("deadline",deadline,"version",7,"reason","终态改期"),null).get("code").asText());

@@ -12,8 +12,8 @@ import java.util.*;
 @RequestMapping("/api/tasks")
 /** 任务接口。列表隐藏完成情况字段，生命周期通过详情 events 表达。 */
 public class TaskController {
-    final Business business; final ReviewApplicationService reviews; final cn.workpanel.module.task.TaskLifecycleService lifecycle; final cn.workpanel.module.task.TaskRevisionService revisions; final cn.workpanel.module.task.TaskQueryService queries;
-    public TaskController(Business business,ReviewApplicationService reviews,cn.workpanel.module.task.TaskLifecycleService lifecycle,cn.workpanel.module.task.TaskRevisionService revisions,cn.workpanel.module.task.TaskQueryService queries) { this.business=business; this.reviews=reviews; this.lifecycle=lifecycle; this.revisions=revisions; this.queries=queries; }
+    final Business business; final Db db; final ReviewApplicationService reviews; final cn.workpanel.module.task.TaskLifecycleService lifecycle; final cn.workpanel.module.task.TaskRevisionService revisions; final cn.workpanel.module.task.TaskQueryService queries;
+    public TaskController(Business business, Db db, ReviewApplicationService reviews, cn.workpanel.module.task.TaskLifecycleService lifecycle, cn.workpanel.module.task.TaskRevisionService revisions, cn.workpanel.module.task.TaskQueryService queries) { this.business=business; this.db=db; this.reviews=reviews; this.lifecycle=lifecycle; this.revisions=revisions; this.queries=queries; }
     /** 分页查询范围内任务。支持 search、ownerId、date、period、cursor、limit；越权 ownerId 返回 403。 */
     @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(defaultValue="") String search,@RequestParam(required=false) String ownerId,@RequestParam(required=false) String date,@RequestParam(defaultValue="day") String period) {
         return queries.list(Actor.current(r),new cn.workpanel.module.task.TaskQueryService.Query(cursor,limit,search,ownerId,date,period));
