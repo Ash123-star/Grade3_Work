@@ -631,9 +631,11 @@ void main() {
         await t.runAsync(() async {
           final img = await render.toImage(pixelRatio: 1);
           final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-          File(
+          final output = File(
             '../output/flutter-evidence/$label.png',
-          ).writeAsBytesSync(bytes!.buffer.asUint8List());
+          );
+          output.parent.createSync(recursive: true);
+          output.writeAsBytesSync(bytes!.buffer.asUint8List());
           img.dispose();
         });
       }

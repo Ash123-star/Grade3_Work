@@ -351,9 +351,11 @@ void main() {
       await t.runAsync(() async {
         final bitmap = await boundary.toImage(pixelRatio: 1);
         final png = await bitmap.toByteData(format: ui.ImageByteFormat.png);
-        await File(
+        final output = File(
           '../output/flutter-evidence/55-ai-hierarchy-large.png',
-        ).writeAsBytes(png!.buffer.asUint8List());
+        );
+        output.parent.createSync(recursive: true);
+        await output.writeAsBytes(png!.buffer.asUint8List());
         bitmap.dispose();
       });
       await close(t);

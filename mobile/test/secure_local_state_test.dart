@@ -577,6 +577,7 @@ void main() {
       final image = await boundary.toImage(pixelRatio: 1);
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       final file = File('../output/flutter-evidence/40-session-recovery.png');
+      file.parent.createSync(recursive: true);
       await file.writeAsBytes(bytes!.buffer.asUint8List());
       image.dispose();
     });

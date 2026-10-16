@@ -15,4 +15,6 @@
 
 CLI 在当前进程 PATH 中尚未被 Get-Command openspec.cmd 找到，已通过 E:/Dev/npm-global/openspec.cmd 绝对路径实际运行。未修改用户系统 PATH，文档提供定位与临时 PATH 方法。
 
+2026-10-16 PR #18 合并复查：当前 CLI 不接受缺少 delta 的配置变更。补齐 project-workflow delta spec 后，openspec.cmd validate --all --strict 为 28 passed / 0 failed；此前验证记录仅代表当时环境。
+
 2.2 未完成：本次配置维护随成员 B 开发准备记录，关联认证 Issue #3；Sprint 待关联。配置和说明整理为本地提交。用户要求暂不推送 GitHub，因此远程 PR、非作者审阅及归档仍未完成。

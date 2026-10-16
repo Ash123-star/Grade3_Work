@@ -41,5 +41,13 @@
 - ReviewApi 旧声明不作为已完成证据，实际跨模块最终应用边界是已接入的 ReviewedRevisionApplication。组织分页/错误码由真实客户端测试验证，接口快照随后端全套生成。
 - 回滚不自动删除表或业务数据。后续 main 再新增迁移时需重新检查编号，不能覆盖已发布迁移。
 
-## 浏览器验收补充
+## PR #18 合并复查
+
+2026-10-16 按用户合并指示进行复查。修复配置维护变更缺少 delta spec 的严格校验失败，以及截图测试未创建 output/flutter-evidence 目录的问题。截图目录从不存在的状态重跑 Flutter 测试，240 项通过、1 项显式真实后端用例默认跳过；flutter analyze --no-pub 无问题；OpenSpec 严格校验 28 项通过。既有真实客户端证据见上文，本次未重复 Android、外部模型或真实客户端人工验收，未取得新的 C/E 人工确认或非作者成员审阅。
+
+本次后端标准命令 powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 完整 clean verify：129 项通过，0 失败/错误/跳过，打包成功，V1–V13 迁移通过。20 并发、10 万日志和 1 万任务背景数据下，组织查询 P95 728.97ms，审核列表 P95 29.12ms。首次 -DockerMaven 运行出现性能用例准备阶段 HTTP 超时（128 项通过、1 项错误）；改用本机 Maven 后原数据规模、20 秒请求超时和 2 秒 P95 阈值不变，完整通过。Docker 超时原因尚未确定，保留 server/pr18-validation.log 与 server/pr18-validation-native.log 本地诊断日志，不声称该模式已通过。
+
+两次运行均出现 Surefire 测试 JVM 退出等待 30 秒后强制结束的诊断；本机最终退出码为 0、BUILD SUCCESS。后台任务退出清理仍需后续排查，不将测试通过等同于优雅退出已验证。
+
+## 浏览器已知限制
 真实 Flutter Web 已完成登录及账号页检查，CORS 允许来源绑定已实测修复。账号截图见 member-b-real-profile.png（隔离合成演示账号）。现有 DraftDatabase Web 使用不支持的 stub，首页提示本机草稿读取失败；Web 仅用于认证、组织、审核及在线页面展示，不能用于离线草稿展示。Android 原生持久化由自动测试覆盖，实机尚未验收，此项继续跟踪，不以浏览器代替实机。

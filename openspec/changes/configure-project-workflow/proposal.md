@@ -11,7 +11,7 @@
 
 ## Capabilities
 
-无产品行为变更；本次为工具配置和文档维护，设置 skip_specs: true，不新增产品 delta spec。
+无产品行为变更；本次为工具配置和文档维护。新增 project-workflow delta spec，描述共享配置与验证约束，不依赖 CLI 对 skip_specs 的支持。
 
 ## Impact
 
