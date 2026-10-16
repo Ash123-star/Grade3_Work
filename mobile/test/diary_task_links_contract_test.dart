@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -372,7 +373,7 @@ void main() {
           Future.value(
             ByteData.sublistView(
               File(
-                'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+                materialIconsFontPath,
               ).readAsBytesSync(),
             ),
           ),
@@ -402,7 +403,7 @@ void main() {
       final bitmap = await boundary.toImage(pixelRatio: 1);
       final png = await bitmap.toByteData(format: ui.ImageByteFormat.png);
       final file = File(
-        'docs/evidence/stage3-rebuild/53-diary-task-picker-large.png',
+        '../output/flutter-evidence/53-diary-task-picker-large.png',
       );
       file.parent.createSync(recursive: true);
       file.writeAsBytesSync(png!.buffer.asUint8List());

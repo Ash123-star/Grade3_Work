@@ -349,7 +349,7 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 80)),
       );
       await t.pumpAndSettle();
-      expect(find.text('服务暂时不可用，请稍后重试'), findsOneWidget);
+      expect(find.text('无法连接企业服务，请确认后端已启动及连接地址正确'), findsOneWidget);
       expect(
         t
             .widget<TextFormField>(find.byType(TextFormField).first)
@@ -387,7 +387,7 @@ void main() {
         adapter.requests.lastWhere((r) => r.path.endsWith('/submit')).data,
         {'version': 10},
       );
-      expect(find.text('服务暂时不可用，请稍后重试'), findsNothing);
+      expect(find.text('无法连接企业服务，请确认后端已启动及连接地址正确'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pumpAndSettle();
     },

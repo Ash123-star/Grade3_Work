@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -364,7 +365,7 @@ void main() {
         Future.value(
           ByteData.sublistView(
             File(
-              'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+              materialIconsFontPath,
             ).readAsBytesSync(),
           ),
         ),
@@ -415,9 +416,11 @@ void main() {
       await t.runAsync(() async {
         final rendered = await boundary.toImage(pixelRatio: 1);
         final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
-        await File(
-          'docs/evidence/stage3-rebuild/$name.png',
-        ).writeAsBytes(png!.buffer.asUint8List());
+        final output = File(
+          '../output/flutter-evidence/$name.png',
+        );
+        output.parent.createSync(recursive: true);
+        await output.writeAsBytes(png!.buffer.asUint8List());
         rendered.dispose();
       });
       await t.pumpWidget(const SizedBox.shrink());
