@@ -7,6 +7,10 @@
 ### Requirement: 状态与合法转换
 任务状态 SHALL 只在下列转换内变化，且每次转换 SHALL 追加一条事件，记录操作人、动作、前后状态和生效版本：
 
+#### Scenario: 按动作执行合法转换
+- **WHEN** 用户请求执行下表动作
+- **THEN** 服务端 SHALL 校验执行人和当前状态，并仅允许对应结果状态
+
 | 动作 | 执行人 | 允许的当前状态 | 结果状态 |
 |---|---|---|---|
 | `RECEIVED` 接收 | 主负责人 | `DISPATCHED` | `RECEIVED` |
@@ -81,6 +85,8 @@
 
 ### Requirement: 转派
 派发人或管理员 SHALL 能对非终态任务申请更换主负责人，申请 MUST 附原因与当前版本，并经现有候选修订复核通过后生效。新主负责人 MUST 是派发人范围内的同公司在职用户且不同于当前主负责人。生效时 SHALL：替换主负责人，若新主负责人原为协作人则移出协作人；原主负责人不再是参与人；状态回到 `DISPATCHED`；追加 `REASSIGNED` 事件记录新旧负责人；版本加 1。复核通过前任务保持原负责人与原状态。
+
+系统 MUST 允许将 `TASK_REASSIGN` 和 `TASK_RESCHEDULE` 作为 `review_requests.kind` 写入既有复核表；该兼容性 SHALL 通过新的前向 Flyway 迁移实现，且 SHALL NOT 修改已发布迁移或既有复核记录。
 
 #### Scenario: 转派生效
 - **WHEN** 派发人对 `RECEIVED` 任务申请转派给同团队另一成员，复核全部通过

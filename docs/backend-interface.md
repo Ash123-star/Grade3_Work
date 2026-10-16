@@ -65,6 +65,18 @@
 
 这些内容只是后续工作登记，不是已发布接口。具体 URL、请求/响应字段、权限、状态、幂等和迁移必须先通过独立 OpenSpec 设计，再同步运行时 SpringDoc、`docs/openapi.json` 和 Flutter/Web 客户端。
 
+## 长期记忆与发展分析（2026-10-15 整合）
+
+所有接口由服务端按当前用户、公司及个人/组织范围鉴权；来源版本、撤权与遗忘状态重新校验。具体字段和成功响应 schema 见运行时 `/api/openapi` 与 `docs/openapi.json`。
+
+- `/api/ai-maps/development`：查询当前发展分析；`POST /api/ai-maps/development/jobs` 使用 `Idempotency-Key` 创建异步分析，返回 202；作业支持查询、重试、取消、证据和反馈。
+- `/api/ai-memories`：授权记忆查询与新增；修订、确认使用版本校验，组织关键记忆走独立审核；删除创建遗忘作业，返回 202，并可查询清理状态。
+- `/api/ai-memories/preferences/me`：仅本人读写目标和偏好；更新携带 version。
+- `/api/ai-memories/knowledge-status`：授权知识索引状态；管理员可回填、重建索引及重试失败索引作业。
+- 无 DeepSeek 配置或供应商异常返回受控错误，基础任务日报不依赖模型成功；分析内容是建议，不自动创建任务。
+
+部署新增 V10/V11，旧实验库升级限制与验证见 `local-memory-integration.md`。
+
 ## 调用示例
 
 ```http

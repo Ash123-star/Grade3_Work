@@ -1,6 +1,7 @@
 ## 1. 数据迁移
 
 - [ ] 1.1 新增 `server/src/main/resources/db/migration/V6__task_lifecycle.sql`：`task_events` 增加 `from_phase`、`to_phase`、`task_version`，扩展事件类型约束（含 `RETURNED`、`REASSIGNED`、`RESCHEDULED`）；在含 V1–V5 数据的库上启动，验证 Flyway 成功且历史事件行未被修改
+- [ ] 1.2 新增 `server/src/main/resources/db/migration/V12__task_revision_review_kinds.sql`：以前向方式扩展 `review_requests_kind_valid`，允许 `TASK_REASSIGN` 与 `TASK_RESCHEDULE`；在含 V1–V11 数据的库上启动，验证 Flyway 成功且既有复核记录不变
 
 ## 2. 状态机
 

@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -585,8 +586,11 @@ void main() {
       a.emptyDiary = false;
       a.failDiary = true;
       await t.tap(find.text('重新检查'));
-      await settleLocalIo(t);
-      expect(find.text('加载未完成'), findsOneWidget);
+      // 等待实际 HTTP 重试退避（300ms + 900ms）结束再检查失败状态。
+      for (var attempt = 0; attempt < 3; attempt++) {
+        await settleLocalIo(t);
+      }
+      expect(find.text('暂时无法连接'), findsOneWidget);
       expect(find.textContaining('服务器暂无'), findsNothing);
       for (final kind in ['owner', 'date', 'forbidden']) {
         a.failDiary = false;
@@ -648,7 +652,7 @@ void main() {
       ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
       (
         'MaterialIcons',
-        'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+        materialIconsFontPath,
       ),
     ]) {
       await (FontLoader(family)..addFont(
@@ -679,9 +683,11 @@ void main() {
       await t.runAsync(() async {
         final rendered = await boundary.toImage(pixelRatio: 1);
         final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
-        await File(
-          'docs/evidence/stage3-rebuild/$name.png',
-        ).writeAsBytes(png!.buffer.asUint8List());
+        final output = File(
+          '../output/flutter-evidence/$name.png',
+        );
+        output.parent.createSync(recursive: true);
+        await output.writeAsBytes(png!.buffer.asUint8List());
         rendered.dispose();
       });
       await t.pumpWidget(const SizedBox.shrink());

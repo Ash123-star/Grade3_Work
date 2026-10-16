@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'support/local_test_state.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -1050,7 +1051,7 @@ void main() {
         Future.value(
           ByteData.sublistView(
             File(
-              'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+              materialIconsFontPath,
             ).readAsBytesSync(),
           ),
         ),
@@ -1083,7 +1084,7 @@ void main() {
         final img = await render.toImage(pixelRatio: 1);
         final data = await img.toByteData(format: ui.ImageByteFormat.png);
         final output = File(
-          '${const String.fromEnvironment('SCREENSHOT_OUTPUT', defaultValue: 'docs/evidence/stage3-rebuild')}/$label.png',
+          '${const String.fromEnvironment('SCREENSHOT_OUTPUT', defaultValue: '../output/flutter-evidence')}/$label.png',
         );
         output.parent.createSync(recursive: true);
         output.writeAsBytesSync(data!.buffer.asUint8List());

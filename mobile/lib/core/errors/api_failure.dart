@@ -39,12 +39,17 @@ class ApiFailure implements Exception {
             : FailureKind.server,
     };
     final message = switch (code) {
+      'AI_NOT_CONFIGURED' => 'DeepSeek 尚未配置，已有记忆仍可查看',
+      'AI_BUDGET' => '今日 AI 预算已用尽，请稍后再试',
+      'AI_PROVIDER_FAILED' => '模型服务暂时不可用，请稍后重试',
+      'MEMORY_SOURCE_STALE' => '来源已有新版本，请刷新分析与证据',
       'INVALID_CREDENTIALS' =>
         e.requestOptions.path.endsWith('/password')
             ? '原密码错误，请重新填写'
             : '账号或密码错误，请重新填写',
       'PASSWORD_CHANGE_REQUIRED' => '首次登录请先修改密码',
       'MEMBERSHIP_PENDING' => '部门归属尚未确认，请刷新申请状态',
+      'ACCOUNT_DISABLED' => '账号已停用，请联系管理员',
       'PASSWORD_UNCHANGED' => '新密码需与原密码不同',
       'PASSWORD_POLICY' => '密码至少12个字符，UTF-8编码不超过72字节',
       _ => switch (kind) {

@@ -69,7 +69,7 @@ foreach ($package in @('postgresql', 'redis')) {
     Compress-Archive -Path $paths -DestinationPath (Join-Path $OutputDirectory "$package.zip") -Force
 }
 $runtimeFiles += @('deploy/compose.yaml', 'deploy/.env.example', 'deploy/.dockerignore',
-    'deploy/runtime/Dockerfile', 'deploy/runtime/start.sh', 'deploy/runtime/health.sh',
+    'deploy/runtime/Dockerfile', 'deploy/runtime/start.sh', 'deploy/runtime/health.sh', 'deploy/runtime/neo4j-start.sh', 'deploy/runtime/neo4j-health.sh',
     'scripts/start-data.ps1', 'scripts/build-data-packages.ps1', 'scripts/verify-data.ps1', 'scripts/verify-data-lifecycle.ps1',
     'scripts/data-integrity.sql', 'docs/data-infrastructure.md') | ForEach-Object { Join-Path $root $_ }
 Add-Type -AssemblyName System.IO.Compression.FileSystem

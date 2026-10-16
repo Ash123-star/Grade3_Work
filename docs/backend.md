@@ -1,18 +1,18 @@
 # 企业协作后端
 
-后端实现位于 `server/`，Java 21 / Spring Boot 3.4 / PostgreSQL 16 / Redis 7。业务通过同一套 `/api` REST 接口供 Android 与 Web 使用。移动端当前仍是演示数据仓库，接入此服务和独立 Web 工作台属于后续客户端工作。
+后端实现位于 `server/`，Java 21 / Spring Boot 3.4。PostgreSQL 16 保存权威业务和记忆，Redis 7 处理会话与限流，Neo4j 5.26 Community 保存可重建图投影。AI 地图的 Flutter 真实模式与 Web 页面共用发展分析、记忆、RAG 证据接口；其他移动端页面仍依其原有仓库模式运行。
 
 ## 启动
 
-需要 Docker Desktop（Linux 容器）和 Compose v2。复制 `deploy/backend/.env.example` 为 `.env`，填写 `DB_PASSWORD`、`REDIS_PASSWORD`、`ADMIN_ACCOUNT`、`ADMIN_PASSWORD`、`ADMIN_PHONE`。密码无默认值；管理员密码至少 12 个字符且 UTF-8 编码不超过 72 字节。手机号需满足大陆手机格式。
+需要 Docker Desktop（Linux 容器）和 Compose v2。复制 `deploy/backend/.env.example` 为 `.env`，填写 `DB_PASSWORD`、`REDIS_PASSWORD`、`NEO4J_PASSWORD`、`ADMIN_ACCOUNT`、`ADMIN_PASSWORD`、`ADMIN_PHONE`。密码无默认值；管理员密码至少 12 个字符且 UTF-8 编码不超过 72 字节。手机号需满足大陆手机格式。
 
-Redis 密码使用字母、数字、下划线或连字符，建议随机生成至少 32 字符。后端部署目录包含自身的 Redis 配置与启动脚本，可独立于此前的数据部署包使用。
+Redis 密码使用字母、数字、下划线或连字符，建议随机生成至少 32 字符。Neo4j 密码至少 16 字符。三个数据库运行在同一个 `data` 容器，各自拥有独立持久卷。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1
 ```
 
-首次运行缺少 `.env` 时，脚本创建空配置模板并提示填写。Flyway 自动执行四个追加式迁移，预置产品部、市场部、技术部，并建立日报任务关系、汇报环保护和审核自审约束。初始化管理员由环境变量创建并记录审计；重复启动不覆盖现有账号或密码。数据库已初始化后，更改环境变量不会更改既有数据库密码。
+首次运行缺少 `.env` 时，脚本创建空配置模板并提示填写。Flyway 执行 V1–V13 追加式迁移；V1–V9 保留主分支任务和日报结构，V10–V11 增加长期记忆与知识索引，V12 保留任务审核类型，V13 增加持久登录防护。初始化管理员由环境变量创建并记录审计；重复启动不覆盖现有账号或密码。数据库已初始化后，更改环境变量不会更改既有数据库密码。旧实验分支已执行同名 V4/V5 记忆迁移的数据库不能直接升级，应使用备份和独立数据库迁移，禁止改写 Flyway 历史。
 
 | 服务 | 本机地址 | 说明 |
 | --- | --- | --- |
@@ -21,16 +21,16 @@ powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1
 | OpenAPI | http://127.0.0.1:8080/api/openapi | 双端共用机器契约 |
 | PostgreSQL | 127.0.0.1:55435 | 数据库及用户 `workpanel` |
 | Redis | 127.0.0.1:56382 | 请求限流、AI 预算 |
+| Neo4j Bolt | 127.0.0.1:57688 | 授权关系投影；客户端不直连 |
 
 部署使用独立 Compose 项目 `workpanel-backend` 和独立持久卷。已有 `deploy/compose.yaml` 数据基础包使用另一套 UUID 表结构；此后端的 Flyway 表不能直接应用到该已迁移数据库。现有数据基础环境保持独立，此服务用新的空库初始化。
 
 ```powershell
 docker compose --env-file deploy/backend/.env -f deploy/backend/compose.yaml ps
 docker compose --env-file deploy/backend/.env -f deploy/backend/compose.yaml logs --tail 50 api
-docker compose --env-file deploy/backend/.env -f deploy/backend/compose.yaml down
-```
+docker compose --env-file deploy/backend/.env -f deploy/backend/compose.yaml down```
 
-停止不带 `-v`，保留数据。正式 HTTPS 部署时设置 `API_DOMAIN` 为已指向服务器的域名、设置真实 `CORS_ORIGINS`，开放 80/443 后运行 `scripts/start-backend.ps1 -Https`。Caddy 自动申请证书并对 SSE 及时刷新；API、数据库、Redis 的宿主端口绑定回环地址。生产域名与证书签发需在实际部署环境验收。
+停止不带 `-v`，保留数据。正式 HTTPS 部署时设置 `API_DOMAIN` 为已指向服务器的域名、设置真实 `CORS_ORIGINS`，开放 80/443 后运行 `scripts/start-backend.ps1 -Https`。Caddy 自动申请证书并对 SSE 及时刷新；API 和三个数据库的宿主端口绑定回环地址。生产域名与证书签发需在实际部署环境验收。
 
 如需本机 Java 调试，配置 `DB_URL`、`DB_USER`、`DB_PASSWORD`、`REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD` 及首次管理员变量，运行 `mvn.cmd -f server/pom.xml spring-boot:run`。数据库必须为空库或本后端 Flyway 管理的库。
 
@@ -77,10 +77,10 @@ openspec.cmd validate --all --strict
 powershell -ExecutionPolicy Bypass -File scripts/backup-backend.ps1
 ```
 
-测试脚本创建随机名称、随机本机端口和随机密码的独立 PostgreSQL/Redis 容器，执行 Maven verify 后仅清理自己创建的容器；外部 DeepSeek 由本机 HTTP 模拟服务覆盖，不消耗真实供应商额度。报告在 `server/target/surefire-reports`。实际验证结果见 `docs/backend-validation.md`。
+测试脚本创建随机名称、随机本机端口和随机密码的三数据库统一容器，执行 Maven verify 后仅清理自己创建的容器；外部 DeepSeek 由本机 HTTP 模拟服务覆盖，不消耗真实供应商额度。报告在 `server/target/surefire-reports`。实际验证结果见 `docs/backend-validation.md`。
 
 本机 Java 进程因 Windows 提交内存不足无法启动时，可以加 `-DockerMaven`，在限制为 1GB/2 核的 Java 21 容器内运行同一套测试，数据库连接使用 `host.docker.internal`。该方式复用用户 Maven 缓存，不需额外安装 Java；普通方式需要本机 Java 21 和 Maven 3.9。Docker 构建会在受限内存的 Maven 阶段打包，再生成非 root JRE 运行镜像。
 
-备份为 PostgreSQL 自定义格式，包含账号、业务、审计、通知、AI 和附件，默认位于被 Git 忽略的 `deploy/backend/backups/`。Redis 只存临时限流及预算，持久业务用量保存在 PostgreSQL。备份文件应按业务数据管理访问权限，并单独保存 `.env`。
+备份为 PostgreSQL 自定义格式，包含账号、业务、记忆、遗忘排除规则、审计、通知、AI 和附件，默认位于被 Git 忽略的 `deploy/backend/backups/`。Neo4j 可由 PostgreSQL 重建；Redis 只存临时限流及预算，持久业务用量保存在 PostgreSQL。备份文件应按业务数据管理访问权限，并单独保存 `.env`。
 
-恢复到全新隔离数据库，先停止 API 写入，再 `docker cp` 备份入数据库容器，通过 `pg_restore -U workpanel -d <新库> --no-owner --no-privileges <容器内路径>` 恢复；核对 Flyway 历史和行数后将 API 指向新库。不在现有业务库上直接覆盖恢复。应用回滚保持数据库迁移向前，新增结构通过下一个 Flyway 版本调整。
+恢复到全新隔离数据库时，保持目标库和 API 离线，`docker cp` 备份入数据库容器，通过 `pg_restore -U workpanel -d <新库> --no-owner --no-privileges <容器内路径>` 恢复。必须导入比备份更新的独立遗忘账本，并执行 `deploy/backend/replay-ai-forget.sql`，重建知识索引与 Neo4j 投影且核查遗忘内容不可见后才切换流量；详见 `docs/ai-map-operations.md`。不在现有业务库直接覆盖恢复。应用回滚保持数据库迁移向前，新增结构通过下一个 Flyway 版本调整。

@@ -1,5 +1,19 @@
 # 后端验证记录
 
+## 本机环境配置与当前版本回归（2026-10-11）
+
+组员 B 本机安装 Temurin JDK 21.0.12.1，Maven 3.9.11 实际使用 Java 21；Docker Desktop 4.94.0 的 Linux 引擎启动成功，WSL 2.6.3 和固件虚拟化已启用。Flutter 3.38.7 / Dart 3.10.7 安装并按官方 SHA-256 校验；浏览器预览入口为 http://127.0.0.1:5175，默认演示模式。Android SDK 未配置，Google Maven 网络诊断超时，Android 构建及真实客户端联调未验收。
+
+- `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven`：实际执行，10 tests / 1 failure / 0 errors / 0 skipped，未通过。测试使用独立 PostgreSQL/Redis 容器，结束后由脚本清理；DeepSeek 是模拟服务。
+- 失败为 `BackendIntegrationTest.scopedTasksIdempotencyAndLifecycle` 第 172 行：团队长将任务转派给 `reviewer`，该人员不在其团队范围，接口返回 400 `INVALID_OWNER`，测试期待 200。组织场景仅给 alice/leader 配置该团队，未给 reviewer 配置。需 C/E 确认合法转派用例应选范围内人员，保留越权拒绝测试；不能为测试通过放宽服务端范围。
+- 其余 9 个测试场景组通过，包含认证初始化、组织独立审核、日报审核链和版本冲突；这不表示所有未覆盖业务边界完成。
+- `mvn.cmd -B -f server/pom.xml -DskipTests package`：BUILD SUCCESS，生成本地可执行 JAR。跳过测试打包仅用于本机启动，不视为验收通过。
+- 全容器启动首次在 Docker Hub `auth.docker.io/token` 连接超时，后端 API 镜像未构建成功；实际采用 Compose 的 PostgreSQL 16 / Redis 7 容器，加本机 JDK 21 运行 API。数据库健康检查通过，Flyway V1—V4 成功执行。
+- 本机 HTTP 冒烟：`/api/health` 为 UP；管理员登录、me 成功；首次改密标记 true，改密前访问组织返回 403，冒烟会话已登出。未自动修改用户初始密码。
+- Swagger 原 `/api/docs` 重定向到 `/api/swagger-ui/index.html`，被现有过滤器以 401 拦截。仅在本机启动参数使用 `--springdoc.swagger-ui.path=/docs`；`http://127.0.0.1:8080/docs`、`/api/openapi` 均实测 200。公共鉴权/SpringDoc 路径需 E 后续统一，仓库代码未修复。
+
+本机管理员为 lyb-local-admin，随机凭据保存在被 Git 忽略的 deploy/backend/.env；使用合成测试手机号，无真实个人资料和 DeepSeek 密钥。Issue 编号待关联。后端业务代码和测试预期未修改。
+
 日期：2026-10-08 至 2026-10-09（Asia/Shanghai）。本次验证范围为 Spring Boot 后端；不代表 Flutter 已联网、Web 已完成或生产环境已上线。
 
 ## 实际通过
@@ -42,3 +56,7 @@ Docker 镜像 `workpanel-backend:local` 构建成功。`scripts/smoke-backend-im
 - `mvn.cmd -f server/pom.xml test`：测试编译阶段已发现并修复迁移后的测试字段引用；最终测试运行受 Maven 网络权限和外部 PostgreSQL/Redis 环境限制，未取得集成测试通过证据。
 - `scripts/test-backend.ps1`：环境阻塞，当前执行器未安装 Docker（`docker is not recognized`）。
 - 因上述环境限制，本轮不能报告编译或集成测试通过；代码完成度以源码迁移和 OpenSpec 校验为准，待具备 Maven 网络和 Docker 后重新执行。
+
+## 2026-10-09 AI 地图增量
+
+本节覆盖新增长期记忆、RAG 和同容器 Neo4j；上文为既有后端历史验收。当前 `scripts/test-backend.ps1` 使用三数据库统一测试容器，最新测试数及双端验证以 `docs/ai-map-validation.md` 为准。真实 DeepSeek 已完成最小连接和本地预览分析，正式服务凭据仍需单独配置。

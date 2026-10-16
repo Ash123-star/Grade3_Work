@@ -3,6 +3,10 @@ server:
   error:
     include-message: never
 spring:
+  task:
+    scheduling:
+      pool:
+        size: 4
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:55432/workpanel}
     username: ${DB_USER:workpanel}
@@ -35,6 +39,10 @@ app:
   ai-daily-tokens: ${AI_DAILY_TOKENS:50000}
   ai-max-tokens: ${AI_MAX_TOKENS:2000}
   ai-timeout-seconds: ${AI_TIMEOUT_SECONDS:60}
+  neo4j-uri: ${NEO4J_URI:}
+  neo4j-username: ${NEO4J_USERNAME:neo4j}
+  neo4j-password: ${NEO4J_PASSWORD:}
+  memory-extract-enabled: ${AI_MEMORY_EXTRACT_ENABLED:true}
 springdoc:
   remove-broken-reference-definitions: false
   api-docs:

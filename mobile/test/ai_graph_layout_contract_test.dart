@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -333,7 +334,7 @@ void main() {
         ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
         (
           'MaterialIcons',
-          'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+          materialIconsFontPath,
         ),
       ]) {
         await (FontLoader(family)..addFont(
@@ -350,9 +351,11 @@ void main() {
       await t.runAsync(() async {
         final bitmap = await boundary.toImage(pixelRatio: 1);
         final png = await bitmap.toByteData(format: ui.ImageByteFormat.png);
-        await File(
-          'docs/evidence/stage3-rebuild/55-ai-hierarchy-large.png',
-        ).writeAsBytes(png!.buffer.asUint8List());
+        final output = File(
+          '../output/flutter-evidence/55-ai-hierarchy-large.png',
+        );
+        output.parent.createSync(recursive: true);
+        await output.writeAsBytes(png!.buffer.asUint8List());
         bitmap.dispose();
       });
       await close(t);

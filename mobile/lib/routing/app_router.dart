@@ -24,6 +24,7 @@ import 'package:pandora_mobile/features/dashboard/server_analytics_page.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/features/ai_map/ai_job_pages.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_tools.dart';
+import 'package:pandora_mobile/features/ai_map/long_term_memory_page.dart' as memory;
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -60,6 +61,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/ai/memory',
+        builder: (_, _) => const memory.AiPage(),
+      ),
       GoRoute(
         path: '/logs/subordinates',
         builder: (_, _) => const LogsPage(subordinates: true),
