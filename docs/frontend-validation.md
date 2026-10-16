@@ -29,6 +29,27 @@
 - 本次为 client 层单元测试，用可编程 Dio 适配器 Mock HTTP，未对真实后端 SSE 端点做端到端联调；真实联调属 E 后续「按模块逐个接入真实接口」阶段。
 - `notification stream updates Last-Event-ID on reconnect` 用例依赖生产重连退避（当前 3 秒硬编码）；若后续将退避改为可注入，可缩短该用例等待。
 
+## 全链路真实后端联调回归（2026-10-16，E，已完成）
+
+### 环境
+- 工具链：Docker 29.8.2（配 registry-mirrors：docker.1panel.live / docker.m.daocloud.io / docker.1ms.run），Flutter 3.47.7。
+- 代码基线：本地 `zhw` 已 `git merge --ff-only origin/main` 对齐到 `7ac6c97`（含 B 的审核分层、C 的任务/日报与 #10 修复、D 的 AI/记忆、认证 V13）。
+- 后端形态：`scripts/start-backend.ps1` 用 `deploy/backend/compose.yaml` 起真实容器（三合一 data 容器 + api 容器），`deploy/backend/.env` 为本地联调配置（随机密钥、`DEEPSEEK_API_KEY` 留空走 AI 降级，已被 gitignore，不提交）。
+- `http://127.0.0.1:8080/api/health` = UP，api 与 data 容器均 healthy。
+
+### 后端集成测试（真实 PG+Redis）
+- `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1`：Maven `clean verify` BUILD SUCCESS，**129 测试 0 失败 0 错误 0 跳过**。
+- 其中 `BackendIntegrationTest` 18 全过（含 @Order 3/10 的转派/改期场景，经 C 的 V6/V12 迁移后 #10 已修复，不再触发约束 409）、`TaskDispatchIntegrationTest` 20 全过。
+
+### 全链路 HTTP 回归脚本（可重复）
+- 新增 `scripts/e2e-smoke.ps1`（E 的可重复联调脚本，打真实容器后端，ASCII 输出以适配 PS5 控制台）。在全新数据库上一次运行 **22/22 核心链路断言全过**：
+  - 公共平台：health、OpenAPI 契约含 `TaskDraft`、X-Trace-Id、统一错误模型、401/403 鉴权、幂等键重放/冲突、版本并发 409。
+  - 核心验收点：注册传 `role=ADMIN` 被拒 400（防越权）；首登强制改密、改密前 403；独立复核人（公司复核人路由组织变更）；组织数据范围（leader 可派发 alice、不含跨部门 bob）；无派发资格员工 403 + 任务列表无 `phase/status/completion/events` 字段；任务生命周期 RECEIVED→FEEDBACK→ACCEPTED→ARCHIVED 时间线；日报草稿版本冲突 409、未提交草稿对上级不可见、平级越权读 403、下属日志入口可见已提交日报而员工访问 403；通知中心可达。
+- 复跑说明：首登改密与手机号唯一是一次性副作用；重跑前先 `docker compose --env-file deploy/backend/.env -f deploy/backend/compose.yaml down -v` 重建数据卷（本地测试数据，非生产）。
+
+### 结论
+分工文档安排的「E 最后一天组织全链路回归」已完成：最新 main 的真实部署形态后端 + 真实 HTTP 跑通核心用户链路，且后端集成测试全绿。前端 client 层（重试/SSE）此前已随 #11 合入 main。
+
 ## 进度与待办（2026-10-14，E）
 
 ### 已完成（本会话）
