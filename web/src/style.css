@@ -27,3 +27,5 @@ article:last-child { border-bottom: 0; }
 .vue-flow__node { width: 260px; white-space: normal; padding: 12px; background: #e8f3ee; border: 1px solid #85b6a2; border-radius: 6px; }
 .drawer { position: fixed; top: 0; right: 0; height: 100vh; width: min(480px,100%); padding: 20px; background: #fff; overflow: auto; box-shadow: -8px 0 30px #25313830; z-index: 10; }
 @media (max-width: 600px) { main { padding: 15px; } h1 { font-size: 24px; } .graph { height: auto; } .graph .vue-flow { display: none; } .mobile-path { display: block; } .mobile-path p { padding: 10px 0; border-bottom: 1px solid #e1e9e5; } }
+
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #edf2ef; padding: 12px; }

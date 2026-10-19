@@ -35,6 +35,15 @@ public class Security {
                         boolean ownReviewRead=r.getMethod().equals("GET")&&(path.equals("/api/reviews")||path.matches("/api/reviews/[^/]+"));
                         if(!a.status().equals("ACTIVE")&&!Set.of("/api/auth/password","/api/auth/me","/api/auth/logout","/api/organization/membership-application").contains(path)&&!ownReviewRead) throw new ApiError(403,"MEMBERSHIP_PENDING","部门归属尚未确认");
                         limiter.check("api:"+a.id(),120,60);
+                        if(path.startsWith("/api/admin/workspace/")) {
+                            a.requireAdmin();
+                            String target=path.substring("/api/admin/workspace".length());
+                            if(!(target.startsWith("/ai-maps/")||target.startsWith("/ai-memories")||target.equals("/organization/audit")||target.equals("/organization/task-audit")||target.equals("/auth/me"))) throw ApiError.notFound();
+                            // 管理入口复用已鉴权业务 Controller，身份仍是本次请求从数据库读取的 Actor。
+                            // 不根据 User-Agent 或可伪造客户端头改变 Android 的公共业务权限。
+                            r.getRequestDispatcher("/api"+target).forward(r,s);
+                            return;
+                        }
                     }
                     chain.doFilter(r,s);
                 } catch(ApiError e) { s.setStatus(e.status); s.setContentType("application/json;charset=UTF-8"); s.getWriter().write(db.write(Errors.body(e.code,e.getMessage(),r))); }

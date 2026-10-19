@@ -91,3 +91,18 @@ Content-Type: application/json
 ```json
 {"code":"VERSION_CONFLICT","message":"数据已被其他操作修改","traceId":"..."}
 ```
+
+## week6 成员 B 增量（Issue #22）
+
+- 日志首次提交时间为不可重置窗口起点：不足24小时可申请修订，恰好及超过24小时返回 `409 LOG_EDIT_WINDOW_EXPIRED`。管理员没有窗口例外；窗口内申请可窗口外完成审核，仍校验版本与独立审核。
+- `POST /api/logs/{id}/withdraw`：仅本人，body `{version,reason}`。窗口内将已提交日志撤回为私有草稿，保留首次 `submitted_at`，递增版本。重复或旧版本409，非本人403，范围外404。重提沿用首次时间，撤回后的草稿超过窗口也不可写入。
+- 日志列表/详情增量返回 `submittedAt`、`editableUntil`（ISO-8601 UTC或null）、`canEdit`、`canWithdraw`；字段只辅助展示，每次写请求仍服务端检查。旧 snake_case 字段保留兼容。
+- `GET /api/logs/subordinates` 增加 `departmentId`、`search`，可与原 `ownerId/date/period/cursor/limit` 组合。search为最多100字的字面子串，匹配日志JSON内容、人员姓名或账号。原日志结构没有独立标题字段；不虚构标题搜索字段。部门取人员当前归属。
+- 下属返回 `items/total/nextCursor` 并新增 `groups:[{department:{id,name},items:[...]}]`；groups只分组当前日志页，同一部门可能跨页。条目新增 `author:{id,name}`、`department:{id,name}`。total在权限与筛选之后计算。未知/越权部门均空结果；员工入口403；不返回他人草稿。
+- 独立 `web/` 工作台非认证业务调用 `/api/admin/workspace` + 原业务路径。服务端重新读取当前身份，必须ADMIN后才委托原AI工作台及组织审计接口。例如 `GET /api/admin/workspace/organization/audit`。不支持任意代理路径。认证仍用原 `/api/auth/*`，只有ADMIN进入工作台；403/401清理页面会话。
+- 该管理入口不改变Android/Flutter Web原公共业务接口的范围。FOUNDER不能仅凭创始人角色进入独立Web。不能用User-Agent、Origin或客户端自报角色替代服务端授权。
+- V14 `log_first_submission_window` 允许撤回保留首次时间，已提交日志仍要求非空时间。不改V1–V13。C的新迁移需合并前确认编号；回滚不能直接恢复旧约束（撤回记录可能已有时间），不得清空首次时间来强行回滚。
+- 日志评论 `POST /api/logs/{id}/comments`：text为1至2000字，可选parentId回复同一日志评论；返回id/actor_id/author_name/text/parent_id/created_at。所有已有日志可见权限的人可评论，24小时后仍可追加，禁止编辑删除。重复POST产生新评论（无幂等键），客户端避免自动重试。草稿403、不可见404、非法文本或回复目标400。GET返回同样字段，旧字段保留；不扩大同级或跨公司日志可见范围。通知日志作者及仍有权限的被回复人，同人去重，事务outbox不带正文。
+- `GET /api/admin/workspace/organization/task-audit`（公共同权限入口`/api/organization/task-audit`）：仅ADMIN，taskId可选（最多100字）、cursor>=0、limit为1至100。返回items/total/nextCursor；条目包含审计原字段及actor_name/task_id。过滤任务直接事件、任务审核申请/决定及最终生效；数据库按公司过滤后计数分页。无权/未知taskId均空，非法分页400、非ADMIN403。无版本及幂等键，只读；Web任务审计入口支持翻页与前后值展示。
+- 新增V15 `log_comment_replies`，旧评论parent_id为null，通过复合外键禁止跨日志回复。不修改旧迁移，不回删历史评论。
+- 用户确认：标签模型与权限实际接入、C的新任务增删改审核联调等待C提供分支或契约。现有任务审计展示不代表新任务增删改闭环已经完成。

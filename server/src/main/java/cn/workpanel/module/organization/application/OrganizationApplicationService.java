@@ -85,4 +85,9 @@ public class OrganizationApplicationService implements OrganizationApi {
         return reviews.create(actor, kind.equals("teams") ? "TEAM" : "DEPARTMENT", id, version, before, candidate, Db.required(body, "reason"));
     }
     public Map<String, Object> audit(Actor actor, int cursor, int limit) { requireActive(actor); actor.requireAdmin(); Business.page(cursor, limit); return repository.audit(actor.company(), cursor, limit); }
+    public Map<String,Object> taskAudit(Actor actor,String taskId,int cursor,int limit) {
+        requireActive(actor); actor.requireAdmin(); Business.page(cursor,limit);
+        if(taskId!=null&&taskId.length()>100) throw ApiError.bad("INVALID_TASK_ID","任务ID过长");
+        return repository.taskAudit(actor.company(),taskId,cursor,limit);
+    }
 }
