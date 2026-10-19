@@ -9,6 +9,7 @@ import 'package:pandora_mobile/data/models/ai.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/ai_repository.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
@@ -344,9 +345,9 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final value = await showDatePicker(
-                        context: sheet,
-                        initialDate: selectedDate,
+                      final value = await showPremiumDatePicker(
+                        sheet,
+                        initial: selectedDate,
                         firstDate: DateTime(2020),
                         lastDate: DateTime(2100),
                       );

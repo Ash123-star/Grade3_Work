@@ -2,6 +2,7 @@ import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/log_edit_window.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
 
 enum DemoScenario { normal, empty, offline, forbidden }
@@ -17,7 +18,10 @@ class MockRepository implements Repository {
     this.session, {
     this.scenario = DemoScenario.normal,
     DemoStore? store,
-  }) : store = store ?? DemoStore();
+    DateTime Function()? clock,
+  }) : store = store ?? DemoStore(),
+       clock = clock ?? DateTime.now;
+  final DateTime Function() clock;
   final Session session;
   final DemoScenario scenario;
   final DemoStore store;
@@ -75,7 +79,7 @@ class MockRepository implements Repository {
         !session.administrator) {
       throw const ApiFailure(FailureKind.forbidden, '此功能仅向管理员开放');
     }
-    if (['logs/subordinates', 'analytics', 'organization'].contains(resource) &&
+    if (['logs/subordinates', 'analytics'].contains(resource) &&
         !session.manager) {
       throw const ApiFailure(FailureKind.forbidden, '无权查看管理范围外的数据');
     }
@@ -87,7 +91,8 @@ class MockRepository implements Repository {
   );
   String stamp(DateTime d) => d.toIso8601String().split('T').first;
   List<Record> _seed(String resource) {
-    final now = DateTime.now();
+    final instant = clock();
+    final now = shanghaiWallTime(instant);
     if (resource == 'organization') {
       return [
         for (final (i, name) in ['林小满', '陈一诺', '许知远'].indexed)
@@ -102,7 +107,12 @@ class MockRepository implements Repository {
               'dispatch_enabled': i == 0,
               'company_reviewer': false,
               'department_id': i == 2 ? 'd-tech' : 'd-product',
+              'departmentName': i == 2 ? '技术部' : '产品部',
               'team_id': i == 2 ? 't-dev' : 't-experience',
+              'managerId': i == 0 ? 'u-boss' : 'u1',
+              'participatingTaskCount': [7, 5, 4][i],
+              'todayLogStatus': i == 2 ? '今日日志待提交' : '今日日志已提交',
+              'taskStatus': i == 1 ? '有任务待验收' : '任务推进中',
             },
           ),
       ];
@@ -160,11 +170,11 @@ class MockRepository implements Repository {
         '跟进需求反馈',
         '确认验收标准',
       ],
-      'reviews' => ['日报内容修订', '公司展示项更新'],
+      'reviews' => ['任务内容调整', '公司展示项更新'],
       'notifications' => [
         '你有一项新的任务',
-        '日报修订等待复核',
-        '今日工作日志待阅',
+        '任务修改等待复核',
+        '有人评论了你的日志',
         '任务即将截止',
         '公司展示项审核通过',
       ],
@@ -173,7 +183,7 @@ class MockRepository implements Repository {
       'organization/admin' => ['产品部', '市场部', '技术部'],
       _ => <String>[],
     };
-    return [
+    final result = [
       for (final (i, title) in titles.indexed)
         Record(
           id: '${i + 1}',
@@ -207,21 +217,44 @@ class MockRepository implements Repository {
               now.day + (resource == 'tasks' ? i - 1 : -i),
               11 + i % 3 * 2,
             ).toIso8601String(),
-            'deadline': now.add(Duration(days: i - 1)).toIso8601String(),
-            'createdAt': now
+            'deadline': DateTime(
+              now.year,
+              now.month,
+              now.day + i - 1,
+              18,
+            ).toIso8601String(),
+            'createdAt': instant
                 .subtract(Duration(days: i))
                 .toUtc()
                 .toIso8601String(),
             'businessDate': stamp(now.subtract(Duration(days: i))),
+            if (resource == 'logs')
+              'submittedAt': instant
+                  .subtract(Duration(days: i, hours: 2))
+                  .toUtc()
+                  .toIso8601String(),
+            if (resource == 'logs') 'authorName': ['林小满', '陈一诺', '许知远'][i % 3],
             'status': resource == 'tasks'
                 ? ['待接收', '进行中', '待验收', '需补充', '已验收', '已归档'][i % 6]
                 : '已提交',
-            '紧急程度': i % 3 == 0 ? '紧急' : '普通',
             '所属分组': '产品体验',
-            '主负责人': ['林小满', '陈一诺', '许知远'][i % 3],
-            '协作人': '许知远',
+            'participantIds': ['u${i % 3 + 1}', 'u${(i + 1) % 3 + 1}'],
+            'participantNames': [
+              ['林小满', '陈一诺', '许知远'][i % 3],
+              ['林小满', '陈一诺', '许知远'][(i + 1) % 3],
+            ],
+            'tagId': [
+              'company-important',
+              'department-design',
+              'personal-today',
+            ][i % 3],
+            'tagName': ['重要', '设计', '今日'][i % 3],
+            'tagCategory': ['公司', '部门', '个人'][i % 3],
+            'tagColor': ['#FFB35C', '#9EDCC3', '#B9DDF5'][i % 3],
             '附件': i % 2 == 0 ? '交互说明.pdf' : '',
-            'dispatcherId': 'u1',
+            'dispatcherId': resource == 'tasks'
+                ? (i.isEven ? 'u2' : 'u1')
+                : 'u1',
             'acceptedAt': i >= 4
                 ? now.add(Duration(days: i - 2)).toIso8601String()
                 : null,
@@ -230,7 +263,7 @@ class MockRepository implements Repository {
               '${stamp(now.subtract(Duration(days: i)))} · 林小满创建任务',
               if (i > 0) '负责人已接收任务',
             ],
-            'type': ['任务', '审批', '日志', '截止提醒', '审核结果'][i % 5],
+            'type': ['任务', '审批', '评论', '截止提醒', '审核结果'][i % 5],
             'targetResource': [
               'tasks',
               'reviews',
@@ -246,12 +279,145 @@ class MockRepository implements Repository {
             'after': '完成调研并补充三份访谈记录',
             'reason': '补充最新工作成果，便于团队同步。',
             'reviewEvents': <String>[],
-            'comments': <String>[],
+            'comments': <Map<String, dynamic>>[],
             'sources': ['/item/logs/1', '/item/tasks/1'],
           },
         ),
     ];
+    // Stable distinct records show busy days without duplicating one daily log.
+    if (resource == 'tasks' || resource == 'logs') {
+      final monday = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: now.weekday - 1));
+      if (resource == 'tasks') {
+        result.add(
+          Record(
+            id: 'demo-training-span',
+            title: '数据结构实训',
+            ownerId: session.id,
+            fields: {
+              'startAt': monday
+                  .add(const Duration(days: 3, hours: 9))
+                  .toIso8601String(),
+              'deadline': monday
+                  .add(const Duration(days: 8, hours: 18))
+                  .toIso8601String(),
+              'participantIds': [session.id],
+              'participantNames': [session.name],
+              'dispatcherId': 'u-boss',
+              'status': '进行中',
+              'tagName': '实训',
+              'tagColor': '#BE8A68',
+            },
+          ),
+        );
+      }
+      for (var day = 0; day < 7; day++) {
+        final date = monday.add(Duration(days: day));
+        final count = resource == 'tasks' ? 10 : 3;
+        for (var i = 0; i < count; i++) {
+          final owner = 'u${i % 3 + 1}';
+          if (resource == 'logs' &&
+              result.any(
+                (r) =>
+                    r.ownerId == owner &&
+                    r.fields['businessDate'] == stamp(date),
+              )) {
+            continue;
+          }
+          if (resource == 'logs' &&
+              date.isAfter(DateTime(now.year, now.month, now.day))) {
+            continue;
+          }
+          result.add(
+            Record(
+              id: 'demo-$resource-$day-$i',
+              title:
+                  '${['核对需求与交付', '整理评审意见', '完善交互方案', '验证任务链路', '同步项目进展'][i % 5]} · ${day + 1}-${i + 1}',
+              ownerId: owner,
+              fields: {
+                'businessDate': stamp(date),
+                'startAt': DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
+                  9 + i % 7,
+                ).toIso8601String(),
+                'endAt': DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
+                  10 + i % 7,
+                ).toIso8601String(),
+                'deadline': DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
+                  18,
+                ).toIso8601String(),
+                'status': resource == 'tasks' ? '进行中' : '已提交',
+                'submittedAt': stamp(date) == stamp(now)
+                    ? instant
+                          .subtract(const Duration(hours: 2))
+                          .toUtc()
+                          .toIso8601String()
+                    : '${stamp(date)}T18:00:00+08:00',
+                'authorName': ['林小满', '陈一诺', '许知远'][i % 3],
+                'participantIds': [owner],
+                'participantNames': [
+                  ['林小满', '陈一诺', '许知远'][i % 3],
+                ],
+                'dispatcherId': i.isEven ? 'u-boss' : 'u1',
+                'tagId': [
+                  'company-important',
+                  'department-design',
+                  'personal-today',
+                ][i % 3],
+                'tagName': ['重要', '设计', '今日'][i % 3],
+                'tagColor': ['#FFB35C', '#9EDCC3', '#B9DDF5'][i % 3],
+                '今日工作': '完成需求核对及协作沟通',
+                'body': '完成需求核对及协作沟通',
+                '明日计划': '跟进交付并整理验收结果',
+                '遇到的阻碍': '暂无',
+                '工时': '6',
+                'comments': <Map<String, dynamic>>[],
+              },
+            ),
+          );
+        }
+      }
+    }
+    return result;
   }
+
+  Set<String> get visiblePeople {
+    final ids = <String>{session.id};
+    if (!session.manager) return ids;
+    final people = rows('organization');
+    if (session.administrator || session.role == UserRole.founder) {
+      return {...ids, ...people.map((p) => p.id)};
+    }
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final person in people) {
+        if (ids.contains('${person.fields['managerId']}') &&
+            ids.add(person.id)) {
+          changed = true;
+        }
+      }
+    }
+    return ids;
+  }
+
+  bool taskVisible(Record r) =>
+      visiblePeople.contains(r.ownerId) ||
+      visiblePeople.contains('${r.fields['dispatcherId']}') ||
+      (r.fields['participantIds'] as List? ?? const []).any(
+        (id) => visiblePeople.contains('$id'),
+      );
 
   @override
   Future<PageResult> list(String resource, Query query) async {
@@ -265,6 +431,18 @@ class MockRepository implements Repository {
     var items = rows(
       resource,
     ).where((r) => '${r.title}${r.subtitle}'.contains(query.search));
+    if (resource == 'organization') {
+      items = items.where((r) => visiblePeople.contains(r.id));
+    }
+    if (resource == 'tasks') items = items.where(taskVisible);
+    if (resource == 'logs/subordinates') {
+      items = items.where(
+        (r) =>
+            r.ownerId != session.id &&
+            visiblePeople.contains(r.ownerId) &&
+            isSubmittedDiary(r),
+      );
+    }
     if ([
       'logs',
       'dashboard/personal',
@@ -283,7 +461,14 @@ class MockRepository implements Repository {
       items = items.where((p) => p.fields['status'] == 'ACTIVE');
     }
     if (resource == 'tasks' && !session.manager) {
-      items = items.where((r) => r.ownerId == session.id);
+      items = items.where((r) {
+        final participants = (r.fields['participantIds'] as List?)
+            ?.map((id) => '$id')
+            .toSet();
+        return r.ownerId == session.id ||
+            participants?.contains(session.id) == true ||
+            '${r.fields['dispatcherId'] ?? ''}' == session.id;
+      });
     }
     if (resource == 'reviews' && !session.manager) {
       items = items.where((r) => r.ownerId == session.id);
@@ -293,10 +478,31 @@ class MockRepository implements Repository {
     }
     if (query.from != null && query.to != null) {
       items = items.where((r) {
+        DateTime? parseBusinessInstant(dynamic value) {
+          final raw = '$value';
+          return DateTime.tryParse(
+            RegExp(r'(Z|[+-]\d{2}:?\d{2})$').hasMatch(raw) ? raw : '$raw+08:00',
+          );
+        }
+
+        if (resource == 'tasks') {
+          final deadline = parseBusinessInstant(
+            r.fields['deadline'] ?? r.fields['createdAt'],
+          );
+          final start = parseBusinessInstant(
+            r.fields['startAt'] ??
+                r.fields['deadline'] ??
+                r.fields['createdAt'],
+          );
+          return start != null &&
+              deadline != null &&
+              start.isBefore(query.to!) &&
+              !deadline.isBefore(query.from!);
+        }
         final raw = resource.startsWith('logs')
             ? '${r.fields['businessDate']}T00:00:00+08:00'
             : '${r.fields['deadline'] ?? r.fields['createdAt']}';
-        final date = DateTime.tryParse(raw);
+        final date = parseBusinessInstant(raw);
         return date != null &&
             !date.isBefore(query.from!) &&
             date.isBefore(query.to!);
@@ -391,9 +597,14 @@ class MockRepository implements Repository {
     }
     final item = rows(resource).where((r) => r.id == id).firstOrNull;
     if (item == null) throw const ApiFailure(FailureKind.notFound, '记录不存在或已归档');
+    if (resource == 'tasks' && !taskVisible(item) ||
+        resource == 'organization' && !visiblePeople.contains(item.id)) {
+      throw const ApiFailure(FailureKind.forbidden, '无权查看管理范围外的数据');
+    }
     if (['logs', 'logs/subordinates', 'tasks', 'reviews'].contains(resource) &&
         !session.manager &&
-        item.ownerId != session.id) {
+        item.ownerId != session.id &&
+        !(resource == 'tasks' && taskVisible(item))) {
       throw const ApiFailure(FailureKind.forbidden, '无权查看其他成员的记录');
     }
     if ([
@@ -409,6 +620,26 @@ class MockRepository implements Repository {
         item.ownerId != session.id &&
         !isSubmittedDiary(item)) {
       throw const ApiFailure(FailureKind.forbidden, '草稿仅本人可见');
+    }
+    if (resource == 'logs' || resource == 'logs/subordinates') {
+      if (!visiblePeople.contains(item.ownerId)) {
+        throw const ApiFailure(FailureKind.forbidden, '无权查看该日志');
+      }
+      return Record(
+        id: item.id,
+        title: item.title,
+        subtitle: item.subtitle,
+        ownerId: item.ownerId,
+        version: item.version,
+        fields: {
+          ...item.fields,
+          'canEdit':
+              item.ownerId == session.id &&
+              LogEditWindow(item).canEditAt(clock()),
+          'editableUntil': LogEditWindow(item).until?.toUtc().toIso8601String(),
+          'serverNow': clock().toUtc().toIso8601String(),
+        },
+      );
     }
     return item;
   }
@@ -527,6 +758,61 @@ class MockRepository implements Repository {
       }
       return rows('ai-maps').first;
     }
+    if (resource == 'tasks/comments' || resource == 'logs/comments') {
+      final targetResource = resource.split('/').first;
+      final target = await detail(targetResource, '${v['id'] ?? ''}');
+      if (targetResource == 'logs' && !isSubmittedDiary(target)) {
+        throw const ApiFailure(FailureKind.validation, '请先提交日志再评论');
+      }
+      final text = '${v['text'] ?? v['评语'] ?? ''}'.trim();
+      if (text.isEmpty) {
+        throw const ApiFailure(FailureKind.validation, '评论不能为空');
+      }
+      if (action != 'comment' && action != 'create') {
+        throw const ApiFailure(FailureKind.validation, '评论发布后不能编辑或删除');
+      }
+      final comments = List<dynamic>.from(
+        target.fields['comments'] as List? ?? const [],
+      );
+      final parent = v['parentCommentId'];
+      if (parent != null &&
+          !comments.any((c) => c is Map && c['id'] == parent)) {
+        throw const ApiFailure(FailureKind.validation, '回复的评论不存在');
+      }
+      final comment = {
+        'id': 'c${clock().microsecondsSinceEpoch}-${comments.length}',
+        'text': text,
+        'actorId': session.id,
+        'actorName': session.name,
+        'createdAt': clock().toUtc().toIso8601String(),
+        'parentCommentId': ?parent,
+      };
+      comments.add(comment);
+      final targets = rows(targetResource);
+      final pos = targets.indexWhere((r) => r.id == target.id);
+      targets[pos] = Record(
+        id: target.id,
+        title: target.title,
+        ownerId: target.ownerId,
+        subtitle: target.subtitle,
+        version: target.version,
+        fields: {...targets[pos].fields, 'comments': comments},
+      );
+      notify(
+        '${session.name} 评论了${targetResource == 'logs' ? '日志' : '任务'}',
+        targetResource,
+        target.id,
+        target.ownerId,
+        '评论',
+      );
+      final result = Record(
+        id: '${comment['id']}',
+        title: '评论已发布',
+        fields: comment,
+      );
+      if (key != null) store.responses[key] = result;
+      return result;
+    }
     final records = rows(resource);
     if (resource == 'notifications' && action == 'read-all') {
       for (var i = 0; i < records.length; i++) {
@@ -568,6 +854,50 @@ class MockRepository implements Repository {
       );
       return Record(id: diary.id, title: '演示阅读已登记', fields: const {'ok': true});
     }
+    if (resource == 'logs') {
+      if (previous != null && previous.ownerId != session.id) {
+        throw const ApiFailure(FailureKind.forbidden, '仅作者可修改日志');
+      }
+      if (previous != null &&
+          isSubmittedDiary(previous) &&
+          !LogEditWindow(previous).canEditAt(clock())) {
+        throw const ApiFailure(FailureKind.forbidden, '日志提交已满24小时，已锁定');
+      }
+      if (action == 'request-review') {
+        throw const ApiFailure(FailureKind.validation, '日志直接保存，不需要审批');
+      }
+      if (action == 'update' &&
+          (previous == null || !isSubmittedDiary(previous))) {
+        throw const ApiFailure(FailureKind.validation, '请先提交日志');
+      }
+      if (action == 'save-draft' &&
+          previous != null &&
+          isSubmittedDiary(previous)) {
+        throw const ApiFailure(FailureKind.validation, '已提交日志请直接修改');
+      }
+      if (action == 'submit' &&
+          previous != null &&
+          isSubmittedDiary(previous)) {
+        throw const ApiFailure(FailureKind.conflict, '日志已经提交，请直接修改');
+      }
+      if (action != 'save-draft' &&
+          '${v['今日工作'] ?? previous?.fields['今日工作'] ?? ''}'.trim().isEmpty) {
+        throw const ApiFailure(FailureKind.validation, '请填写今日工作');
+      }
+      final businessDate =
+          '${v['businessDate'] ?? previous?.fields['businessDate'] ?? ''}';
+      if (DateTime.tryParse(businessDate) == null) {
+        throw const ApiFailure(FailureKind.validation, '请选择日志日期');
+      }
+      if (previous == null &&
+          records.any(
+            (r) =>
+                r.ownerId == session.id &&
+                r.fields['businessDate'] == businessDate,
+          )) {
+        throw const ApiFailure(FailureKind.conflict, '该日期已有日志，请打开已有记录');
+      }
+    }
     if (previous != null &&
         ['dashboard/personal', 'private-notes'].contains(resource) &&
         previous.ownerId != session.id) {
@@ -598,8 +928,10 @@ class MockRepository implements Repository {
         throw const ApiFailure(FailureKind.validation, '当前任务状态不支持此操作');
       }
       if (['receive', 'feedback'].contains(action) &&
-          previous.ownerId != session.id) {
-        throw const ApiFailure(FailureKind.forbidden, '请切换为主负责人操作');
+          !(previous.fields['participantIds'] as List? ?? const [])
+              .map((value) => '$value')
+              .contains(session.id)) {
+        throw const ApiFailure(FailureKind.forbidden, '当前账号不在任务参与人范围内');
       }
       if ([
             'accept',
@@ -636,19 +968,6 @@ class MockRepository implements Repository {
       notify('有新的修改申请待审核', 'reviews', request.id, 'u1', '审批');
       if (key != null) store.responses[key] = request;
       return request;
-    }
-    if (resource == 'logs/comments') {
-      final logs = rows('logs');
-      final pos = logs.indexWhere((r) => r.id == id);
-      if (pos >= 0) {
-        logs[pos] = copy(logs[pos], {
-          'comments': [
-            ...?logs[pos].fields['comments'] as List?,
-            '${session.name}：${v['评语']}',
-          ],
-        });
-      }
-      return const Record(id: 'comment', title: '评语已保存');
     }
     final labels = {
       'receive': '接收任务',
@@ -700,15 +1019,16 @@ class MockRepository implements Repository {
       fields['dispatcherId'] = previous?.fields['dispatcherId'] ?? session.id;
     }
     if (resource == 'logs') {
-      fields['status'] = '已提交';
-      fields['versions'] = [
-        ...?previous?.fields['versions'] as List?,
-        {
-          'version': (previous?.version ?? 0) + 1,
-          'body': fields['今日工作'],
-          'time': DateTime.now().toString().substring(0, 16),
-        },
-      ];
+      fields['status'] = action == 'save-draft' ? '草稿' : '已提交';
+      fields['authorName'] = session.name;
+      if (action != 'save-draft') {
+        fields['submittedAt'] =
+            previous?.fields['submittedAt'] ??
+            clock().toUtc().toIso8601String();
+      }
+      fields.remove('versions');
+      fields.remove('canEdit');
+      fields.remove('editableUntil');
     }
     if (resource == 'feedback') fields['status'] = '待处理';
     if (resource == 'notifications') fields['read'] = true;

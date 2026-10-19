@@ -8,6 +8,7 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/common/detail_pages.dart';
 
@@ -120,7 +121,7 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
               subtitle: '日期或分类无效，请从成员列表重新进入',
             ),
             OutlinedButton(
-              onPressed: () => context.go('/me/team'),
+              onPressed: () => context.go('/me/people'),
               child: const Text('返回成员列表'),
             ),
           ],
@@ -259,9 +260,9 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                                       ),
                               ),
                               onPressed: () async {
-                                final next = await showDatePicker(
-                                  context: context,
-                                  initialDate:
+                                final next = await showPremiumDatePicker(
+                                  context,
+                                  initial:
                                       ref.read(
                                         memberLogDateProvider(memberId),
                                       ) ??

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:pandora_mobile/data/models/log_edit_window.dart';
+import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +13,7 @@ import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'catalog.dart';
 import 'form_page.dart';
 import '../../core/state/live_notifications.dart';
@@ -25,11 +29,7 @@ class ListPage extends ConsumerStatefulWidget {
 }
 
 class _ListPageState extends ConsumerState<ListPage> {
-  String search = '',
-      filter = '全部',
-      group = '全部分组',
-      urgency = '全部紧急度',
-      deadline = '全部期限';
+  String search = '', filter = '全部', group = '全部标签', deadline = '全部期限';
   String? owner;
   int inbox = 0;
   String auditActor = '';
@@ -217,22 +217,16 @@ class _ListPageState extends ConsumerState<ListPage> {
                 selector(
                   group,
                   {
-                    '全部分组',
+                    '全部标签',
                     group,
                     ...data.valueOrNull?.items.map(
                           (r) =>
-                              '${r.fields['所属分组'] ?? r.fields['group'] ?? '日常工作'}',
+                              '${r.fields['tagName'] ?? r.fields['tagId'] ?? '未分类'}',
                         ) ??
                         <String>[],
                   }.toList(),
                   (v) => setState(() => group = v),
                 ),
-                selector(urgency, const [
-                  '全部紧急度',
-                  '紧急',
-                  '普通',
-                  '不紧急',
-                ], (v) => setState(() => urgency = v)),
                 selector(deadline, const [
                   '全部期限',
                   '未来7天',
@@ -249,7 +243,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                       if (p != null && mounted) setState(() => owner = p.id);
                     },
                     icon: const Icon(Icons.person_outline, size: 18),
-                    label: Text(owner == null ? '负责人' : '负责人 $owner'),
+                    label: Text(owner == null ? '参与人' : '参与人 $owner'),
                   ),
                 if (owner != null)
                   TextButton(
@@ -266,7 +260,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                 children: [
                   for (final value
                       in resource == 'notifications'
-                          ? ['全部', '任务', '审批', '日志', '截止提醒', '审核结果']
+                          ? ['全部', '任务', '审批', '评论', '截止提醒', '审核结果']
                           : resource == 'reviews'
                           ? ['全部', '待审', '已通过', '已驳回']
                           : ['全部', '日志', '任务', '组织'])
@@ -300,9 +294,9 @@ class _ListPageState extends ConsumerState<ListPage> {
                         : auditDate!.toIso8601String().split('T').first,
                   ),
                   onPressed: () async {
-                    final day = await showDatePicker(
-                      context: context,
-                      initialDate: auditDate ?? DateTime.now(),
+                    final day = await showPremiumDatePicker(
+                      context,
+                      initial: auditDate ?? DateTime.now(),
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2100),
                     );
@@ -349,14 +343,15 @@ class _ListPageState extends ConsumerState<ListPage> {
                     return false;
                   }
                   if (resource == 'tasks') {
-                    if (owner != null && r.ownerId != owner) return false;
-                    if (group != '全部分组' &&
-                        '${r.fields['所属分组'] ?? r.fields['group'] ?? '日常工作'}' !=
-                            group) {
+                    if (owner != null &&
+                        !(r.fields['participantIds'] as List? ?? const [])
+                            .map((value) => '$value')
+                            .contains(owner)) {
                       return false;
                     }
-                    if (urgency != '全部紧急度' &&
-                        '${r.fields['紧急程度'] ?? '普通'}' != urgency) {
+                    if (group != '全部标签' &&
+                        '${r.fields['tagName'] ?? r.fields['tagId'] ?? '未分类'}' !=
+                            group) {
                       return false;
                     }
                     final due = DateTime.tryParse('${r.fields['deadline']}');
@@ -432,130 +427,119 @@ class _ListPageState extends ConsumerState<ListPage> {
                             ),
                           ),
                       ],
-                      InkWell(
-                        onTap: resource == 'notifications' && messageBusy
-                            ? null
-                            : () => open(r),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (resource == 'organization') ...[
-                                CircleAvatar(
-                                  backgroundColor: CuteTokens.blue,
-                                  child: Text(
-                                    r.title.isEmpty
-                                        ? '人'
-                                        : r.title.substring(0, 1),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                              ],
-                              if (resource == 'notifications') ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Icon(
-                                    r.fields['read'] == true
-                                        ? Icons.notifications_none
-                                        : Icons.circle,
-                                    size: r.fields['read'] == true ? 20 : 9,
-                                    color: r.fields['read'] == true
-                                        ? CuteTokens.muted
-                                        : const Color(0xFFA7460E),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                              ],
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      r.title,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                      if (resource == 'tasks')
+                        _taskCard(context, r, () => open(r))
+                      else
+                        InkWell(
+                          onTap: resource == 'notifications' && messageBusy
+                              ? null
+                              : () => open(r),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (resource == 'organization') ...[
+                                  CircleAvatar(
+                                    backgroundColor: CuteTokens.blue,
+                                    child: Text(
+                                      r.title.isEmpty
+                                          ? '人'
+                                          : r.title.substring(0, 1),
                                     ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      resource == 'tasks'
-                                          ? '${r.fields['主负责人'] ?? r.ownerId} · ${prettyDate(r.fields['deadline'])}'
-                                          : r.subtitle,
-                                      style: const TextStyle(
-                                        color: CuteTokens.muted,
-                                        fontSize: 12,
-                                      ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                                if (resource == 'notifications') ...[
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Icon(
+                                      r.fields['read'] == true
+                                          ? Icons.notifications_none
+                                          : Icons.circle,
+                                      size: r.fields['read'] == true ? 20 : 9,
+                                      color: r.fields['read'] == true
+                                          ? CuteTokens.muted
+                                          : const Color(0xFFA7460E),
                                     ),
-                                    if (resource == 'tasks')
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 8),
-                                        child: Wrap(
-                                          spacing: 8,
-                                          children: [
-                                            StatusPill(
-                                              '${r.fields['所属分组'] ?? '日常工作'}',
-                                              color: CuteTokens.blue,
-                                            ),
-                                            StatusPill(
-                                              '${r.fields['紧急程度'] ?? '普通'}',
-                                              color: CuteTokens.yellow,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    if (resource == 'reviews')
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 6),
-                                        child: Text(
-                                          '${r.fields['reviewState'] ?? ''} · 申请人 ${r.fields['applicantName'] ?? r.ownerId}',
-                                          style: const TextStyle(
-                                            color: CuteTokens.muted,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    if (resource == 'notifications')
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 6),
-                                        child: Text(
-                                          '${r.fields['read'] == true ? '已读' : '未读'} · ${prettyDate(r.fields['createdAt'])}',
-                                          style: const TextStyle(
-                                            color: CuteTokens.muted,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    if (resource == 'audit')
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
                                       Text(
-                                        '${prettyDate(r.fields['createdAt'])} · 操作者 ${r.fields['actor_id'] ?? '未返回'}',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
+                                        r.title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              if (resource == 'notifications' &&
-                                  readingMessage == r.id)
-                                const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        r.subtitle,
+                                        style: const TextStyle(
+                                          color: CuteTokens.muted,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      if (resource == 'reviews')
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 6,
+                                          ),
+                                          child: Text(
+                                            '${r.fields['reviewState'] ?? ''} · 申请人 ${r.fields['applicantName'] ?? r.ownerId}',
+                                            style: const TextStyle(
+                                              color: CuteTokens.muted,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      if (resource == 'notifications')
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 6,
+                                          ),
+                                          child: Text(
+                                            '${r.fields['read'] == true ? '已读' : '未读'} · ${prettyDate(r.fields['createdAt'])}',
+                                            style: const TextStyle(
+                                              color: CuteTokens.muted,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      if (resource == 'audit')
+                                        Text(
+                                          '${prettyDate(r.fields['createdAt'])} · 操作者 ${r.fields['actor_id'] ?? '未返回'}',
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                    ],
                                   ),
-                                )
-                              else
-                                const Icon(Icons.chevron_right, size: 18),
-                            ],
+                                ),
+                                const SizedBox(width: 8),
+                                if (resource == 'notifications' &&
+                                    readingMessage == r.id)
+                                  const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                else
+                                  const Icon(Icons.chevron_right, size: 18),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const Divider(height: 1),
+                      if (resource != 'tasks') const Divider(height: 1),
                     ],
                   ],
                 );
@@ -565,6 +549,118 @@ class _ListPageState extends ConsumerState<ListPage> {
         ],
       ),
     );
+  }
+
+  Widget _taskCard(BuildContext context, Record record, VoidCallback onTap) {
+    final f = record.fields;
+    final participantNames =
+        (f['participantNames'] as List?)
+            ?.map((value) => '$value')
+            .where((value) => value.trim().isNotEmpty)
+            .toList() ??
+        (f['participantIds'] as List?)
+            ?.map((value) => '$value')
+            .where((value) => value.trim().isNotEmpty)
+            .toList() ??
+        const <String>[];
+    final tagName = '${f['tagName'] ?? f['tag_id'] ?? f['tagId'] ?? '未分类'}';
+    final tagCategory = '${f['tagCategory'] ?? ''}';
+    final tagColor = _recordColor(f['tagColor'] ?? f['tag_color']);
+    return PaperSurface(
+      onTap: onTap,
+      color: const Color(0xFFFFF5C8),
+      texture: TuantuanAssets.textures['warmSparkle'],
+      cornerDecoration: TuantuanAssets.cardCorners['warm'],
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const TuantuanIconTile(
+                icon: 'task',
+                color: SunnyPalette.orange,
+                size: 40,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  record.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: AppTypography.displayFamily,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: SunnyPalette.muted,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              TuantuanStatusPill(
+                '${f['status'] ?? '待接收'}',
+                color: SunnyPalette.mint,
+                icon: Icons.flag_outlined,
+              ),
+              TuantuanStatusPill(
+                '${tagCategory.isEmpty ? '' : '$tagCategory · '}$tagName',
+                color: tagColor,
+                icon: Icons.sell_outlined,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _taskSummaryLine(
+            Icons.schedule_outlined,
+            '截止 ${prettyDate(f['deadline'])}',
+          ),
+          const SizedBox(height: 6),
+          _taskSummaryLine(
+            Icons.group_outlined,
+            participantNames.isEmpty
+                ? '参与人待选择'
+                : '参与人 ${participantNames.take(3).join('、')}${participantNames.length > 3 ? ' 等' : ''}',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _taskSummaryLine(IconData icon, String text) => Row(
+    children: [
+      Icon(icon, size: 17, color: CuteTokens.muted),
+      const SizedBox(width: 6),
+      Expanded(
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
+        ),
+      ),
+    ],
+  );
+
+  Color _recordColor(dynamic value) {
+    final text = '$value'.trim();
+    if (text.isEmpty || text == 'null') return SunnyPalette.blue;
+    final parsed = int.tryParse(text.replaceFirst('#', ''), radix: 16);
+    return parsed == null
+        ? SunnyPalette.blue
+        : Color(
+            text.replaceFirst('#', '').length <= 6
+                ? 0xFF000000 | parsed
+                : parsed,
+          );
   }
 
   String _notificationGroup(Record r) {
@@ -642,6 +738,21 @@ class _DetailPageState extends ConsumerState<DetailPage> {
   String? error;
   late final Session initialLogIdentity = ref.read(sessionProvider);
   ApiFailure? logAccessError;
+  Timer? windowTimer;
+  @override
+  void initState() {
+    super.initState();
+    windowTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && widget.resource.startsWith('logs')) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    windowTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> action(Record item, String action) async {
     if (action == 'archive') {
       final yes = await showDialog<bool>(
@@ -851,57 +962,24 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             final actions = <Widget>[];
             final children = <Widget>[];
             if (resource == 'tasks') {
+              final participantIds = (f['participantIds'] as List? ?? const [])
+                  .map((value) => '$value')
+                  .toSet();
+              final participantNames =
+                  (f['participantNames'] as List?)
+                      ?.map((value) => '$value')
+                      .where((value) => value.trim().isNotEmpty)
+                      .toList() ??
+                  participantIds.toList();
+              final canActOnTask =
+                  participantIds.contains(user.id) || item.ownerId == user.id;
               final dispatcher =
                   user.manager &&
                   (f['dispatcherId'] == user.id || user.administrator);
-              final secondary = <String, String>{
-                if (dispatcher &&
-                    ['待接收', '进行中', '待验收', '需补充'].contains(status)) ...{
-                  '转派任务': 'transfer',
-                  '调整截止时间': 'reschedule',
-                  '撤回任务': 'withdraw',
-                },
-                if (AppConfig.mock && dispatcher && status == '待验收')
-                  '退回补充': 'return',
-                '我的私人备注': 'note',
-              };
-              actions.add(
-                PopupMenuButton<String>(
-                  tooltip: '更多操作',
-                  onSelected: (kind) => edit(item, kind),
-                  itemBuilder: (_) => [
-                    for (final entry in secondary.entries)
-                      PopupMenuItem(value: entry.value, child: Text(entry.key)),
-                  ],
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: SunnyPalette.orange,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFE4D395)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '更多',
-                          style: TextStyle(
-                            color: SunnyPalette.ink,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        SizedBox(width: 4),
-                        Icon(Icons.more_horiz_rounded, size: 20),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-              if (item.ownerId == user.id && status == '待接收') {
+              if (canActOnTask && status == '待接收') {
                 bottom = button('接收任务', () => action(item, 'receive'));
               }
-              if (item.ownerId == user.id && ['进行中', '需补充'].contains(status)) {
+              if (canActOnTask && ['进行中', '需补充'].contains(status)) {
                 bottom = button('提交成果反馈', () => edit(item, 'feedback'));
               }
               if (dispatcher && status == '待验收') {
@@ -915,13 +993,15 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   spacing: 12,
                   runSpacing: 8,
                   children: [
-                    StatusPill(
-                      '${f['所属分组'] ?? f['group'] ?? '日常工作'}',
-                      color: CuteTokens.blue,
+                    TuantuanStatusPill(
+                      '${f['status'] ?? '待接收'}',
+                      color: SunnyPalette.mint,
+                      icon: Icons.flag_outlined,
                     ),
-                    StatusPill(
-                      '${f['紧急程度'] ?? f['urgency'] ?? '普通'}',
-                      color: CuteTokens.yellow,
+                    TuantuanStatusPill(
+                      '${f['tagCategory'] == null ? '' : '${f['tagCategory']} · '}${f['tagName'] ?? f['tagId'] ?? '未分类'}',
+                      color: _recordColor(f['tagColor'] ?? f['tag_color']),
+                      icon: Icons.sell_outlined,
                     ),
                   ],
                 ),
@@ -937,14 +1017,26 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 const SizedBox(height: 20),
                 PaperSurface(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _attribute('负责人', f['主负责人'] ?? item.ownerId),
+                      _attribute(
+                        '开始时间',
+                        prettyDate(f['startAt'] ?? f['start_at']),
+                      ),
                       const SizedBox(height: 14),
                       _attribute('截止时间', prettyDate(f['deadline'])),
-                      if ('${f['协作人'] ?? ''}'.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        _attribute('协作人', f['协作人']),
-                      ],
+                      const SizedBox(height: 14),
+                      _attribute(
+                        '参与人',
+                        participantNames.isEmpty
+                            ? '尚未返回参与人'
+                            : participantNames.join('、'),
+                      ),
+                      const SizedBox(height: 14),
+                      _attribute(
+                        '审核状态',
+                        '${f['reviewState'] ?? f['approvalStatus'] ?? '无需审核'}',
+                      ),
                     ],
                   ),
                 ),
@@ -995,6 +1087,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 if (f['验收意见'] != null) section('验收意见', f['验收意见']),
                 const SectionHeader('流转记录'),
                 timeline(f['events'] as List? ?? []),
+                PublicComments(resource: 'tasks', record: item),
               ]);
             } else if (resource == 'reviews') {
               final self = item.ownerId == user.id;
@@ -1153,21 +1246,25 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ),
               ]);
             } else if (resource.startsWith('logs')) {
-              actions.add(
-                IconButton(
-                  tooltip: '历史修订与已读',
-                  onPressed: () => context.push('/history?id=${item.id}'),
-                  icon: const Icon(Icons.history),
-                ),
-              );
+              final window = LogEditWindow(item);
               if (item.ownerId == user.id) {
-                final isDraft = f['status'] == '草稿';
-                bottom = button(
-                  isDraft ? '继续编辑草稿' : '申请修订日志',
-                  () => edit(item, isDraft ? 'log-edit' : 'log-revise'),
-                );
-              } else if (user.manager) {
-                bottom = button('添加评语', () => edit(item, 'comment'));
+                final canEdit = window.canEditAt(DateTime.now());
+                bottom = !window.submitted
+                    ? button('提交日志', () => action(item, 'submit'))
+                    : SunnyPrimaryButton(
+                        onPressed: busy || !canEdit
+                            ? null
+                            : () => edit(item, 'log-revise'),
+                        child: Text(canEdit ? '修改日志' : '已满24小时 · 日志已锁定'),
+                      );
+                if (!window.submitted) {
+                  actions.add(
+                    TextButton(
+                      onPressed: () => edit(item, 'log-edit'),
+                      child: const Text('编辑草稿'),
+                    ),
+                  );
+                }
               }
               children.addAll([
                 Text(
@@ -1180,11 +1277,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${f['businessDate'] ?? ''} · 作者 ${f['authorName'] ?? item.ownerId} · ${isSubmittedDiary(item)
-                      ? '正式版本'
-                      : f['status'] == '草稿'
-                      ? '草稿版本'
-                      : '提交状态未确认'} v${item.version}',
+                  '${f['businessDate'] ?? ''} · 作者 ${f['authorName'] ?? item.ownerId} · ${f['status'] ?? (isSubmittedDiary(item) ? '已提交' : '提交状态未确认')}',
                   style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                 ),
                 if (isSubmittedDiary(item) &&
@@ -1235,40 +1328,14 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   const SizedBox(height: 20),
                   DiaryReadReceipt(
                     item,
-                    key: ValueKey('diary-read:${item.id}:${item.version}'),
+                    key: ValueKey('diary-read:${item.id}'),
                     onAccessDenied: (failure) {
                       if (mounted) setState(() => logAccessError = failure);
                     },
                   ),
                 ],
-                const SectionHeader('上级评语'),
-                if (f['commentsError'] != null)
-                  RecordFailure(
-                    f['commentsError'] as Object,
-                    retry: () => ref.invalidate(provider),
-                  ),
-                if (f['commentsError'] == null &&
-                    (f['comments'] as List? ?? []).isEmpty)
-                  const Text('暂无评语', style: TextStyle(color: CuteTokens.muted)),
-                for (final comment in (f['comments'] as List? ?? []))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: comment is Map
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${comment['text'] ?? ''}'),
-                              Text(
-                                '作者 ${comment['actorId'] ?? '未提供'} · ${comment['time'] ?? '时间未提供'}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: CuteTokens.muted,
-                                ),
-                              ),
-                            ],
-                          )
-                        : Text(_value(comment)),
-                  ),
+                if (isSubmittedDiary(item))
+                  PublicComments(resource: 'logs', record: item),
               ]);
             } else if (resource == 'organization') {
               children.addAll([
@@ -1367,7 +1434,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${item.subtitle} · v${item.version}',
+                  item.subtitle,
                   style: const TextStyle(color: CuteTokens.muted),
                 ),
                 section(
@@ -1484,6 +1551,16 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             );
           },
         );
+  }
+
+  Color _recordColor(dynamic value) {
+    final text = '$value'.trim();
+    if (text.isEmpty || text == 'null') return SunnyPalette.blue;
+    final normalized = text.replaceFirst('#', '');
+    final parsed = int.tryParse(normalized, radix: 16);
+    return parsed == null
+        ? SunnyPalette.blue
+        : Color(normalized.length <= 6 ? 0xFF000000 | parsed : parsed);
   }
 
   Widget _attribute(String label, dynamic value) => Row(
@@ -1636,7 +1713,7 @@ class MemberRecords extends ConsumerWidget {
                       title: Text(r.title),
                       subtitle: Text(
                         resource.startsWith('logs')
-                            ? '${r.fields['businessDate'] ?? '未标记业务日期'} · 已提交 · v${r.version}'
+                            ? '${r.fields['businessDate'] ?? '未标记业务日期'} · 已提交'
                             : resource == 'tasks'
                             ? '截止 ${businessEventTime(r.fields['deadline']) ?? '未设置'}'
                             : r.subtitle,

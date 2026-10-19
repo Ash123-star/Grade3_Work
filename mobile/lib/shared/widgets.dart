@@ -4,6 +4,7 @@ export 'page_states.dart';
 export 'sunny_button.dart';
 import 'page_states.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart'
@@ -31,9 +32,16 @@ void openForm(
   String form, {
   String? id,
   int? version,
-}) => context.push(
-  '/form/$form${id == null ? '' : '?id=${encode(id)}&version=${version ?? 1}'}',
-);
+  bool restoreDiaryDraft = false,
+}) {
+  final query = [
+    if (id != null) 'id=${encode(id)}',
+    if (id != null) 'version=${version ?? 1}',
+    if (restoreDiaryDraft) 'draftSource=diary',
+  ].join('&');
+  context.push('/form/$form${query.isEmpty ? '' : '?$query'}');
+}
+
 void notice(BuildContext context, String text, {bool success = false}) =>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -292,6 +300,18 @@ class DateControls extends ConsumerWidget {
         ref.read(selectedDateProvider.notifier).state = period == '月'
         ? DateTime(date.year, date.month + direction, 1)
         : date.add(Duration(days: direction * (period == '周' ? 7 : 1)));
+    final tabs = PillTabs(
+      labels: const ['日', '周', '月'],
+      selected: ['日', '周', '月'].indexOf(period),
+      onChanged: (i) =>
+          ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
+    );
+    final today = TextButton.icon(
+      onPressed: () =>
+          ref.read(selectedDateProvider.notifier).state = DateTime.now(),
+      icon: const Icon(Icons.today_outlined, size: 18),
+      label: const Text('今天'),
+    );
     return Column(
       children: [
         Row(
@@ -304,25 +324,35 @@ class DateControls extends ConsumerWidget {
             Expanded(
               child: TextButton(
                 onPressed: () async {
-                  final next = await showDatePicker(
+                  final next = await showCalendarDateWheel(
                     context: context,
                     initialDate: date,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2040),
                   );
                   if (next != null) {
                     ref.read(selectedDateProvider.notifier).state = next;
                   }
                 },
-                child: Text(
-                  period == '月'
-                      ? '${date.year}年${date.month}月'
-                      : '${date.month}月${date.day}日${period == '周' ? ' · 本周' : ''}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: CuteTokens.ink,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          period == '月'
+                              ? '${date.year}年${date.month}月'
+                              : '${date.month}月${date.day}日${period == '周' ? ' · 本周' : ''}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: CuteTokens.ink,
+                          ),
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down, color: CuteTokens.ink),
+                  ],
                 ),
               ),
             ),
@@ -333,14 +363,79 @@ class DateControls extends ConsumerWidget {
             ),
           ],
         ),
-        PillTabs(
-          labels: const ['日', '周', '月'],
-          selected: ['日', '周', '月'].indexOf(period),
-          onChanged: (i) =>
-              ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
-        ),
+        if (period == '月')
+          Row(
+            children: [
+              Expanded(child: tabs),
+              const SizedBox(width: 4),
+              today,
+            ],
+          )
+        else ...[
+          tabs,
+          Align(alignment: Alignment.centerRight, child: today),
+        ],
         const SizedBox(height: 8),
       ],
     );
   }
+}
+
+Future<DateTime?> showCalendarDateWheel({
+  required BuildContext context,
+  required DateTime initialDate,
+}) {
+  var selected = DateTime(initialDate.year, initialDate.month, initialDate.day);
+  return showModalBottomSheet<DateTime>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: SizedBox(
+        height: 340,
+        child: Column(
+          children: [
+            Expanded(
+              child: CupertinoTheme(
+                data: const CupertinoThemeData(
+                  primaryColor: SunnyPalette.primaryStrong,
+                ),
+                child: CupertinoDatePicker(
+                  key: const ValueKey('calendar-date-wheel'),
+                  mode: CupertinoDatePickerMode.date,
+                  dateOrder: DatePickerDateOrder.ymd,
+                  initialDateTime: selected,
+                  minimumYear: 2020,
+                  maximumYear: 2040,
+                  onDateTimeChanged: (value) => selected = value,
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    key: const ValueKey('calendar-date-cancel'),
+                    onPressed: () => Navigator.pop(sheetContext),
+                    child: const Text('取消'),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton(
+                    key: const ValueKey('calendar-date-confirm'),
+                    onPressed: () => Navigator.pop(sheetContext, selected),
+                    child: const Text('确定'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
