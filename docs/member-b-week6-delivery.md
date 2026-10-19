@@ -39,4 +39,4 @@
 - C标签持久化契约尚未提供：创始人管理/颜色/停用和任务日志共享标签权限未接入。
 - C新任务增删改审核尚未接入：当前测试只覆盖已有审核，不代表新能力完成。
 - Flutter客户端新交互、真机及新增功能APK验收不在本批后端/Web交付内。
-- 完成代码验证后提交PR，仍需非作者审阅；不直接合并main。
+- 已推送代码提交`0294287`至lyb，创建[PR #23](https://github.com/Ash123-star/Grade3_Work/pull/23)，关联[Issue #22](https://github.com/Ash123-star/Grade3_Work/issues/22)；仍需非作者审阅，未合并main。
