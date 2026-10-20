@@ -202,7 +202,7 @@ void main() {
       await t.ensureVisible(cell);
       await t.tap(cell);
       await t.pumpAndSettle();
-      expect(find.text('5 条记录'), findsOneWidget);
+      expect(find.descendant(of: find.byType(BottomSheet), matching: find.text('5 条记录')), findsOneWidget);
       c.read(sessionProvider.notifier).state = const Session(active: false);
       await t.pump();
       expect(find.text('账号权限已变化，请关闭后重新查看'), findsOneWidget);

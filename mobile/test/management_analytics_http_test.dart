@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'support/local_test_state.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -623,7 +624,7 @@ void main() {
           Future.value(
             ByteData.sublistView(
               File(
-                'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+                materialIconsFontPath,
               ).readAsBytesSync(),
             ),
           ),
@@ -647,9 +648,11 @@ void main() {
         await t.runAsync(() async {
           final img = await render.toImage(pixelRatio: 1);
           final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-          File(
-            'docs/evidence/stage3-rebuild/$label.png',
-          ).writeAsBytesSync(bytes!.buffer.asUint8List());
+          final output = File(
+            '../output/flutter-evidence/$label.png',
+          );
+          output.parent.createSync(recursive: true);
+          output.writeAsBytesSync(bytes!.buffer.asUint8List());
           img.dispose();
         });
       }
@@ -679,9 +682,11 @@ void main() {
       await t.runAsync(() async {
         final img = await render.toImage(pixelRatio: 1);
         final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-        File(
-          'docs/evidence/stage3-rebuild/30-server-statistics.png',
-        ).writeAsBytesSync(bytes!.buffer.asUint8List());
+        final output = File(
+          '../output/flutter-evidence/30-server-statistics.png',
+        );
+        output.parent.createSync(recursive: true);
+        output.writeAsBytesSync(bytes!.buffer.asUint8List());
         img.dispose();
       });
       await close(t);

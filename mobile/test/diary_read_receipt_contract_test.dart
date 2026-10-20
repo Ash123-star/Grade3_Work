@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -186,7 +187,7 @@ void main() {
     for (final (status, kind) in [
       (401, FailureKind.unauthorized),
       (403, FailureKind.forbidden),
-      (503, FailureKind.server),
+      (503, FailureKind.unavailable),
     ]) {
       adapter.readStatus = status;
       await expectLater(
@@ -415,7 +416,7 @@ void main() {
       ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
       (
         'MaterialIcons',
-        'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+        materialIconsFontPath,
       ),
     ]) {
       await (FontLoader(family)..addFont(
@@ -436,9 +437,11 @@ void main() {
     await t.runAsync(() async {
       final bitmap = await boundary.toImage(pixelRatio: 1);
       final png = await bitmap.toByteData(format: ui.ImageByteFormat.png);
-      await File(
-        'docs/evidence/stage3-rebuild/54-diary-reading-recovery-large.png',
-      ).writeAsBytes(png!.buffer.asUint8List());
+      final output = File(
+        '../output/flutter-evidence/54-diary-reading-recovery-large.png',
+      );
+      output.parent.createSync(recursive: true);
+      await output.writeAsBytes(png!.buffer.asUint8List());
       bitmap.dispose();
     });
     await close(t);

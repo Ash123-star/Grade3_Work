@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'support/local_test_state.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -29,7 +30,7 @@ void main() {
         Future.value(
           ByteData.sublistView(
             File(
-              'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+              materialIconsFontPath,
             ).readAsBytesSync(),
           ),
         ),
@@ -227,7 +228,7 @@ void main() {
         // A separate evidence directory avoids overwriting images held by Windows previews.
         const outputDirectory = String.fromEnvironment(
           'SCREENSHOT_OUTPUT',
-          defaultValue: 'docs/evidence/stage3-rebuild',
+          defaultValue: '../output/flutter-evidence',
         );
         final output = File('$outputDirectory/${screen.$1}.png');
         output.parent.createSync(recursive: true);

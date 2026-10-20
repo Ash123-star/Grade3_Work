@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'support/local_test_state.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -283,7 +284,7 @@ void main() {
       adapter.meStatus = 503;
       await t.tap(find.text('刷新申请状态'));
       await settle(t);
-      expect(find.text('服务暂时不可用，请稍后重试'), findsOneWidget);
+      expect(find.text('无法连接企业服务，请确认后端已启动及连接地址正确'), findsOneWidget);
       expect(c.read(sessionProvider).status, 'PENDING');
       adapter.meStatus = 200;
       adapter.user['status'] = 'ACTIVE';
@@ -390,7 +391,7 @@ void main() {
       adapter.logoutStatus = 503;
       await t.tap(find.widgetWithText(FilledButton, '退出'));
       await settle(t);
-      expect(find.text('退出未完成：服务暂时不可用，请稍后重试'), findsOneWidget);
+      expect(find.text('退出未完成：无法连接企业服务，请确认后端已启动及连接地址正确'), findsOneWidget);
       expect(c.read(sessionProvider).token, 'token-1');
       adapter.logoutStatus = 200;
       await t.ensureVisible(button);
@@ -563,7 +564,7 @@ void main() {
           Future.value(
             ByteData.sublistView(
               File(
-                'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+                materialIconsFontPath,
               ).readAsBytesSync(),
             ),
           ),
@@ -600,7 +601,7 @@ void main() {
         await t.runAsync(() async {
           final img = await render.toImage(pixelRatio: 1);
           final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-          final output = File('docs/evidence/stage3-rebuild/$label.png');
+          final output = File('../output/flutter-evidence/$label.png');
           output.parent.createSync(recursive: true);
           output.writeAsBytesSync(bytes!.buffer.asUint8List());
           img.dispose();
@@ -630,9 +631,11 @@ void main() {
         await t.runAsync(() async {
           final img = await render.toImage(pixelRatio: 1);
           final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-          File(
-            'docs/evidence/stage3-rebuild/$label.png',
-          ).writeAsBytesSync(bytes!.buffer.asUint8List());
+          final output = File(
+            '../output/flutter-evidence/$label.png',
+          );
+          output.parent.createSync(recursive: true);
+          output.writeAsBytesSync(bytes!.buffer.asUint8List());
           img.dispose();
         });
       }

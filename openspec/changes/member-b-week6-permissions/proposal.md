@@ -1,0 +1,22 @@
+## Why
+
+week6 分工要求 B 将既有日志审核与组织范围扩展到 24 小时窗口、部门分组、标签权限及管理员 Web。当前主线 4ded9fc 尚无完整实现；历史验收不代表本批完成。
+
+## What Changes
+
+- P0：提交后不足 24 小时可申请日志修订，窗口外拒绝；窗口内申请可在窗口外审核。撤回重提保留首次提交时间，管理员不例外（用户已确认）。
+- P1：授权下属日志按部门、日期、关键词查询并分组，保留旧 items 分页兼容。
+- P0：创始人标签维护权限、公司/部门/个人可见范围；依赖 C 提供标签持久化和关联契约，禁止另造重复表。
+- P0：独立 web/ 仅 ADMIN，FOUNDER 不自动获准；Flutter Web 仍作联调客户端，Android 普通业务不受影响（用户已确认）。
+- 保留后台并发与审核记录，客户端不展示版本。用户追加授权B实现日志公开评论/回复及Web任务审计；日志权限范围不扩大，评论不受正文窗口限制且不可改删。
+
+## Capabilities
+
+### New Capabilities
+- `member-b-week6-access`: 日志窗口、下属部门查询、标签及管理员工作台权限。
+
+### Modified Capabilities
+
+## Impact
+
+B 刘逸冰负责；Sprint week6（具体里程碑待关联），Issue #22。影响 log、organization、公共鉴权、web/ 以及接口文档和测试。沿用团队→部门→公司独立审核，不修改已发布 V1–V13。Flutter 视觉、任务多参与人模型、AI 非目标。旧 OpenSpec context 的 B 不改 log/Security/web 边界由本次明确分工覆盖。

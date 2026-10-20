@@ -49,6 +49,7 @@ class ApiFailure implements Exception {
             : '账号或密码错误，请重新填写',
       'PASSWORD_CHANGE_REQUIRED' => '首次登录请先修改密码',
       'MEMBERSHIP_PENDING' => '部门归属尚未确认，请刷新申请状态',
+      'ACCOUNT_DISABLED' => '账号已停用，请联系管理员',
       'PASSWORD_UNCHANGED' => '新密码需与原密码不同',
       'PASSWORD_POLICY' => '密码至少12个字符，UTF-8编码不超过72字节',
       _ => switch (kind) {

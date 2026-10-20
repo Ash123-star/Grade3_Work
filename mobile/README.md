@@ -2,7 +2,7 @@
 
 本工程实现 Android UI 框架和真实后端接入。默认使用后端 HTTP Repository；需要离线演示时显式传入 `--dart-define=USE_MOCK=true`。客户端不直接连接数据库、不调用 DeepSeek，不保存 API Key。
 
-设计、接口与验收请从[文档索引](docs/README.md)进入。命令过程日志统一放 `.diagnostics/`（Git忽略），不要再写入工程根目录；历史日志已整理，验收结论与截图保留在 `docs/`。
+设计、接口与验收请从[文档索引](docs/README.md)进入。命令过程日志可放 `.diagnostics/`（Git忽略）；本批自动测试截图统一写入仓库 `output/flutter-evidence/`（Git忽略），不要再写入工程根目录；历史日志已整理，验收结论与截图保留在 `docs/`。
 
 ## 运行
 

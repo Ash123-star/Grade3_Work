@@ -1,3 +1,4 @@
+import 'support/flutter_sdk_assets.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -528,7 +529,7 @@ void main() {
       ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
       (
         'MaterialIcons',
-        'D:/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+        materialIconsFontPath,
       ),
     ]) {
       final loader = FontLoader(item.$1)
@@ -575,7 +576,8 @@ void main() {
     await t.runAsync(() async {
       final image = await boundary.toImage(pixelRatio: 1);
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      final file = File('docs/evidence/stage3-rebuild/40-session-recovery.png');
+      final file = File('../output/flutter-evidence/40-session-recovery.png');
+      file.parent.createSync(recursive: true);
       await file.writeAsBytes(bytes!.buffer.asUint8List());
       image.dispose();
     });

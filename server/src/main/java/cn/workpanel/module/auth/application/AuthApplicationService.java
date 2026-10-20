@@ -3,6 +3,7 @@ package cn.workpanel.module.auth.application;
 import cn.workpanel.contract.ActorContext;
 import cn.workpanel.module.auth.api.AuthApi;
 import java.util.Map;
+import java.util.List;
 
 /**
  * 认证用例服务契约。HTTP 适配器通过该边界调用认证用例，数据库和会话实现由基础设施提供。
@@ -12,5 +13,8 @@ public interface AuthApplicationService extends AuthApi {
     Map<String, Object> changePassword(ActorContext actor, Map<String, Object> command);
 
     /** 撤销当前会话；操作具有幂等语义。 */
-    Map<String, Object> logout(ActorContext actor);
+    Map<String, Object> logout(ActorContext actor, String token);
+
+    /** 公开的注册可选部门，不含公司业务数据。 */
+    List<Map<String, Object>> registrationDepartments();
 }

@@ -7,6 +7,21 @@ const account = ref(''), password = ref(''), error = ref(''), message = ref(''),
 const needsPassword = ref(false), oldPassword = ref(''), newPassword = ref('');
 const scopes = ref<Data[]>([]), scope = ref<Data>({domain: 'PERSONAL'}), preferences = ref<Data>({}), knowledge = ref<Data>({}), analysis = ref<Data>({});
 const memories = ref<Data[]>([]), evidence = ref<Data[]>([]), panel = ref('');
+const workspace = ref('analysis'), auditItems = ref<Data[]>([]), auditTask = ref(''), auditCursor = ref(0), auditTotal = ref(0), auditBusy = ref(false), auditError = ref('');
+let auditGeneration = 0;
+async function loadAudit(cursor = 0) {
+  const ticket = ++auditGeneration; auditBusy.value = true; auditError.value = ''; auditItems.value = [];
+  try {
+    const result = await api('GET','/organization/task-audit',undefined,{cursor:String(cursor),limit:'20',...(auditTask.value.trim()?{taskId:auditTask.value.trim()}:{})});
+    if(ticket !== auditGeneration || !token.value) return;
+    auditItems.value=result.items; auditTotal.value=result.total; auditCursor.value=cursor;
+  } catch(e) { if(ticket === auditGeneration) auditError.value=String(e); }
+  finally { if(ticket === auditGeneration) auditBusy.value=false; }
+}
+function openAudit() { workspace.value='audit';panel.value='';void loadAudit(); }
+const auditLabel = (type: string) => ({TASK_DISPATCHED:'派发任务',TASK_EVENT:'任务进展',REVIEW_REQUESTED:'申请审核',REVIEW_APPROVED:'审核通过',REVIEW_REJECTED:'审核驳回',REVISION_APPLIED:'变更生效'}[type] ?? type);
+function auditValue(value: unknown) { if(typeof value==='string') { try {return JSON.stringify(JSON.parse(value),null,2);} catch {return value;} } return JSON.stringify(value,null,2); }
+
 let timer: ReturnType<typeof setTimeout> | undefined, forgetTimer: ReturnType<typeof setTimeout> | undefined, generation = 0;
 const output = computed<Data>(() => analysis.value.output ?? {});
 const personal = computed(() => scope.value.domain === 'PERSONAL');
@@ -15,21 +30,26 @@ const qualityLabel = (value: string) => ({ LIMITED: '证据有限', INSUFFICIENT
 const claimLabel = (value: string, provenance: string) => value === 'FACT' && provenance === 'SELF_REPORTED' ? '本人记录' : ({ FACT: '业务记录', OBSERVATION: '待核实观察', HYPOTHESIS: '待验证方向' }[value] ?? value);
 const sourceLabel = (value: string) => ({ SELF_REPORTED: '本人提供', BUSINESS_EVENT: '业务事件', AI_EXTRACTED: 'AI 候选' }[value] ?? value);
 async function api(method: string, path: string, body?: Data, query?: Data, headers: Record<string,string> = {}) {
-  const url = `/api${path}${query ? '?' + new URLSearchParams(query).toString() : ''}`;
+  const endpoint = path.startsWith('/auth/') ? `/api${path}` : `/api/admin/workspace${path}`;
+  const url = `${endpoint}${query ? '?' + new URLSearchParams(query).toString() : ''}`;
   const response = await fetch(url, {method, headers: {'Authorization': `Bearer ${token.value}`, ...(body ? {'Content-Type':'application/json'} : {}), ...headers}, body: body ? JSON.stringify(body) : undefined});
   const data = await response.json();
-  if (!response.ok) throw new Error(data.message ?? `请求失败：${response.status}`);
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) logout();
+    throw new Error(data.message ?? `请求失败：${response.status}`);
+  }
   return data;
 }
 async function action(work: () => Promise<void>) { error.value = ''; try { await work(); } catch(e) { error.value = String(e); } }
 async function login() { await action(async () => {
   const result = await api('POST','/auth/login',{account:account.value,password:password.value});
   token.value = result.token;oldPassword.value=password.value;password.value = ''; sessionStorage.setItem('workpanel-token', token.value);
+  if(result.user.role !== 'ADMIN') { logout(); throw new Error('此工作台仅供管理员使用，请使用 Android 客户端'); }
   needsPassword.value=Boolean(result.user.must_change_password);
   if (!needsPassword.value) {oldPassword.value='';await load();}
 }); }
 async function changePassword() {await action(async()=>{await api('POST','/auth/password',{oldPassword:oldPassword.value,newPassword:newPassword.value});logout();message.value='密码已更新，请重新登录';});}
-function logout() { generation++; clearTimeout(timer); clearTimeout(forgetTimer); token.value='';sessionStorage.removeItem('workpanel-token');analysis.value={};preferences.value={};knowledge.value={};scopes.value=[];memories.value=[];evidence.value=[];panel.value='';needsPassword.value=false;oldPassword.value='';newPassword.value=''; }
+function logout() { auditGeneration++;auditItems.value=[];auditTotal.value=0;auditTask.value='';auditError.value='';auditBusy.value=false;workspace.value='analysis';generation++; clearTimeout(timer); clearTimeout(forgetTimer); token.value='';sessionStorage.removeItem('workpanel-token');analysis.value={};preferences.value={};knowledge.value={};scopes.value=[];memories.value=[];evidence.value=[];panel.value='';needsPassword.value=false;oldPassword.value='';newPassword.value=''; }
 async function load() {
   const ticket = ++generation; clearTimeout(timer); busy.value=true;analysis.value={};memories.value=[];evidence.value=[];panel.value='';
   try {
@@ -80,7 +100,7 @@ const nodes = computed(() => [
 ]);
 const edges = computed(()=> (output.value.facts ?? []).flatMap((f:Data,i:number)=>(output.value.directions ?? []).flatMap((d:Data,j:number)=> d.sourceIds?.some((id:string)=>f.sourceIds?.includes(id)) ? [{id:`e-${i}-${j}`,source:`fact-${i}`,target:`direction-${j}`,label:'参考证据'}] : [])));
 onBeforeUnmount(()=>{generation++;clearTimeout(timer);clearTimeout(forgetTimer);});
-if(token.value) action(async()=>{const user=await api('GET','/auth/me');needsPassword.value=Boolean(user.must_change_password);if(!needsPassword.value) await load();});
+if(token.value) action(async()=>{const user=await api('GET','/auth/me');if(user.role!=='ADMIN'){logout();throw new Error('此工作台仅供管理员使用');}needsPassword.value=Boolean(user.must_change_password);if(!needsPassword.value) await load();});
 </script>
 
 <template>
@@ -90,6 +110,17 @@ if(token.value) action(async()=>{const user=await api('GET','/auth/me');needsPas
     <form v-if="!token" class="card login" @submit.prevent="login"><h2>登录企业服务</h2><label>账号<input v-model="account" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button class="primary">登录</button></form>
     <form v-else-if="needsPassword" class="card login" @submit.prevent="changePassword"><h2>首次登录修改密码</h2><label>原密码<input v-model="oldPassword" type="password" autocomplete="current-password" required></label><label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" minlength="12" required></label><button class="primary">修改并重新登录</button></form>
     <template v-else>
+      <nav aria-label="工作台"><button :class="{primary:workspace==='analysis'}" @click="workspace='analysis'">成长分析</button><button :class="{primary:workspace==='audit'}" @click="openAudit">任务审计</button></nav>
+      <section v-if="workspace==='audit'" class="card" aria-label="任务审计记录">
+        <h2>任务审计</h2><p>本公司任务的操作与审核记录，只读保留历史。</p>
+        <form @submit.prevent="loadAudit(0)"><label>任务 ID（可选）<input v-model="auditTask" maxlength="100" placeholder="留空查看全部任务"></label><button :disabled="auditBusy">查询记录</button></form>
+        <p v-if="auditBusy" role="status">正在加载审计记录…</p><p v-else-if="auditError" role="alert" class="error">{{auditError}}</p>
+        <template v-else><p>共 {{auditTotal}} 条记录</p><p v-if="!auditItems.length">暂无匹配的任务审计记录</p>
+          <article v-for="item in auditItems" :key="item.id"><h3>{{auditLabel(item.type)}}</h3><p>{{item.actor_name || item.actor_id}} · {{item.created_at}}</p><p>任务：{{item.task_id}}</p><p>原因：{{item.reason || '未填写'}}</p><details><summary>查看变更前后内容</summary><h4>变更前</h4><pre>{{auditValue(item.before_value)}}</pre><h4>变更后</h4><pre>{{auditValue(item.after_value)}}</pre></details></article>
+          <nav aria-label="审计分页"><button :disabled="auditCursor===0" @click="loadAudit(Math.max(0,auditCursor-20))">上一页</button><span>第 {{Math.floor(auditCursor/20)+1}} 页</span><button :disabled="auditCursor+20>=auditTotal" @click="loadAudit(auditCursor+20)">下一页</button></nav>
+        </template>
+      </section>
+      <template v-else>
       <nav aria-label="分析数据范围"><button v-for="s in scopes" :key="s.domain+s.scopeId" :class="{primary:scope.domain===s.domain && (!scope.scopeId || scope.scopeId===s.scopeId)}" @click="scope={domain:s.domain,scopeType:s.scopeType,scopeId:s.scopeId};action(load)">{{s.label}}</button><button @click="manage">管理记忆</button></nav>
       <section v-if="personal" class="card"><h2>我的目标与偏好</h2><p>仅本人可见；保存后下一次分析使用新目标。</p><label>希望发展的方向<textarea v-model="preferences.explicit_goals" maxlength="2000"></textarea></label><label>建议偏好与可投入时间<textarea v-model="preferences.response_preferences" maxlength="2000"></textarea></label><button @click="saveGoal">保存目标</button></section>
       <section class="card"><p>有效记忆 {{knowledge.memories ?? 0}} 条 · 已索引 {{knowledge.indexedMemories ?? 0}} 条 · 更新中 {{knowledge.indexingMemories ?? 0}} 条 · 待确认 {{knowledge.candidates ?? 0}} 条</p><button class="primary" :disabled="busy || working" @click="generate">{{working?'正在检索证据并生成分析…':'更新分析'}}</button><button v-if="working" @click="action(async()=>{await api('DELETE',`/ai-maps/development/jobs/${analysis.id}`);await load()})">取消</button></section>
@@ -103,6 +134,7 @@ if(token.value) action(async()=>{const user=await api('GET','/auth/me');needsPas
       </template>
       <section v-else-if="!busy && !working" class="card"><h2>从有效工作记录开始</h2><p>提交日志、补充成果与目标，再更新分析。证据不足时会说明信息缺口。</p></section>
       <aside v-if="panel" class="drawer" aria-label="记忆与证据"><button @click="panel=''">关闭</button><template v-if="panel==='memory'"><h2>记忆知识库</h2><button @click="edit()">补充经历</button><p>前 30 条；原始记录不会因停止记忆被删除。</p><article v-for="m in memories" :key="m.id"><p>{{m.content}}</p><small>{{claimLabel(m.claim_type,m.provenance)}} · {{m.status==='CANDIDATE'?'待确认':'已生效'}} · 来源版本 {{m.source_version}}</small><div><button @click="edit(m)">纠正</button><button v-if="m.status==='CANDIDATE'" @click="confirmMemory(m)">确认观察</button><button @click="forget(m)">停止记忆</button></div></article></template><template v-else><h2>RAG 分析依据</h2><article v-for="e in evidence" :key="e.chunkId"><p>{{e.text}}</p><small>{{sourceLabel(e.provenance)}} · 来源版本 {{e.version}}</small></article></template></aside>
+      </template>
     </template>
   </main>
 </template>
