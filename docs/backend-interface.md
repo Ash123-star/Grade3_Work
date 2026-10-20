@@ -25,7 +25,7 @@
 
 ## 任务 `/tasks`
 
-`GET /tasks` 列表故意不返回完成情况或状态列；流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 创建任务需要 `title,deadline,ownerId`，支持协作人、附件和 `Idempotency-Key`。
+`GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
 
 `POST /tasks/{id}/events` 请求至少包含当前 `version` 和 `type`。事件枚举及附加字段如下：
 
@@ -41,7 +41,9 @@
 
 事件更新使用乐观锁；版本不匹配返回 `409 VERSION_CONFLICT`，字段缺失或时间格式错误返回 `400`。事件写入和任务更新在同一事务中完成。
 
-`POST /tasks/{id}/revisions` 修改已发布任务并携带版本，必要时进入审核。无派发资格返回 403。
+`POST /tasks/{id}/revisions` 修改已发布任务并携带版本、理由和候选内容，批准后才生效；候选可调整参与人、唯一标签、开始/截止时间和说明。`POST /tasks/{id}/deletions` 带 `{version,reason}` 提交删除审核，批准后归档而非物理删除。两个操作均拒绝旧版本覆盖。
+
+`GET/POST /tasks/{taskId}/comments` 读取或新增任务公开评论。评论包含作者、昵称、头像标识、时间、正文与可选 `parentId`；有任务读取权限者可读，派发人、参与人或管理员可写。新增必须给 `Idempotency-Key`，评论不可编辑或删除，评论、审计与通知 outbox 同一事务写入。标签由 `GET/POST/PUT /task-labels` 管理，直接写入仅创始人可用，更新携带 `version`。
 
 ## 日志 `/logs`
 

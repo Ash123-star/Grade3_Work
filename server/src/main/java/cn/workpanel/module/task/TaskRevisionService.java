@@ -47,6 +47,17 @@ public class TaskRevisionService {
         return new ReviewRequest(version, Map.of("deadline", oldDeadline), Map.of("deadline", deadline));
     }
 
+    /** 删除只提交审核申请；批准后归档，永不物理删除。 */
+    public ReviewRequest prepareDeletion(Actor actor,String taskId,Map<String,Object> request) {
+        var task=TaskAccess.readable(db,actor,taskId,true); Db.fields(request,"version","reason");
+        String reason=Db.required(request,"reason"); int version=Db.version(request);
+        if(!actor.id().equals(Db.str(task,"issuer_id"))&&!actor.admin()) throw ApiError.forbidden();
+        if(TaskStateMachine.Phase.parse(Db.str(task,"phase")).terminal()) throw new ApiError(409,"INVALID_TRANSITION","终态任务不能删除");
+        if(version!=Integer.parseInt(Db.str(task,"version"))) throw ApiError.conflict();
+        var before=new LinkedHashMap<String,Object>(); before.put("title",Db.str(task,"title")); before.put("body",db.read(task.get("body"))); before.put("phase",Db.str(task,"phase"));
+        return new ReviewRequest(version,before,Map.of("reason",reason,"summary",before));
+    }
+
     private void authorizeDedicated(Actor actor, Map<String, Object> task, TaskStateMachine.Action action, int requestedVersion) {
         var phase = TaskStateMachine.Phase.parse(Db.str(task, "phase"));
         var decision = TaskStateMachine.decide(phase, action, TaskRoles.resolve(db, actor, task));
@@ -60,15 +71,10 @@ public class TaskRevisionService {
         }
     }
 
-    /** 通用修订不得借道修改负责人或截止时间，二者须经过专用复核。 */
+    /** 通用修订经审核后可以修改参与人、标签和带时区的时间。 */
     public Map<String, Object> validateGeneric(Db db, Actor actor, Map<String, Object> task,
             Map<String, Object> candidate) {
         var normalized = TaskRevisionSupport.validate(db, actor, Db.str(task, "id"), candidate);
-        var current = db.read(task.get("body"));
-        if (!Db.str(current, "ownerId").equals(Db.str(normalized, "ownerId"))
-                || !sameDeadline(Db.str(current, "deadline"), Db.str(normalized, "deadline"))) {
-            throw ApiError.bad("USE_DEDICATED_REVISION", "负责人和截止时间须通过转派或改期申请修改");
-        }
         return normalized;
     }
 
@@ -78,8 +84,8 @@ public class TaskRevisionService {
         var normalized = validateGeneric(db, applicant, task, candidate);
         var draft = TaskRevisionSupport.apply(db, applicant, Db.str(task, "id"), normalized);
         int nextVersion = expectedVersion + 1;
-        Db.conflict(db.update("UPDATE tasks SET title=?,body=?::jsonb,version=? WHERE id=? AND version=?",
-                draft.title(), db.write(draft.body()), nextVersion, Db.str(task, "id"), expectedVersion));
+        Db.conflict(db.update("UPDATE tasks SET title=?,start_at=?::timestamptz,deadline=?::timestamptz,body=?::jsonb,version=? WHERE id=? AND version=?",
+                draft.title(),draft.startAt(),draft.deadline(), db.write(draft.body()), nextVersion, Db.str(task, "id"), expectedVersion));
         String phase = Db.str(task, "phase");
         TaskTimeline.append(db, applicant, Db.str(task, "id"), "REVISED", draft.body(), phase, phase, nextVersion);
         notifyParticipants(db, applicant, Db.str(task, "id"), nextVersion, "TASK_REVISED");
@@ -93,19 +99,15 @@ public class TaskRevisionService {
         if (oldOwner.equals(newOwner)) throw ApiError.bad("SAME_OWNER", "新负责人不能与当前负责人相同");
         ensureActiveOwner(db, applicant, newOwner);
         var body = new LinkedHashMap<>(db.read(task.get("body")));
-        body.put("ownerId", newOwner);
-        var collaborators = new ArrayList<String>();
-        Object rawCollaborators = body.get("collaborators");
-        if (rawCollaborators instanceof List<?> list) for (Object value : list) {
-            String collaborator = String.valueOf(value);
-            if (!collaborator.equals(oldOwner) && !collaborator.equals(newOwner)) collaborators.add(collaborator);
-        }
-        body.put("collaborators", collaborators.stream().distinct().sorted().toList());
+        body.remove("ownerId"); body.remove("collaborators");
+        var participants=new TreeSet<String>();
+        for(var row:db.rows("SELECT user_id FROM task_participants WHERE task_id=?",taskId)) participants.add(Db.str(row,"user_id"));
+        participants.remove(oldOwner); participants.add(newOwner); body.put("participants",List.copyOf(participants));
         int nextVersion = expectedVersion + 1;
         Db.conflict(db.update("UPDATE tasks SET owner_id=?,body=?::jsonb,phase='DISPATCHED',version=? WHERE id=? AND version=?",
                 newOwner, db.write(body), nextVersion, taskId, expectedVersion));
-        db.update("DELETE FROM task_assignees WHERE task_id=? AND user_id IN (?,?)", taskId, oldOwner, newOwner);
-        db.update("INSERT INTO task_assignees(task_id,user_id,kind,company_id) VALUES (?,?,'PRIMARY',?)",
+        db.update("DELETE FROM task_participants WHERE task_id=? AND user_id=?", taskId, oldOwner);
+        db.update("INSERT INTO task_participants(task_id,user_id,company_id) VALUES (?,?,?) ON CONFLICT (task_id,user_id) DO NOTHING",
                 taskId, newOwner, applicant.company());
         TaskTimeline.append(db, applicant, taskId, "REASSIGNED", Map.of("oldOwnerId", oldOwner, "ownerId", newOwner, "reason", reason),
                 Db.str(task, "phase"), TaskStateMachine.Phase.DISPATCHED.name(), nextVersion);
@@ -127,6 +129,15 @@ public class TaskRevisionService {
         TaskTimeline.append(db, applicant, taskId, "RESCHEDULED", Map.of("oldDeadline", oldDeadline, "deadline", deadline, "reason", reason),
                 phase, phase, nextVersion);
         notifyParticipants(db, applicant, taskId, nextVersion, "TASK_RESCHEDULED");
+    }
+
+    /** 审核通过的删除申请只归档，不物理删除任务及其审计历史。 */
+    public void applyDeletion(Db db,Actor applicant,Map<String,Object> task,int expectedVersion,String reason) {
+        requireNotTerminal(task); String taskId=Db.str(task,"id"); int nextVersion=expectedVersion+1;
+        var summary=Map.of("title",Db.str(task,"title"),"body",db.read(task.get("body")),"reason",reason);
+        Db.conflict(db.update("UPDATE tasks SET phase='ARCHIVED',version=? WHERE id=? AND version=?",nextVersion,taskId,expectedVersion));
+        TaskTimeline.append(db,applicant,taskId,"ARCHIVED",summary,Db.str(task,"phase"),"ARCHIVED",nextVersion);
+        db.audit(applicant,"TASK_DELETED_BY_REVIEW",taskId,summary,Map.of("phase","ARCHIVED","version",nextVersion),reason);
     }
 
     public static boolean sameDeadline(String first, String second) {
@@ -152,7 +163,7 @@ public class TaskRevisionService {
     private static void notifyParticipants(Db db, Actor actor, String taskId, int version, String type) {
         var recipients = new LinkedHashSet<String>();
         recipients.add(Db.str(db.one("SELECT issuer_id FROM tasks WHERE id=? AND company_id=?", taskId, actor.company()), "issuer_id"));
-        for (var participant : db.rows("SELECT user_id FROM task_assignees WHERE task_id=?", taskId)) recipients.add(Db.str(participant, "user_id"));
+        for (var participant : db.rows("SELECT user_id FROM task_participants WHERE task_id=?", taskId)) recipients.add(Db.str(participant, "user_id"));
         for (String recipient : recipients) db.notify(actor, recipient, type, taskId,
                 type.toLowerCase(Locale.ROOT) + ":" + taskId + ":" + version + ":" + recipient);
     }
