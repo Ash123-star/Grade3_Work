@@ -73,9 +73,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
           if (selectedDate != null) _dateLabel(selectedDate),
           '选择日期…',
         ],
-        selected: selectedDate == null
-            ? '全部日期'
-            : _dateLabel(selectedDate),
+        selected: selectedDate == null ? '全部日期' : _dateLabel(selectedDate),
       );
       if (!context.mounted || choice == null) return;
       if (choice == '全部日期') {
@@ -102,6 +100,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
 
     return PageFrame(
       title: team ? '下属日志' : '日志',
+      showTitle: team,
       actions: [
         if (!team && user.manager)
           TextButton(
@@ -137,7 +136,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
             ),
             const SizedBox(height: 12),
             people!.when(
-              loading: () => const LinearProgressIndicator(),
+              loading: () => const SunnyLoadingIndicator(),
               error: (error, _) => RecordFailure(
                 error,
                 retry: () => ref.invalidate(recordsProvider('organization')),

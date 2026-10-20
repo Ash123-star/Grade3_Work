@@ -463,12 +463,15 @@ void main() {
       expect(find.text('本人的全部任务'), findsOneWidget);
       expect(find.byTooltip('新增任务'), findsNothing);
       c.read(scenarioProvider.notifier).state = DemoScenario.offline;
+      c.invalidate(recordsProvider('tasks'));
       await t.pumpAndSettle();
       expect(find.textContaining('网络连接超时'), findsOneWidget);
       c.read(scenarioProvider.notifier).state = DemoScenario.empty;
+      c.invalidate(recordsProvider('tasks'));
       await t.pumpAndSettle();
       expect(find.text('暂无任务记录'), findsOneWidget);
       c.read(scenarioProvider.notifier).state = DemoScenario.normal;
+      c.invalidate(recordsProvider('tasks'));
       await t.pumpAndSettle();
       expect(find.text('暂无任务记录'), findsNothing);
       expect(t.takeException(), isNull);

@@ -48,59 +48,38 @@ void notice(BuildContext context, String text, {bool success = false}) =>
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(
             color: success
-                ? SunnyPalette.primaryStrong.withValues(alpha: .3)
-                : const Color(0xFFE0A3A3),
+                ? const Color(0xFFB9DED0)
+                : Theme.of(context).colorScheme.error.withValues(alpha: .28),
           ),
         ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: success
+            ? const Color(0xFFEAF6F0)
+            : Theme.of(context).colorScheme.errorContainer,
+        elevation: 2,
         closeIconColor: Theme.of(context).colorScheme.onSurface,
         showCloseIcon: true,
-        content: Stack(
+        content: Row(
           children: [
-            Positioned.fill(
-              child: TuantuanSkin(
-                TuantuanAssets.feedbackSkins[success ? 'success' : 'error']!,
-              ),
+            Icon(
+              success ? Icons.check_circle_outline : Icons.error_outline,
+              color: success
+                  ? SunnyPalette.successInk
+                  : Theme.of(context).colorScheme.error,
+              size: 22,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: success
-                  ? Row(
-                      children: [
-                        const TuantuanMascot('success', size: 34),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            text,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onTertiaryContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        const Icon(
-                          Icons.error_rounded,
-                          color: SunnyPalette.brandOrange,
-                          size: 28,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            text,
-                            style: const TextStyle(color: SunnyPalette.ink),
-                          ),
-                        ),
-                      ],
-                    ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: success
+                      ? const Color(0xFF246447)
+                      : Theme.of(context).colorScheme.onErrorContainer,
+                ),
+              ),
             ),
           ],
         ),
@@ -120,8 +99,8 @@ class PageBody extends StatelessWidget {
   final ScrollController? controller;
   final Widget? header;
   @override
-  Widget build(BuildContext context) => TuantuanPaperBackdrop(
-    child: Align(
+  Widget build(BuildContext context) {
+    final content = Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
@@ -131,8 +110,9 @@ class PageBody extends StatelessWidget {
           children: [?header, ...children],
         ),
       ),
-    ),
-  );
+    );
+    return TuantuanPaperBackdrop(child: content);
+  }
 }
 
 class PageFrame extends StatelessWidget {
@@ -140,37 +120,64 @@ class PageFrame extends StatelessWidget {
     super.key,
     required this.title,
     required this.child,
+    this.showTitle = true,
     this.actions,
     this.fab,
     this.bottom,
   });
   final String title;
   final Widget child;
+  final bool showTitle;
   final List<Widget>? actions;
   final Widget? fab;
   final Widget? bottom;
   @override
   Widget build(BuildContext context) {
     final canGoBack = Navigator.of(context).canPop();
-    final header = canGoBack || (actions?.isNotEmpty ?? false)
-        ? ConstrainedBox(
-            key: const ValueKey('page-scroll-actions'),
-            constraints: const BoxConstraints(minHeight: 48),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final headerContent = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (showTitle)
+            Row(
               children: [
-                if (canGoBack) const BackButton(),
+                const DogAvatar(index: DogAssets.friendly, size: 30),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: actions ?? const [],
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
+          if (canGoBack || (actions?.isNotEmpty ?? false))
+            ConstrainedBox(
+              key: const ValueKey('page-scroll-actions'),
+              constraints: const BoxConstraints(minHeight: 40),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (canGoBack) const BackButton(),
+                  Expanded(
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: actions ?? const [],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    final header = showTitle || canGoBack || (actions?.isNotEmpty ?? false)
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: headerContent,
           )
-        : null;
+        : const SizedBox.shrink();
     final content = child;
     return Scaffold(
       body: SafeArea(
@@ -181,14 +188,9 @@ class PageFrame extends StatelessWidget {
                 header: header,
                 children: content.children,
               )
-            : header == null
-            ? TuantuanPaperBackdrop(child: content)
             : TuantuanPaperBackdrop(
-                child: NestedScrollView(
-                  headerSliverBuilder: (_, _) => [
-                    SliverToBoxAdapter(child: header),
-                  ],
-                  body: content,
+                child: Column(
+                  children: [header, Expanded(child: content)],
                 ),
               ),
       ),
@@ -286,7 +288,7 @@ Color _resourceAccent(BuildContext context, String resource) =>
       'logs' || 'logs/subordinates' => SunnyPalette.coral,
       'notifications' => SunnyPalette.blue,
       'reviews' => SunnyPalette.purple,
-      'organization' => SunnyPalette.mint,
+      'organization' => SunnyPalette.primaryContainer,
       _ => Theme.of(context).colorScheme.surface,
     };
 

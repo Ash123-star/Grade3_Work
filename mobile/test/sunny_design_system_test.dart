@@ -18,6 +18,7 @@ import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/page_states.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/widgets.dart' show notice;
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 
 Widget host(Widget child, {bool reduceMotion = false, double scale = 1}) =>
@@ -51,11 +52,11 @@ void main() {
       theme.navigationBarTheme.iconTheme!.resolve({
         WidgetState.selected,
       })!.color,
-      const Color(0xFF319E7A),
+      SunnyPalette.primaryStrong,
     );
   });
 
-  testWidgets('press edge, keyboard focus and disabled activation', (t) async {
+  testWidgets('pressed, keyboard focus and disabled activation', (t) async {
     var calls = 0;
     final focus = FocusNode();
     addTearDown(focus.dispose);
@@ -74,16 +75,19 @@ void main() {
     );
     BoxDecoration decoration() =>
         t.widget<AnimatedContainer>(surface).decoration! as BoxDecoration;
-    expect(decoration().boxShadow!.first.offset.dy, 3);
+    expect(decoration().boxShadow, isEmpty);
     final finger = await t.startGesture(t.getCenter(find.byType(FilledButton)));
     await t.pump(const Duration(milliseconds: 120));
-    expect(decoration().boxShadow!.first.offset.dy, 1);
+    expect(
+      t.widget<AnimatedContainer>(surface).transform!.getTranslation().y,
+      1,
+    );
     await finger.up();
     await t.pumpAndSettle();
     expect(calls, 1);
     focus.requestFocus();
     await t.pumpAndSettle();
-    expect(decoration().boxShadow!.any((s) => s.spreadRadius == 3), isTrue);
+    expect(decoration().boxShadow!.any((s) => s.spreadRadius == 2), isTrue);
     await t.sendKeyEvent(LogicalKeyboardKey.enter);
     await t.pumpAndSettle();
     expect(calls, 2);
@@ -91,7 +95,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byType(FilledButton));
     expect(calls, 2);
-    expect(decoration().boxShadow!.any((s) => s.offset.dy > 0), isFalse);
+    expect(decoration().boxShadow, isEmpty);
     final style = t.widget<FilledButton>(find.byType(FilledButton)).style!;
     expect(
       style.backgroundColor!.resolve({WidgetState.disabled}),
@@ -115,7 +119,7 @@ void main() {
     await t.pump();
     expect(t.getSize(find.byType(SunnyPrimaryButton)), size);
     expect(find.text('保存建议草稿'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(SunnyLoadingIndicator), findsOneWidget);
     await t.tap(find.byType(FilledButton));
     expect(calls, 0);
     expect(
@@ -141,7 +145,7 @@ void main() {
     await t.pump();
     final surface = t.widget<AnimatedContainer>(find.byType(AnimatedContainer));
     expect(surface.duration, Duration.zero);
-    expect(surface.transform!.getTranslation().y, 2);
+    expect(surface.transform!.getTranslation().y, 1);
     await finger.up();
     await t.pump();
   });
@@ -150,10 +154,7 @@ void main() {
     t,
   ) async {
     await t.pumpWidget(host(const EmptyIllustration()));
-    expect(
-      t.widget<TuantuanMascot>(find.byType(TuantuanMascot)).pose,
-      'empty',
-    );
+    expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
     await t.pumpWidget(
       host(
         RecordFailure(
@@ -162,10 +163,7 @@ void main() {
         ),
       ),
     );
-    expect(
-      t.widget<TuantuanMascot>(find.byType(TuantuanMascot)).pose,
-      'error',
-    );
+    expect(find.byIcon(Icons.cloud_off_outlined), findsOneWidget);
     await t.pumpWidget(
       host(
         const EmptyIllustration(
@@ -175,11 +173,11 @@ void main() {
         ),
       ),
     );
-    expect(find.byType(TuantuanMascot), findsNothing);
+    expect(find.byType(DogPose), findsNothing);
     expect(find.text('无权访问'), findsOneWidget);
   });
 
-  testWidgets('only confirmed success feedback uses success pose', (t) async {
+  testWidgets('feedback uses a compact icon and plain surface', (t) async {
     late BuildContext context;
     await t.pumpWidget(
       host(
@@ -193,18 +191,45 @@ void main() {
     );
     notice(context, '草稿已加密保存到此设备', success: true);
     await t.pump();
-    expect(
-      t.widget<TuantuanMascot>(find.byType(TuantuanMascot)).pose,
-      'success',
-    );
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    expect(find.byType(TuantuanSkin), findsNothing);
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     await t.pump();
     notice(context, '修订已提交，等待复核');
     await t.pump();
-    expect(find.byType(TuantuanMascot), findsNothing);
+    expect(find.byType(DogPose), findsNothing);
   });
 
-  testWidgets('calendar type toggles expose changed accessibility state', (
+  testWidgets('dropdown choices use the shared rounded option sheet', (
+    t,
+  ) async {
+    String? value = 'all';
+    await t.pumpWidget(
+      host(
+        StatefulBuilder(
+          builder: (context, setState) => PremiumDropdownField<String>(
+            key: ValueKey(value),
+            initialValue: value,
+            decoration: const InputDecoration(labelText: '部门筛选'),
+            items: const [
+              DropdownMenuItem(value: 'all', child: Text('全部部门')),
+              DropdownMenuItem(value: 'design', child: Text('设计部')),
+            ],
+            onChanged: (next) => setState(() => value = next),
+          ),
+        ),
+      ),
+    );
+    await t.tap(find.text('全部部门'));
+    await t.pumpAndSettle();
+    expect(find.text('设计部'), findsOneWidget);
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    await t.tap(find.text('设计部'));
+    await t.pumpAndSettle();
+    expect(value, 'design');
+  });
+
+  testWidgets('calendar view exposes task records without type toggle', (
     t,
   ) async {
     final semantics = t.ensureSemantics();
@@ -221,16 +246,31 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    Semantics filter() => t
-        .widgetList<Semantics>(find.byType(Semantics))
-        .firstWhere((w) => w.properties.toggled != null);
-    expect(filter().properties.toggled, isTrue);
-    await t.tap(find.text('● 任务'));
-    await t.pumpAndSettle();
-    expect(filter().properties.toggled, isFalse);
-    expect(find.text('○ 任务'), findsOneWidget);
+    expect(find.text('● 任务'), findsNothing);
+    expect(find.text('○ 任务'), findsNothing);
     expect(t.takeException(), isNull);
     semantics.dispose();
+  });
+
+  testWidgets('illustration layers are opt-in for selected surfaces', (
+    t,
+  ) async {
+    await t.pumpWidget(
+      host(
+        const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PaperSurface(child: Text('plain')),
+            PaperSurface(
+              decorated: true,
+              skin: 'mint',
+              child: Text('illustrated'),
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(find.byType(TuantuanSkin), findsOneWidget);
   });
 
   testWidgets('render component states and all six original poses', (t) async {
@@ -245,11 +285,7 @@ void main() {
     final icons = FontLoader('MaterialIcons')
       ..addFont(
         Future.value(
-          ByteData.sublistView(
-            File(
-              materialIconsFontPath,
-            ).readAsBytesSync(),
-          ),
+          ByteData.sublistView(File(materialIconsFontPath).readAsBytesSync()),
         ),
       );
     await font.load();

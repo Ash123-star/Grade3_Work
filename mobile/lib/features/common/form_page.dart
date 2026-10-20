@@ -594,7 +594,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                     InputChip(
                       avatar: CircleAvatar(
                         radius: 11,
-                        backgroundColor: SunnyPalette.mint,
+                        backgroundColor: SunnyPalette.primaryContainer,
                         child: Text(
                           person.title.isEmpty
                               ? '人'
@@ -780,7 +780,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           children: [
             _taskRow(
               label,
-              DropdownButtonFormField<String>(
+              PremiumDropdownField<String>(
                 initialValue: options.contains(controller.text)
                     ? controller.text
                     : null,
@@ -855,12 +855,12 @@ class _FormPageState extends ConsumerState<FormPage> {
       return ref
           .watch(registrationDepartmentsProvider)
           .when(
-            loading: () => const LinearProgressIndicator(),
+            loading: () => const SunnyLoadingIndicator(),
             error: (e, _) => ErrorPanel(
               '无法加载注册部门：$e',
               retry: () => ref.invalidate(registrationDepartmentsProvider),
             ),
-            data: (page) => DropdownButtonFormField<String>(
+            data: (page) => PremiumDropdownField<String>(
               initialValue: page.items.any((r) => r.id == selectedDepartment)
                   ? selectedDepartment
                   : null,
@@ -886,7 +886,7 @@ class _FormPageState extends ConsumerState<FormPage> {
       _ => <String>[],
     };
     if (options.isNotEmpty) {
-      return DropdownButtonFormField<String>(
+      return PremiumDropdownField<String>(
         key: ValueKey('$label:${controller.text}'),
         initialValue: options.contains(controller.text)
             ? controller.text
@@ -1542,6 +1542,7 @@ class _FormPageState extends ConsumerState<FormPage> {
         : [(auth ? '账号信息' : '填写内容', spec.fields)];
     return PageFrame(
       title: document ? (log ? '写日志' : '修改日志') : spec.title,
+      showTitle: !auth,
       actions: document
           ? [
               Padding(
@@ -1592,45 +1593,128 @@ class _FormPageState extends ConsumerState<FormPage> {
       child: PageBody(
         children: [
           if (auth) ...[
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E5),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFF0DDC8)),
+              ),
+              padding: const EdgeInsets.fromLTRB(18, 18, 14, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: SunnyPalette.primary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: widget.kind == 'login' ? '工作' : '协作',
+                                style: const TextStyle(
+                                  fontFamily: 'serif',
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w600,
+                                  color: DogBrandPalette.ink,
+                                ),
+                              ),
+                              TextSpan(
+                                text: widget.kind == 'login' ? '有序' : '同行',
+                                style: const TextStyle(
+                                  fontFamily: 'serif',
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w700,
+                                  fontStyle: FontStyle.italic,
+                                  color: SunnyPalette.primaryStrong,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const DogPose(index: DogAssets.sitting, size: 104),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.kind == 'login'
-                            ? '把工作理清楚，\n从今天开始。'
-                            : '和团队一起，\n把事情做好。',
-                        style: const TextStyle(
-                          fontFamily: AppTypography.displayFamily,
-                          fontSize: 27,
-                          fontWeight: FontWeight.w700,
-                          height: 1.4,
+                for (final feature in const [
+                  ('任务协同', Icons.task_alt_rounded),
+                  ('工作日志', Icons.edit_note_rounded),
+                  ('日程视图', Icons.calendar_month_rounded),
+                ])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 42),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFCF7),
+                          borderRadius: BorderRadius.circular(13),
+                          border: Border.all(color: DogBrandPalette.line),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              feature.$2,
+                              size: 16,
+                              color: SunnyPalette.primaryStrong,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                feature.$1,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: DogBrandPalette.ink,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '阳光纸张 · 你的协作工作台',
-                        style: TextStyle(color: CuteTokens.muted),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const TuantuanMascot('welcome', size: 96),
               ],
             ),
-            const SizedBox(height: 24),
-          ],
-          if (widget.kind == 'register')
-            const Padding(
-              padding: EdgeInsets.only(bottom: 20),
-              child: Text(
-                '注册仅创建待确认员工。选择申请部门，管理员确认后可访问公司内容。短信验证尚未接入。',
-                style: TextStyle(height: 1.6, color: CuteTokens.muted),
-              ),
+            const SizedBox(height: 14),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'login', label: Text('登录')),
+                ButtonSegment(value: 'register', label: Text('注册')),
+              ],
+              selected: {widget.kind},
+              onSelectionChanged: busy
+                  ? null
+                  : (selection) => context.go(
+                      selection.single == 'register'
+                          ? '/auth/register'
+                          : '/auth/login',
+                    ),
+              showSelectedIcon: false,
             ),
+            const SizedBox(height: 14),
+          ],
           if (widget.kind == 'password') ...[
             PaperSurface(
               child: Text(
@@ -1690,7 +1774,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const TuantuanMascot('welcome', size: 56),
+                const DogPose(index: DogAssets.resting, size: 52),
               ],
             ),
             const SizedBox(height: 16),
@@ -1777,6 +1861,41 @@ class _FormPageState extends ConsumerState<FormPage> {
                         ],
                       ),
                     )
+                  : auth
+                  ? PaperSurface(
+                      color: DogBrandPalette.surface,
+                      borderColor: DogBrandPalette.line,
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.key_rounded,
+                                size: 19,
+                                color: SunnyPalette.primaryStrong,
+                              ),
+                              const SizedBox(width: 7),
+                              Text(
+                                widget.kind == 'login' ? '账号密码登录' : '创建员工账号',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: DogBrandPalette.ink,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          for (final label in spec.fields) ...[
+                            field(label),
+                            if (label != spec.fields.last)
+                              const SizedBox(height: 14),
+                          ],
+                        ],
+                      ),
+                    )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -1836,10 +1955,67 @@ class _FormPageState extends ConsumerState<FormPage> {
               ),
             ),
           ],
-          if (widget.kind == 'login')
-            TextButton(
-              onPressed: () => context.push('/auth/register'),
-              child: const Text('注册员工账号'),
+          if (widget.kind == 'register')
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF4E8),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFF0DDC8)),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 19,
+                        color: SunnyPalette.primaryStrong,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '注册仅申请创建待确认员工。请选择申请部门；管理员确认前无法访问公司内容。短信验证尚未接入。',
+                          style: TextStyle(
+                            color: DogBrandPalette.ink,
+                            height: 1.45,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (auth)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.shield_outlined,
+                    size: 18,
+                    color: DogBrandPalette.muted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.kind == 'login'
+                          ? '企业账号用于进入对应组织空间，业务数据范围按账号权限控制。'
+                          : '账号归属由管理员确认；确认前不会开放公司业务资料。',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: DogBrandPalette.muted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           const DemoLabel(),
         ],

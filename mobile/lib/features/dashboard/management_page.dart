@@ -8,6 +8,7 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 
 const managementKinds = {
   'department',
@@ -289,7 +290,7 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
     bool required = false,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
-    child: DropdownButtonFormField<String>(
+    child: PremiumDropdownField<String>(
       key: ValueKey('$label:$value:${options.map((e) => e.$1).join(',')}'),
       initialValue: options.any((e) => e.$1 == value) ? value : null,
       isExpanded: true,

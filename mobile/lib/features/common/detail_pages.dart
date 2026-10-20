@@ -122,9 +122,10 @@ class _ListPageState extends ConsumerState<ListPage> {
       String value,
       List<String> options,
       ValueChanged<String> onChanged,
-    ) => DropdownButton<String>(
-      value: value,
-      underline: const SizedBox.shrink(),
+    ) => PremiumDropdownField<String>(
+      initialValue: value,
+      decoration: const InputDecoration(border: InputBorder.none),
+      isExpanded: false,
       items: options
           .map(
             (v) => DropdownMenuItem(
@@ -529,9 +530,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                                   const SizedBox(
                                     width: 18,
                                     height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
+                                    child: SunnyLoadingIndicator(size: 18),
                                   )
                                 else
                                   const Icon(Icons.chevron_right, size: 18),
@@ -1641,7 +1640,7 @@ class OwnPrivateNote extends ConsumerWidget {
             ref
                 .watch(itemProvider(('private-notes', id)))
                 .when(
-                  loading: () => const LinearProgressIndicator(),
+                  loading: () => const SunnyLoadingIndicator(),
                   error: (e, _) =>
                       e is ApiFailure && e.kind == FailureKind.notFound
                       ? const Text('暂无私人备注')
@@ -1689,7 +1688,7 @@ class MemberRecords extends ConsumerWidget {
       ref
           .watch(memberRecordsProvider((resource, ownerId)))
           .when(
-            loading: () => const LinearProgressIndicator(),
+            loading: () => const SunnyLoadingIndicator(),
             error: (e, s) => RecordFailure(
               e,
               retry: () =>

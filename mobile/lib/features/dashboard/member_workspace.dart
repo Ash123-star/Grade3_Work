@@ -10,6 +10,7 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/features/common/detail_pages.dart';
 
 String memberDayLabel(DateTime date) =>
@@ -168,7 +169,8 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                   data: (member) => PageBody(
                     children: [
                       PaperSurface(
-                        color: CuteTokens.blue,
+                        color: const Color(0xFFFFFCF7),
+                        borderColor: const Color(0xFFEEDCCB),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -191,7 +193,11 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                                     ),
                                   ),
                                 ),
-                                const Icon(Icons.lock_outline, size: 18),
+                                const Icon(
+                                  Icons.lock_outline_rounded,
+                                  size: 18,
+                                  color: DogBrandPalette.muted,
+                                ),
                               ],
                             ),
                             const SizedBox(height: 8),

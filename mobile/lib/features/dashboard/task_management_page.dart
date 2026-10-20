@@ -296,7 +296,17 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
           : null,
       child: PageBody(
         children: [
-          Text('任务管理', style: Theme.of(context).textTheme.headlineSmall),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '任务管理',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ),
+              const DogAvatar(index: DogAssets.friendly, size: 32),
+            ],
+          ),
           const SizedBox(height: 8),
           Text(
             user.manager ? '本人及下属的全部任务' : '本人的全部任务',

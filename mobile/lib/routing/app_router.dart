@@ -15,7 +15,8 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
-import 'package:pandora_mobile/features/dashboard/organization_browser.dart';
+import 'package:pandora_mobile/features/dashboard/personnel_page.dart';
+import 'package:pandora_mobile/features/dashboard/task_management_page.dart';
 import 'package:pandora_mobile/features/dashboard/own_profile_page.dart';
 import 'package:pandora_mobile/core/state/session_lifecycle.dart';
 import 'package:pandora_mobile/core/config.dart';
@@ -24,7 +25,8 @@ import 'package:pandora_mobile/features/dashboard/server_analytics_page.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/features/ai_map/ai_job_pages.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_tools.dart';
-import 'package:pandora_mobile/features/ai_map/long_term_memory_page.dart' as memory;
+import 'package:pandora_mobile/features/ai_map/long_term_memory_page.dart'
+    as memory;
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -61,10 +63,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/ai/memory',
-        builder: (_, _) => const memory.AiPage(),
-      ),
+      GoRoute(path: '/ai/memory', builder: (_, _) => const memory.AiPage()),
       GoRoute(
         path: '/logs/subordinates',
         builder: (_, _) => const LogsPage(subordinates: true),
@@ -86,31 +85,31 @@ final routerProvider = Provider<GoRouter>((ref) {
                 selectedIndex: shell.currentIndex,
                 onDestinationSelected: (i) => shell.goBranch(i),
                 destinations: const [
-                NavigationDestination(
-                  icon: TuantuanIcon('mindmap', size: 26),
-                  selectedIcon: TuantuanIcon('mindmap', size: 26),
-                  label: '导图',
-                ),
-                NavigationDestination(
-                  icon: TuantuanIcon('calendar', size: 26),
-                  selectedIcon: TuantuanIcon('calendar', size: 26),
-                  label: '视图',
-                ),
-                NavigationDestination(
-                  icon: TuantuanIcon('log', size: 26),
-                  selectedIcon: TuantuanIcon('log', size: 26),
-                  label: '日志',
-                ),
-                NavigationDestination(
-                  icon: TuantuanIcon('ai', size: 26),
-                  selectedIcon: TuantuanIcon('ai', size: 26),
-                  label: 'AI地图',
-                ),
-                NavigationDestination(
-                  icon: TuantuanIcon('members', size: 26),
-                  selectedIcon: TuantuanIcon('members', size: 26),
-                  label: '我的',
-                ),
+                  NavigationDestination(
+                    icon: TuantuanIcon('mindmap', size: 26),
+                    selectedIcon: TuantuanIcon('mindmap', size: 26),
+                    label: '导图',
+                  ),
+                  NavigationDestination(
+                    icon: TuantuanIcon('calendar', size: 26),
+                    selectedIcon: TuantuanIcon('calendar', size: 26),
+                    label: '视图',
+                  ),
+                  NavigationDestination(
+                    icon: TuantuanIcon('log', size: 26),
+                    selectedIcon: TuantuanIcon('log', size: 26),
+                    label: '日志',
+                  ),
+                  NavigationDestination(
+                    icon: TuantuanIcon('ai', size: 26),
+                    selectedIcon: TuantuanIcon('ai', size: 26),
+                    label: 'AI地图',
+                  ),
+                  NavigationDestination(
+                    icon: TuantuanIcon('members', size: 26),
+                    selectedIcon: TuantuanIcon('members', size: 26),
+                    label: '我的',
+                  ),
                 ],
               ),
             ),
@@ -163,6 +162,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/me/profile', builder: (_, _) => const OwnProfilePage()),
+      GoRoute(path: '/me/people', builder: (_, _) => const PersonnelPage()),
+      GoRoute(
+        path: '/tasks/received',
+        builder: (_, _) => const ReceivedTasksPage(),
+      ),
+      GoRoute(path: '/me/tasks', builder: (_, _) => const TaskManagementPage()),
       GoRoute(
         path: '/attachments/:id',
         builder: (_, s) => AttachmentDownloadPage(
@@ -176,14 +181,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           logId: s.pathParameters['id']!,
           version: int.tryParse(s.pathParameters['version']!) ?? -1,
         ),
-      ),
-      GoRoute(
-        path: '/me/organization',
-        builder: (_, _) => const OrganizationBrowser(),
-      ),
-      GoRoute(
-        path: '/me/team',
-        builder: (_, _) => const ListPage('organization'),
       ),
       GoRoute(
         path: '/me/team/:memberId',
