@@ -19,8 +19,8 @@ public class LogController {
     @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(required=false) String ownerId,@RequestParam(required=false) String date,@RequestParam(defaultValue="day") String period) {
         return queries.list(Actor.current(r),new LogQueryService.Query(cursor,limit,ownerId,date,period),false);
     }
-    /** 查询下属已提交日报，是管理者查看下属日志的固定入口；员工调用返回 403。 */
-    @GetMapping("/subordinates") public Map<String,Object> subordinates(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(required=false) String ownerId,@RequestParam(required=false) String date,@RequestParam(defaultValue="day") String period) { return queries.list(Actor.current(r),new LogQueryService.Query(cursor,limit,ownerId,date,period),true); }
+    /** 管理者下属日志：departmentId/date/period/search 可组合；groups 分组当前日志页，保留 items/total/nextCursor。员工403，未知和越权部门均空结果；关键词超过100字400。只读，无幂等键。 */
+    @GetMapping("/subordinates") public Map<String,Object> subordinates(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(required=false) String ownerId,@RequestParam(required=false) String date,@RequestParam(defaultValue="day") String period,@RequestParam(required=false) String departmentId,@RequestParam(required=false) String search) { return queries.list(Actor.current(r),new LogQueryService.Query(cursor,limit,ownerId,date,period,departmentId,search),true); }
     /** 兼容统计与导出模块的内部调用；范围和草稿私密性仍由查询服务统一执行。 */
     public Map<String,Object> list(Actor actor,int cursor,int limit,String ownerId,String date,String period,boolean subordinate) {
         return queries.list(actor,new LogQueryService.Query(cursor,limit,ownerId,date,period),subordinate);
@@ -44,10 +44,13 @@ public class LogController {
     }
     /** 获取日报历史版本。本人或授权范围内上级可读；返回按版本升序的历史内容。 */
     @GetMapping("/{id}/versions") public List<Map<String,Object>> versions(HttpServletRequest r,@PathVariable String id) { return workflow.versions(Actor.current(r),id); }
+    /** 本人窗口内撤回；version/reason 必填，超时409、越权403；版本控制重复请求，成功返回当前日志能力字段。 */
+    @PostMapping("/{id}/withdraw") @Transactional
+    public Map<String,Object> withdraw(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) { return workflow.withdraw(Actor.current(r),id,b); }
     /** 标记已提交日报为已读。需要日志可见权限；草稿不能标记。 */
     @PostMapping("/{id}/read") public Map<String,Object> read(HttpServletRequest r,@PathVariable String id) { return workflow.markRead(Actor.current(r),id); }
     /** 获取日报评语。需要日志可见权限；返回评语作者和时间。 */
     @GetMapping("/{id}/comments") public List<Map<String,Object>> comments(HttpServletRequest r,@PathVariable String id) { return workflow.comments(Actor.current(r),id); }
-    /** 新增日报评语。管理者或日报本人可写已提交日报；请求含 text；失败返回 403。 */
+    /** 追加公开评论或回复：已有日志读取权限，text为1至2000字，可选parentId必须属于同日志。返回id/actor_id/author_name/text/parent_id/created_at；无版本或幂等键，重复POST产生新评论。无效400、草稿403、不可见404；不支持改删，不受24小时正文窗口限制。 */
     @PostMapping("/{id}/comments") @Transactional public Map<String,Object> comment(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) { return workflow.comment(Actor.current(r),id,b); }
 }

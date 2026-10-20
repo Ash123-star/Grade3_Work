@@ -31,25 +31,25 @@ test('knowledge status and forget job reach a clear terminal state', async ({ pa
     const path = new URL(request.url()).pathname;
     let body: unknown;
     let status = 200;
-    if (path === '/api/auth/me') body = {must_change_password: false};
-    else if (path === '/api/ai-maps/development') body = {
+    if (path === '/api/auth/me') body = {role: 'ADMIN', must_change_password: false};
+    else if (path === '/api/admin/workspace/ai-maps/development') body = {
       scopes: [{domain: 'PERSONAL', scopeType: 'SELF', scopeId: 'self', label: '个人'}],
       analysis: {},
     };
-    else if (path === '/api/ai-memories/knowledge-status') body = {
+    else if (path === '/api/admin/workspace/ai-memories/knowledge-status') body = {
       memories: forgotten ? 0 : 1, indexedMemories: 0,
       indexingMemories: forgotten ? 0 : 1, candidates: 1,
     };
-    else if (path === '/api/ai-memories/preferences/me') body = {version: 1, explicit_goals: '', response_preferences: ''};
-    else if (path === '/api/ai-memories' && request.method() === 'GET') body = {
+    else if (path === '/api/admin/workspace/ai-memories/preferences/me') body = {version: 1, explicit_goals: '', response_preferences: ''};
+    else if (path === '/api/admin/workspace/ai-memories' && request.method() === 'GET') body = {
       items: forgotten ? [] : [{id: 'memory-1', version: 2, content: '完成模块评审', claim_type: 'FACT', provenance: 'SELF_REPORTED', status: 'ACTIVE', source_version: 1}],
     };
-    else if (path === '/api/ai-memories/memory-1' && request.method() === 'DELETE') {
+    else if (path === '/api/admin/workspace/ai-memories/memory-1' && request.method() === 'DELETE') {
       expect(request.headers()['if-match']).toBe('2');
       forgotten = true;
       status = 202;
       body = {id: 'forget-1', state: 'PENDING'};
-    } else if (path === '/api/ai-memories/forget-jobs/forget-1') {
+    } else if (path === '/api/admin/workspace/ai-memories/forget-jobs/forget-1') {
       body = {id: 'forget-1', state: ++jobReads === 1 ? 'PENDING' : 'SUCCEEDED'};
     } else throw new Error(`Unexpected API request: ${request.method()} ${path}`);
     await route.fulfill({status, contentType: 'application/json', body: JSON.stringify(body)});
@@ -73,8 +73,8 @@ test('analysis failures and missing evidence never reveal a sample conclusion', 
     const path = new URL(route.request().url()).pathname;
     let status = 200;
     let body: unknown;
-    if (path === '/api/auth/me') body = {must_change_password: false};
-    else if (path === '/api/ai-maps/development') {
+    if (path === '/api/auth/me') body = {role: 'ADMIN', must_change_password: false};
+    else if (path === '/api/admin/workspace/ai-maps/development') {
       if (state === 'DENIED') {status = 403; body = {code: 'FORBIDDEN', message: '你没有访问这项内容的权限'};}
       else body = {
         scopes: [{domain: 'PERSONAL', scopeType: 'SELF', scopeId: 'self', label: '个人'}],
@@ -85,8 +85,8 @@ test('analysis failures and missing evidence never reveal a sample conclusion', 
           },
         } : {id: 'analysis-1', state, error: state === 'FAILED' ? 'DeepSeek 尚未配置' : '来源已变化，请更新分析'},
       };
-    } else if (path === '/api/ai-memories/knowledge-status') body = {memories: 1, indexedMemories: 0, indexingMemories: 1, candidates: 0};
-    else if (path === '/api/ai-memories/preferences/me') body = {version: 1, explicit_goals: '', response_preferences: ''};
+    } else if (path === '/api/admin/workspace/ai-memories/knowledge-status') body = {memories: 1, indexedMemories: 0, indexingMemories: 1, candidates: 0};
+    else if (path === '/api/admin/workspace/ai-memories/preferences/me') body = {version: 1, explicit_goals: '', response_preferences: ''};
     else throw new Error(`Unexpected API request: ${path}`);
     await route.fulfill({status, contentType: 'application/json', body: JSON.stringify(body)});
   });

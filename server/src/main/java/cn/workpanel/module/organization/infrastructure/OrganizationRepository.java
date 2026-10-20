@@ -46,6 +46,15 @@ public class OrganizationRepository {
         if (!Set.of("departments", "teams").contains(kind)) throw cn.workpanel.ApiError.notFound();
         return db.one("SELECT * FROM " + kind + " WHERE id=? AND company_id=?", id, company);
     }
+    public Map<String,Object> taskAudit(String company,String taskId,int cursor,int limit) {
+        String from=" FROM audit_records a LEFT JOIN review_requests r ON r.id=a.object_id AND r.company_id=a.company_id AND r.kind IN ('TASK','TASK_REASSIGN','TASK_RESCHEDULE') LEFT JOIN tasks t ON t.id=a.object_id AND t.company_id=a.company_id LEFT JOIN users u ON u.id=a.actor_id AND u.company_id=a.company_id WHERE a.company_id=? AND (a.type LIKE 'TASK\\_%' ESCAPE '\\' OR r.id IS NOT NULL OR (a.type='REVISION_APPLIED' AND t.id IS NOT NULL))";
+        var args=new ArrayList<Object>(); args.add(company);
+        if(taskId!=null&&!taskId.isBlank()) { from+=" AND COALESCE(r.target_id,a.object_id)=?"; args.add(taskId.trim()); }
+        long total=db.count("SELECT count(*)"+from,args.toArray());
+        args.add(limit); args.add(cursor);
+        var items=db.rows("SELECT a.*,u.name AS actor_name,COALESCE(r.target_id,a.object_id) AS task_id"+from+" ORDER BY a.id DESC LIMIT ? OFFSET ?",args.toArray());
+        return Map.of("items",items,"total",total,"nextCursor",String.valueOf((long)cursor+items.size()));
+    }
     public Map<String, Object> audit(String company, int cursor, int limit) {
         return Map.of("items", db.rows("SELECT * FROM audit_records WHERE company_id=? ORDER BY id DESC LIMIT ? OFFSET ?", company, limit, cursor),
             "total", db.count("SELECT count(*) FROM audit_records WHERE company_id=?", company), "nextCursor", String.valueOf((long) cursor + limit));

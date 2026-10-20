@@ -35,6 +35,7 @@ public class OpenApi {
         var draft=object("businessDate","body","version"); draft.addProperty("businessDate",new DateSchema()); draft.addProperty("body",ref("LogContent")); draft.addProperty("version",version()); c.addSchemas("LogDraft",draft); c.addSchemas("LogRevision",revision("LogContent","body"));
         var v=object("version"); v.addProperty("version",version()); c.addSchemas("Version",v);
         var comment=object("text"); comment.addProperty("text",text().minLength(1)); c.addSchemas("Comment",comment);
+        var logComment=object("text"); logComment.addProperty("text",text().minLength(1).maxLength(2000)); logComment.addProperty("parentId",text().minLength(1)); c.addSchemas("LogComment",logComment);
         var decision=object("approve"); decision.addProperty("approve",new BooleanSchema()); decision.addProperty("reason",text().description("驳回必填")); c.addSchemas("ReviewDecision",decision);
         var reviewer=object("version","reason"); reviewer.addProperty("version",version()); reviewer.addProperty("reason",text().minLength(1)); c.addSchemas("ReviewerApplication",reviewer);
         var membership=object("version","reason","departmentId"); membership.addProperty("version",version()); membership.addProperty("reason",text().minLength(1)); membership.addProperty("departmentId",text().minLength(1)); c.addSchemas("MembershipApplication",membership);
@@ -102,7 +103,7 @@ public class OpenApi {
             var bodies=Map.ofEntries(
                 Map.entry("POST /api/auth/register","Registration"),Map.entry("POST /api/auth/login","Login"),Map.entry("POST /api/auth/password","PasswordChange"),
                 Map.entry("POST /api/tasks","TaskDraft"),Map.entry("POST /api/tasks/{id}/events","TaskEvent"),Map.entry("POST /api/tasks/{id}/reassignments","TaskReassignment"),Map.entry("POST /api/tasks/{id}/reschedules","TaskReschedule"),Map.entry("POST /api/tasks/{id}/revisions","TaskRevision"),
-                Map.entry("PUT /api/logs/draft","LogDraft"),Map.entry("POST /api/logs/{id}/submit","Version"),Map.entry("POST /api/logs/{id}/revisions","LogRevision"),Map.entry("POST /api/logs/{id}/comments","Comment"),
+                Map.entry("PUT /api/logs/draft","LogDraft"),Map.entry("POST /api/logs/{id}/submit","Version"),Map.entry("POST /api/logs/{id}/withdraw","ReviewerApplication"),Map.entry("POST /api/logs/{id}/revisions","LogRevision"),Map.entry("POST /api/logs/{id}/comments","LogComment"),
                 Map.entry("POST /api/reviews/{id}/decision","ReviewDecision"),Map.entry("POST /api/organization/membership-application","MembershipApplication"),Map.entry("POST /api/organization/reviewer-application","ReviewerApplication"),Map.entry("POST /api/organization/review-policy/revisions","ReviewPolicy"),Map.entry("POST /api/organization/users/{id}/revisions","UserRevision"),Map.entry("POST /api/organization/{kind}/revisions","UnitRevision"),
                 Map.entry("POST /api/dashboard/company/revisions","CompanyItemRevision"),Map.entry("POST /api/dashboard/personal","PersonalItem"),Map.entry("PUT /api/private-notes","PrivateNote"),Map.entry("PUT /api/profiles/me","Profile"),
                 Map.entry("POST /api/ai/jobs","AiJobRequest"),Map.entry("PUT /api/ai/jobs/{id}/draft","AiDraftEdit"),Map.entry("POST /api/ai/jobs/{id}/confirm-task","ConfirmTask"),Map.entry("POST /api/ai-maps/edges","MapEdge"),
@@ -129,9 +130,21 @@ public class OpenApi {
             var reschedule=api.getPaths().get("/api/tasks/{id}/reschedules"); if(reschedule!=null&&reschedule.getPost()!=null) reschedule.getPost().setDescription("提交改期复核申请；申请不会立即改期。必须提供带时区、不同于当前值的 deadline。");
             var logDraft=api.getPaths().get("/api/logs/draft"); if(logDraft!=null&&logDraft.getPut()!=null) logDraft.getPut().setDescription("保存本人每日唯一日报草稿。草稿仅本人可读；version 过期返回 409，已提交日报须走候选修订。");
             var logSubmit=api.getPaths().get("/api/logs/{id}/submit"); if(logSubmit!=null&&logSubmit.getPost()!=null) logSubmit.getPost().setDescription("仅日报本人可按当前 version 提交。提交会记录时间和历史版本；重复或旧版本提交返回 409。");
-            var logRevision=api.getPaths().get("/api/logs/{id}/revisions"); if(logRevision!=null&&logRevision.getPost()!=null) logRevision.getPost().setDescription("已提交日报的候选修订。草稿返回 400 DRAFT_LOG；审核通过时发生版本冲突将拒绝覆盖。");
+            var logRevision=api.getPaths().get("/api/logs/{id}/revisions"); if(logRevision!=null&&logRevision.getPost()!=null) logRevision.getPost().setDescription("已提交日报在首次提交后不足24小时可申请修订，过期409 LOG_EDIT_WINDOW_EXPIRED（管理员无例外）；窗口内申请可窗口外审批。草稿400 DRAFT_LOG；版本冲突拒绝覆盖。");
             var logs=api.getPaths().get("/api/logs"); if(logs!=null&&logs.getGet()!=null) logs.getGet().setDescription("分页查询本人草稿或组织范围内已提交日报。ownerId 其他公司返回 404，同公司范围外返回 403；非本人草稿永不返回。");
-            var subordinates=api.getPaths().get("/api/logs/subordinates"); if(subordinates!=null&&subordinates.getGet()!=null) subordinates.getGet().setDescription("下属日报固定入口。仅管理者可用，只返回组织范围内他人的已提交日报；草稿永不出现。");
+            var subordinates=api.getPaths().get("/api/logs/subordinates"); if(subordinates!=null&&subordinates.getGet()!=null) subordinates.getGet().setDescription("下属日报固定入口。departmentId、date/period、search（最多100字）组合过滤，返回当前页groups及兼容items/total/nextCursor；部门取人员当前归属。未知或范围外部门空结果，员工403，草稿不返回。");
+            var logView=new ObjectSchema(); logView.setAdditionalProperties(true);
+            logView.addProperty("submittedAt",new DateTimeSchema().nullable(true));
+            logView.addProperty("editableUntil",new DateTimeSchema().nullable(true));
+            logView.addProperty("canEdit",new BooleanSchema()); logView.addProperty("canWithdraw",new BooleanSchema());
+            var identity=object("id","name"); identity.addProperty("id",text()); identity.addProperty("name",text());
+            logView.addProperty("author",identity); logView.addProperty("department",identity);
+            logView.setDescription("兼容原日志字段；新增能力字段由服务端当前时间和身份计算，不能替代写入权限校验。");
+            api.getComponents().addSchemas("LogAccessView",logView);
+            var logPage=object("items","total","nextCursor"); logPage.addProperty("items",new ArraySchema().items(ref("LogAccessView"))); logPage.addProperty("total",new IntegerSchema().format("int64")); logPage.addProperty("nextCursor",text());
+            var group=object("department","items"); group.addProperty("department",identity); group.addProperty("items",new ArraySchema().items(ref("LogAccessView")));
+            logPage.addProperty("groups",new ArraySchema().items(group).description("下属入口分组当前日志页；同部门可跨页"));
+            api.getComponents().addSchemas("LogAccessPage",logPage);
             api.getPaths().forEach((path,item)->item.readOperationsMap().forEach((method,op)->{
                 String name=bodies.get(method.name()+" "+path); if(name!=null&&op.getRequestBody()!=null) op.getRequestBody().setContent(new Content().addMediaType("application/json",new MediaType().schema(ref(name))));
                 String response=responses.get(method.name()+" "+path);
@@ -139,9 +152,23 @@ public class OpenApi {
                     String status=Set.of("POST /api/ai-maps/development/jobs","POST /api/ai-maps/development/jobs/{id}/retry","DELETE /api/ai-memories/{id}","POST /api/ai-memories/index-rebuild","POST /api/ai-memories/index-jobs/{id}/retry").contains(method.name()+" "+path)?"202":"200";
                     op.getResponses().addApiResponse(status,new ApiResponse().description("当前授权结果").content(new Content().addMediaType("application/json",new MediaType().schema(ref(response)))));
                 }
+                String logResponse=null;
+                if(method==PathItem.HttpMethod.GET&&Set.of("/api/logs","/api/logs/subordinates").contains(path)) logResponse="LogAccessPage";
+                if(method==PathItem.HttpMethod.GET&&path.equals("/api/logs/{id}")||method==PathItem.HttpMethod.PUT&&path.equals("/api/logs/draft")||method==PathItem.HttpMethod.POST&&Set.of("/api/logs/{id}/submit","/api/logs/{id}/withdraw").contains(path)) logResponse="LogAccessView";
+                if(logResponse!=null) op.getResponses().addApiResponse("200",new ApiResponse().description("当前日志及操作能力").content(new Content().addMediaType("application/json",new MediaType().schema(ref(logResponse)))));
                 if(Set.of("/api/health","/api/auth/login","/api/auth/register","/api/auth/departments").contains(path)) op.setSecurity(List.of());
                 for(String status:List.of("400","401","403","404","409","429","503")) op.getResponses().addApiResponse(status,new ApiResponse().description("错误码及 traceId，详情参见后端接口说明").content(new Content().addMediaType("application/json",new MediaType().schema(ref("Error")))));
             }));
+            // 显式记录管理别名，避免前端依靠未登记路径；复制对象不改变普通业务接口。
+            var adminPaths=new LinkedHashMap<String,PathItem>();
+            api.getPaths().forEach((path,item)->{
+                if(path.startsWith("/api/ai-maps/")||path.startsWith("/api/ai-memories")||path.equals("/api/organization/audit")||path.equals("/api/organization/task-audit")||path.equals("/api/auth/me")) {
+                    var copy=io.swagger.v3.core.util.Json.mapper().convertValue(item,PathItem.class);
+                    copy.readOperations().forEach(op->{ op.setOperationId("adminWorkspace_"+op.getOperationId()); op.setDescription("独立工作台管理员入口：每次请求必须为当前有效ADMIN，否则401/403。"+Objects.toString(op.getDescription(),"")); });
+                    adminPaths.put("/api/admin/workspace"+path.substring(4),copy);
+                }
+            });
+            api.getPaths().putAll(adminPaths);
         };
     }
 }
