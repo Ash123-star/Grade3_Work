@@ -11,6 +11,7 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/features/dashboard/management_page.dart';
 
 typedef CsvSaver = Future<String?> Function(String name, Uint8List bytes);
@@ -286,7 +287,7 @@ class _AnalyticsExportPageState extends ConsumerState<AnalyticsExportPage> {
           const DateControls(),
           const Text('范围与工作统计相同，服务端再次校验每条记录权限。'),
           const SizedBox(height: 20),
-          DropdownButtonFormField<String>(
+          PremiumDropdownField<String>(
             initialValue: resource,
             decoration: const InputDecoration(labelText: '导出内容'),
             items: const [

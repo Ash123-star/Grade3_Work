@@ -9,6 +9,7 @@ import 'package:pandora_mobile/data/models/ai.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/ai_repository.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
@@ -344,9 +345,9 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final value = await showDatePicker(
-                        context: sheet,
-                        initialDate: selectedDate,
+                      final value = await showPremiumDatePicker(
+                        sheet,
+                        initial: selectedDate,
                         firstDate: DateTime(2020),
                         lastDate: DateTime(2100),
                       );
@@ -452,7 +453,6 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
             title: '把下一步想清楚',
             subtitle: '先看建议，再核对来源',
             color: Color(0xFFF1E7FF),
-            mascotAsset: 'ai',
           ),
           const SizedBox(height: 12),
           if (error != null)
@@ -541,14 +541,14 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: PaperSurface(
                   skin: TuantuanAssets
-                      .surfaces[['warm', 'blue', 'mint'][index % 3]],
+                      .surfaces[['warm', 'blue', 'warm'][index % 3]],
                   color: [
                     SunnyPalette.orange,
                     SunnyPalette.blue,
-                    SunnyPalette.mint,
+                    SunnyPalette.primaryContainer,
                   ][index % 3],
                   cornerDecoration: TuantuanAssets
-                      .cardCorners[['warm', 'blue', 'mint'][index % 3]],
+                      .cardCorners[['warm', 'blue', 'warm'][index % 3]],
                   onTap: () =>
                       openJob('/ai/jobs/${encode(job.id)}/actions/$index'),
                   child: Row(
@@ -559,7 +559,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
                         backgroundColor: [
                           const Color(0xFFFFE5D2),
                           const Color(0xFFE0F0FF),
-                          const Color(0xFFDFF4E9),
+                          const Color(0xFFFFE9D4),
                         ][index],
                         child: Text('${index + 1}'),
                       ),

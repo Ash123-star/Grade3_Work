@@ -35,17 +35,7 @@ const screens = <String, ScreenSpec>{
   'dispatch': ScreenSpec(
     '派发任务',
     'tasks',
-    fields: [
-      '任务名称',
-      '所属分组',
-      '任务内容',
-      '截止时间',
-      '紧急程度',
-      '进度备注',
-      '主负责人',
-      '协作人',
-      '附件',
-    ],
+    fields: ['任务名称', '开始时间', '任务内容', '截止时间', '标签', '参与人', '附件'],
     manager: true,
   ),
   'feedback': ScreenSpec(
@@ -110,10 +100,10 @@ const screens = <String, ScreenSpec>{
     action: 'submit',
   ),
   'log-revise': ScreenSpec(
-    '修订已提交日志',
+    '编辑已提交日志',
     'logs',
-    fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时', '修改理由'],
-    action: 'request-review',
+    fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时'],
+    action: 'update',
   ),
   'comment': ScreenSpec(
     '日志评语',

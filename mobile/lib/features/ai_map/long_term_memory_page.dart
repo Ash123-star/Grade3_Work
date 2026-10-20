@@ -565,12 +565,12 @@ class _AiPageState extends ConsumerState<AiPage> {
             if (loading)
               const Padding(
                 padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: SunnyLoadingIndicator(size: 26)),
               ),
             if (error != null) ErrorPanel(error!, retry: load),
             if (working)
               const ListTile(
-                leading: CircularProgressIndicator(),
+                leading: SunnyLoadingIndicator(size: 20),
                 title: Text('正在检索证据并生成分析…'),
               ),
             if (['FAILED', 'STALE', 'CANCELLED'].contains(analysis['state']))

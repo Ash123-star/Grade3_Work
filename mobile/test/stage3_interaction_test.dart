@@ -10,7 +10,6 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
-import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_page.dart';
 
 void main() {
@@ -48,12 +47,7 @@ void main() {
         (await t.runAsync(() => store.read(location)))?.fields['今日工作'],
         '核对移动端验收范围',
       );
-      expect(
-        find.byWidgetPredicate(
-          (w) => w is TuantuanMascot && w.pose == 'success',
-        ),
-        findsOneWidget,
-      );
+      expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
       expect(prefs.getString('draft:u1:2025-02-03:今日工作'), isNull);
       c.read(selectedDateProvider.notifier).state = DateTime(2027, 1, 1);
       c.read(logFilterDateProvider.notifier).state = DateTime(2024, 1, 1);

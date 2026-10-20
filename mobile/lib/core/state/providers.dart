@@ -219,17 +219,46 @@ final datedRecordsProvider = FutureProvider.autoDispose
     .family<PageResult, String>((ref, resource) {
       var active = true;
       ref.onDispose(() => active = false);
-      final range = BusinessRange(
-        ref.watch(selectedDateProvider),
-        ref.watch(periodProvider),
-      );
+      final date = ref.watch(selectedDateProvider);
+      final period = ref.watch(periodProvider);
+      final DateTime from, to;
+      if (period == '月' && resource == 'tasks') {
+        final range = _calendarMonthRange(date);
+        from = range.from;
+        to = range.to;
+      } else {
+        final range = BusinessRange(date, period);
+        from = range.from;
+        to = range.to;
+      }
       return readCompleteList(
         ref.watch(repositoryProvider),
         resource,
-        Query(from: range.from, to: range.to),
+        Query(from: from, to: to),
         isActive: () => active,
       );
     });
+
+({DateTime from, DateTime to}) _calendarMonthRange(DateTime date) {
+  final first = DateTime(date.year, date.month);
+  final gridStart = first.subtract(Duration(days: first.weekday - 1));
+  final weeks =
+      ((first.weekday - 1 + DateTime(date.year, date.month + 1, 0).day) / 7)
+          .ceil();
+  final gridEnd = gridStart.add(Duration(days: weeks * 7));
+  return (
+    from: DateTime.utc(
+      gridStart.year,
+      gridStart.month,
+      gridStart.day,
+    ).subtract(const Duration(hours: 8)),
+    to: DateTime.utc(
+      gridEnd.year,
+      gridEnd.month,
+      gridEnd.day,
+    ).subtract(const Duration(hours: 8)),
+  );
+}
 
 void refreshBusiness(WidgetRef ref) {
   ref.invalidate(recordsProvider);
@@ -282,7 +311,7 @@ final logDayRecordsProvider = FutureProvider.autoDispose
       );
     });
 
-final logFilterDateProvider = StateProvider<DateTime?>((ref) => null);
+final logFilterDateProvider = StateProvider<DateTime?>((ref) => DateTime.now());
 
 /// Public registration choices use server IDs; names never substitute for IDs.
 final registrationDepartmentsProvider = FutureProvider.autoDispose<PageResult>(

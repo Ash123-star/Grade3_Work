@@ -10,6 +10,7 @@ import '../../data/models/diary_task_links.dart';
 import '../../data/repositories/complete_list.dart';
 import '../../shared/paper_layout.dart';
 import '../../shared/widgets.dart';
+import '../../shared/premium_pickers.dart';
 
 String diaryDayKey(DateTime day) => DraftLocation.diary('', day).object;
 
@@ -170,9 +171,9 @@ class _DiarySyncPageState extends ConsumerState<DiarySyncPage> {
               icon: const Icon(Icons.event_outlined),
               label: Text(date),
               onPressed: () async {
-                final selected = await showDatePicker(
-                  context: context,
-                  initialDate: validDiaryDay(date) ?? DateTime.now(),
+                final selected = await showPremiumDatePicker(
+                  context,
+                  initial: validDiaryDay(date) ?? DateTime.now(),
                   firstDate: DateTime(2020),
                   lastDate: DateTime(2100),
                 );

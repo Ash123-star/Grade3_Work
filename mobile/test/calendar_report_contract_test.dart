@@ -333,10 +333,16 @@ void main() {
       expect(find.byKey(ValueKey('week-day:$day')), findsOneWidget);
     }
     final first = t.getTopLeft(find.byKey(const ValueKey('week-day:1')));
-    expect(
-      t.getSize(find.byKey(const ValueKey('week-pill:tasks:deadline'))).width,
-      156,
+    final deadlinePill = t.getRect(
+      find.byKey(const ValueKey('week-pill:tasks:deadline')),
     );
+    final timedPill = t.getRect(
+      find.byKey(const ValueKey('week-pill:tasks:timed')),
+    );
+    expect(deadlinePill.width, greaterThan(t.getSize(overview).width / 2));
+    expect(deadlinePill.left, timedPill.left);
+    expect(deadlinePill.right, timedPill.right);
+    expect(deadlinePill.right, lessThan(t.getRect(overview).right));
     for (var day = 2; day <= 7; day++) {
       final current = t.getTopLeft(find.byKey(ValueKey('week-day:$day')));
       expect(current.dx, first.dx);
@@ -344,10 +350,20 @@ void main() {
     }
     await t.tap(find.byKey(const ValueKey('week-day:4')));
     await t.pumpAndSettle();
-    expect(find.text('发布截止点'), findsOneWidget);
-    expect(find.text('有真实时段的工作'), findsOneWidget);
-    expect(find.text('日报15'), findsOneWidget);
-    expect(find.text('3 条记录'), findsOneWidget);
+    final sheet = find.byType(BottomSheet);
+    expect(
+      find.descendant(of: sheet, matching: find.text('发布截止点')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('有真实时段的工作')),
+      findsOneWidget,
+    );
+    expect(find.text('日报15'), findsNothing);
+    expect(
+      find.descendant(of: sheet, matching: find.text('2 条记录')),
+      findsOneWidget,
+    );
     expect(t.takeException(), isNull);
   });
   testWidgets('render actual 360dp large-text day week and report', (t) async {
@@ -363,11 +379,7 @@ void main() {
     final icons = FontLoader('MaterialIcons')
       ..addFont(
         Future.value(
-          ByteData.sublistView(
-            File(
-              materialIconsFontPath,
-            ).readAsBytesSync(),
-          ),
+          ByteData.sublistView(File(materialIconsFontPath).readAsBytesSync()),
         ),
       );
     await icons.load();
@@ -416,9 +428,7 @@ void main() {
       await t.runAsync(() async {
         final rendered = await boundary.toImage(pixelRatio: 1);
         final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
-        final output = File(
-          '../output/flutter-evidence/$name.png',
-        );
+        final output = File('../output/flutter-evidence/$name.png');
         output.parent.createSync(recursive: true);
         await output.writeAsBytes(png!.buffer.asUint8List());
         rendered.dispose();

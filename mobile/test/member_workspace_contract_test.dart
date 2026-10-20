@@ -223,10 +223,10 @@ void main() {
     (t) async {
       final adapter = MemberAdapter();
       final c = await launch(t, adapter, '/logs/subordinates');
-      expect(find.text('查看 u2 的工作台'), findsOneWidget);
-      await t.ensureVisible(find.text('查看 u2 的工作台'));
+      expect(find.text('查看 陈一诺 的日志'), findsOneWidget);
+      await t.ensureVisible(find.text('查看 陈一诺 的日志'));
       await t.pumpAndSettle();
-      await t.tap(find.text('查看 u2 的工作台'));
+      await t.tap(find.text('查看 陈一诺 的日志'));
       await settleLocalIo(t);
       expect(c.read(memberLogDateProvider('u2')), DateTime(2026, 1, 31));
       expect(find.text('正在查看：陈一诺'), findsOneWidget);

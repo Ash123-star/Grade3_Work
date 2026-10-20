@@ -20,7 +20,6 @@
 `deploy/backend/` 后端 API、PostgreSQL、Redis 的 Compose 部署
 `deploy/postgresql/` 独立数据基础设施包，不能与 server Flyway 混用
 `deploy/redis/` Redis 配置
-`doc/` 课程要求和产品资料
 `docs/` 后端运行、架构、接口、数据库和验证文档
 `openspec/` 需求变更、规格、设计和任务清单
 `scripts/` 启动、测试、备份和数据初始化脚本

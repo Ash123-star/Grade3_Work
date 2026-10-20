@@ -282,7 +282,6 @@ class _AiPageState extends ConsumerState<AiPage> {
                 title: '把下一步想清楚',
                 subtitle: '先看建议，再核对来源',
                 color: Color(0xFFF1E7FF),
-                mascotAsset: 'ai',
               ),
               const SizedBox(height: 12),
               Text(
@@ -303,16 +302,16 @@ class _AiPageState extends ConsumerState<AiPage> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: PaperSurface(
-                    skin: TuantuanAssets.surfaces[['warm', 'blue', 'mint'][i]],
+                    skin: TuantuanAssets.surfaces[['warm', 'blue', 'warm'][i]],
                     color: [
                       SunnyPalette.orange,
                       SunnyPalette.blue,
-                      SunnyPalette.mint,
+                      SunnyPalette.primaryContainer,
                     ][i],
                     texture: TuantuanAssets
-                        .textures[['warmSparkle', 'paper', 'mintGrid'][i]],
+                        .textures[['warmSparkle', 'paper', 'warmSparkle'][i]],
                     cornerDecoration:
-                        TuantuanAssets.cardCorners[['warm', 'blue', 'mint'][i]],
+                        TuantuanAssets.cardCorners[['warm', 'blue', 'warm'][i]],
                     onTap: () => openSources(item),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,7 +336,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                                   backgroundColor: [
                                     const Color(0xFFFFE5D2),
                                     CuteTokens.blue,
-                                    CuteTokens.mint,
+                                    SunnyPalette.primaryContainer,
                                   ][i],
                                   child: Text(
                                     '${i + 1}',
@@ -492,7 +491,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                 ref
                     .watch(recordsProvider('tasks'))
                     .when(
-                      loading: () => const LinearProgressIndicator(),
+                      loading: () => const SunnyLoadingIndicator(),
                       error: (e, _) => Text('$e'),
                       data: (p) {
                         final overdue = p.items.where((r) {
@@ -540,6 +539,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
     return PageFrame(
       title: 'AI地图',
+      showTitle: false,
       child: PageBody(
         controller: scroll,
         children: [

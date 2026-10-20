@@ -148,6 +148,41 @@ void main() {
   );
 
   test(
+    'unregistered list/detail resources fail before HTTP requests',
+    () async {
+      for (final resource in ['feedback', 'organization/teams']) {
+        await expectLater(
+          repo.list(resource, const Query()),
+          throwsA(failure(FailureKind.unavailable)),
+        );
+        await expectLater(
+          repo.detail(resource, 'record-1'),
+          throwsA(failure(FailureKind.unavailable)),
+        );
+      }
+      expect(adapter.requests, isEmpty);
+    },
+  );
+
+  test(
+    'submitted log update never writes through the draft endpoint',
+    () async {
+      await expectLater(
+        repo.execute(
+          'logs',
+          const Command('update', {
+            'id': 'submitted-log',
+            'businessDate': '2026-10-20',
+            '今日工作': '修订内容',
+          }, version: 3),
+        ),
+        throwsA(failure(FailureKind.unavailable)),
+      );
+      expect(adapter.requests, isEmpty);
+    },
+  );
+
+  test(
     'transfer and reschedule submit complete candidate without changing effective task',
     () async {
       for (final action in ['transfer', 'reschedule']) {

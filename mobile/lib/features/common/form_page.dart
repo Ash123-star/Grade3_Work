@@ -10,6 +10,7 @@ import 'package:pandora_mobile/data/local/draft_store.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/log_edit_window.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
@@ -18,7 +19,21 @@ import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/models/diary_task_links.dart';
 import 'package:pandora_mobile/shared/diary_task_links.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'catalog.dart';
+
+const _taskTagLabels = <String, String>{
+  'company-important': '重要',
+  'department-research': '研发',
+  'department-design': '设计',
+  'personal-today': '今日',
+};
+const _taskTagColors = <String, Color>{
+  'company-important': Color(0xFFFFD9A8),
+  'department-research': Color(0xFFBDEFD7),
+  'department-design': Color(0xFFCFE5FF),
+  'personal-today': Color(0xFFE7D4FF),
+};
 
 class FormPage extends ConsumerStatefulWidget {
   const FormPage(
@@ -44,6 +59,7 @@ class _FormPageState extends ConsumerState<FormPage> {
   late final ScreenSpec spec;
   final String idem = DateTime.now().microsecondsSinceEpoch.toString();
   Timer? timer;
+  Timer? windowTimer;
   bool busy = false, saved = false, submitted = false, loadingExisting = false;
   bool loadFailed = false, conflict = false;
   DateTime? savedAt;
@@ -57,14 +73,20 @@ class _FormPageState extends ConsumerState<FormPage> {
   String? selectedOwner;
   String? selectedDepartment;
   final collaborators = <String, Record>{};
+  final participants = <String, Record>{};
   List<UploadedAttachment> uploadedAttachments = [];
   bool attachmentsReady = true;
   DateTime? deadline;
+  DateTime? startAt;
   int? loadedVersion;
   String? serverDraftId;
   Record? original;
   bool get log => widget.kind == 'log-edit';
   bool get document => log || widget.kind == 'log-revise';
+  bool get windowOpen =>
+      !document ||
+      original == null ||
+      LogEditWindow(original!).canEditAt(DateTime.now());
   DraftLocation get draftLocation => log
       ? DraftLocation.diary(accountId, businessDate)
       : DraftLocation.revision(
@@ -82,11 +104,16 @@ class _FormPageState extends ConsumerState<FormPage> {
     for (final field in spec.fields) {
       controllers[field] = TextEditingController();
     }
-    if (log && widget.id == null) restore();
+    if (log && widget.restoreDiaryDraft) restore();
     if (widget.id != null ||
         widget.source != null ||
         widget.kind == 'profile-edit') {
       loadExisting();
+    }
+    if (document) {
+      windowTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted && !windowOpen) setState(() {});
+      });
     }
   }
 
@@ -165,7 +192,36 @@ class _FormPageState extends ConsumerState<FormPage> {
             '${item.fields['个人介绍'] ?? item.fields['body'] ?? ''}';
       }
       selectedOwner = item.ownerId;
+      final participantValues =
+          item.fields['participantIds'] ?? item.fields['participant_ids'];
+      final participantNames = item.fields['participantNames'] is List
+          ? (item.fields['participantNames'] as List)
+          : const <dynamic>[];
+      if (participantValues is List) {
+        for (final (index, value) in participantValues.indexed) {
+          final id = '$value'.trim();
+          if (id.isNotEmpty) {
+            final name = index < participantNames.length
+                ? '${participantNames[index]}'
+                : id;
+            participants[id] = Record(id: id, title: name);
+          }
+        }
+      }
+      if (controllers.containsKey('标签')) {
+        controllers['标签']!.text =
+            '${item.fields['tagId'] ?? item.fields['tag_id'] ?? item.fields['标签'] ?? ''}';
+      }
+      startAt = DateTime.tryParse(
+        '${item.fields['startAt'] ?? item.fields['start_at']}',
+      );
       deadline = DateTime.tryParse('${item.fields['deadline']}');
+      if (controllers.containsKey('开始时间') && startAt != null) {
+        controllers['开始时间']!.text = startAt!.toLocal().toString().substring(
+          0,
+          16,
+        );
+      }
       if (controllers.containsKey('截止时间') && deadline != null) {
         controllers['截止时间']!.text = deadline!.toLocal().toString().substring(
           0,
@@ -263,6 +319,30 @@ class _FormPageState extends ConsumerState<FormPage> {
   Future<void> saveDraft({bool notify = false}) async {
     if (loadingExisting || draftRestoring || submitted) return;
     timer?.cancel();
+    if (notify && AppConfig.mock && log && windowOpen) {
+      try {
+        final record = await ref
+            .read(repositoryProvider)
+            .execute(
+              'logs',
+              Command('save-draft', {
+                for (final e in controllers.entries) e.key: e.value.text,
+                'title': controllers['今日工作']!.text.trim().isEmpty
+                    ? '未命名日志草稿'
+                    : controllers['今日工作']!.text.trim().split('\n').first,
+                'businessDate': businessDate.toIso8601String().split('T').first,
+                if (serverDraftId != null || widget.id != null)
+                  'id': serverDraftId ?? widget.id,
+              }, version: loadedVersion),
+            );
+        serverDraftId = record.id;
+        loadedVersion = record.version;
+        refreshBusiness(ref);
+      } catch (e) {
+        if (mounted) setState(() => error = '$e');
+        return;
+      }
+    }
     final snapshot = {for (final e in controllers.entries) e.key: e.value.text};
     final location = draftLocation, generation = editGeneration;
     final draft = LocalDraft(
@@ -296,6 +376,7 @@ class _FormPageState extends ConsumerState<FormPage> {
   @override
   void dispose() {
     timer?.cancel();
+    windowTimer?.cancel();
     if (document &&
         !submitted &&
         !saved &&
@@ -331,8 +412,10 @@ class _FormPageState extends ConsumerState<FormPage> {
     '密码',
     '手机号',
     '部门',
-    '主负责人',
+    '参与人',
+    '开始时间',
     '截止时间',
+    '标签',
     '今日工作',
     '成果说明',
     '问题描述',
@@ -369,6 +452,12 @@ class _FormPageState extends ConsumerState<FormPage> {
         !deadline!.isAfter(DateTime.now())) {
       return '截止时间必须晚于当前时间';
     }
+    if (field == '截止时间' &&
+        startAt != null &&
+        deadline != null &&
+        !deadline!.isAfter(startAt!)) {
+      return '截止时间必须晚于开始时间';
+    }
     if (field == '确认密码' && value != controllers['新密码']?.text) return '两次密码不一致';
     if (field == '工时' &&
         (value ?? '').isNotEmpty &&
@@ -393,7 +482,12 @@ class _FormPageState extends ConsumerState<FormPage> {
         mounted &&
         ref.read(sessionProvider).id == accountId) {
       setState(() {
-        if (field == '协作人') {
+        if (field == '参与人') {
+          participants[result.id] = result;
+          controllers[field]!.text = participants.values
+              .map((p) => p.title)
+              .join('、');
+        } else if (field == '协作人') {
           if (result.id != selectedOwner) collaborators[result.id] = result;
           controllers[field]!.text = collaborators.values
               .map((p) => p.title)
@@ -412,18 +506,361 @@ class _FormPageState extends ConsumerState<FormPage> {
     }
   }
 
+  IconData _taskFieldIcon(String label) => switch (label) {
+    '任务名称' => Icons.title_rounded,
+    '任务内容' => Icons.notes_rounded,
+    '标签' => Icons.sell_outlined,
+    '开始时间' => Icons.play_circle_outline_rounded,
+    '截止时间' => Icons.event_outlined,
+    '参与人' => Icons.group_outlined,
+    '附件' => Icons.attach_file_rounded,
+    _ => Icons.tune_rounded,
+  };
+
+  Future<void> pickTaskDate(String label) async {
+    final current = label == '开始时间' ? startAt : deadline;
+    final picked = await showPremiumDateTimePicker(
+      context,
+      initial: current ?? DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      title: label,
+    );
+    if (picked == null || !mounted) return;
+    final date = picked;
+    final time = TimeOfDay.fromDateTime(picked);
+    setState(() {
+      if (label == '开始时间') {
+        startAt = picked;
+      } else {
+        deadline = picked;
+      }
+      controllers[label]!.text =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${time.format(context)}';
+    });
+  }
+
+  Widget _taskRow(String label, Widget value, {bool topAligned = false}) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: topAligned
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.center,
+          children: [
+            TuantuanIconTile(
+              icon: label == '任务内容'
+                  ? 'log'
+                  : label == '参与人'
+                  ? 'members'
+                  : 'task',
+              color: SunnyPalette.orange,
+              size: 38,
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 72,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: SunnyPalette.ink,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: value),
+          ],
+        ),
+      );
+
+  Widget _taskField(String label) {
+    final controller = controllers[label]!;
+    final icon = _taskFieldIcon(label);
+    final textStyle = const TextStyle(fontSize: 15, height: 1.45);
+    if (label == '参与人') {
+      return FormField<void>(
+        validator: (_) => participants.isEmpty ? '至少选择一名参与人' : null,
+        builder: (state) => _taskRow(
+          label,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final person in participants.values)
+                    InputChip(
+                      avatar: CircleAvatar(
+                        radius: 11,
+                        backgroundColor: SunnyPalette.primaryContainer,
+                        child: Text(
+                          person.title.isEmpty
+                              ? '人'
+                              : person.title.substring(0, 1),
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                      label: Text(person.title),
+                      onDeleted: busy
+                          ? null
+                          : () => setState(() {
+                              participants.remove(person.id);
+                              controller.text = participants.values
+                                  .map((p) => p.title)
+                                  .join('、');
+                              state.didChange(null);
+                            }),
+                    ),
+                  ActionChip(
+                    avatar: const Icon(Icons.add, size: 18),
+                    label: const Text('添加'),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            await selectPerson(label);
+                            state.didChange(null);
+                          },
+                  ),
+                ],
+              ),
+              if (state.hasError)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    state.errorText!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          topAligned: true,
+        ),
+      );
+    }
+    if (label == '附件') {
+      return _taskRow(
+        label,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AttachmentEditor(
+              key: ValueKey('$accountId:$label'),
+              enabled: !busy && !loadingExisting && !loadFailed,
+              onChanged: (selection) {
+                if (!mounted || ref.read(sessionProvider).id != accountId) {
+                  return;
+                }
+                setState(() {
+                  uploadedAttachments = selection.files;
+                  attachmentsReady = selection.ready;
+                  controller.text = selection.files
+                      .map((f) => f.name)
+                      .join('、');
+                });
+              },
+            ),
+            if (controller.text.isNotEmpty)
+              Text(controller.text, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        topAligned: true,
+      );
+    }
+    if (label == '开始时间' || label == '截止时间') {
+      return FormField<String>(
+        initialValue: controller.text,
+        validator: (_) => validate(label, controller.text),
+        builder: (state) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _taskRow(
+              label,
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: busy ? null : () => pickTaskDate(label),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          controller.text.isEmpty ? '选择日期和时间' : controller.text,
+                          style: controller.text.isEmpty
+                              ? const TextStyle(
+                                  color: CuteTokens.muted,
+                                  fontSize: 14,
+                                )
+                              : textStyle,
+                        ),
+                      ),
+                      Icon(icon, size: 20, color: CuteTokens.muted),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (state.hasError) _taskError(state.errorText!),
+          ],
+        ),
+      );
+    }
+    final options = switch (label) {
+      '标签' => _taskTagLabels.keys.toList(),
+      _ => const <String>[],
+    };
+    if (label == '标签') {
+      return FormField<String>(
+        initialValue: controller.text,
+        validator: (_) => validate(label, controller.text),
+        builder: (state) => _taskRow(
+          label,
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: busy
+                ? null
+                : () async {
+                    final choice = await showPremiumTagPicker(
+                      context,
+                      options: [
+                        for (final entry in _taskTagLabels.entries)
+                          PremiumTagOption(
+                            entry.key,
+                            entry.value,
+                            _taskTagColors[entry.key]!,
+                          ),
+                      ],
+                      selected: controller.text,
+                    );
+                    if (choice == null || !mounted) return;
+                    controller.text = choice;
+                    state.didChange(choice);
+                    setState(() {});
+                  },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  if (controller.text.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _taskTagColors[controller.text],
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        _taskTagLabels[controller.text] ?? controller.text,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  if (controller.text.isEmpty)
+                    const Text('选择标签', style: TextStyle(color: Colors.grey)),
+                  const Spacer(),
+                  const Icon(Icons.expand_more_rounded),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    if (options.isNotEmpty) {
+      return FormField<String>(
+        initialValue: controller.text,
+        validator: (_) => validate(label, controller.text),
+        builder: (state) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _taskRow(
+              label,
+              PremiumDropdownField<String>(
+                initialValue: options.contains(controller.text)
+                    ? controller.text
+                    : null,
+                isExpanded: true,
+                icon: const Icon(Icons.expand_more_rounded),
+                decoration: const InputDecoration(
+                  hintText: '选择字段值',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+                ),
+                items: options
+                    .map(
+                      (option) => DropdownMenuItem(
+                        value: option,
+                        child: Text(
+                          label == '标签' ? _taskTagLabels[option]! : option,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: busy
+                    ? null
+                    : (value) {
+                        controller.text = value ?? '';
+                        state.didChange(value);
+                        setState(() {});
+                      },
+              ),
+            ),
+            if (state.hasError) _taskError(state.errorText!),
+          ],
+        ),
+      );
+    }
+    return _taskRow(
+      label,
+      TextFormField(
+        controller: controller,
+        maxLines: label == '任务内容' ? 4 : 1,
+        style: textStyle,
+        decoration: InputDecoration(
+          hintText: label == '任务名称' ? '输入任务名称' : '补充任务说明',
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        ),
+        validator: (value) => validate(label, value),
+        onChanged: (_) => setState(() {}),
+      ),
+      topAligned: label == '任务内容',
+    );
+  }
+
+  Widget _taskError(String message) => Padding(
+    padding: const EdgeInsets.only(left: 88, top: 2),
+    child: Text(
+      message,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.error,
+        fontSize: 12,
+      ),
+    ),
+  );
+
   Widget field(String label) {
+    if (widget.kind == 'dispatch') return _taskField(label);
     final controller = controllers[label]!;
     if (widget.kind == 'register' && label == '部门' && !AppConfig.mock) {
       return ref
           .watch(registrationDepartmentsProvider)
           .when(
-            loading: () => const LinearProgressIndicator(),
+            loading: () => const SunnyLoadingIndicator(),
             error: (e, _) => ErrorPanel(
               '无法加载注册部门：$e',
               retry: () => ref.invalidate(registrationDepartmentsProvider),
             ),
-            data: (page) => DropdownButtonFormField<String>(
+            data: (page) => PremiumDropdownField<String>(
               initialValue: page.items.any((r) => r.id == selectedDepartment)
                   ? selectedDepartment
                   : null,
@@ -443,14 +880,13 @@ class _FormPageState extends ConsumerState<FormPage> {
     }
     final options = switch (label) {
       '部门' || '上级部门' => ['产品部', '市场部', '技术部'],
-      '紧急程度' => ['紧急', '普通', '不紧急'],
-      '所属分组' => ['产品设计', '客户调研', '日常协作'],
+      '标签' => _taskTagLabels.keys.toList(),
       '角色' => UserRole.values.map((r) => r.label).toList(),
       '展示受众' => ['本团队', '本部门', '全公司'],
       _ => <String>[],
     };
     if (options.isNotEmpty) {
-      return DropdownButtonFormField<String>(
+      return PremiumDropdownField<String>(
         key: ValueKey('$label:${controller.text}'),
         initialValue: options.contains(controller.text)
             ? controller.text
@@ -516,6 +952,46 @@ class _FormPageState extends ConsumerState<FormPage> {
         ],
       );
     }
+    if (label == '参与人') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('参与人 *'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final p in participants.values)
+                InputChip(
+                  label: Text(p.title),
+                  onDeleted: busy
+                      ? null
+                      : () => setState(() {
+                          participants.remove(p.id);
+                          controller.text = participants.values
+                              .map((p) => p.title)
+                              .join('、');
+                        }),
+                ),
+              ActionChip(
+                avatar: const Icon(Icons.person_add_alt, size: 18),
+                label: const Text('添加参与人'),
+                onPressed: busy ? null : () => selectPerson(label),
+              ),
+            ],
+          ),
+          if (participants.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                '至少选择一名参与人',
+                style: TextStyle(color: CuteTokens.muted),
+              ),
+            ),
+        ],
+      );
+    }
     if (label == '协作人') {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,7 +1039,14 @@ class _FormPageState extends ConsumerState<FormPage> {
         },
       );
     }
-    final person = ['主负责人', '协作人', '员工', '直属上级', '指定公司复核人'].contains(label);
+    final person = [
+      '主负责人',
+      '协作人',
+      '参与人',
+      '员工',
+      '直属上级',
+      '指定公司复核人',
+    ].contains(label);
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
@@ -594,13 +1077,14 @@ class _FormPageState extends ConsumerState<FormPage> {
               )
             : person
             ? const Icon(Icons.person_search_outlined)
-            : label == '截止时间'
+            : label == '开始时间' || label == '截止时间'
             ? const Icon(Icons.calendar_today)
             : null,
       ),
       obscureText: label.contains('密码') && !visiblePasswords.contains(label),
       readOnly:
           person ||
+          label == '开始时间' ||
           label == '截止时间' ||
           (widget.kind == 'profile-edit' && label == '姓名'),
       minLines: document && label == '今日工作' ? 2 : null,
@@ -627,30 +1111,23 @@ class _FormPageState extends ConsumerState<FormPage> {
       validator: (value) => validate(label, value),
       onTap: person
           ? () => selectPerson(label)
-          : label == '截止时间'
+          : label == '开始时间' || label == '截止时间'
           ? () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now(),
+              final picked = await showPremiumDateTimePicker(
+                context,
+                initial: label == '开始时间' ? startAt : deadline,
                 firstDate: DateTime.now().subtract(const Duration(days: 1)),
-                lastDate: DateTime(2040),
+                title: label,
               );
-              if (date == null || !mounted) return;
-              final time = await showTimePicker(
-                context: context,
-                initialTime: const TimeOfDay(hour: 18, minute: 0),
-              );
-              if (time != null && mounted) {
+              if (picked != null && mounted) {
                 setState(() {
-                  deadline = DateTime(
-                    date.year,
-                    date.month,
-                    date.day,
-                    time.hour,
-                    time.minute,
-                  );
+                  if (label == '开始时间') {
+                    startAt = picked;
+                  } else {
+                    deadline = picked;
+                  }
                   controller.text =
-                      '${date.year}-${date.month}-${date.day} ${time.format(context)}';
+                      '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')} ${TimeOfDay.fromDateTime(picked).format(context)}';
                 });
               }
             }
@@ -664,6 +1141,10 @@ class _FormPageState extends ConsumerState<FormPage> {
         conflict ||
         busy ||
         !attachmentsReady) {
+      return;
+    }
+    if (!windowOpen) {
+      setState(() => error = '日志提交已满24小时，已锁定');
       return;
     }
     if (!['login', 'register', 'password'].contains(widget.kind) &&
@@ -718,9 +1199,10 @@ class _FormPageState extends ConsumerState<FormPage> {
       if (widget.kind == 'dispatch')
         'attachments': uploadedAttachments.map((f) => f.id).toList(),
       if (widget.kind == 'dispatch')
-        'collaborators': collaborators.keys
-            .where((id) => id != selectedOwner)
-            .toList(),
+        'participantIds': participants.keys.toList(),
+      if (widget.kind == 'dispatch' &&
+          controllers['标签']!.text.trim().isNotEmpty)
+        'tagId': controllers['标签']!.text.trim(),
       if (widget.id == null ||
           controllers.containsKey('任务名称') ||
           controllers.containsKey('标题'))
@@ -733,6 +1215,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                 : spec.title),
       if (selectedOwner != null) 'ownerId': selectedOwner,
       if (selectedDepartment != null) 'departmentId': selectedDepartment,
+      if (startAt != null) 'startAt': startAt!.toUtc().toIso8601String(),
       if (deadline != null) 'deadline': deadline!.toUtc().toIso8601String(),
       if (log) 'businessDate': businessDate.toIso8601String().split('T').first,
       if (controllers.containsKey('驳回原因')) 'reason': controllers['驳回原因']!.text,
@@ -861,6 +1344,7 @@ class _FormPageState extends ConsumerState<FormPage> {
             loadingExisting ||
             loadFailed ||
             conflict ||
+            !windowOpen ||
             (!AppConfig.mock && widget.kind == 'return')
         ? null
         : submit,
@@ -874,7 +1358,11 @@ class _FormPageState extends ConsumerState<FormPage> {
           : error != null
           ? '重试提交'
           : document
-          ? (log ? '提交日志' : '提交修订申请')
+          ? (!windowOpen
+                ? '已满24小时 · 日志已锁定'
+                : log
+                ? '提交'
+                : '保存日志修改')
           : spec.title,
     ),
   );
@@ -906,7 +1394,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                     final yes = await showDialog<bool>(
                       context: context,
                       builder: (c) => TuantuanDialog(
-                        title: const Text('重新读取最新版本？'),
+                        title: const Text('重新读取最新内容？'),
                         content: const Text(
                           '编辑区将替换为最新内容。本机已保存的草稿保留，不会自动提交或覆盖服务器。',
                         ),
@@ -933,7 +1421,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                       }
                     }
                   },
-            child: const Text('重新读取最新版本'),
+            child: const Text('重新读取最新内容'),
           ),
       ],
     ),
@@ -945,12 +1433,13 @@ class _FormPageState extends ConsumerState<FormPage> {
     final fields = widget.kind == 'acceptance' || widget.kind == 'return'
         ? ['成果说明', '遇到的阻碍', '附件']
         : task
-        ? ['主负责人', '截止时间']
+        ? ['参与人', '开始时间', '截止时间']
         : widget.kind == 'log-revise' || widget.kind == 'comment'
         ? ['业务日期', '今日工作']
         : ['内容'];
     String value(String label) => switch (label) {
-      '主负责人' => '${f[label] ?? f['ownerName'] ?? item.ownerId}',
+      '参与人' =>
+        '${(f['participantNames'] as List?)?.join('、') ?? f['participantIds'] ?? '未设置'}',
       '截止时间' => f['deadline'] == null ? '未设置' : '${f['deadline']}',
       '业务日期' => '${f['businessDate'] ?? '未标记'}',
       '内容' => '${f['内容'] ?? f['body'] ?? '暂无内容'}',
@@ -962,7 +1451,9 @@ class _FormPageState extends ConsumerState<FormPage> {
         SectionHeader(
           widget.kind == 'acceptance' || widget.kind == 'return'
               ? '本次成果 · 只读'
-              : '当前生效 · v${item.version}',
+              : widget.kind == 'log-revise' || widget.kind == 'comment'
+              ? '当前日志'
+              : '当前记录',
         ),
         PaperSurface(
           child: Column(
@@ -1039,9 +1530,9 @@ class _FormPageState extends ConsumerState<FormPage> {
     }
     final groups = widget.kind == 'dispatch'
         ? [
-            ('任务内容', ['任务名称', '所属分组', '任务内容']),
-            ('工作安排', ['截止时间', '紧急程度', '进度备注']),
-            ('成员与附件', ['主负责人', '协作人', '附件']),
+            ('任务内容', ['任务名称', '任务内容']),
+            ('字段属性', ['标签', '开始时间', '截止时间']),
+            ('参与人与附件', ['参与人', '附件']),
           ]
         : widget.kind == 'feedback'
         ? [
@@ -1050,13 +1541,21 @@ class _FormPageState extends ConsumerState<FormPage> {
           ]
         : [(auth ? '账号信息' : '填写内容', spec.fields)];
     return PageFrame(
-      title: document ? (log ? '写日志' : '修订日志') : spec.title,
+      title: document ? (log ? '写日志' : '修改日志') : spec.title,
+      showTitle: !auth,
       actions: document
           ? [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(right: 16),
                 child: Center(
-                  child: Text('草稿', style: TextStyle(color: CuteTokens.muted)),
+                  child: Text(
+                    log
+                        ? '草稿'
+                        : windowOpen
+                        ? '24小时内可修改'
+                        : '已锁定',
+                    style: const TextStyle(color: CuteTokens.muted),
+                  ),
                 ),
               ),
             ]
@@ -1077,7 +1576,11 @@ class _FormPageState extends ConsumerState<FormPage> {
             secondary: document
                 ? OutlinedButton(
                     onPressed:
-                        busy || loadingExisting || draftRestoring || submitted
+                        busy ||
+                            loadingExisting ||
+                            draftRestoring ||
+                            submitted ||
+                            !windowOpen
                         ? null
                         : () => saveDraft(notify: true),
                     child: const Text('保存草稿'),
@@ -1090,45 +1593,128 @@ class _FormPageState extends ConsumerState<FormPage> {
       child: PageBody(
         children: [
           if (auth) ...[
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E5),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFF0DDC8)),
+              ),
+              padding: const EdgeInsets.fromLTRB(18, 18, 14, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: SunnyPalette.primary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: widget.kind == 'login' ? '工作' : '协作',
+                                style: const TextStyle(
+                                  fontFamily: 'serif',
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w600,
+                                  color: DogBrandPalette.ink,
+                                ),
+                              ),
+                              TextSpan(
+                                text: widget.kind == 'login' ? '有序' : '同行',
+                                style: const TextStyle(
+                                  fontFamily: 'serif',
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w700,
+                                  fontStyle: FontStyle.italic,
+                                  color: SunnyPalette.primaryStrong,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const DogPose(index: DogAssets.sitting, size: 104),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.kind == 'login'
-                            ? '把工作理清楚，\n从今天开始。'
-                            : '和团队一起，\n把事情做好。',
-                        style: const TextStyle(
-                          fontFamily: AppTypography.displayFamily,
-                          fontSize: 27,
-                          fontWeight: FontWeight.w700,
-                          height: 1.4,
+                for (final feature in const [
+                  ('任务协同', Icons.task_alt_rounded),
+                  ('工作日志', Icons.edit_note_rounded),
+                  ('日程视图', Icons.calendar_month_rounded),
+                ])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 42),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFCF7),
+                          borderRadius: BorderRadius.circular(13),
+                          border: Border.all(color: DogBrandPalette.line),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              feature.$2,
+                              size: 16,
+                              color: SunnyPalette.primaryStrong,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                feature.$1,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: DogBrandPalette.ink,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '阳光纸张 · 你的协作工作台',
-                        style: TextStyle(color: CuteTokens.muted),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const TuantuanMascot('welcome', size: 96),
               ],
             ),
-            const SizedBox(height: 24),
-          ],
-          if (widget.kind == 'register')
-            const Padding(
-              padding: EdgeInsets.only(bottom: 20),
-              child: Text(
-                '注册仅创建待确认员工。选择申请部门，管理员确认后可访问公司内容。短信验证尚未接入。',
-                style: TextStyle(height: 1.6, color: CuteTokens.muted),
-              ),
+            const SizedBox(height: 14),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'login', label: Text('登录')),
+                ButtonSegment(value: 'register', label: Text('注册')),
+              ],
+              selected: {widget.kind},
+              onSelectionChanged: busy
+                  ? null
+                  : (selection) => context.go(
+                      selection.single == 'register'
+                          ? '/auth/register'
+                          : '/auth/login',
+                    ),
+              showSelectedIcon: false,
             ),
+            const SizedBox(height: 14),
+          ],
           if (widget.kind == 'password') ...[
             PaperSurface(
               child: Text(
@@ -1188,7 +1774,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const TuantuanMascot('welcome', size: 56),
+                const DogPose(index: DogAssets.resting, size: 52),
               ],
             ),
             const SizedBox(height: 16),
@@ -1210,7 +1796,6 @@ class _FormPageState extends ConsumerState<FormPage> {
             ),
           if ([
             'publish',
-            'log-revise',
             'transfer',
             'reschedule',
             'role',
@@ -1248,7 +1833,7 @@ class _FormPageState extends ConsumerState<FormPage> {
             const SizedBox(height: 16),
           ],
           IgnorePointer(
-            ignoring: loadingExisting,
+            ignoring: loadingExisting || !windowOpen,
             child: Form(
               key: form,
               child: document
@@ -1272,6 +1857,41 @@ class _FormPageState extends ConsumerState<FormPage> {
                             field(label),
                             if (index < spec.fields.length - 1)
                               const Divider(height: 28),
+                          ],
+                        ],
+                      ),
+                    )
+                  : auth
+                  ? PaperSurface(
+                      color: DogBrandPalette.surface,
+                      borderColor: DogBrandPalette.line,
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.key_rounded,
+                                size: 19,
+                                color: SunnyPalette.primaryStrong,
+                              ),
+                              const SizedBox(width: 7),
+                              Text(
+                                widget.kind == 'login' ? '账号密码登录' : '创建员工账号',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: DogBrandPalette.ink,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          for (final label in spec.fields) ...[
+                            field(label),
+                            if (label != spec.fields.last)
+                              const SizedBox(height: 14),
                           ],
                         ],
                       ),
@@ -1335,10 +1955,67 @@ class _FormPageState extends ConsumerState<FormPage> {
               ),
             ),
           ],
-          if (widget.kind == 'login')
-            TextButton(
-              onPressed: () => context.push('/auth/register'),
-              child: const Text('注册员工账号'),
+          if (widget.kind == 'register')
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF4E8),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFF0DDC8)),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 19,
+                        color: SunnyPalette.primaryStrong,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '注册仅申请创建待确认员工。请选择申请部门；管理员确认前无法访问公司内容。短信验证尚未接入。',
+                          style: TextStyle(
+                            color: DogBrandPalette.ink,
+                            height: 1.45,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (auth)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.shield_outlined,
+                    size: 18,
+                    color: DogBrandPalette.muted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.kind == 'login'
+                          ? '企业账号用于进入对应组织空间，业务数据范围按账号权限控制。'
+                          : '账号归属由管理员确认；确认前不会开放公司业务资料。',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: DogBrandPalette.muted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           const DemoLabel(),
         ],

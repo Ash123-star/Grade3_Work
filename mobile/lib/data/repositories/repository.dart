@@ -257,6 +257,8 @@ class HttpRepository implements Repository {
   };
 
   String _pathForList(String resource) => switch (resource) {
+    'tasks' => '/tasks',
+    'logs' => '/logs',
     'logs/subordinates' => '/logs/subordinates',
     'dashboard/company' => '/dashboard/company',
     'dashboard/personal' => '/dashboard/personal',
@@ -266,7 +268,10 @@ class HttpRepository implements Repository {
     'audit' => '/organization/audit',
     'analytics' => '/analytics',
     'ai-maps' => '/ai-maps',
-    _ => '/$resource',
+    'organization/departments' => '/organization/departments',
+    'reviews' => '/reviews',
+    'notifications' => '/notifications',
+    _ => throw ApiFailure(FailureKind.unavailable, '列表接口尚未登记：$resource'),
   };
 
   Record _record(Map<String, dynamic> raw) {
@@ -334,6 +339,39 @@ class HttpRepository implements Repository {
       fields['submittedAt'] = raw['submitted_at'];
     }
     if (raw.containsKey('deadline')) fields['deadline'] = raw['deadline'];
+    if (raw.containsKey('start_at')) fields['startAt'] = raw['start_at'];
+    if (raw.containsKey('startAt')) fields['startAt'] = raw['startAt'];
+    if (raw.containsKey('tag_id')) fields['tagId'] = raw['tag_id'];
+    if (raw.containsKey('tagId')) fields['tagId'] = raw['tagId'];
+    if (raw.containsKey('tag_name')) fields['tagName'] = raw['tag_name'];
+    if (raw.containsKey('tagName')) fields['tagName'] = raw['tagName'];
+    if (raw.containsKey('tag_category')) {
+      fields['tagCategory'] = raw['tag_category'];
+    }
+    if (raw.containsKey('tagCategory')) {
+      fields['tagCategory'] = raw['tagCategory'];
+    }
+    if (raw.containsKey('tag_color')) fields['tagColor'] = raw['tag_color'];
+    if (raw.containsKey('tagColor')) fields['tagColor'] = raw['tagColor'];
+    if (raw['participant_ids'] is List) {
+      fields['participantIds'] = raw['participant_ids'];
+    }
+    if (raw['participantIds'] is List) {
+      fields['participantIds'] = raw['participantIds'];
+    }
+    if (raw['participants'] is List) {
+      final values = raw['participants'] as List;
+      fields['participantIds'] = [
+        for (final value in values)
+          value is Map ? '${value['id'] ?? value['user_id'] ?? ''}' : '$value',
+      ].where((value) => value.isNotEmpty).toList();
+      fields['participantNames'] = [
+        for (final value in values)
+          value is Map
+              ? '${value['name'] ?? value['display_name'] ?? value['title'] ?? value['id'] ?? ''}'
+              : '$value',
+      ];
+    }
     for (final pair in [
       ('work', '今日工作'),
       ('blockers', '遇到的阻碍'),
@@ -426,7 +464,8 @@ class HttpRepository implements Repository {
       fields['type'] = switch (raw['type']) {
         'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' => '任务',
         'DEADLINE' => '截止提醒',
-        'LOG_SUBMITTED' || 'LOG_COMMENT' => '日志',
+        'LOG_SUBMITTED' => '日志',
+        'LOG_COMMENT' => '评论',
         'REVIEW_PENDING' => '审批',
         'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
         _ => '${raw['type'] ?? '消息'}',
@@ -582,7 +621,7 @@ class HttpRepository implements Repository {
         'reviews' => '/reviews/${Uri.encodeComponent(id)}',
         'ai-maps' => '/ai-maps',
         'private-notes' => '/private-notes',
-        _ => '/$resource/${Uri.encodeComponent(id)}',
+        _ => throw ApiFailure(FailureKind.unavailable, '详情接口尚未登记：$resource'),
       };
       final response = await _getWithRetry<dynamic>(path);
       if (resource == 'private-notes' || resource == 'ai-maps') {
@@ -686,23 +725,27 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _taskDraft(Command command) {
     final v = _values(command);
+    final tag = '${v['tagId'] ?? v['标签'] ?? ''}'.trim();
+    final participants = v['participantIds'] ?? v['参与人'];
     return {
       'title': v['title'] ?? v['任务名称'],
-      'ownerId': v['ownerId'],
+      if (v['ownerId'] != null) 'ownerId': v['ownerId'],
+      'participantIds': participants is List
+          ? participants
+          : '${participants ?? ''}'
+                .split('、')
+                .map((value) => value.trim())
+                .where((value) => value.isNotEmpty)
+                .toList(),
+      'startAt': v['startAt'],
       'deadline': v['deadline'],
-      'group': v['所属分组'] ?? v['group'],
       'content': v['任务内容'] ?? v['内容'] ?? v['content'],
       'urgency': switch ('${v['紧急程度'] ?? v['urgency'] ?? '普通'}') {
         '紧急' || 'URGENT' => 'URGENT',
         '不紧急' || 'LOW' => 'LOW',
         _ => 'NORMAL',
       },
-      'progressNote': v['进度备注'] ?? v['progressNote'],
-      'collaborators':
-          v['collaborators'] ??
-          (v['协作人'] is String && '${v['协作人']}'.isNotEmpty
-              ? ['${v['协作人']}']
-              : const <String>[]),
+      if (tag.isNotEmpty) 'tagId': tag,
       'attachments': v['attachments'] ?? const <String>[],
     }..removeWhere((key, value) => value == null);
   }
@@ -875,6 +918,12 @@ class HttpRepository implements Repository {
             );
           }
         }
+        if (command.action == 'update') {
+          throw const ApiFailure(
+            FailureKind.unavailable,
+            '已提交日志修改接口尚未定案；当前不会误写入草稿',
+          );
+        }
         return await _putRecord('/logs/draft', {
           'businessDate': v['businessDate'],
           'body': _diaryBody(v),
@@ -882,6 +931,12 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'logs/comments') {
+        if (v['parentCommentId'] != null) {
+          throw const ApiFailure(
+            FailureKind.unavailable,
+            '评论回复关系接口尚未定案；请作为普通评论提交',
+          );
+        }
         return await _postRecord(
           '/logs/${Uri.encodeComponent(_commandId(command))}/comments',
           {'text': v['评语'] ?? v['text']},

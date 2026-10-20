@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
-import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 
 enum BuddyPose { welcome, writing, explaining, success, empty, retry }
@@ -294,58 +293,31 @@ class SunnyWelcome extends StatelessWidget {
     this.color = const Color(0xFFE6FAEF),
     this.pose = BuddyPose.welcome,
     this.pet,
-    this.mascotAsset,
     this.action,
   });
   final String title, subtitle;
   final Color color;
   final BuddyPose pose;
   final CompanionPet? pet;
-  final String? mascotAsset;
   final Widget? action;
   @override
   Widget build(BuildContext context) => PaperSurface(
-    skin:
-        '${TuantuanAssets.newPack}/surfaces/card_corners/${TuantuanAssets.tone(color)}_corner.png',
     color: color,
-    outlined: true,
-    padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
-    texture: TuantuanAssets
-        .textures[color == SunnyPalette.purple ? 'lavenderCloud' : 'mintGrid'],
-    cornerDecoration: TuantuanAssets
-        .cardCorners[color == SunnyPalette.purple ? 'lavender' : 'mint'],
+    outlined: false,
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (action != null)
           Align(alignment: Alignment.centerRight, child: action),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: SunnyPalette.ink,
-                      fontSize: 13,
-                      height: 1.55,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (mascotAsset case final asset?)
-              TuantuanMascot(asset, size: 80)
-            else if (pet case final companion?)
-              PetCompanion(pet: companion)
-            else
-              WorkBuddy(size: 52, pose: pose),
-          ],
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: SunnyPalette.ink,
+            height: 1.5,
+          ),
         ),
       ],
     ),

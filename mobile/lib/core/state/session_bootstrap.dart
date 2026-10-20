@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
+import 'package:pandora_mobile/shared/page_states.dart';
 import '../../data/local/session_store.dart';
 import '../../data/local/secure_values.dart';
 import '../../data/models/models.dart';
@@ -205,9 +206,14 @@ class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Center(
-                        child: TuantuanMascot(
-                          error == null ? 'ai' : 'error',
-                          size: 96,
+                        child: SunnyStatusIcon(
+                          icon: error == null
+                              ? Icons.sync_rounded
+                              : Icons.cloud_off_outlined,
+                          color: error == null
+                              ? const Color(0xFF4C8066)
+                              : Theme.of(context).colorScheme.error,
+                          size: 72,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -218,7 +224,7 @@ class _SessionBootstrapState extends ConsumerState<SessionBootstrap> {
                       const SizedBox(height: 16),
                       const Text('确认账号状态后进入工作台。本机加密草稿按账号保留。'),
                       const SizedBox(height: 24),
-                      if (working) const LinearProgressIndicator(),
+                      if (working) const SunnyLoadingIndicator(size: 24),
                       if (error != null) ...[
                         Text(error!),
                         const SizedBox(height: 16),

@@ -595,10 +595,9 @@ void main() {
     },
   );
   testWidgets(
-    'organization preserves empty units and rejected management has no company resubmit',
+    'personnel includes later pages and rejected management has no company resubmit',
     (t) async {
-      final c = await launch(t, '/me/organization');
-      expect(find.text('空部门'), findsOneWidget);
+      final c = await launch(t, '/me/people');
       expect(find.text('第二页成员'), findsOneWidget);
       c.read(routerProvider).go('/me/reviews/rejected');
       await settle(t);

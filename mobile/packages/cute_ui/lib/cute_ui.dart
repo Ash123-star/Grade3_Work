@@ -140,6 +140,15 @@ class SectionHeader extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 12),
     child: Row(
       children: [
+        Image.asset(
+          'assets/generated_ui/dog/avatars/avatar_01.png',
+          width: 24,
+          height: 24,
+          fit: BoxFit.contain,
+          excludeFromSemantics: true,
+          errorBuilder: (_, _, _) => const SizedBox(width: 24, height: 24),
+        ),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(title, style: Theme.of(context).textTheme.titleMedium),
         ),
