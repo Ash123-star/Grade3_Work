@@ -5,9 +5,18 @@ COPY server/pom.xml server/pom.xml
 COPY server/src server/src
 RUN --mount=type=cache,target=/root/.m2 mvn -B -f server/pom.xml -DskipTests package
 
+FROM alpine:3.22 AS parser-sandbox
+RUN apk add --no-cache build-base linux-headers
+COPY deploy/parser/sandbox.c /src/sandbox.c
+COPY deploy/parser/sandbox-test.c /src/sandbox-test.c
+RUN cc -O2 -Wall -Wextra -Werror /src/sandbox.c -o /parser-sandbox \
+    && cc -O2 -Wall -Wextra -Werror /src/sandbox-test.c -o /sandbox-test \
+    && /parser-sandbox /sandbox-test
+
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S workpanel && adduser -S -G workpanel workpanel
 WORKDIR /app
+COPY --from=parser-sandbox --chmod=0555 /parser-sandbox /usr/local/bin/workpanel-parser-sandbox
 COPY --from=build --chown=workpanel:workpanel /build/server/target/collaboration-server-1.0.0.jar app.jar
 USER workpanel
 EXPOSE 8080

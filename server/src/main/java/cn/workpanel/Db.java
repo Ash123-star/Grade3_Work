@@ -17,7 +17,7 @@ public class Db {
     public int update(String sql, Object... args) { return jdbc.update(sql,args); }
     public List<Map<String,Object>> rows(String sql, Object... args) {
         var rows=jdbc.queryForList(sql,args);
-        for(var row:rows) for(var entry:row.entrySet()) if(entry.getValue() instanceof PGobject pg) entry.setValue(Set.of("json","jsonb").contains(pg.getType())?read(pg):pg.getValue());
+        for(var row:rows) for(var entry:row.entrySet()) if(entry.getValue() instanceof PGobject pg) entry.setValue(Set.of("json","jsonb").contains(pg.getType())?jsonValue(pg.getValue()):pg.getValue());
         return rows;
     }
     public Map<String,Object> one(String sql, Object... args) {
@@ -26,6 +26,7 @@ public class Db {
     public long count(String sql, Object... args) { return jdbc.queryForObject(sql,Long.class,args); }
     public String write(Object o) { try { return json.writeValueAsString(o); } catch(Exception e) { throw new IllegalArgumentException("JSON",e); } }
     public Map<String,Object> read(Object o) { try { if(o instanceof Map<?,?>) return json.convertValue(o,new TypeReference<>(){}); return json.readValue(o.toString(),new TypeReference<>(){}); } catch(Exception e) { throw new IllegalArgumentException("JSON",e); } }
+    private Object jsonValue(String value){try{return json.readValue(value,Object.class);}catch(Exception e){throw new IllegalArgumentException("JSON",e);}}
     public static String id() { return UUID.randomUUID().toString(); }
     public static String hash(String s) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8))); } catch(Exception e) { throw new IllegalStateException(e); } }
     public static String str(Map<String,?> m,String key) { Object o=m.get(key); return o==null?"":o.toString(); }

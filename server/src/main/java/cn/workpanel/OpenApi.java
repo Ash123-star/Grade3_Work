@@ -40,6 +40,8 @@ public class OpenApi {
         var reviewer=object("version","reason"); reviewer.addProperty("version",version()); reviewer.addProperty("reason",text().minLength(1)); c.addSchemas("ReviewerApplication",reviewer);
         var membership=object("version","reason","departmentId"); membership.addProperty("version",version()); membership.addProperty("reason",text().minLength(1)); membership.addProperty("departmentId",text().minLength(1)); c.addSchemas("MembershipApplication",membership);
         var policy=object("version","reason"); policy.addProperty("version",version()); policy.addProperty("reason",text().minLength(1)); policy.addProperty("taskTeamReview",new BooleanSchema()); policy.addProperty("taskDepartmentReview",new BooleanSchema()); c.addSchemas("ReviewPolicy",policy);
+        for(String key:List.of("aiWorkCreateAuthorization","aiWorkSubmitAuthorization"))policy.addProperty(key,new BooleanSchema());
+        for(var entry:Map.of("aiWorkAuthorizationMaxDays",30,"aiWorkAuthorizationMaxObjects",100,"aiWorkAuthorizationMaxActions",5).entrySet())policy.addProperty(entry.getKey(),new IntegerSchema().minimum(java.math.BigDecimal.ONE).maximum(java.math.BigDecimal.valueOf(entry.getValue())));
         var organization=object("version","reason"); organization.addProperty("version",version()); organization.addProperty("reason",text().minLength(1)); for(String field:List.of("name","departmentId","teamId","managerId")) organization.addProperty(field,text()); organization.addProperty("role",new StringSchema()._enum(List.of("ADMIN","FOUNDER","DIRECTOR","LEADER","EMPLOYEE"))); organization.addProperty("status",new StringSchema()._enum(List.of("ACTIVE","DISABLED"))); organization.addProperty("dispatchEnabled",new BooleanSchema()); organization.addProperty("companyReviewer",new BooleanSchema()); c.addSchemas("UserRevision",organization);
         var unit=object("name","version","reason"); unit.addProperty("id",text()); unit.addProperty("name",text().minLength(1)); unit.addProperty("departmentId",text().description("团队必填")); unit.addProperty("version",version()); unit.addProperty("reason",text().minLength(1)); c.addSchemas("UnitRevision",unit);
         var item=object("title","version"); item.addProperty("id",text()); item.addProperty("title",text().minLength(1)); item.addProperty("text",text()); item.addProperty("version",version()); item.addProperty("pinned",new BooleanSchema()); item.addProperty("archived",new BooleanSchema()); item.addProperty("position",new IntegerSchema().minimum(java.math.BigDecimal.ZERO).maximum(java.math.BigDecimal.valueOf(10000))); c.addSchemas("PersonalItem",item);
@@ -162,7 +164,7 @@ public class OpenApi {
             // 显式记录管理别名，避免前端依靠未登记路径；复制对象不改变普通业务接口。
             var adminPaths=new LinkedHashMap<String,PathItem>();
             api.getPaths().forEach((path,item)->{
-                if(path.startsWith("/api/ai-maps/")||path.startsWith("/api/ai-memories")||path.equals("/api/organization/audit")||path.equals("/api/organization/task-audit")||path.equals("/api/auth/me")) {
+                if(path.startsWith("/api/")&&Security.adminWorkspaceAllowed(path.substring(4))) {
                     var copy=io.swagger.v3.core.util.Json.mapper().convertValue(item,PathItem.class);
                     copy.readOperations().forEach(op->{ op.setOperationId("adminWorkspace_"+op.getOperationId()); op.setDescription("独立工作台管理员入口：每次请求必须为当前有效ADMIN，否则401/403。"+Objects.toString(op.getDescription(),"")); });
                     adminPaths.put("/api/admin/workspace"+path.substring(4),copy);

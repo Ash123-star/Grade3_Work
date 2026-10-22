@@ -43,6 +43,12 @@ app:
   neo4j-username: ${NEO4J_USERNAME:neo4j}
   neo4j-password: ${NEO4J_PASSWORD:}
   memory-extract-enabled: ${AI_MEMORY_EXTRACT_ENABLED:true}
+  ai-workbench-enabled: ${AI_WORKBENCH_ENABLED:true}
+  ai-work-execution-enabled: ${AI_WORK_EXECUTION_ENABLED:false}
+  ai-ocr-enabled: ${AI_OCR_ENABLED:false}
+  ai-ocr-url: ${AI_OCR_URL:}
+  ai-parser-sandbox: ${AI_PARSER_SANDBOX:/usr/local/bin/workpanel-parser-sandbox}
+  ai-parser-sandbox-required: ${AI_PARSER_SANDBOX_REQUIRED:false}
 springdoc:
   remove-broken-reference-definitions: false
   api-docs:

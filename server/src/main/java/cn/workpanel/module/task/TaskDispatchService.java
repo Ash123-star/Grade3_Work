@@ -32,9 +32,11 @@ public class TaskDispatchService {
         db.update("INSERT INTO tasks(id,company_id,owner_id,issuer_id,title,deadline,body,phase,version) VALUES (?,?,?,?,?,?::timestamptz,?::jsonb,'DISPATCHED',1)",id,a.company(),d.ownerId(),a.id(),d.title(),d.deadline(),db.write(body));
         TaskParticipants.assign(db,a,id,d);
         TaskAttachments.bind(db,a,id,d.attachments(),false);
+        for(var item:d.acceptanceChecklist()) db.update("INSERT INTO task_acceptance_items(company_id,task_id,version,item_id,body) VALUES (?,?,1,?,?::jsonb)",a.company(),id,item.get("id"),db.write(item));
         TaskTimeline.append(db,a,id,"DISPATCHED",body,null,"DISPATCHED",1);
         db.update("INSERT INTO idempotency_keys(company_id,actor_id,key,request_hash,task_id,hash_version) VALUES (?,?,?,?,?,2)",a.company(),a.id(),key,TaskDraftNormalizer.hash(db,d),id);
         db.audit(a,"TASK_DISPATCHED",id,Map.of(),body,"派发任务");
+        db.notify(a,d.ownerId(),"TASK_DISPATCHED",id,"task-dispatched:"+id);
         return detail(TaskAccess.issued(db,a,id));
     }
 
