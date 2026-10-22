@@ -1319,7 +1319,14 @@ class _FormPageState extends ConsumerState<FormPage> {
         context.go('/auth/login');
         notice(context, '密码已修改，请使用新密码重新登录');
       } else {
-        notice(context, AppConfig.mock ? '已保存到演示数据' : '已提交');
+        notice(
+          context,
+          widget.kind == 'log-revise'
+              ? '修订申请已提交，审核通过后生效'
+              : AppConfig.mock
+              ? '已保存到演示数据'
+              : '已提交',
+        );
         if (context.canPop()) context.pop();
       }
     } catch (e) {
@@ -1362,7 +1369,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                 ? '已满24小时 · 日志已锁定'
                 : log
                 ? '提交'
-                : '保存日志修改')
+                : '提交修订申请')
           : spec.title,
     ),
   );
@@ -1439,7 +1446,7 @@ class _FormPageState extends ConsumerState<FormPage> {
         : ['内容'];
     String value(String label) => switch (label) {
       '参与人' =>
-        '${(f['participantNames'] as List?)?.join('、') ?? f['participantIds'] ?? '未设置'}',
+        '${(f['participantNames'] as List?)?.join('、') ?? f['participantIds'] ?? f['主负责人'] ?? item.ownerId}',
       '截止时间' => f['deadline'] == null ? '未设置' : '${f['deadline']}',
       '业务日期' => '${f['businessDate'] ?? '未标记'}',
       '内容' => '${f['内容'] ?? f['body'] ?? '暂无内容'}',

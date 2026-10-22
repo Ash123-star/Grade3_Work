@@ -1,3 +1,4 @@
+import 'support/workflow_fixture.dart';
 import 'support/local_test_state.dart';
 import 'package:pandora_mobile/core/state/local_state.dart';
 import 'package:pandora_mobile/data/local/draft_store.dart';
@@ -19,7 +20,9 @@ void main() {
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.resetPhysicalSize);
     addTearDown(t.view.resetDevicePixelRatio);
-    final c = testContainer();
+    final c = testContainer(
+      overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+    );
     addTearDown(c.dispose);
     c.read(logDateProvider.notifier).state = DateTime(2025, 2, 3);
     await t.pumpWidget(
@@ -58,12 +61,12 @@ void main() {
       );
       final hours = find.byType(TextFormField).last;
       await t.enterText(hours, 'NaN');
-      await t.tap(find.text('提交日志'));
+      await t.tap(find.text('提交'));
       await t.pumpAndSettle();
       expect(find.text('工时应在0到24之间'), findsOneWidget);
       await t.enterText(hours, '7.5');
       c.read(scenarioProvider.notifier).state = DemoScenario.offline;
-      await t.tap(find.text('提交日志'));
+      await t.tap(find.text('提交'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.text('提交失败，内容已保留'), findsOneWidget);
@@ -148,9 +151,9 @@ void main() {
             .onPressed,
         isNull,
       );
-      await t.ensureVisible(find.text('重新读取最新版本'));
+      await t.ensureVisible(find.text('重新读取最新内容'));
       await t.pumpAndSettle();
-      await t.tap(find.text('重新读取最新版本'));
+      await t.tap(find.text('重新读取最新内容'));
       await t.pumpAndSettle();
       await t.tap(find.widgetWithText(FilledButton, '重新读取'));
       await t.pumpAndSettle();
@@ -174,11 +177,7 @@ void main() {
       final c = await launch(t, '/item/tasks/1');
       expect(find.text('接收任务'), findsOneWidget);
       expect(find.text('转派任务'), findsNothing);
-      await t.tap(find.byTooltip('更多操作'));
-      await t.pumpAndSettle();
-      expect(find.text('转派任务'), findsOneWidget);
-      await t.tapAt(const Offset(10, 350));
-      await t.pumpAndSettle();
+      expect(find.byTooltip('更多操作'), findsNothing);
       await t.tap(find.text('接收任务'));
       await t.pumpAndSettle();
       expect(find.text('提交成果反馈'), findsOneWidget);

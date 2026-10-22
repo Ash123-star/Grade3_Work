@@ -138,7 +138,7 @@ void main() {
         final picture = await render.toImage(pixelRatio: 1);
         final png = await picture.toByteData(format: ui.ImageByteFormat.png);
         final file = File(
-          'docs/evidence/week5/month-tasks-${size.width.toInt()}x${size.height.toInt()}-$scale.png',
+          '../output/flutter-evidence/week5/month-tasks-${size.width.toInt()}x${size.height.toInt()}-$scale.png',
         );
         file.parent.createSync(recursive: true);
         file.writeAsBytesSync(png!.buffer.asUint8List());

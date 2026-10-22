@@ -184,7 +184,7 @@ class AuthIntegrationTest {
                 cn.workpanel.tools.LegacyAuthUpgrade.upgrade(dataSource,schema);
                 assertEquals("unchanged",db.one("SELECT password_hash FROM "+schema+".users WHERE id='legacy'").get("password_hash"));
                 assertEquals(3,db.count("SELECT failures FROM "+schema+".auth_login_state WHERE account_hash=?",Db.hash("legacy")));
-                assertEquals(15,db.count("SELECT count(*) FROM "+schema+".flyway_schema_history WHERE version IS NOT NULL AND success"));
+                assertEquals(16,db.count("SELECT count(*) FROM "+schema+".flyway_schema_history WHERE version IS NOT NULL AND success"));
             } finally { db.update("DROP SCHEMA "+schema+" CASCADE"); }
         }
     }

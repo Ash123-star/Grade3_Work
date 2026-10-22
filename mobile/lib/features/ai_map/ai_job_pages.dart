@@ -464,6 +464,7 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
       'content': content.text.trim(),
       'group': group.text.trim(),
       'ownerId': owner!.id,
+      'urgency': 'NORMAL',
       'deadline': deadline!.toUtc().toIso8601String(),
       'collaborators': collaborators.keys.toList(),
       'attachments': files.map((f) => f.id).toList(),

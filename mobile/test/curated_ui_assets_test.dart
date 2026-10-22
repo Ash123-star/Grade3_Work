@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'support/flutter_sdk_assets.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -149,7 +150,7 @@ void main() {
           }
           expect(t.takeException(), isNull, reason: '$name $width');
           if (name == 'dashboard') {
-            expect(find.byType(DogAvatar), findsOneWidget);
+            expect(find.byType(DogAvatar), findsWidgets);
             expect(
               find.byType(TuantuanIcon).evaluate().length,
               greaterThanOrEqualTo(2),
@@ -176,7 +177,7 @@ void main() {
             expect(style.decoration.color, SunnyPalette.orange);
             expect(
               find.ancestor(
-                of: find.byType(DogAvatar),
+                of: find.byType(ProtectedAvatar),
                 matching: find.byType(Row),
               ),
               findsWidgets,

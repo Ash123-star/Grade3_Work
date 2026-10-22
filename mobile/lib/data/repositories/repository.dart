@@ -250,6 +250,7 @@ class HttpRepository implements Repository {
   Map<String, dynamic> _query(Query query) => {
     if (query.cursor != null) 'cursor': query.cursor,
     if (query.ownerId != null) 'ownerId': query.ownerId,
+    if (query.departmentId != null) 'departmentId': query.departmentId,
     'limit': 30,
     if (query.search.isNotEmpty) 'search': query.search,
     if (query.from != null) 'date': _date(query),
@@ -302,7 +303,13 @@ class HttpRepository implements Repository {
       }
       fields['姓名'] = raw['name'];
     }
-    if (raw['department'] != null) fields['departmentName'] = raw['department'];
+    if (raw['department'] is Map) {
+      fields['departmentName'] = raw['department']['name'];
+      fields['departmentId'] = raw['department']['id'];
+    } else if (raw['department'] != null) {
+      fields['departmentName'] = raw['department'];
+    }
+    if (raw['author'] is Map) fields['authorName'] = raw['author']['name'];
     if (raw['kind'] != null && raw['target_id'] != null) {
       fields['targetId'] = raw['target_id'];
       fields['targetResource'] = switch (raw['kind']) {
@@ -688,6 +695,9 @@ class HttpRepository implements Repository {
   ) {
     if (kind == 'comments') {
       return {
+        'id': raw['id'],
+        'parentCommentId': raw['parent_id'],
+        'authorName': raw['author_name'],
         'text': raw['text'] ?? '',
         'actorId': raw['actor_id'],
         'time': raw['created_at'],
@@ -725,6 +735,27 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _taskDraft(Command command) {
     final v = _values(command);
+    // 已发布旧契约仍可读取和修订；新表单字段明确出现时保留新模型，不将多人静默降级。
+    if (!v.containsKey('participantIds') &&
+        !v.containsKey('参与人') &&
+        !v.containsKey('tagId') &&
+        !v.containsKey('标签')) {
+      return {
+        'title': v['title'] ?? v['任务名称'],
+        'ownerId': v['ownerId'],
+        'deadline': v['deadline'],
+        'group': v['所属分组'] ?? v['group'] ?? '',
+        'content': v['任务内容'] ?? v['内容'] ?? v['content'] ?? '',
+        'urgency': switch ('${v['紧急程度'] ?? v['urgency'] ?? '普通'}') {
+          '紧急' || 'URGENT' => 'URGENT',
+          '不紧急' || 'LOW' => 'LOW',
+          _ => 'NORMAL',
+        },
+        'progressNote': v['进度备注'] ?? v['progressNote'] ?? '',
+        'collaborators': v['collaborators'] ?? const <String>[],
+        'attachments': v['attachments'] ?? const <String>[],
+      }..removeWhere((key, value) => value == null);
+    }
     final tag = '${v['tagId'] ?? v['标签'] ?? ''}'.trim();
     final participants = v['participantIds'] ?? v['参与人'];
     return {
@@ -879,6 +910,12 @@ class HttpRepository implements Repository {
           }
           return Record(id: id, title: '阅读已登记', fields: const {'ok': true});
         }
+        if (command.action == 'withdraw') {
+          return await _postRecord(
+            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
+            {'version': command.version, 'reason': v['撤回原因']},
+          );
+        }
         if (command.action == 'request-review') {
           return await _postRecord(
             '/logs/${Uri.encodeComponent(_commandId(command))}/revisions',
@@ -931,15 +968,12 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'logs/comments') {
-        if (v['parentCommentId'] != null) {
-          throw const ApiFailure(
-            FailureKind.unavailable,
-            '评论回复关系接口尚未定案；请作为普通评论提交',
-          );
-        }
         return await _postRecord(
           '/logs/${Uri.encodeComponent(_commandId(command))}/comments',
-          {'text': v['评语'] ?? v['text']},
+          {
+            'text': v['评语'] ?? v['text'],
+            if (v['parentCommentId'] != null) 'parentId': v['parentCommentId'],
+          },
         );
       }
       if (resource == 'reviews') {

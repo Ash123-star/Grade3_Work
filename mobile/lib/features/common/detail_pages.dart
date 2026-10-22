@@ -1246,20 +1246,35 @@ class _DetailPageState extends ConsumerState<DetailPage> {
               ]);
             } else if (resource.startsWith('logs')) {
               final window = LogEditWindow(item);
+              if (item.ownerId == user.id &&
+                  f['canWithdraw'] == true &&
+                  window.canEditAt(DateTime.now())) {
+                actions.add(
+                  TextButton(
+                    onPressed: busy ? null : () => edit(item, 'log-withdraw'),
+                    child: const Text('撤回日志'),
+                  ),
+                );
+              }
               if (item.ownerId == user.id) {
                 final canEdit = window.canEditAt(DateTime.now());
                 bottom = !window.submitted
-                    ? button('提交日志', () => action(item, 'submit'))
+                    ? SunnyPrimaryButton(
+                        onPressed: busy || !canEdit
+                            ? null
+                            : () => action(item, 'submit'),
+                        child: const Text('提交日志'),
+                      )
                     : SunnyPrimaryButton(
                         onPressed: busy || !canEdit
                             ? null
                             : () => edit(item, 'log-revise'),
-                        child: Text(canEdit ? '修改日志' : '已满24小时 · 日志已锁定'),
+                        child: Text(canEdit ? '申请修订日志' : '已满24小时 · 日志已锁定'),
                       );
                 if (!window.submitted) {
                   actions.add(
                     TextButton(
-                      onPressed: () => edit(item, 'log-edit'),
+                      onPressed: canEdit ? () => edit(item, 'log-edit') : null,
                       child: const Text('编辑草稿'),
                     ),
                   );

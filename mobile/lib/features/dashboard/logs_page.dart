@@ -131,8 +131,14 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                 hintText: '搜索姓名或日志内容',
                 prefixIcon: Icon(Icons.search),
               ),
-              onChanged: (value) =>
-                  setState(() => search = value.trim().toLowerCase()),
+              onChanged: (value) => setState(() {
+                search = value.trim().toLowerCase();
+                final filter = ref.read(subordinateLogFilterProvider);
+                ref.read(subordinateLogFilterProvider.notifier).state = (
+                  filter.$1,
+                  search,
+                );
+              }),
             ),
             const SizedBox(height: 12),
             people!.when(
@@ -162,7 +168,25 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                             selected: department,
                           );
                           if (selected != null && mounted) {
-                            setState(() => department = selected);
+                            setState(() {
+                              department = selected;
+                              final person = page.items
+                                  .where(
+                                    (p) =>
+                                        p.fields['departmentName'] == selected,
+                                  )
+                                  .firstOrNull;
+                              ref
+                                  .read(subordinateLogFilterProvider.notifier)
+                                  .state = (
+                                selected == '全部部门'
+                                    ? null
+                                    : (person?.fields['department_id'] ??
+                                              person?.fields['departmentId'])
+                                          ?.toString(),
+                                search,
+                              );
+                            });
                           }
                         },
                         icon: const Icon(Icons.apartment_outlined, size: 18),

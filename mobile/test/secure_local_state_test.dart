@@ -335,7 +335,7 @@ void main() {
       await t.pumpWidget(
         UncontrolledProviderScope(container: c, child: const PandoraApp()),
       );
-      c.read(routerProvider).go('/form/log-edit');
+      c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await t.pumpAndSettle();
       await settleLocalIo(t);
       await t.pumpAndSettle();
@@ -348,7 +348,7 @@ void main() {
       expect(saved!.fields['今日工作'], '真实加密编辑链路');
       c.read(routerProvider).go('/logs');
       await t.pumpAndSettle();
-      c.read(routerProvider).go('/form/log-edit');
+      c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await t.pumpAndSettle();
       await settleLocalIo(t);
       await t.pumpAndSettle();
@@ -455,7 +455,7 @@ void main() {
       await t.pumpWidget(
         UncontrolledProviderScope(container: c, child: const PandoraApp()),
       );
-      c.read(routerProvider).go('/form/log-edit');
+      c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.textContaining('草稿读取失败'), findsOneWidget);
@@ -527,10 +527,7 @@ void main() {
   testWidgets('render safe restart recovery at360dp and1.5 text', (t) async {
     for (final item in [
       ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
-      (
-        'MaterialIcons',
-        materialIconsFontPath,
-      ),
+      ('MaterialIcons', materialIconsFontPath),
     ]) {
       final loader = FontLoader(item.$1)
         ..addFont(

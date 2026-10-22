@@ -66,28 +66,263 @@ class DemoAccount {
 }
 
 const demoAccounts = <DemoAccount>[
-  DemoAccount(id: 'u1', name: '林小满', role: UserRole.leader, departmentId: 'd-product', departmentName: '产品部', teamId: 't-experience', teamName: '产品体验组', managerId: 'u-product-dir', intro: '负责产品体验与版本节奏，关注方案清晰度和跨团队交付。', dispatch: true),
-  DemoAccount(id: 'u2', name: '陈一诺', role: UserRole.employee, departmentId: 'd-product', departmentName: '产品部', teamId: 't-experience', teamName: '产品体验组', managerId: 'u1', intro: '负责需求梳理和用户访谈，把一线反馈整理成可执行的问题清单。'),
-  DemoAccount(id: 'u3', name: '许知远', role: UserRole.employee, departmentId: 'd-tech', departmentName: '技术部', teamId: 't-platform', teamName: '平台研发组', managerId: 'u-tech-lead', intro: '负责服务接口与数据模型，重视兼容性、可观测性和故障恢复。'),
-  DemoAccount(id: 'u4', name: '陆星宇', role: UserRole.employee, departmentId: 'd-product', departmentName: '产品部', teamId: 't-experience', teamName: '产品体验组', managerId: 'u1', intro: '跟进产品原型和验收口径，擅长把复杂流程拆成清楚步骤。'),
-  DemoAccount(id: 'u5', name: '苏予安', role: UserRole.employee, departmentId: 'd-product', departmentName: '产品部', teamId: 't-research', teamName: '用户研究组', managerId: 'u-research-lead', intro: '负责用户研究与可用性观察，持续归纳高频需求和体验风险。'),
-  DemoAccount(id: 'u6', name: '蔡明澄', role: UserRole.employee, departmentId: 'd-tech', departmentName: '技术部', teamId: 't-platform', teamName: '平台研发组', managerId: 'u-tech-lead', intro: '负责后端功能开发和接口联调，按契约补齐边界与错误处理。'),
-  DemoAccount(id: 'u7', name: '温以宁', role: UserRole.employee, departmentId: 'd-tech', departmentName: '技术部', teamId: 't-quality', teamName: '质量保障组', managerId: 'u-quality-lead', intro: '负责质量保障与回归策略，覆盖核心路径、异常场景和发布风险。'),
-  DemoAccount(id: 'u8', name: '唐星澜', role: UserRole.employee, departmentId: 'd-market', departmentName: '市场运营部', teamId: 't-content', teamName: '内容运营组', managerId: 'u-market-lead', intro: '负责产品内容与渠道素材，跟踪发布计划和用户反馈。'),
-  DemoAccount(id: 'u9', name: '顾言', role: UserRole.employee, departmentId: 'd-market', departmentName: '市场运营部', teamId: 't-growth', teamName: '用户增长组', managerId: 'u-growth-lead', intro: '负责增长活动和转化数据，按周复盘渠道效果与实验结论。'),
-  DemoAccount(id: 'u10', name: '叶青禾', role: UserRole.employee, departmentId: 'd-customer', departmentName: '客户成功部', teamId: 't-delivery', teamName: '客户交付组', managerId: 'u-customer-lead', intro: '负责客户交付与问题跟踪，推动反馈闭环并维护服务质量。'),
-  DemoAccount(id: 'u-product-dir', name: '王若衡', role: UserRole.director, departmentId: 'd-product', departmentName: '产品部', teamId: 't-product-office', teamName: '产品管理组', managerId: 'u-founder', intro: '统筹产品路线与跨部门资源，负责阶段目标、风险和交付评审。', dispatch: true, companyReviewer: true),
-  DemoAccount(id: 'u-tech-dir', name: '贺知行', role: UserRole.director, departmentId: 'd-tech', departmentName: '技术部', teamId: 't-tech-office', teamName: '技术管理组', managerId: 'u-founder', intro: '统筹技术架构、研发能力建设和重点项目交付。', dispatch: true, companyReviewer: true),
-  DemoAccount(id: 'u-market-dir', name: '沈嘉禾', role: UserRole.director, departmentId: 'd-market', departmentName: '市场运营部', teamId: 't-market-office', teamName: '运营管理组', managerId: 'u-founder', intro: '统筹品牌、内容与用户增长工作，关注渠道投入和结果复盘。', dispatch: true),
-  DemoAccount(id: 'u-customer-dir', name: '周予川', role: UserRole.director, departmentId: 'd-customer', departmentName: '客户成功部', teamId: 't-customer-office', teamName: '交付管理组', managerId: 'u-founder', intro: '统筹客户交付、续约风险和跨团队问题处理。', dispatch: true),
-  DemoAccount(id: 'u-tech-lead', name: '周逸飞', role: UserRole.leader, departmentId: 'd-tech', departmentName: '技术部', teamId: 't-platform', teamName: '平台研发组', managerId: 'u-tech-dir', intro: '带领平台研发组推进服务改造、接口稳定性和技术债治理。', dispatch: true),
-  DemoAccount(id: 'u-research-lead', name: '许明萱', role: UserRole.leader, departmentId: 'd-product', departmentName: '产品部', teamId: 't-research', teamName: '用户研究组', managerId: 'u-product-dir', intro: '带领用户研究组规划访谈、可用性测试和需求证据沉淀。', dispatch: true),
-  DemoAccount(id: 'u-quality-lead', name: '罗景行', role: UserRole.leader, departmentId: 'd-tech', departmentName: '技术部', teamId: 't-quality', teamName: '质量保障组', managerId: 'u-tech-dir', intro: '带领质量保障组维护回归策略、缺陷分级和发布质量门禁。', dispatch: true),
-  DemoAccount(id: 'u-market-lead', name: '唐婧', role: UserRole.leader, departmentId: 'd-market', departmentName: '市场运营部', teamId: 't-content', teamName: '内容运营组', managerId: 'u-market-dir', intro: '带领内容运营组规划选题、素材生产和渠道发布。', dispatch: true),
-  DemoAccount(id: 'u-growth-lead', name: '沈嘉宁', role: UserRole.leader, departmentId: 'd-market', departmentName: '市场运营部', teamId: 't-growth', teamName: '用户增长组', managerId: 'u-market-dir', intro: '带领用户增长组设计实验并跟踪转化漏斗。', dispatch: true),
-  DemoAccount(id: 'u-customer-lead', name: '方可为', role: UserRole.leader, departmentId: 'd-customer', departmentName: '客户成功部', teamId: 't-delivery', teamName: '客户交付组', managerId: 'u-customer-dir', intro: '带领客户交付组推进实施计划、培训安排和问题闭环。', dispatch: true),
-  DemoAccount(id: 'u-founder', name: '顾清远', role: UserRole.founder, departmentId: 'd-executive', departmentName: '经营管理层', teamId: 't-executive', teamName: '经营办公室', managerId: '', intro: '关注公司经营目标、组织协作和长期产品方向。', dispatch: true, companyReviewer: true),
-  DemoAccount(id: 'u-admin', name: '乔安宁', role: UserRole.admin, departmentId: 'd-admin', departmentName: '综合管理部', teamId: 't-admin', teamName: '组织与信息组', managerId: 'u-founder', intro: '负责组织配置、账号支持和权限审计，确保管理操作留有依据。'),
+  DemoAccount(
+    id: 'u1',
+    name: '林小满',
+    role: UserRole.leader,
+    departmentId: 'd-product',
+    departmentName: '产品部',
+    teamId: 't-experience',
+    teamName: '产品体验组',
+    managerId: 'u-product-dir',
+    intro: '负责产品体验与版本节奏，关注方案清晰度和跨团队交付。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u2',
+    name: '陈一诺',
+    role: UserRole.employee,
+    departmentId: 'd-product',
+    departmentName: '产品部',
+    teamId: 't-experience',
+    teamName: '产品体验组',
+    managerId: 'u1',
+    intro: '负责需求梳理和用户访谈，把一线反馈整理成可执行的问题清单。',
+  ),
+  DemoAccount(
+    id: 'u3',
+    name: '许知远',
+    role: UserRole.employee,
+    departmentId: 'd-tech',
+    departmentName: '技术部',
+    teamId: 't-platform',
+    teamName: '平台研发组',
+    managerId: 'u-tech-lead',
+    intro: '负责服务接口与数据模型，重视兼容性、可观测性和故障恢复。',
+  ),
+  DemoAccount(
+    id: 'u4',
+    name: '陆星宇',
+    role: UserRole.employee,
+    departmentId: 'd-product',
+    departmentName: '产品部',
+    teamId: 't-experience',
+    teamName: '产品体验组',
+    managerId: 'u1',
+    intro: '跟进产品原型和验收口径，擅长把复杂流程拆成清楚步骤。',
+  ),
+  DemoAccount(
+    id: 'u5',
+    name: '苏予安',
+    role: UserRole.employee,
+    departmentId: 'd-product',
+    departmentName: '产品部',
+    teamId: 't-research',
+    teamName: '用户研究组',
+    managerId: 'u-research-lead',
+    intro: '负责用户研究与可用性观察，持续归纳高频需求和体验风险。',
+  ),
+  DemoAccount(
+    id: 'u6',
+    name: '蔡明澄',
+    role: UserRole.employee,
+    departmentId: 'd-tech',
+    departmentName: '技术部',
+    teamId: 't-platform',
+    teamName: '平台研发组',
+    managerId: 'u-tech-lead',
+    intro: '负责后端功能开发和接口联调，按契约补齐边界与错误处理。',
+  ),
+  DemoAccount(
+    id: 'u7',
+    name: '温以宁',
+    role: UserRole.employee,
+    departmentId: 'd-tech',
+    departmentName: '技术部',
+    teamId: 't-quality',
+    teamName: '质量保障组',
+    managerId: 'u-quality-lead',
+    intro: '负责质量保障与回归策略，覆盖核心路径、异常场景和发布风险。',
+  ),
+  DemoAccount(
+    id: 'u8',
+    name: '唐星澜',
+    role: UserRole.employee,
+    departmentId: 'd-market',
+    departmentName: '市场运营部',
+    teamId: 't-content',
+    teamName: '内容运营组',
+    managerId: 'u-market-lead',
+    intro: '负责产品内容与渠道素材，跟踪发布计划和用户反馈。',
+  ),
+  DemoAccount(
+    id: 'u9',
+    name: '顾言',
+    role: UserRole.employee,
+    departmentId: 'd-market',
+    departmentName: '市场运营部',
+    teamId: 't-growth',
+    teamName: '用户增长组',
+    managerId: 'u-growth-lead',
+    intro: '负责增长活动和转化数据，按周复盘渠道效果与实验结论。',
+  ),
+  DemoAccount(
+    id: 'u10',
+    name: '叶青禾',
+    role: UserRole.employee,
+    departmentId: 'd-customer',
+    departmentName: '客户成功部',
+    teamId: 't-delivery',
+    teamName: '客户交付组',
+    managerId: 'u-customer-lead',
+    intro: '负责客户交付与问题跟踪，推动反馈闭环并维护服务质量。',
+  ),
+  DemoAccount(
+    id: 'u-product-dir',
+    name: '王若衡',
+    role: UserRole.director,
+    departmentId: 'd-product',
+    departmentName: '产品部',
+    teamId: 't-product-office',
+    teamName: '产品管理组',
+    managerId: 'u-founder',
+    intro: '统筹产品路线与跨部门资源，负责阶段目标、风险和交付评审。',
+    dispatch: true,
+    companyReviewer: true,
+  ),
+  DemoAccount(
+    id: 'u-tech-dir',
+    name: '贺知行',
+    role: UserRole.director,
+    departmentId: 'd-tech',
+    departmentName: '技术部',
+    teamId: 't-tech-office',
+    teamName: '技术管理组',
+    managerId: 'u-founder',
+    intro: '统筹技术架构、研发能力建设和重点项目交付。',
+    dispatch: true,
+    companyReviewer: true,
+  ),
+  DemoAccount(
+    id: 'u-market-dir',
+    name: '沈嘉禾',
+    role: UserRole.director,
+    departmentId: 'd-market',
+    departmentName: '市场运营部',
+    teamId: 't-market-office',
+    teamName: '运营管理组',
+    managerId: 'u-founder',
+    intro: '统筹品牌、内容与用户增长工作，关注渠道投入和结果复盘。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u-customer-dir',
+    name: '周予川',
+    role: UserRole.director,
+    departmentId: 'd-customer',
+    departmentName: '客户成功部',
+    teamId: 't-customer-office',
+    teamName: '交付管理组',
+    managerId: 'u-founder',
+    intro: '统筹客户交付、续约风险和跨团队问题处理。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u-tech-lead',
+    name: '周逸飞',
+    role: UserRole.leader,
+    departmentId: 'd-tech',
+    departmentName: '技术部',
+    teamId: 't-platform',
+    teamName: '平台研发组',
+    managerId: 'u-tech-dir',
+    intro: '带领平台研发组推进服务改造、接口稳定性和技术债治理。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u-research-lead',
+    name: '许明萱',
+    role: UserRole.leader,
+    departmentId: 'd-product',
+    departmentName: '产品部',
+    teamId: 't-research',
+    teamName: '用户研究组',
+    managerId: 'u-product-dir',
+    intro: '带领用户研究组规划访谈、可用性测试和需求证据沉淀。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u-quality-lead',
+    name: '罗景行',
+    role: UserRole.leader,
+    departmentId: 'd-tech',
+    departmentName: '技术部',
+    teamId: 't-quality',
+    teamName: '质量保障组',
+    managerId: 'u-tech-dir',
+    intro: '带领质量保障组维护回归策略、缺陷分级和发布质量门禁。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u-market-lead',
+    name: '唐婧',
+    role: UserRole.leader,
+    departmentId: 'd-market',
+    departmentName: '市场运营部',
+    teamId: 't-content',
+    teamName: '内容运营组',
+    managerId: 'u-market-dir',
+    intro: '带领内容运营组规划选题、素材生产和渠道发布。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u-growth-lead',
+    name: '沈嘉宁',
+    role: UserRole.leader,
+    departmentId: 'd-market',
+    departmentName: '市场运营部',
+    teamId: 't-growth',
+    teamName: '用户增长组',
+    managerId: 'u-market-dir',
+    intro: '带领用户增长组设计实验并跟踪转化漏斗。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u-customer-lead',
+    name: '方可为',
+    role: UserRole.leader,
+    departmentId: 'd-customer',
+    departmentName: '客户成功部',
+    teamId: 't-delivery',
+    teamName: '客户交付组',
+    managerId: 'u-customer-dir',
+    intro: '带领客户交付组推进实施计划、培训安排和问题闭环。',
+    dispatch: true,
+  ),
+  DemoAccount(
+    id: 'u-founder',
+    name: '顾清远',
+    role: UserRole.founder,
+    departmentId: 'd-executive',
+    departmentName: '经营管理层',
+    teamId: 't-executive',
+    teamName: '经营办公室',
+    managerId: '',
+    intro: '关注公司经营目标、组织协作和长期产品方向。',
+    dispatch: true,
+    companyReviewer: true,
+  ),
+  DemoAccount(
+    id: 'u-admin',
+    name: '乔安宁',
+    role: UserRole.admin,
+    departmentId: 'd-admin',
+    departmentName: '综合管理部',
+    teamId: 't-admin',
+    teamName: '组织与信息组',
+    managerId: 'u-founder',
+    intro: '负责组织配置、账号支持和权限审计，确保管理操作留有依据。',
+  ),
 ];
 
 class DemoStore {
@@ -231,7 +466,13 @@ class MockRepository implements Repository {
             'departmentNames': ['产品部', '技术部', '客户成功部', '市场运营部', '综合管理部'][i],
             'ownerName': ['王若衡', '贺知行', '周予川', '沈嘉禾', '乔安宁'][i],
             'participantIds': [
-              ['u-product-dir', 'u-tech-dir', 'u-customer-dir', 'u-market-dir', 'u-admin'][i],
+              [
+                'u-product-dir',
+                'u-tech-dir',
+                'u-customer-dir',
+                'u-market-dir',
+                'u-admin',
+              ][i],
             ],
           },
         ),
@@ -244,9 +485,9 @@ class MockRepository implements Repository {
     final result = <Record>[];
     for (final account in demoAccounts) {
       final participating = tasks.where(
-        (task) =>
-            (task.fields['participantIds'] as List? ?? const [])
-                .contains(account.id),
+        (task) => (task.fields['participantIds'] as List? ?? const []).contains(
+          account.id,
+        ),
       );
       final hasTodayLog = logs.any(
         (log) =>
@@ -293,7 +534,9 @@ class MockRepository implements Repository {
           'department_id': item.$1,
           'departmentName': item.$2,
           'status': 'ACTIVE',
-          'memberCount': demoAccounts.where((a) => a.departmentId == item.$1).length,
+          'memberCount': demoAccounts
+              .where((a) => a.departmentId == item.$1)
+              .length,
           'managerId': item.$4,
           'manager_id': item.$4,
         },
@@ -359,10 +602,13 @@ class MockRepository implements Repository {
             ownerId: account.id,
             subtitle: '${account.departmentName} · ${account.teamName}',
             fields: {
-              'body': '${account.intro} 本阶段同步跟进：${focus[(i + slot + 3) % focus.length]}。',
+              'body':
+                  '${account.intro} 本阶段同步跟进：${focus[(i + slot + 3) % focus.length]}。',
               'status': slot == 0 ? '进行中' : '待复核',
               '排序位置': slot,
-              'createdAt': now.subtract(Duration(days: slot + i % 4)).toIso8601String(),
+              'createdAt': now
+                  .subtract(Duration(days: slot + i % 4))
+                  .toIso8601String(),
               'departmentName': account.departmentName,
               'teamName': account.teamName,
             },
@@ -372,35 +618,50 @@ class MockRepository implements Repository {
 
   List<String> _taskTitlesFor(DemoAccount account) =>
       switch (account.departmentId) {
-        'd-product' => account.teamId == 't-research'
-            ? const ['完成重点用户访谈纪要与需求证据整理', '提交可用性测试问题分级与改进建议']
-            : const ['完成产品需求评审与验收口径确认', '跟进版本交互走查和体验问题闭环'],
-        'd-tech' => account.teamId == 't-quality'
-            ? const ['补齐核心流程回归用例与缺陷复现步骤', '完成发布前质量门禁检查和风险汇总']
-            : const ['完成平台接口联调与异常分支验证', '提交服务告警复盘和慢查询优化建议'],
-        'd-market' => account.teamId == 't-growth'
-            ? const ['复盘渠道转化漏斗并制定下一轮实验', '完成新用户触达活动分组与指标配置']
-            : const ['完成本周内容排期和多渠道审核稿', '整理品牌活动素材并提交发布复盘'],
+        'd-product' =>
+          account.teamId == 't-research'
+              ? const ['完成重点用户访谈纪要与需求证据整理', '提交可用性测试问题分级与改进建议']
+              : const ['完成产品需求评审与验收口径确认', '跟进版本交互走查和体验问题闭环'],
+        'd-tech' =>
+          account.teamId == 't-quality'
+              ? const ['补齐核心流程回归用例与缺陷复现步骤', '完成发布前质量门禁检查和风险汇总']
+              : const ['完成平台接口联调与异常分支验证', '提交服务告警复盘和慢查询优化建议'],
+        'd-market' =>
+          account.teamId == 't-growth'
+              ? const ['复盘渠道转化漏斗并制定下一轮实验', '完成新用户触达活动分组与指标配置']
+              : const ['完成本周内容排期和多渠道审核稿', '整理品牌活动素材并提交发布复盘'],
         'd-customer' => const ['完成客户环境部署问题清单与责任分派', '组织客户培训并跟进上线后一周回访'],
         'd-admin' => const ['复核新员工入职资料和部门归属申请', '更新账号权限台账并核对离职回收记录'],
         _ => const ['准备季度经营复盘数据和待决策事项', '协调重点客户续约风险与跨部门资源'],
       };
 
-  List<String> _logWorkFor(DemoAccount account) =>
-      switch (account.departmentId) {
-        'd-product' => account.teamId == 't-research'
-            ? const ['完成 5 位目标用户访谈并归纳共性诉求', '整理可用性测试记录并提交问题优先级', '补充需求证据链接和待确认假设']
-            : const ['完成需求评审并更新验收标准', '走查新版本关键页面并登记交互问题', '与研发确认本周版本范围和依赖时间'],
-        'd-tech' => account.teamId == 't-quality'
-            ? const ['补充登录与任务流程的回归用例', '复现并定位移动端列表分页缺陷', '核对发布候选包的阻断项和回滚步骤']
-            : const ['完成组织查询接口联调和错误映射', '排查服务慢查询并提交索引建议', '补充超时重试和权限拒绝场景验证'],
-        'd-market' => account.teamId == 't-growth'
-            ? const ['复盘注册转化漏斗并标记流失节点', '上线分组触达实验并检查样本口径', '整理渠道获客成本和下周实验假设']
-            : const ['完成产品更新说明和渠道素材审核', '排定本周公众号与社群内容发布时间', '汇总活动反馈并整理品牌素材归档'],
-        'd-customer' => const ['跟进客户测试环境部署并关闭高优问题', '完成管理员培训并收集操作反馈', '更新客户上线清单和续约风险跟踪项'],
-        'd-admin' => const ['核对账号归属变更申请及审批记录', '完成新员工入职支持和权限开通核验', '更新组织通讯录并复核离职账号回收'],
-        _ => const ['复核季度经营指标并标注待决策差异', '协调重点客户续约事项和资源负责人', '完成跨部门周会纪要及行动项跟踪'],
-      };
+  List<String> _logWorkFor(
+    DemoAccount account,
+  ) => switch (account.departmentId) {
+    'd-product' =>
+      account.teamId == 't-research'
+          ? const ['完成 5 位目标用户访谈并归纳共性诉求', '整理可用性测试记录并提交问题优先级', '补充需求证据链接和待确认假设']
+          : const ['完成需求评审并更新验收标准', '走查新版本关键页面并登记交互问题', '与研发确认本周版本范围和依赖时间'],
+    'd-tech' =>
+      account.teamId == 't-quality'
+          ? const ['补充登录与任务流程的回归用例', '复现并定位移动端列表分页缺陷', '核对发布候选包的阻断项和回滚步骤']
+          : const ['完成组织查询接口联调和错误映射', '排查服务慢查询并提交索引建议', '补充超时重试和权限拒绝场景验证'],
+    'd-market' =>
+      account.teamId == 't-growth'
+          ? const ['复盘注册转化漏斗并标记流失节点', '上线分组触达实验并检查样本口径', '整理渠道获客成本和下周实验假设']
+          : const ['完成产品更新说明和渠道素材审核', '排定本周公众号与社群内容发布时间', '汇总活动反馈并整理品牌素材归档'],
+    'd-customer' => const [
+      '跟进客户测试环境部署并关闭高优问题',
+      '完成管理员培训并收集操作反馈',
+      '更新客户上线清单和续约风险跟踪项',
+    ],
+    'd-admin' => const [
+      '核对账号归属变更申请及审批记录',
+      '完成新员工入职支持和权限开通核验',
+      '更新组织通讯录并复核离职账号回收',
+    ],
+    _ => const ['复核季度经营指标并标注待决策差异', '协调重点客户续约事项和资源负责人', '完成跨部门周会纪要及行动项跟踪'],
+  };
 
   String _initiativeFor(DemoAccount account, int index) {
     final initiatives = switch (account.departmentId) {
@@ -427,11 +688,21 @@ class MockRepository implements Repository {
           final title =
               '${_initiativeFor(owner, i)}：${taskTitles[(i ~/ demoAccounts.length) % taskTitles.length]}';
           final teammates = demoAccounts
-              .where((account) => account.teamId == owner.teamId && account.id != owner.id)
+              .where(
+                (account) =>
+                    account.teamId == owner.teamId && account.id != owner.id,
+              )
               .take(2)
               .toList();
-          final start = DateTime(now.year, now.month, now.day).add(Duration(days: i % 17 - 8));
-          final deadline = _atDay(start.add(Duration(days: 1 + i % 3)), 16 + i % 3);
+          final start = DateTime(
+            now.year,
+            now.month,
+            now.day,
+          ).add(Duration(days: i % 17 - 8));
+          final deadline = _atDay(
+            start.add(Duration(days: 1 + i % 3)),
+            16 + i % 3,
+          );
           final status = statuses[i % statuses.length];
           final dispatcher = _account(
             owner.managerId.isEmpty ? 'u-founder' : owner.managerId,
@@ -441,30 +712,46 @@ class MockRepository implements Repository {
             id: 'task-demo-${i + 1}',
             title: title,
             ownerId: owner.id,
-            subtitle: '${owner.departmentName} · ${owner.teamName} · ${stamp(deadline)}',
+            subtitle:
+                '${owner.departmentName} · ${owner.teamName} · ${stamp(deadline)}',
             fields: {
-              'body': '${owner.name}负责${title}，交付物为可复核的工作记录和相关依据；跨组依赖由${dispatcher.name}协调。',
+              'body':
+                  '${owner.name}负责$title，交付物为可复核的工作记录和相关依据；跨组依赖由${dispatcher.name}协调。',
               'status': status,
               'startAt': _atDay(start, 9 + i % 3).toIso8601String(),
               'endAt': _atDay(start, 12 + i % 3).toIso8601String(),
               'deadline': deadline.toIso8601String(),
-              'createdAt': instant.subtract(Duration(days: i % 12 + 1)).toUtc().toIso8601String(),
+              'createdAt': instant
+                  .subtract(Duration(days: i % 12 + 1))
+                  .toUtc()
+                  .toIso8601String(),
               'dispatcherId': dispatcher.id,
               'participantIds': [owner.id, ...teammates.map((a) => a.id)],
               'participantNames': [owner.name, ...teammates.map((a) => a.name)],
               '所属分组': owner.teamName,
               'departmentId': owner.departmentId,
               'departmentName': owner.departmentName,
-              'tagId': ['company-important', 'department-design', 'department-research', 'customer-delivery', 'personal-today'][i % 5],
+              'tagId': [
+                'company-important',
+                'department-design',
+                'department-research',
+                'customer-delivery',
+                'personal-today',
+              ][i % 5],
               'tagName': tagNames[i % 5],
-              'tagCategory': i % 5 == 0 ? '公司' : i % 5 == 4 ? '个人' : '部门',
+              'tagCategory': i % 5 == 0
+                  ? '公司'
+                  : i % 5 == 4
+                  ? '个人'
+                  : '部门',
               'tagColor': tagColors[i % 5],
               'reviewState': status == '待验收' ? '待审' : '已通过',
               '成果说明': '${owner.name}已整理交付材料，待相关人员核对验收清单。',
               'events': [
                 '${stamp(start)} · ${dispatcher.name}派发任务',
                 '${stamp(start)} · ${owner.name}确认负责人和完成时间',
-                if (status == '待验收' || status == '已验收') '${stamp(deadline)} · 提交验收材料',
+                if (status == '待验收' || status == '已验收')
+                  '${stamp(deadline)} · 提交验收材料',
               ],
               'comments': [
                 {
@@ -495,7 +782,11 @@ class MockRepository implements Repository {
         for (var entry = 0; entry < 3; entry++)
           (() {
             final offset = (i * 3 + entry * 5) % 14;
-            final day = DateTime(now.year, now.month, now.day).subtract(Duration(days: offset));
+            final day = DateTime(
+              now.year,
+              now.month,
+              now.day,
+            ).subtract(Duration(days: offset));
             final workItems = _logWorkFor(account);
             final work = workItems[entry];
             final next = workItems[(entry + 1) % workItems.length];
@@ -510,12 +801,16 @@ class MockRepository implements Repository {
               id: 'log-${account.id}-${entry + 1}',
               title: '$work · ${account.name}',
               ownerId: account.id,
-              subtitle: '${stamp(day)} · ${account.name} · ${account.departmentName}',
+              subtitle:
+                  '${stamp(day)} · ${account.name} · ${account.departmentName}',
               fields: {
-                'body': '${account.name}在${account.teamName}完成${work}。相关材料已归档，${(i + entry) % 4 == 0 ? '当前阻碍是等待${account.departmentName}确认依赖时间。' : '本日没有影响排期的阻塞事项。'}',
+                'body':
+                    '${account.name}在${account.teamName}完成$work。相关材料已归档，${(i + entry) % 4 == 0 ? '当前阻碍是等待${account.departmentName}确认依赖时间。' : '本日没有影响排期的阻塞事项。'}',
                 '今日工作': work,
                 '明日计划': '${account.teamName}继续跟进$next，并同步相关负责人。',
-                '遇到的阻碍': (i + entry) % 4 == 0 ? '等待${account.departmentName}确认依赖时间。' : '暂无，当前事项按计划推进。',
+                '遇到的阻碍': (i + entry) % 4 == 0
+                    ? '等待${account.departmentName}确认依赖时间。'
+                    : '暂无，当前事项按计划推进。',
                 '工时': '${6 + (i + entry) % 3}',
                 'businessDate': stamp(day),
                 'submittedAt': submitted.toIso8601String(),
@@ -528,15 +823,27 @@ class MockRepository implements Repository {
                 'participantIds': [account.id],
                 'participantNames': [account.name],
                 'dispatcherId': account.managerId,
-                'tagId': ['department-research', 'department-design', 'customer-delivery', 'personal-today'][(i + entry) % 4],
+                'tagId': [
+                  'department-research',
+                  'department-design',
+                  'customer-delivery',
+                  'personal-today',
+                ][(i + entry) % 4],
                 'tagName': ['需求评审', '体验设计', '客户交付', '个人计划'][(i + entry) % 4],
-                'tagColor': ['#FFD9A8', '#CFE5FF', '#F5DDC6', '#E7D4FF'][(i + entry) % 4],
+                'tagColor': [
+                  '#FFD9A8',
+                  '#CFE5FF',
+                  '#F5DDC6',
+                  '#E7D4FF',
+                ][(i + entry) % 4],
                 'comments': [
                   {
                     'id': commentId,
                     'actorId': reviewer.id,
                     'actorName': reviewer.name,
-                    'createdAt': submitted.add(const Duration(minutes: 20)).toIso8601String(),
+                    'createdAt': submitted
+                        .add(const Duration(minutes: 20))
+                        .toIso8601String(),
                     'text': '已看到${account.teamName}的更新，请在明日计划中继续跟进：$next。',
                   },
                   {
@@ -544,7 +851,9 @@ class MockRepository implements Repository {
                     'actorId': account.id,
                     'actorName': account.name,
                     'parentCommentId': commentId,
-                    'createdAt': submitted.add(const Duration(minutes: 35)).toIso8601String(),
+                    'createdAt': submitted
+                        .add(const Duration(minutes: 35))
+                        .toIso8601String(),
                     'text': '收到，我会补充进展依据并在下一次同步前更新结果。',
                   },
                 ],
@@ -556,29 +865,47 @@ class MockRepository implements Repository {
 
   List<Record> _seedReviews(DateTime now) {
     const subjects = [
-      '申请调整产品需求验收范围', '申请补充客户访谈日志', '申请更新平台接口交付时间',
-      '申请归档已结束的渠道活动', '申请修订质量回归检查项', '申请调整客户实施排期',
-      '申请新增内容发布审核人', '申请更新团队职责说明', '申请补录版本风险复盘',
-      '申请变更组织成员归属', '申请修订用户增长实验目标', '申请补充季度经营重点',
+      '申请调整产品需求验收范围',
+      '申请补充客户访谈日志',
+      '申请更新平台接口交付时间',
+      '申请归档已结束的渠道活动',
+      '申请修订质量回归检查项',
+      '申请调整客户实施排期',
+      '申请新增内容发布审核人',
+      '申请更新团队职责说明',
+      '申请补录版本风险复盘',
+      '申请变更组织成员归属',
+      '申请修订用户增长实验目标',
+      '申请补充季度经营重点',
     ];
     return [
       for (final (i, subject) in subjects.indexed)
         (() {
           final applicant = demoAccounts[(i * 5 + 1) % demoAccounts.length];
-          final approver = _account(applicant.managerId.isEmpty ? 'u-founder' : applicant.managerId);
+          final approver = _account(
+            applicant.managerId.isEmpty ? 'u-founder' : applicant.managerId,
+          );
           final pending = i % 3 == 0;
           return Record(
             id: 'review-demo-${i + 1}',
             title: subject,
             ownerId: applicant.id,
-            subtitle: '${applicant.name} · ${applicant.departmentName} · ${stamp(now.subtract(Duration(days: i)))}',
+            subtitle:
+                '${applicant.name} · ${applicant.departmentName} · ${stamp(now.subtract(Duration(days: i)))}',
             fields: {
               'applicantName': applicant.name,
               'reviewerName': approver.name,
-              'reviewState': pending ? '待审' : i % 2 == 0 ? '已通过' : '已驳回',
+              'reviewState': pending
+                  ? '待审'
+                  : i % 2 == 0
+                  ? '已通过'
+                  : '已驳回',
               'targetResource': i % 2 == 0 ? 'tasks' : 'logs',
-              'targetId': i % 2 == 0 ? 'task-demo-${i + 1}' : 'log-${applicant.id}-1',
-              'reason': '${applicant.name}说明了业务背景、影响范围和期望生效时间，等待${approver.name}核对。',
+              'targetId': i % 2 == 0
+                  ? 'task-demo-${i + 1}'
+                  : 'log-${applicant.id}-1',
+              'reason':
+                  '${applicant.name}说明了业务背景、影响范围和期望生效时间，等待${approver.name}核对。',
               'before': '当前已生效内容保持不变。',
               'after': '按申请补充交付范围、记录或组织说明。',
               'step': 0,
@@ -603,20 +930,28 @@ class MockRepository implements Repository {
           '收到${_account(account.managerId.isEmpty ? 'u-founder' : account.managerId).name}的工作提醒',
         ][i % 3],
         ownerId: account.id,
-        subtitle: '${stamp(now.subtract(Duration(hours: i * 3)))} · ${account.departmentName}',
+        subtitle:
+            '${stamp(now.subtract(Duration(hours: i * 3)))} · ${account.departmentName}',
         fields: {
           'type': ['任务', '日志', '评论'][i % 3],
           'targetResource': ['tasks', 'logs', 'reviews'][i % 3],
-          'targetId': ['task-demo-${i + 1}', 'log-${account.id}-1', 'review-demo-${i % 12 + 1}'][i % 3],
+          'targetId': [
+            'task-demo-${i + 1}',
+            'log-${account.id}-1',
+            'review-demo-${i % 12 + 1}',
+          ][i % 3],
           'read': i % 4 == 0,
-          'actorName': _account(account.managerId.isEmpty ? 'u-founder' : account.managerId).name,
+          'actorName': _account(
+            account.managerId.isEmpty ? 'u-founder' : account.managerId,
+          ).name,
           'createdAt': now.subtract(Duration(hours: i * 3)).toIso8601String(),
         },
       ),
   ];
 
   List<Record> _seedAudit(DateTime now) => [
-    for (final (i, account) in demoAccounts.where((a) => a.role != UserRole.employee).indexed)
+    for (final (i, account)
+        in demoAccounts.where((a) => a.role != UserRole.employee).indexed)
       Record(
         id: 'audit-demo-${i + 1}',
         title: [
@@ -626,7 +961,8 @@ class MockRepository implements Repository {
           '${account.name}更新组织工作职责说明',
         ][i % 4],
         ownerId: account.id,
-        subtitle: '${stamp(now.subtract(Duration(days: i + 1)))} · ${account.role.label}',
+        subtitle:
+            '${stamp(now.subtract(Duration(days: i + 1)))} · ${account.role.label}',
         fields: {
           'actorId': account.id,
           'actorName': account.name,
@@ -675,9 +1011,14 @@ class MockRepository implements Repository {
         !session.manager) {
       throw const ApiFailure(FailureKind.forbidden, '无权查看他人数据');
     }
-    var items = rows(
-      resource,
-    ).where((r) => '${r.title}${r.subtitle}'.contains(query.search));
+    var items = rows(resource).where(
+      (r) =>
+          (resource == 'logs' || resource == 'logs/subordinates'
+                  ? '${r.title} ${r.subtitle} ${r.fields['authorName'] ?? ''} ${r.fields['今日工作'] ?? r.fields['body'] ?? ''}'
+                  : '${r.title}${r.subtitle}')
+              .toLowerCase()
+              .contains(query.search.toLowerCase()),
+    );
     if (resource == 'organization') {
       items = items.where((r) => visiblePeople.contains(r.id));
     }
@@ -700,6 +1041,13 @@ class MockRepository implements Repository {
     }
     if (resource == 'logs/subordinates' && query.ownerId != null) {
       items = items.where((r) => r.ownerId == query.ownerId);
+    }
+    if (resource == 'logs/subordinates' && query.departmentId != null) {
+      items = items.where(
+        (r) =>
+            '${r.fields['departmentId'] ?? r.fields['department_id'] ?? ''}' ==
+            query.departmentId,
+      );
     }
     if (resource == 'organization/dispatch-people') {
       if (!session.manager || !session.dispatch) {
@@ -863,6 +1211,10 @@ class MockRepository implements Repository {
               item.ownerId == session.id &&
               LogEditWindow(item).canEditAt(clock()),
           'editableUntil': LogEditWindow(item).until?.toUtc().toIso8601String(),
+          'canWithdraw':
+              item.ownerId == session.id &&
+              isSubmittedDiary(item) &&
+              LogEditWindow(item).canEditAt(clock()),
           'serverNow': clock().toUtc().toIso8601String(),
         },
       );
@@ -1061,6 +1413,21 @@ class MockRepository implements Repository {
     }
     final index = records.indexWhere((r) => r.id == id);
     final previous = index < 0 ? null : records[index];
+    if (previous == null &&
+        [
+          'approve',
+          'reject',
+          'receive',
+          'feedback',
+          'accept',
+          'return',
+          'archive',
+          'withdraw',
+          'transfer',
+          'reschedule',
+        ].contains(action)) {
+      throw const ApiFailure(FailureKind.notFound, '记录不存在或无权访问');
+    }
     if (resource == 'logs' && action == 'read') {
       final diary = await detail('logs', id ?? '');
       if (!isSubmittedDiary(diary)) {
@@ -1084,27 +1451,31 @@ class MockRepository implements Repository {
       if (previous != null && previous.ownerId != session.id) {
         throw const ApiFailure(FailureKind.forbidden, '仅作者可修改日志');
       }
-      if (previous != null &&
-          isSubmittedDiary(previous) &&
-          !LogEditWindow(previous).canEditAt(clock())) {
+      if (previous != null && !LogEditWindow(previous).canEditAt(clock())) {
         throw const ApiFailure(FailureKind.forbidden, '日志提交已满24小时，已锁定');
       }
-      if (action == 'request-review') {
-        throw const ApiFailure(FailureKind.validation, '日志直接保存，不需要审批');
+
+      if (action == 'update') {
+        throw const ApiFailure(FailureKind.validation, '已提交日志请申请修订');
       }
-      if (action == 'update' &&
-          (previous == null || !isSubmittedDiary(previous))) {
-        throw const ApiFailure(FailureKind.validation, '请先提交日志');
+      if (action == 'withdraw' || action == 'request-review') {
+        if (previous == null || !isSubmittedDiary(previous)) {
+          throw const ApiFailure(FailureKind.validation, '请先提交日志');
+        }
+        if (command.version == null ||
+            '${v['reason'] ?? v['修改理由'] ?? ''}'.trim().isEmpty) {
+          throw const ApiFailure(FailureKind.validation, '请填写原因并提供当前版本');
+        }
       }
       if (action == 'save-draft' &&
           previous != null &&
           isSubmittedDiary(previous)) {
-        throw const ApiFailure(FailureKind.validation, '已提交日志请直接修改');
+        throw const ApiFailure(FailureKind.validation, '已提交日志请申请修订');
       }
       if (action == 'submit' &&
           previous != null &&
           isSubmittedDiary(previous)) {
-        throw const ApiFailure(FailureKind.conflict, '日志已经提交，请直接修改');
+        throw const ApiFailure(FailureKind.conflict, '日志已经提交，请申请修订');
       }
       if (action != 'save-draft' &&
           '${v['今日工作'] ?? previous?.fields['今日工作'] ?? ''}'.trim().isEmpty) {
@@ -1154,7 +1525,7 @@ class MockRepository implements Repository {
         throw const ApiFailure(FailureKind.validation, '当前任务状态不支持此操作');
       }
       if (['receive', 'feedback'].contains(action) &&
-          !(previous.fields['participantIds'] as List? ?? const [])
+          !(previous.fields['participantIds'] as List? ?? [previous.ownerId])
               .map((value) => '$value')
               .contains(session.id)) {
         throw const ApiFailure(FailureKind.forbidden, '当前账号不在任务参与人范围内');
@@ -1186,6 +1557,7 @@ class MockRepository implements Repository {
           'reason': v['修改理由'] ?? '',
           'targetResource': resource,
           'targetId': id,
+          'baseVersion': previous?.version,
           'candidate': v,
           'reviewEvents': <String>[],
         },
@@ -1245,7 +1617,10 @@ class MockRepository implements Repository {
       fields['dispatcherId'] = previous?.fields['dispatcherId'] ?? session.id;
     }
     if (resource == 'logs') {
-      fields['status'] = action == 'save-draft' ? '草稿' : '已提交';
+      fields['status'] = ['save-draft', 'withdraw'].contains(action)
+          ? '草稿'
+          : '已提交';
+      fields['submitted'] = fields['status'] == '已提交';
       fields['authorName'] = session.name;
       if (action != 'save-draft') {
         fields['submittedAt'] =
@@ -1254,6 +1629,7 @@ class MockRepository implements Repository {
       }
       fields.remove('versions');
       fields.remove('canEdit');
+      fields.remove('canWithdraw');
       fields.remove('editableUntil');
     }
     if (resource == 'feedback') fields['status'] = '待处理';
@@ -1275,6 +1651,10 @@ class MockRepository implements Repository {
       if (fields['reviewState'] == '已通过' && fields['candidate'] is Map) {
         final target = rows('${fields['targetResource']}');
         final pos = target.indexWhere((r) => r.id == fields['targetId']);
+        if (fields['baseVersion'] != null &&
+            (pos < 0 || target[pos].version != fields['baseVersion'])) {
+          throw const ApiFailure(FailureKind.conflict, '原记录已更新，请重新申请');
+        }
         final candidate = Map<String, dynamic>.from(fields['candidate'] as Map);
         final base = pos < 0
             ? Record(
