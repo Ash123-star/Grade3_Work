@@ -22,7 +22,7 @@ Flutter 分析退出 0。Web 类型/构建退出 0，浏览器 40 通过、4 个
 
 ## 当前限制
 
-GitHub 公开 API 确认 main=dc00e2b、无开放 PR。已安装 GitHub CLI 明确未登录，Git HTTPS 访问 443 连接失败。正式 Issue/Sprint、推送和 PR 不能伪造；任务 1.1/10.7 保持待办直至对应远程步骤真正完成。真机、20 并发性能、首次使用者和完整 Web 交付任务维持原状态，自动写入继续关闭。
+GitHub 公开 API 确认 main=dc00e2b、当时无开放 PR。初次 Git HTTPS 访问 443 失败，之后网络恢复，两个实现提交已成功推送。GitHub CLI 未登录，但 Git 凭据认证的 GitHub API 可用，已创建 [Issue #24](https://github.com/Ash123-star/Grade3_Work/issues/24)，未将密钥写入文件或输出。正式 Sprint/故事分工与估算仍未安排，任务 1.1 保持待办。真机、20 并发性能、首次使用者和完整 Web 交付任务维持原状态，自动写入继续关闭。
 
 ## 后端和数据库结果
 
@@ -38,4 +38,4 @@ GitHub 公开 API 确认 main=dc00e2b、无开放 PR。已安装 GitHub CLI 明�
 
 真实 Chrome 管理员登录、新办事台及任务审计导航通过，`live-web.log/.exit=0`；模拟器 emulator-5554 打开现有实际 API 版 App 成功。客户端生产代码与上一批已构建/安装 APK 一致，本次仅修改通知测试，不重复构建 APK，不把启动等同真机性能/完整交付验收。
 
-本地提交与远程推送结果按实际命令补充。
+本地提交：后端与迁移 `5847b47`，界面与续办 `92e6600`，均已推送 `origin/codex/ai-work-assistant`，`push.exit=0`。用于审阅的真实模拟器截图（合成测试数据）为 `docs/images/ai-workbench-reconciled.png`；工作区安全备份和 stash 保留。草稿 PR 创建结果另补，未合并 main。
