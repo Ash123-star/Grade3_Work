@@ -280,8 +280,7 @@ void main() {
     'profile counts include late notifications and pending approvals',
     (t) async {
       await launchInbox(t, InboxSyncAdapter(), '/me');
-      expect(find.text('31 条未读消息'), findsOneWidget);
-      expect(find.text('31 项待审批'), findsOneWidget);
+      expect(find.text('31'), findsNWidgets(2));
     },
   );
 
@@ -650,10 +649,7 @@ void main() {
   ) async {
     for (final (family, path) in [
       ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
-      (
-        'MaterialIcons',
-        materialIconsFontPath,
-      ),
+      ('MaterialIcons', materialIconsFontPath),
     ]) {
       await (FontLoader(family)..addFont(
             Future.value(ByteData.sublistView(File(path).readAsBytesSync())),
@@ -683,9 +679,7 @@ void main() {
       await t.runAsync(() async {
         final rendered = await boundary.toImage(pixelRatio: 1);
         final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
-        final output = File(
-          '../output/flutter-evidence/$name.png',
-        );
+        final output = File('../output/flutter-evidence/$name.png');
         output.parent.createSync(recursive: true);
         await output.writeAsBytes(png!.buffer.asUint8List());
         rendered.dispose();

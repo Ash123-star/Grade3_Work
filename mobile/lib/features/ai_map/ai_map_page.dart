@@ -323,7 +323,7 @@ class _AiPageState extends ConsumerState<LegacyDirectionPage> {
                 ref
                     .watch(recordsProvider('tasks'))
                     .when(
-                      loading: () => const LinearProgressIndicator(),
+                      loading: () => const SunnyLoadingIndicator(),
                       error: (e, _) => Text('$e'),
                       data: (p) {
                         final overdue = p.items.where((r) {

@@ -287,7 +287,7 @@ class _AttachmentEditorState extends ConsumerState<AttachmentEditor> {
                       ? '上传中'
                       : '上传未完成'}',
                 ),
-                if (e.sending) LinearProgressIndicator(value: e.progress),
+                if (e.sending) SunnyProgressBar(value: e.progress ?? 0),
                 if (e.error != null)
                   Text(
                     '上传失败：${e.error}',
@@ -361,7 +361,7 @@ class ProtectedAvatar extends ConsumerWidget {
           loading: () => SizedBox(
             width: radius * 2,
             height: radius * 2,
-            child: const Center(child: CircularProgressIndicator()),
+            child: const Center(child: SunnyLoadingIndicator()),
           ),
           error: (_, _) => Semantics(
             label: '头像未能加载，点击重试',

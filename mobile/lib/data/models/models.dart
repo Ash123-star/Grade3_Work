@@ -128,13 +128,14 @@ class PageResult {
 class Query {
   const Query({
     this.search = '',
+    this.departmentId,
     this.cursor,
     this.ownerId,
     this.from,
     this.to,
   });
   final String search;
-  final String? cursor, ownerId;
+  final String? cursor, ownerId, departmentId;
   final DateTime? from, to;
   Map<String, dynamic> toJson() => {
     'search': search,

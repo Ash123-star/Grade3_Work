@@ -34,7 +34,24 @@ void main() {
     },
   );
   test('self review fails and outdated versions are rejected', () async {
-    final repo = MockRepository(const Session());
+    final repo = MockRepository(
+      const Session(),
+      store: DemoStore()
+        ..records['reviews'] = [
+          const Record(
+            id: '1',
+            title: '他人申请',
+            ownerId: 'u2',
+            fields: {'reviewState': '待审', 'step': 0},
+          ),
+          const Record(
+            id: '2',
+            title: '本人申请',
+            ownerId: 'u1',
+            fields: {'reviewState': '待审', 'step': 0},
+          ),
+        ],
+    );
     await expectLater(
       repo.execute(
         'reviews',
@@ -121,7 +138,7 @@ void main() {
     );
     await tester.tap(find.widgetWithText(FilledButton, '派发任务'));
     await tester.pumpAndSettle();
-    expect(find.text('请填写主负责人'), findsOneWidget);
+    expect(find.text('至少选择一名参与人'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

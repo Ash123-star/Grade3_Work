@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
-import 'generated_assets.dart';
+import 'page_states.dart';
 
-/// Stage2 action with a soft lower edge, retaining Material input and semantics.
+/// A restrained themed action button with stable loading and focus states.
 class SunnyPrimaryButton extends StatefulWidget {
   const SunnyPrimaryButton({
     super.key,
@@ -73,8 +73,7 @@ class _SunnyPrimaryButtonState extends State<SunnyPrimaryButton> {
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : tokens.pressDuration;
-    final shift = pressed ? 2.0 : 0.0;
-    final edge = enabled ? tokens.buttonEdge - shift : 0.0;
+    final shift = pressed ? 1.0 : 0.0;
     final label = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -89,8 +88,8 @@ class _SunnyPrimaryButtonState extends State<SunnyPrimaryButton> {
                 ? Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: ExcludeSemantics(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
+                      child: SunnyLoadingIndicator(
+                        size: 14,
                         color: tokens.disabledInk,
                       ),
                     ),
@@ -100,18 +99,16 @@ class _SunnyPrimaryButtonState extends State<SunnyPrimaryButton> {
       ],
     );
     return Padding(
-      padding: EdgeInsets.only(bottom: tokens.buttonEdge),
+      padding: EdgeInsets.zero,
       child: AnimatedContainer(
         duration: duration,
         curve: Curves.easeOut,
         transform: Matrix4.translationValues(0, shift, 0),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(tokens.buttonRadius),
-          boxShadow: [
-            if (enabled)
-              BoxShadow(color: tokens.actionEdge, offset: Offset(0, edge)),
-            if (focused) BoxShadow(color: tokens.focus, spreadRadius: 3),
-          ],
+          boxShadow: focused
+              ? [BoxShadow(color: tokens.focus, spreadRadius: 2)]
+              : const [],
         ),
         child: Semantics(
           liveRegion: widget.loading == true,
@@ -135,24 +132,6 @@ class _SunnyPrimaryButtonState extends State<SunnyPrimaryButton> {
                     : scheme.onPrimary,
               ),
               overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-              backgroundBuilder: (context, buttonStates, child) => Stack(
-                alignment: Alignment.center,
-                children: [
-                  if (!buttonStates.contains(WidgetState.disabled))
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          tokens.buttonRadius,
-                        ),
-                        child: TuantuanSkin(
-                          TuantuanAssets.buttonSkins['mint']!,
-                          opacity: pressed ? .8 : 1,
-                        ),
-                      ),
-                    ),
-                  ?child,
-                ],
-              ),
               shape: WidgetStatePropertyAll(
                 RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(tokens.buttonRadius),

@@ -23,7 +23,7 @@ public class Security {
         CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(Arrays.asList(origins.split(","))); c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS")); c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key","Last-Event-ID","If-Match")); c.setExposedHeaders(List.of("X-Trace-Id","Content-Disposition"));
         UrlBasedCorsConfigurationSource source=new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**",c); return source;
     }
-    @Bean FilterRegistrationBean<OncePerRequestFilter> authentication(Db db,Limiter limiter) {
+    @Bean FilterRegistrationBean<OncePerRequestFilter> authentication(Db db,Limiter limiter,WorkspaceAccessAudit accessAudit) {
         var filter=new OncePerRequestFilter() {
             @Override protected void doFilterInternal(HttpServletRequest r,HttpServletResponse s,FilterChain chain) throws IOException,ServletException {
                 String trace=Db.id(); r.setAttribute("traceId",trace); s.setHeader("X-Trace-Id",trace);
@@ -47,6 +47,7 @@ public class Security {
                     }
                     chain.doFilter(r,s);
                 } catch(ApiError e) { s.setStatus(e.status); s.setContentType("application/json;charset=UTF-8"); s.getWriter().write(db.write(Errors.body(e.code,e.getMessage(),r))); }
+                finally { accessAudit.denied(r,s.getStatus()); }
             }
         };
         var registration=new FilterRegistrationBean<OncePerRequestFilter>(filter); registration.setOrder(-90); return registration;

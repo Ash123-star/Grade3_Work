@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'support/flutter_sdk_assets.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -16,52 +17,47 @@ import 'package:pandora_mobile/theme/app_theme.dart';
 import 'support/local_test_state.dart';
 
 void main() {
-  testWidgets('generated UI assets keep sizing and decorative semantics local', (
-    t,
-  ) async {
-    await t.pumpWidget(
-      const MaterialApp(
-        home: IconTheme(
-          data: IconThemeData(color: Color(0xFFC45E14), size: 30),
-          child: Row(
-            children: [
-              TuantuanIcon('task', size: 30),
-              TuantuanMascot('welcome', size: 48),
-            ],
+  testWidgets(
+    'generated UI assets keep sizing and decorative semantics local',
+    (t) async {
+      await t.pumpWidget(
+        const MaterialApp(
+          home: IconTheme(
+            data: IconThemeData(color: Color(0xFFC45E14), size: 30),
+            child: Row(
+              children: [
+                TuantuanIcon('task', size: 30),
+                DogAvatar(index: 0, size: 48),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-    await settleLocalIo(t);
-    final artwork = t.widget<Image>(
-      find.descendant(
-        of: find.byType(TuantuanIcon),
-        matching: find.byType(Image),
-      ),
-    );
-    expect(artwork.width, 30);
-    expect(
-      find.descendant(
-        of: find.byType(TuantuanMascot),
-        matching: find.byType(IgnorePointer),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byType(TuantuanMascot),
-        matching: find.byType(ExcludeSemantics),
-      ),
-      findsOneWidget,
-    );
-    for (final name in ['phosphor', 'forui']) {
-      expect(
-        await rootBundle.loadString('assets/licenses/$name-LICENSE.txt'),
-        contains('Permission'),
       );
-    }
-    expect(t.takeException(), isNull);
-  });
+      await settleLocalIo(t);
+      final artwork = t.widget<Image>(
+        find.descendant(
+          of: find.byType(TuantuanIcon),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(artwork.width, 30);
+      expect(find.byType(DogAvatar), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(DogAvatar),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsAtLeastNWidgets(1),
+      );
+      for (final name in ['phosphor', 'forui']) {
+        expect(
+          await rootBundle.loadString('assets/licenses/$name-LICENSE.txt'),
+          contains('Permission'),
+        );
+      }
+      expect(t.takeException(), isNull);
+    },
+  );
   testWidgets(
     'all pinned local icons and pets decode without remote requests',
     (t) async {
@@ -80,7 +76,7 @@ void main() {
   );
 
   testWidgets(
-    'semantic badges and mascot decoration preserve narrow and scaled navigation',
+    'semantic badges and dog decorations preserve narrow and scaled navigation',
     (t) async {
       final font = FontLoader('Roboto')
         ..addFont(
@@ -94,11 +90,7 @@ void main() {
       final icons = FontLoader('MaterialIcons')
         ..addFont(
           Future.value(
-            ByteData.sublistView(
-              File(
-                materialIconsFontPath,
-              ).readAsBytesSync(),
-            ),
+            ByteData.sublistView(File(materialIconsFontPath).readAsBytesSync()),
           ),
         );
       await icons.load();
@@ -152,13 +144,13 @@ void main() {
           c.read(routerProvider).go(route);
           await settleLocalIo(t);
           if (name == 'report') {
-            await t.tap(find.text('周报'));
-            await settleLocalIo(t);
-            expect(find.text('工作回顾'), findsOneWidget);
+            expect(find.text('周报'), findsNothing);
+            expect(find.text('月报'), findsNothing);
+            expect(find.text('日志'), findsWidgets);
           }
           expect(t.takeException(), isNull, reason: '$name $width');
           if (name == 'dashboard') {
-            expect(find.byType(TuantuanMascot), findsOneWidget);
+            expect(find.byType(DogAvatar), findsWidgets);
             expect(
               find.byType(TuantuanIcon).evaluate().length,
               greaterThanOrEqualTo(2),
@@ -185,7 +177,7 @@ void main() {
             expect(style.decoration.color, SunnyPalette.orange);
             expect(
               find.ancestor(
-                of: find.byType(TuantuanDecoration),
+                of: find.byType(ProtectedAvatar),
                 matching: find.byType(Row),
               ),
               findsWidgets,

@@ -4,6 +4,28 @@
 
 ## ADDED Requirements
 
+### Requirement: Role change session revocation and denied access audit
+系统 SHALL 在角色变更审核生效事务内撤销目标全部旧会话；管理命名空间401/403 SHALL 持久记录时间、方法、固定入口类别、状态、traceId及可确认身份，不记录令牌、密码、查询串和正文。
+
+#### Scenario: Applied role change
+- **WHEN** 独立审核正式改变用户角色
+- **THEN** 旧会话在普通及管理接口均返回401，新登录遵守新角色权限；驳回不撤销
+
+#### Scenario: Anonymous and forbidden access
+- **WHEN** 匿名或无管理员权限用户访问管理命名空间
+- **THEN** 分别返回401或403并留下脱敏审计，写审计异常不能放行请求
+
+### Requirement: HCJ client integration
+客户端 SHALL 复用已发布日志修订接口，明确审核后生效；回复字段转换保持身份和关系；所有草稿也 SHALL 尊重服务端canEdit=false。
+
+#### Scenario: Submitted revision
+- **WHEN** 用户在窗口内填写修订内容和理由
+- **THEN** 客户端发送revisions而非直接修改，提示审核后生效
+
+#### Scenario: Withdrawn expired draft
+- **WHEN** 服务端返回撤回草稿canEdit=false
+- **THEN** 客户端禁止编辑，不因草稿状态绕过窗口
+
 ### Requirement: Public immutable log comments
 P1，系统 SHALL 允许所有已有日志读取权限的人评论和回复已提交日志，公开范围沿用日志权限；超过24小时仍可评论，评论 MUST NOT 被编辑或删除。
 

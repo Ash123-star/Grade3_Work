@@ -128,8 +128,13 @@ class BackendIntegrationTest {
         assertEquals("APPROVED",result.get("status").asText()); return result;
     }
     void configure(String who,Map<String,Object> changes) throws Exception {
-        var body=new LinkedHashMap<>(changes); body.put("version",get("/auth/me",who).get("version").asInt()); body.put("reason","组织配置");
+        var before=get("/auth/me",who);
+        var body=new LinkedHashMap<>(changes); body.put("version",before.get("version").asInt()); body.put("reason","组织配置");
         var result=post("/organization/users/"+ids.get(who)+"/revisions","integration-admin",body); approve(result.get("id").asText(),"integration-admin");
+        if(changes.containsKey("role")&&!before.get("role").asText().equals(changes.get("role"))) {
+            call(401,"GET","/auth/me",who,null,null);
+            if(!"DISABLED".equals(changes.get("status"))) login(who,PASSWORD);
+        }
     }
     Map<String,Object> taskBody(String title,String owner) { return new LinkedHashMap<>(Map.of("title",title,"ownerId",ids.get(owner),"deadline",LocalDate.parse(date).atTime(23,59).atZone(ZoneId.of("Asia/Shanghai")).toOffsetDateTime().toString(),"urgency","NORMAL","content","任务内容","collaborators",List.of())); }
     JsonNode waitJob(String id,String who,String expected) throws Exception {

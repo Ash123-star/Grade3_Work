@@ -15,7 +15,8 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
-import 'package:pandora_mobile/features/dashboard/organization_browser.dart';
+import 'package:pandora_mobile/features/dashboard/personnel_page.dart';
+import 'package:pandora_mobile/features/dashboard/task_management_page.dart';
 import 'package:pandora_mobile/features/dashboard/own_profile_page.dart';
 import 'package:pandora_mobile/core/state/session_lifecycle.dart';
 import 'package:pandora_mobile/core/config.dart';
@@ -194,6 +195,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/me/profile', builder: (_, _) => const OwnProfilePage()),
+      GoRoute(path: '/me/people', builder: (_, _) => const PersonnelPage()),
+      GoRoute(
+        path: '/tasks/received',
+        builder: (_, _) => const ReceivedTasksPage(),
+      ),
+      GoRoute(path: '/me/tasks', builder: (_, _) => const TaskManagementPage()),
       GoRoute(
         path: '/attachments/:id',
         builder: (_, s) => AttachmentDownloadPage(
@@ -207,14 +214,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           logId: s.pathParameters['id']!,
           version: int.tryParse(s.pathParameters['version']!) ?? -1,
         ),
-      ),
-      GoRoute(
-        path: '/me/organization',
-        builder: (_, _) => const OrganizationBrowser(),
-      ),
-      GoRoute(
-        path: '/me/team',
-        builder: (_, _) => const ListPage('organization'),
       ),
       GoRoute(
         path: '/me/team/:memberId',
