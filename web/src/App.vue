@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { VueFlow } from '@vue-flow/core';
+import WorkBench from './WorkBench.vue';
 type Data = Record<string, any>;
 const token = ref(sessionStorage.getItem('workpanel-token') ?? '');
 const account = ref(''), password = ref(''), error = ref(''), message = ref(''), busy = ref(false);
 const needsPassword = ref(false), oldPassword = ref(''), newPassword = ref('');
 const scopes = ref<Data[]>([]), scope = ref<Data>({domain: 'PERSONAL'}), preferences = ref<Data>({}), knowledge = ref<Data>({}), analysis = ref<Data>({});
 const memories = ref<Data[]>([]), evidence = ref<Data[]>([]), panel = ref('');
-const workspace = ref('analysis'), auditItems = ref<Data[]>([]), auditTask = ref(''), auditCursor = ref(0), auditTotal = ref(0), auditBusy = ref(false), auditError = ref('');
+const authorized=ref(false);
+const workspace = ref('work'), auditItems = ref<Data[]>([]), auditTask = ref(''), auditCursor = ref(0), auditTotal = ref(0), auditBusy = ref(false), auditError = ref('');
 let auditGeneration = 0;
 async function loadAudit(cursor = 0) {
   const ticket = ++auditGeneration; auditBusy.value = true; auditError.value = ''; auditItems.value = [];
@@ -45,11 +47,11 @@ async function login() { await action(async () => {
   const result = await api('POST','/auth/login',{account:account.value,password:password.value});
   token.value = result.token;oldPassword.value=password.value;password.value = ''; sessionStorage.setItem('workpanel-token', token.value);
   if(result.user.role !== 'ADMIN') { logout(); throw new Error('此工作台仅供管理员使用，请使用 Android 客户端'); }
-  needsPassword.value=Boolean(result.user.must_change_password);
+  authorized.value=true;workspace.value='work';needsPassword.value=Boolean(result.user.must_change_password);
   if (!needsPassword.value) {oldPassword.value='';await load();}
 }); }
 async function changePassword() {await action(async()=>{await api('POST','/auth/password',{oldPassword:oldPassword.value,newPassword:newPassword.value});logout();message.value='密码已更新，请重新登录';});}
-function logout() { auditGeneration++;auditItems.value=[];auditTotal.value=0;auditTask.value='';auditError.value='';auditBusy.value=false;workspace.value='analysis';generation++; clearTimeout(timer); clearTimeout(forgetTimer); token.value='';sessionStorage.removeItem('workpanel-token');analysis.value={};preferences.value={};knowledge.value={};scopes.value=[];memories.value=[];evidence.value=[];panel.value='';needsPassword.value=false;oldPassword.value='';newPassword.value=''; }
+function logout() { authorized.value=false; auditGeneration++;auditItems.value=[];auditTotal.value=0;auditTask.value='';auditError.value='';auditBusy.value=false;workspace.value='analysis';generation++; clearTimeout(timer); clearTimeout(forgetTimer); token.value='';sessionStorage.removeItem('workpanel-token');analysis.value={};preferences.value={};knowledge.value={};scopes.value=[];memories.value=[];evidence.value=[];panel.value='';needsPassword.value=false;oldPassword.value='';newPassword.value=''; }
 async function load() {
   const ticket = ++generation; clearTimeout(timer); busy.value=true;analysis.value={};memories.value=[];evidence.value=[];panel.value='';
   try {
@@ -100,18 +102,20 @@ const nodes = computed(() => [
 ]);
 const edges = computed(()=> (output.value.facts ?? []).flatMap((f:Data,i:number)=>(output.value.directions ?? []).flatMap((d:Data,j:number)=> d.sourceIds?.some((id:string)=>f.sourceIds?.includes(id)) ? [{id:`e-${i}-${j}`,source:`fact-${i}`,target:`direction-${j}`,label:'参考证据'}] : [])));
 onBeforeUnmount(()=>{generation++;clearTimeout(timer);clearTimeout(forgetTimer);});
-if(token.value) action(async()=>{const user=await api('GET','/auth/me');if(user.role!=='ADMIN'){logout();throw new Error('此工作台仅供管理员使用');}needsPassword.value=Boolean(user.must_change_password);if(!needsPassword.value) await load();});
+if(token.value) action(async()=>{const user=await api('GET','/auth/me');if(user.role!=='ADMIN'){logout();throw new Error('此工作台仅供管理员使用');}authorized.value=true;needsPassword.value=Boolean(user.must_change_password);if(!needsPassword.value) await load();});
 </script>
 
 <template>
   <main>
-    <header><div><small>AI 地图</small><h1>成长与发展地图</h1></div><button v-if="token" @click="logout">退出</button></header>
+    <header><div><h1>AI地图</h1></div><button v-if="token" @click="logout">退出</button></header>
     <p v-if="error" class="error" role="alert">{{error}}</p><p v-if="message" role="status">{{message}}</p>
     <form v-if="!token" class="card login" @submit.prevent="login"><h2>登录企业服务</h2><label>账号<input v-model="account" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button class="primary">登录</button></form>
     <form v-else-if="needsPassword" class="card login" @submit.prevent="changePassword"><h2>首次登录修改密码</h2><label>原密码<input v-model="oldPassword" type="password" autocomplete="current-password" required></label><label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" minlength="12" required></label><button class="primary">修改并重新登录</button></form>
+    <p v-else-if="!authorized" role="status">正在登录…</p>
     <template v-else>
-      <nav aria-label="工作台"><button :class="{primary:workspace==='analysis'}" @click="workspace='analysis'">成长分析</button><button :class="{primary:workspace==='audit'}" @click="openAudit">任务审计</button></nav>
-      <section v-if="workspace==='audit'" class="card" aria-label="任务审计记录">
+      <nav aria-label="工作台"><button :class="{primary:workspace==='work'}" @click="workspace='work'">办事</button><button :class="{primary:workspace==='analysis'}" @click="workspace='analysis'">成长分析</button><button :class="{primary:workspace==='audit'}" @click="openAudit">任务审计</button></nav>
+      <WorkBench v-if="workspace==='work'" :key="token" :token="token" />
+      <section v-else-if="workspace==='audit'" class="card" aria-label="任务审计记录">
         <h2>任务审计</h2><p>本公司任务的操作与审核记录，只读保留历史。</p>
         <form @submit.prevent="loadAudit(0)"><label>任务 ID（可选）<input v-model="auditTask" maxlength="100" placeholder="留空查看全部任务"></label><button :disabled="auditBusy">查询记录</button></form>
         <p v-if="auditBusy" role="status">正在加载审计记录…</p><p v-else-if="auditError" role="alert" class="error">{{auditError}}</p>

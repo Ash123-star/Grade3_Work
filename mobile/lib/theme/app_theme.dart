@@ -31,6 +31,66 @@ class AppTypography {
   );
 }
 
+class WorkMotion {
+  static const press = Duration(milliseconds: 120);
+  static const overlay = Duration(milliseconds: 200);
+  static const card = Duration(milliseconds: 220);
+  static const success = Duration(milliseconds: 300);
+  static Duration duration(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context) || !TickerMode.of(context)
+      ? Duration.zero
+      : card;
+  static AnimationStyle dialog(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context) || !TickerMode.of(context)
+      ? AnimationStyle.noAnimation
+      : const AnimationStyle(
+          duration: overlay,
+          reverseDuration: press,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+}
+
+/// 暂停后台与离屏装饰，保留完整状态文字及交互。
+class WorkMotionScope extends StatefulWidget {
+  const WorkMotionScope({required this.child, super.key});
+  final Widget child;
+  @override
+  State<WorkMotionScope> createState() => _WorkMotionScopeState();
+}
+
+class _WorkMotionScopeState extends State<WorkMotionScope>
+    with WidgetsBindingObserver {
+  bool foreground = true;
+  @override
+  void initState() {
+    super.initState();
+    foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (mounted) {
+      setState(() => foreground = state == AppLifecycleState.resumed);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => TickerMode(
+    enabled: foreground && !MediaQuery.disableAnimationsOf(context),
+    child: widget.child,
+  );
+}
+
 class SunnyPalette {
   static const primary = Color(0xFF55D8A5);
   static const primaryStrong = Color(0xFF319E7A);

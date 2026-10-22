@@ -34,12 +34,13 @@
 | `RECEIVED` | 负责人 | 无 | 任务进入已接收 |
 | `FEEDBACK` | 负责人/协作人 | `text` | 追加反馈 |
 | `ACCEPTED` | 派发人/管理员 | 无 | 任务验收 |
-| `TRANSFERRED` | 派发人/管理员 | `ownerId` | 更换负责人并重建主负责人关联 |
-| `RESCHEDULED` | 派发人/管理员 | `deadline` | 更新截止时间，必须晚于当前时间 |
+| `RETURNED` | 派发人/管理员 | `text` | 待验收任务退回补充 |
 | `ARCHIVED` | 派发人/管理员 | 无 | 归档已验收任务 |
 | `WITHDRAWN` | 派发人/管理员 | `text` | 撤回未验收任务 |
 
 事件更新使用乐观锁；版本不匹配返回 `409 VERSION_CONFLICT`，字段缺失或时间格式错误返回 `400`。事件写入和任务更新在同一事务中完成。
+
+转派/改期必须走专用复核申请（实际路径见SpringDoc）。`REASSIGNED`/`RESCHEDULED` 为审核生效后的时间线事件，不能通过events直接写入。
 
 `POST /tasks/{id}/revisions` 修改已发布任务并携带版本，必要时进入审核。无派发资格返回 403。
 
@@ -56,6 +57,10 @@
 仪表盘提供 `/dashboard`、`/dashboard/company`、`/dashboard/personal`、`/profiles/{id}` 和 `/private-notes`；私人备注始终仅本人可见。通知提供 `GET /notifications`、`POST /notifications/read-all`、`POST /notifications/{id}/read` 和支持 `Last-Event-ID` 的 `/notifications/stream`。分析提供 `/analytics`、`/timeline` 和 `/analytics/export`，导出与详情使用相同数据范围。附件 `POST /attachments` 使用 multipart，单文件最大 10MB；`GET /attachments/{id}` 每次重新鉴权，不提供公开 URL。
 
 ## AI `/ai`
+
+新办事v1接口、状态、幂等和文件限制见 [ai-work-assistant-api.md](ai-work-assistant-api.md)。旧作业接口兼容保留；普通员工不因使用AI获得派发权限。事项202仅表示请求已持久化。
+
+AI材料上传使用`POST /attachments?purpose=AI_WORK`提前校验真实签名、扩展名和限额；省略用途仍兼容普通附件。能力接口返回同一组格式、字节/页面/像素/单元格/解压限额。自动写入关闭时仍可纯检查；本次只检查或明确禁止提交的要求优先于长期授权，检查后提交不隐含接收、验收或归档。
 
 `POST /ai/jobs` 创建异步草稿，`GET/DELETE /ai/jobs/{id}` 查询或取消，`POST /ai/jobs/{id}/retry` 重试，`PUT /ai/jobs/{id}/draft` 按版本编辑，`GET /ai/jobs/{id}/stream` 读取 SSE，`GET /ai/usage` 查看用量。`GET /ai-maps` 和 `POST /ai-maps/edges` 管理本人范围内地图。`POST /ai/jobs/{id}/confirm-task` 必须带幂等键，确认后重新走任务派发权限和事务；AI 失败返回 job 状态，不影响普通任务和日志。
 

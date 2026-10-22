@@ -7,3 +7,7 @@ server/target
 **/.env
 **/*.log
 deploy/dist
+output
+**/node_modules
+web/dist
+**/__pycache__

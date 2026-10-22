@@ -1,0 +1,20 @@
+services:
+  ocr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: workpanel-ocr:3.0.3
+    restart: on-failure
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:58001:8000"]
+    networks: [parser]
+networks:
+  parser:
+    internal: true

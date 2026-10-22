@@ -29,6 +29,7 @@ class MockRepository implements Repository {
   @override
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
+    bool aiWork = false,
     CancelToken? cancelToken,
     void Function(int, int)? onProgress,
   }) async {

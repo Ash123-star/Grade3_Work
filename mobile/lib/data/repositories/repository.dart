@@ -13,6 +13,7 @@ abstract interface class Repository {
   Future<Record> execute(String resource, Command command);
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
+    bool aiWork = false,
     CancelToken? cancelToken,
     void Function(int, int)? onProgress,
   });
@@ -112,6 +113,7 @@ class HttpRepository implements Repository {
   @override
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
+    bool aiWork = false,
     CancelToken? cancelToken,
     void Function(int, int)? onProgress,
   }) async {
@@ -119,6 +121,7 @@ class HttpRepository implements Repository {
     try {
       final response = await dio.post<Map<String, dynamic>>(
         '/attachments',
+        queryParameters: aiWork ? {'purpose': 'AI_WORK'} : null,
         data: FormData.fromMap({
           'file': MultipartFile.fromBytes(
             file.bytes,
@@ -330,6 +333,12 @@ class HttpRepository implements Repository {
       fields['businessDate'] = raw['business_date'];
     }
     if (raw.containsKey('created_at')) fields['createdAt'] = raw['created_at'];
+    if (raw['author'] is Map) {
+      fields['authorName'] = (raw['author'] as Map)['name'];
+    }
+    if (raw.containsKey('submittedAt')) {
+      fields['submittedAt'] = raw['submittedAt'];
+    }
     if (raw.containsKey('submitted_at')) {
       fields['submittedAt'] = raw['submitted_at'];
     }
@@ -650,7 +659,10 @@ class HttpRepository implements Repository {
     if (kind == 'comments') {
       return {
         'text': raw['text'] ?? '',
+        'id': raw['id'],
         'actorId': raw['actor_id'],
+        'authorName': raw['author_name'],
+        'parentId': raw['parent_id'],
         'time': raw['created_at'],
       };
     }
@@ -825,6 +837,15 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'logs') {
+        if (command.action == 'withdraw') {
+          return await _postRecord(
+            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
+            {
+              'version': command.version,
+              'reason': v['reason'] ?? v['撤回原因'] ?? '',
+            },
+          );
+        }
         if (command.action == 'read') {
           final id = _commandId(command);
           final response = await dio.post<dynamic>(
@@ -884,7 +905,10 @@ class HttpRepository implements Repository {
       if (resource == 'logs/comments') {
         return await _postRecord(
           '/logs/${Uri.encodeComponent(_commandId(command))}/comments',
-          {'text': v['评语'] ?? v['text']},
+          {
+            'text': v['评语'] ?? v['text'],
+            if (v['parentId'] != null) 'parentId': v['parentId'],
+          },
         );
       }
       if (resource == 'reviews') {

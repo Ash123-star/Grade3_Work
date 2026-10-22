@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/ai_work.dart';
+import 'package:pandora_mobile/data/repositories/ai_work_repository.dart';
 
 void main() {
   testWidgets('logs use a single independent date and allow member selection', (
@@ -64,7 +66,17 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final container = testContainer();
+      final container = testContainer(
+        overrides: [
+          workCapabilitiesProvider.overrideWith(
+            (_) async =>
+                const WorkCapabilities(enabled: true, configured: true),
+          ),
+          workListProvider.overrideWith(
+            (_) async => const WorkListPage([], -1),
+          ),
+        ],
+      );
       addTearDown(container.dispose);
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -92,14 +104,10 @@ void main() {
       }
       await tester.tap(find.text('AI地图').last);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('堵点风险'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('堵点风险'));
-      await tester.pumpAndSettle();
-      await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
-      await tester.pumpAndSettle();
+      expect(find.text('说说要办什么…'), findsOneWidget);
       expect(find.text('日'), findsNothing);
-      expect(find.text('行动规划'), findsOneWidget);
+      expect(find.text('行动规划'), findsNothing);
+      expect(find.text('发送'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
