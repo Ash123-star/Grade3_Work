@@ -82,13 +82,20 @@ class TaskDispatchIntegrationTest {
     JsonNode call(int status,String method,String path,String who,Object body,String key) throws Exception {
         var r=send(method,path,who,body,key); assertEquals(status,r.statusCode(),method+" "+path+" "+r.body()); return JSON.readTree(r.body());
     }
-    JsonNode dispatch(String who,Map<String,Object> body,String key) throws Exception { return call(200,"POST","/tasks",who,body,key); }
+    JsonNode requestTask(String who,Map<String,Object> body,String key) throws Exception { return call(200,"POST","/tasks",who,body,key); }
+    JsonNode dispatch(String who,Map<String,Object> body,String key) throws Exception {
+        var request=requestTask(who,body,key);
+        approveTaskRevision(request.get("id").asText());
+        return call(200,"GET","/tasks/"+request.get("target_id").asText(),who,null,null);
+    }
     String error(int status,String who,Map<String,Object> body,String key) throws Exception { return call(status,"POST","/tasks",who,body,key).get("code").asText(); }
     String key() { return "k-"+UUID.randomUUID(); }
 
     Map<String,Object> body(String title,String owner,String... collaborators) {
-        var m=new LinkedHashMap<String,Object>(); m.put("title",title); m.put("ownerId",id.get(owner)); m.put("deadline",deadline); m.put("content","任务内容");
-        m.put("collaborators",Arrays.stream(collaborators).map(id::get).toList()); return m;
+        var participants=new ArrayList<String>(); participants.add(id.get(owner));
+        Arrays.stream(collaborators).map(id::get).forEach(participants::add);
+        var m=new LinkedHashMap<String,Object>(); m.put("title",title); m.put("participants",participants); m.put("deadline",deadline); m.put("content","任务内容");
+        return m;
     }
     String upload(String who) throws Exception {
         String boundary="it-"+run; String part="--"+boundary+"\r\nContent-Disposition: form-data; name=\"file\"; filename=\"spec.txt\"\r\nContent-Type: text/plain\r\n\r\nfile-of-"+who+"\r\n--"+boundary+"--\r\n";
@@ -104,6 +111,15 @@ class TaskDispatchIntegrationTest {
 
     JsonNode list(int status,String query,String who) throws Exception { return call(status,"GET","/tasks?"+query,who,null,null); }
 
+    @Test void taskCreateIsInvisibleUntilReviewApproval() throws Exception {
+        var request=requestTask("leader",body("待审核创建","alice"),key());
+        assertEquals("TASK_CREATE",request.get("kind").asText());
+        String taskId=request.get("target_id").asText();
+        call(404,"GET","/tasks/"+taskId,"leader",null,null);
+        approveTaskRevision(request.get("id").asText());
+        assertEquals(taskId,call(200,"GET","/tasks/"+taskId,"alice",null,null).get("id").asText());
+    }
+
     /** 任务列表只使用白名单投影，不因不同生命周期泄露状态、完成或正文。 */
     @Test void taskListUsesSafeProjectionAndOrganizationScope() throws Exception {
         String prefix="list-safe-"+UUID.randomUUID();
@@ -113,7 +129,7 @@ class TaskDispatchIntegrationTest {
         var leaderPage=list(200,"search="+prefix+"&limit=10","leader");
         assertEquals(2,leaderPage.get("total").asInt());
         assertEquals(Set.of(alice,amy),Set.of(leaderPage.get("items").get(0).get("id").asText(),leaderPage.get("items").get(1).get("id").asText()));
-        Set<String> allowed=Set.of("id","owner_id","issuer_id","title","deadline","version","created_at");
+        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label");
         for(JsonNode item:leaderPage.get("items")) {
             var names=new HashSet<String>(); item.fieldNames().forEachRemaining(names::add);
             assertEquals(allowed,names);
@@ -132,8 +148,8 @@ class TaskDispatchIntegrationTest {
         assertEquals(2,first.get("total").asInt()); assertEquals(2,second.get("total").asInt());
         assertNotEquals(first.get("items").get(0).get("id").asText(),second.get("items").get(0).get("id").asText());
         assertEquals("1",first.get("nextCursor").asText());
-        var forbidden=list(403,"ownerId="+id.get("carl"),"leader"); assertEquals("FORBIDDEN",forbidden.get("code").asText()); assertFalse(forbidden.has("items"));
-        var hidden=list(404,"ownerId="+id.get("outsider"),"leader"); assertEquals("NOT_FOUND",hidden.get("code").asText()); assertFalse(hidden.has("items"));
+        var forbidden=list(403,"participantId="+id.get("carl"),"leader"); assertEquals("FORBIDDEN",forbidden.get("code").asText()); assertFalse(forbidden.has("items"));
+        var hidden=list(404,"participantId="+id.get("outsider"),"leader"); assertEquals("NOT_FOUND",hidden.get("code").asText()); assertFalse(hidden.has("items"));
         var invalid=list(400,"date=not-a-date","leader"); assertEquals("INVALID_DATE",invalid.get("code").asText()); assertFalse(invalid.has("items"));
     }
     // 6.1 正常生命周期与时间线
@@ -157,9 +173,8 @@ class TaskDispatchIntegrationTest {
     @Test void lifecycleRejectsInvalidTransitionsVersionsAndUnauthorizedActors() throws Exception {
         String t=dispatch("leader",body("生命周期拒绝","alice","amy"),key()).get("id").asText();
         assertEquals("INVALID_TRANSITION",call(409,"POST","/tasks/"+t+"/events","alice",Map.of("type","FEEDBACK","version",1,"text","跳过接收"),null).get("code").asText());
-        assertEquals("FORBIDDEN",call(403,"POST","/tasks/"+t+"/events","amy",Map.of("type","RECEIVED","version",1),null).get("code").asText());
+        event(t,"amy","RECEIVED",1,null);
         assertEquals("INVALID_EVENT",call(400,"POST","/tasks/"+t+"/events","alice",Map.of("type","UNKNOWN","version",1),null).get("code").asText());
-        event(t,"alice","RECEIVED",1,null);
         assertEquals("FORBIDDEN",call(403,"POST","/tasks/"+t+"/events","director",Map.of("type","ACCEPTED","version",2),null).get("code").asText());
         assertEquals("FORBIDDEN",call(403,"POST","/tasks/"+t+"/events","alice",Map.of("type","ACCEPTED","version",2),null).get("code").asText());
         assertEquals("NOT_FOUND",call(404,"POST","/tasks/"+t+"/events","leader2",Map.of("type","RECEIVED","version",2),null).get("code").asText());
@@ -220,7 +235,7 @@ class TaskDispatchIntegrationTest {
     @Test void replaySameAndReordered() throws Exception {
         String k=key(); var b=body("重放任务","alice","amy","leader"); String a1=upload("leader"),a2=upload("leader"); b.put("attachments",List.of(a1,a2));
         String t=dispatch("leader",b,k).get("id").asText(); long tasks=companyTasks();
-        var reordered=body("重放任务","alice"); reordered.put("collaborators",List.of(id.get("leader"),id.get("amy"),id.get("amy"),id.get("alice"))); reordered.put("attachments",List.of(a2,a1,a2)); reordered.put("urgency","NORMAL");
+        var reordered=body("重放任务","alice"); reordered.put("participants",List.of(id.get("leader"),id.get("amy"),id.get("amy"),id.get("alice"))); reordered.put("attachments",List.of(a2,a1,a2)); reordered.put("urgency","NORMAL");
         assertEquals(t,dispatch("leader",reordered,k).get("id").asText());
         assertEquals(t,dispatch("leader",b,k).get("id").asText());
         assertEquals(tasks,companyTasks()); assertEquals(1,count("SELECT count(*) FROM task_events WHERE task_id=? AND type='DISPATCHED'",t));
@@ -231,10 +246,13 @@ class TaskDispatchIntegrationTest {
     @Test void concurrentReplayCreatesOne() throws Exception {
         String k=key(); var b=body("并发派发","alice"); long before=companyTasks();
         var pool=Executors.newFixedThreadPool(8); var results=new ArrayList<Future<String>>();
-        for(int i=0;i<8;i++) results.add(pool.submit(()->dispatch("leader",b,k).get("id").asText()));
+        for(int i=0;i<8;i++) results.add(pool.submit(()->requestTask("leader",b,k).get("id").asText()));
         var ids=new HashSet<String>(); for(var f:results) ids.add(f.get(30,TimeUnit.SECONDS)); pool.shutdown();
-        assertEquals(1,ids.size()); assertEquals(before+1,companyTasks());
-        assertEquals(1,count("SELECT count(*) FROM task_events WHERE task_id=? AND type='DISPATCHED'",ids.iterator().next()));
+        assertEquals(1,ids.size()); assertEquals(before,companyTasks());
+        approveTaskRevision(ids.iterator().next());
+        String taskId=db.one("SELECT target_id FROM review_requests WHERE id=?",ids.iterator().next()).get("target_id").toString();
+        assertEquals(before+1,companyTasks());
+        assertEquals(1,count("SELECT count(*) FROM task_events WHERE task_id=? AND type='DISPATCHED'",taskId));
     }
 
     @Test void sameKeyDifferentContentConflicts() throws Exception {
@@ -329,12 +347,13 @@ class TaskDispatchIntegrationTest {
         assertNull(db.one("SELECT task_id FROM attachments WHERE id=?",ok).get("task_id"));
     }
 
-    // 6.6 负责人与协作人
+    // 6.6 无角色参与人集合
     @Test void participants() throws Exception {
         var r=dispatch("leader",body("去重","alice","amy","alice","amy","leader"),key()); String t=r.get("id").asText();
-        assertEquals(1,count("SELECT count(*) FROM task_assignees WHERE task_id=? AND kind='PRIMARY' AND user_id=?",t,id.get("alice")));
-        assertEquals(List.of(id.get("amy"),id.get("leader")).stream().sorted().toList(),TaskParticipants.collaborators(db,t));
-        assertEquals(List.of(id.get("amy"),id.get("leader")).stream().sorted().toList(),JSON.convertValue(r.at("/fields/collaborators"),List.class));
+        assertEquals(List.of(id.get("alice"),id.get("amy"),id.get("leader")).stream().sorted().toList(),
+                TaskParticipants.list(db,t).stream().map(row->row.get("id").toString()).sorted().toList());
+        assertEquals(List.of(id.get("alice"),id.get("amy"),id.get("leader")).stream().sorted().toList(),
+                r.get("participants").findValuesAsText("id").stream().sorted().toList());
         long tasks=companyTasks();
         assertEquals("FORBIDDEN",error(403,"leader",body("其他团队负责人","carl"),key()));
         assertEquals("FORBIDDEN",error(403,"leader",body("其他团队协作人","alice","carl"),key()));
@@ -444,9 +463,12 @@ class TaskDispatchIntegrationTest {
     }
 
     private void approveTaskRevision(String reviewId) throws Exception {
-        // 申请人 leader 不能自审；同团队另一位 active leader 负责第一步团队复核。
-        call(200,"POST","/reviews/"+reviewId+"/decision","muted",Map.of("approve",true,"reason","同意"),null);
-        call(200,"POST","/reviews/"+reviewId+"/decision","director",Map.of("approve",true,"reason","同意"),null);
-        call(200,"POST","/reviews/"+reviewId+"/decision","reviewer",Map.of("approve",true,"reason","同意"),null);
+        while(true) {
+            var pending=db.rows("SELECT reviewer_id FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position LIMIT 1",reviewId);
+            if(pending.isEmpty()) return;
+            String reviewer=pending.getFirst().get("reviewer_id").toString();
+            String who=id.entrySet().stream().filter(entry->entry.getValue().equals(reviewer)).map(Map.Entry::getKey).findFirst().orElseThrow();
+            call(200,"POST","/reviews/"+reviewId+"/decision",who,Map.of("approve",true,"reason","同意"),null);
+        }
     }
 }

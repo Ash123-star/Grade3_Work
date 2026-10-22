@@ -29,7 +29,7 @@
 
 ### 2. 审核前候选、审核后生效
 
-新增 `TASK_CREATE`、`TASK_DELETE` 审核种类，并保留 `TASK` 作为任务修改种类。创建接口校验草稿、参与人、标签与附件后，将规范化候选写进 `review_requests`；`target_id` 预分配为未来任务 ID，审核通过时才插入 `tasks`、参与人、标签、附件和时间线。幂等记录保存预分配 task ID 与 review ID，重复同键同内容返回同一申请；相同键不同内容返回 `409 IDEMPOTENCY_CONFLICT`。
+新增 `TASK_CREATE`、`TASK_DELETE` 审核种类，并保留 `TASK` 作为任务修改种类。创建接口校验草稿、参与人、标签与附件后，将规范化候选写进 `review_requests`；`target_id` 预分配为未来任务 ID，审核通过时才插入 `tasks`、参与人、标签、附件和时间线。幂等记录保存预分配 task ID 与 review ID，重复同键同内容返回同一申请；相同键不同内容返回 `409 IDEMPOTENCY_CONFLICT`。由于待审阶段不存在正式 `tasks` 行，前向迁移会移除 `idempotency_keys.task_id` 的旧外键；待审记录以 `review_id` 作为实际关联，批准后 `task_id` 仍指向新建任务。
 
 修改接口继续使用 `TASK`，但候选采用新任务草稿，审核通过后在 `UPDATE ... WHERE version=?` 中生效。删除接口创建 `TASK_DELETE` 候选，其中保存理由和原任务摘要；批准时以乐观锁将任务归档、追加 `ARCHIVED` 时间线事件、写审计记录，绝不执行 `DELETE FROM tasks`。审核拒绝只改变申请状态，任务保持原状态。
 

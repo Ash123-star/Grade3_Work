@@ -4,6 +4,7 @@ import cn.workpanel.Actor;
 import cn.workpanel.ApiError;
 import cn.workpanel.Db;
 import cn.workpanel.module.review.application.ReviewApplicationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
@@ -12,6 +13,7 @@ import java.util.*;
 @Service
 public class TaskDispatchService {
     final Db db; final ReviewApplicationService reviews;
+    @Autowired
     public TaskDispatchService(Db db,ReviewApplicationService reviews) { this.db=db; this.reviews=reviews; }
     /** 仅供历史 Mockito 单元测试构造；生产 Bean 必须注入审核服务。 */
     @Deprecated public TaskDispatchService(Db db) { this(db,null); }
@@ -21,7 +23,6 @@ public class TaskDispatchService {
         a.requireDispatch();
         if(key==null||key.isBlank()||key.length()>128) throw ApiError.bad("IDEMPOTENCY_REQUIRED","需要 1–128 位幂等键");
         TaskDraft d=TaskDraftNormalizer.normalize(raw);
-        TaskParticipants.validate(db,a,d); TaskLabels.validate(db,a,d); TaskAttachments.verify(db,a,null,d.attachments());
         // 事务级锁把同一派发人同一键的并发请求串行化。
         db.one("SELECT pg_advisory_xact_lock(hashtextextended(?,0))",a.id()+":"+key);
         var old=db.rows("SELECT * FROM idempotency_keys WHERE actor_id=? AND key=?",a.id(),key);
@@ -33,6 +34,7 @@ public class TaskDispatchService {
             if(!reviewId.isBlank()&&reviews!=null) return reviews.get(a,reviewId);
             return detail(TaskAccess.issued(db,a,Db.str(record,"task_id")));
         }
+        TaskParticipants.validate(db,a,d); TaskLabels.validate(db,a,d); TaskAttachments.verify(db,a,null,d.attachments());
         String id=Db.id(); var body=d.body();
         if(reviews==null) return legacyDispatch(a,key,id,d,body);
         var request=reviews.create(a,"TASK_CREATE",id,0,Map.of(),body,"创建任务");
