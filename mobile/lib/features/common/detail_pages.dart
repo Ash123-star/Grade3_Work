@@ -810,6 +810,59 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     if (mounted) setState(() => busy = false);
   }
 
+  Future<void> withdrawLog(Record item) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('撤回日志'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 300,
+          decoration: const InputDecoration(labelText: '撤回原因'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                Navigator.pop(dialog, controller.text.trim());
+              }
+            },
+            child: const Text('撤回'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || !mounted) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await ref
+          .read(repositoryProvider)
+          .execute(
+            'logs',
+            Command('withdraw', {
+              'id': item.id,
+              'reason': reason,
+            }, version: item.version),
+          );
+      refreshBusiness(ref);
+      if (mounted) notice(context, '日志已撤回，可以继续编辑');
+    } catch (failure) {
+      refreshBusiness(ref);
+      if (mounted) setState(() => error = '$failure');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   void edit(Record item, String kind) {
     if (kind == 'log-revise') {
       ref.read(logDateProvider.notifier).state =
@@ -1040,6 +1093,17 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ),
                 ),
                 section('任务说明', f['任务内容'] ?? f['content'] ?? f['body']),
+                if (!AppConfig.mock && ['进行中', '需补充', '待验收'].contains(status))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push(
+                        '/tasks/${encode(item.id)}/delivery-check?version=${item.version}',
+                      ),
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: const Text('检查交付材料'),
+                    ),
+                  ),
                 if ((f['attachments'] as List? ?? []).isNotEmpty) ...[
                   const SectionHeader('任务附件'),
                   for (final id

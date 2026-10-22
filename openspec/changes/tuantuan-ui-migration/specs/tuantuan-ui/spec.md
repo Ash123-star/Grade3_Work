@@ -7,7 +7,21 @@
 #### Scenario: Compact dashboard and aligned actions
 
 - **WHEN** 用户查看导图、任务详情或 AI 页面
-- **THEN** 欢迎区角落装饰与卡片叠层，四象限图标与标题并排，消息/更多/建议草稿在滚动头部右对齐且不占用额外空白行
+- **THEN** 欢迎区角落装饰与卡片叠层，四象限图标与标题并排，消息/更多在滚动头部右对齐且不占用额外空白行；AI 首页使用下述精简布局
+
+### Requirement: Simplified AI analysis entry
+
+优先级 Should，范围为 Flutter 正式与演示 AI 首页。页面 SHALL 在顶部展示发展分析/堵点风险/行动规划三个 Tab 与对应内容，唯一“开始分析”按钮 SHALL 固定在内容区底部、五栏导航上方，滚动内容不得遮挡按钮。页面 MUST 移除“把下一步想清楚”整张欢迎卡及“点击开始分析，基于已有任务…”空状态说明；同时移除顶部大脑、建议草稿、用量、刷新/重置、范围与日期周期筛选、整个优先三件事板块、打开工作关系图入口与来源范围说明。
+
+#### Scenario: Analyze and switch tabs
+
+- **WHEN** 已授权用户进入 AI 首页并点击开始分析
+- **THEN** 正式模式沿用当天/day 请求与既有服务端权限，完成后按 Tab 展示分析、风险和可人工确认的行动；演示模式只刷新带演示标记的数据，不派发正式任务
+
+#### Scenario: Empty, failed or unauthorized analysis
+
+- **WHEN** 没有分析结果、请求失败、生成进行中或账号失去权限
+- **THEN** 已授权用户仍能看到底部开始分析和顶部三个 Tab，生成中禁止重复提交，失败保留明确错误与恢复操作，失权清理受保护数据；页面在 360dp 与 1.5 倍字体下可读且不横向溢出
 
 #### Scenario: Decorative asset failure
 

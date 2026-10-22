@@ -1,0 +1,6 @@
+# PaddleX 3.0.3 imports the pre-1.0 LangChain document API.
+langchain==0.3.25
+langchain-community==0.3.24
+langchain-openai==0.3.18
+openai==1.82.0
+numpy==1.26.4

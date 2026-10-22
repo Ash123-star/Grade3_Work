@@ -191,14 +191,12 @@ void main() {
   testWidgets('AI joins once then edits and completes account-scoped drafts', (
     t,
   ) async {
-    final c = await launch(t, '/ai');
-    await t.tap(find.text('团队走向'));
-    await t.pumpAndSettle();
+    final c = await launch(t, '/ai/directions');
     await t.ensureVisible(find.text('加入行动规划'));
     await t.pumpAndSettle();
     await t.tap(find.text('加入行动规划'));
     await t.pumpAndSettle();
-    expect(c.read(aiActionDraftsProvider('u1')).length, 3);
+    expect(c.read(aiActionDraftsProvider('u1')).length, 2);
     await t.ensureVisible(find.text('发展分析'));
     await t.pumpAndSettle();
     await t.tap(find.text('发展分析'));
@@ -207,7 +205,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('加入行动规划'));
     await t.pumpAndSettle();
-    expect(c.read(aiActionDraftsProvider('u1')).length, 3);
+    expect(c.read(aiActionDraftsProvider('u1')).length, 2);
     await t.ensureVisible(find.text('编辑').first);
     await t.pumpAndSettle();
     await t.tap(find.text('编辑').first);

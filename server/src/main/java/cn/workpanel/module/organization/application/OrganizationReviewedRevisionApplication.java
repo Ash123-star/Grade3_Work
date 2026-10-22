@@ -24,7 +24,9 @@ public class OrganizationReviewedRevisionApplication implements ReviewedRevision
         if(!applicant.company().equals(approver.company())) throw ApiError.forbidden();
         switch(kind) {
             case "POLICY" -> {
-                applicant.requireAdmin(); Db.conflict(db.update("UPDATE companies SET review_policy=?::jsonb,version=version+1 WHERE id=? AND version=?",db.write(c),approver.company(),v));
+                applicant.requireAdmin();var old=db.one("SELECT review_policy FROM companies WHERE id=? FOR UPDATE",approver.company());
+                var next=cn.workpanel.module.aiwork.domain.AuthorizationPolicy.from(c);var previous=cn.workpanel.module.aiwork.domain.AuthorizationPolicy.from(db.read(old.get("review_policy")));
+                Db.conflict(db.update("UPDATE companies SET review_policy=?::jsonb,version=version+1,ai_authorization_revision=ai_authorization_revision+? WHERE id=? AND version=?",db.write(c),next.equals(previous)?0:1,approver.company(),v));
             }
             case "MEMBERSHIP" -> {
                 db.one("SELECT id FROM departments WHERE id=? AND company_id=?",Db.required(c,"departmentId"),approver.company());

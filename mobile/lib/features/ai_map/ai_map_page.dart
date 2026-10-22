@@ -7,12 +7,11 @@ import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
-import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
-import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'server_ai_page.dart';
+import 'workbench_page.dart';
 
 class AiActionDraft {
   const AiActionDraft(
@@ -45,13 +44,22 @@ final aiActionDraftsProvider =
       ],
     );
 
-class AiPage extends ConsumerStatefulWidget {
+class AiPage extends ConsumerWidget {
   const AiPage({super.key});
   @override
-  ConsumerState<AiPage> createState() => _AiPageState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider);
+    return WorkbenchPage(key: ValueKey('${session.id}:${session.token}'));
+  }
 }
 
-class _AiPageState extends ConsumerState<AiPage> {
+class LegacyDirectionPage extends ConsumerStatefulWidget {
+  const LegacyDirectionPage({super.key});
+  @override
+  ConsumerState<LegacyDirectionPage> createState() => _AiPageState();
+}
+
+class _AiPageState extends ConsumerState<LegacyDirectionPage> {
   int tab = 0;
   bool company = false;
   final scroll = ScrollController();
@@ -232,13 +240,6 @@ class _AiPageState extends ConsumerState<AiPage> {
         AppConfig.mock && user.active && scenario == DemoScenario.normal
         ? ref.watch(recordsProvider('ai-maps'))
         : const AsyncValue<PageResult>.data(PageResult([]));
-    final scope = !company
-        ? '个人发展'
-        : switch (user.role) {
-            UserRole.admin || UserRole.founder => '公司走向',
-            UserRole.director => '部门走向',
-            _ => '团队走向',
-          };
     Widget content;
     if (!AppConfig.mock) {
       content = const EmptyIllustration(
@@ -277,175 +278,6 @@ class _AiPageState extends ConsumerState<AiPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SunnyWelcome(
-                pose: BuddyPose.explaining,
-                title: '把下一步想清楚',
-                subtitle: '先看建议，再核对来源',
-                color: Color(0xFFF1E7FF),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                page.items.length >= 3 ? '今天优先处理的三件事' : '建议先处理',
-                style: const TextStyle(
-                  fontFamily: AppTypography.displayFamily,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${AppConfig.mock ? '预设演示 · ' : ''}${_generated(page.items.first)} · $scope',
-                style: const TextStyle(fontSize: 12, color: CuteTokens.muted),
-              ),
-              const SizedBox(height: 12),
-              for (final (i, item) in page.items.take(3).indexed)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: PaperSurface(
-                    skin: TuantuanAssets.surfaces[['warm', 'blue', 'warm'][i]],
-                    color: [
-                      SunnyPalette.orange,
-                      SunnyPalette.blue,
-                      SunnyPalette.primaryContainer,
-                    ][i],
-                    texture: TuantuanAssets
-                        .textures[['warmSparkle', 'paper', 'warmSparkle'][i]],
-                    cornerDecoration:
-                        TuantuanAssets.cardCorners[['warm', 'blue', 'warm'][i]],
-                    onTap: () => openSources(item),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              TuantuanArt(
-                                TuantuanAssets.aiAssets[[
-                                  'priority',
-                                  'sources',
-                                  'confirm',
-                                ][i]]!,
-                              ),
-                              Align(
-                                alignment: Alignment.bottomRight,
-                                child: CircleAvatar(
-                                  radius: 9,
-                                  backgroundColor: [
-                                    const Color(0xFFFFE5D2),
-                                    CuteTokens.blue,
-                                    SunnyPalette.primaryContainer,
-                                  ][i],
-                                  child: Text(
-                                    '${i + 1}',
-                                    style: const TextStyle(
-                                      color: CuteTokens.ink,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${item.fields['body'] ?? item.subtitle}',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: CuteTokens.muted,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '来源 ${_sourcePaths(item).length} 条 · 点击查看',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF7746A5),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 4,
-                children: [
-                  for (final (i, label) in ['发展分析', '堵点风险', '行动规划'].indexed)
-                    TextButton(
-                      onPressed: () => setState(() => tab = i),
-                      style: TextButton.styleFrom(
-                        foregroundColor: tab == i
-                            ? const Color(0xFFA7460E)
-                            : CuteTokens.muted,
-                      ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: tab == i
-                              ? FontWeight.w700
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              PaperSurface(
-                skin: TuantuanAssets.metric,
-                color: const Color(0xFFFFF0DA),
-                onTap: () => context.push('/ai/graph'),
-                child: const Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '打开工作关系图',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            '目标、来源与行动的连接',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: CuteTokens.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    TuantuanArt(
-                      '${TuantuanAssets.newPack}/ai/relation_map.png',
-                      width: 50,
-                      height: 50,
-                    ),
-                    Icon(Icons.chevron_right, size: 18),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
               if (tab == 0) ...[
                 const Text(
                   '方向分析 · 待验证',
@@ -539,49 +371,27 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
     return PageFrame(
       title: 'AI地图',
-      showTitle: false,
+      bottom: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: SunnyPrimaryButton.icon(
+          onPressed: user.active && scenario != DemoScenario.forbidden
+              ? () {
+                  ref.invalidate(recordsProvider('ai-maps'));
+                  notice(context, '已更新演示分析，未调用真实 AI 服务');
+                }
+              : null,
+          icon: const Icon(Icons.auto_awesome_outlined),
+          label: const Text('开始分析'),
+        ),
+      ),
       child: PageBody(
         controller: scroll,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    TuantuanFilterChip(
-                      label: const Text('个人发展'),
-                      selected: !company,
-                      onSelected: (_) => setState(() => company = false),
-                    ),
-                    if (user.manager)
-                      TuantuanFilterChip(
-                        label: Text(switch (user.role) {
-                          UserRole.admin || UserRole.founder => '公司走向',
-                          UserRole.director => '部门走向',
-                          _ => '团队走向',
-                        }),
-                        selected: company,
-                        onSelected: (_) => setState(() => company = true),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: () => context.push('/ai-usage'),
-                style: TextButton.styleFrom(
-                  backgroundColor: SunnyPalette.orange,
-                ),
-                icon: const Icon(Icons.edit_note_rounded, size: 18),
-                label: const Text(
-                  '建议草稿',
-                  style: TextStyle(color: SunnyPalette.ink, fontSize: 12),
-                ),
-              ),
-            ],
+          PillTabs(
+            labels: const ['发展分析', '堵点风险', '行动规划'],
+            wrapLabels: true,
+            selected: tab,
+            onChanged: (value) => setState(() => tab = value),
           ),
           const SizedBox(height: 16),
           content,

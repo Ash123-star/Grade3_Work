@@ -158,6 +158,29 @@ void main() {
   });
   Matcher failure(FailureKind kind) =>
       isA<ApiFailure>().having((f) => f.kind, 'kind', kind);
+  test('file errors explain the repair and hide raw parser diagnostics', () {
+    for (final entry in {
+      'UNSUPPORTED_FILE': (415, '请添加PNG、JPEG、PDF、Word或Excel文件'),
+      'FILE_TYPE_MISMATCH': (415, '文件格式与名称不一致，请重新导出后添加'),
+      'FILE_LIMIT': (400, '材料超出处理范围，请缩小或拆分后重试'),
+      'FILE_TOO_LARGE': (413, '材料超出处理范围，请缩小或拆分后重试'),
+      'FILE_ENCRYPTED': (422, '请先解除文件加密，再添加材料'),
+    }.entries) {
+      final request = RequestOptions(path: '/attachments');
+      final error = ApiFailure.fromDio(
+        DioException(
+          requestOptions: request,
+          response: Response(
+            requestOptions: request,
+            statusCode: entry.value.$1,
+            data: {'code': entry.key, 'message': 'raw parser diagnostics'},
+          ),
+        ),
+      );
+      expect(error.kind, FailureKind.validation);
+      expect(error.message, entry.value.$2);
+    }
+  });
   test(
     'multipart sends exact bytes, receives actual metadata and rejects invalid files or response',
     () async {
@@ -195,6 +218,16 @@ void main() {
         repo.uploadAttachment(SelectedAttachment('x', Uint8List.fromList([1]))),
         throwsA(failure(FailureKind.forbidden)),
       );
+    },
+  );
+  test(
+    'AI material upload declares its purpose and keeps ordinary uploads compatible',
+    () async {
+      await repo.uploadAttachment(
+        SelectedAttachment('材料.pdf', Uint8List.fromList([1])),
+        aiWork: true,
+      );
+      expect(adapter.requests.single.queryParameters, {'purpose': 'AI_WORK'});
     },
   );
   test(

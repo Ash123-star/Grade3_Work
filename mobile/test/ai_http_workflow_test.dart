@@ -25,6 +25,7 @@ import 'package:pandora_mobile/data/repositories/repository.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_tools.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/config.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 
 HttpRepository buildHttp(Session user, AiAdapter adapter) {
   final repository = HttpRepository('http://localhost/api', user.token);
@@ -603,7 +604,16 @@ void main() {
     'formal AI generation displays sourced priorities after final GET, no task mutation',
     (t) async {
       await home(t);
-      await tapVisible(t, find.text('生成分析草稿'));
+      expect(find.text('发展分析'), findsOneWidget);
+      expect(find.text('堵点风险'), findsOneWidget);
+      expect(find.text('行动规划'), findsOneWidget);
+      expect(find.text('把下一步想清楚'), findsNothing);
+      expect(find.textContaining('点击开始分析，基于已有任务'), findsNothing);
+      expect(
+        t.getTopLeft(find.text('开始分析')).dy,
+        greaterThan(t.getTopLeft(find.text('发展分析')).dy),
+      );
+      await tapVisible(t, find.text('开始分析'));
       await settle(t);
       t
           .state<ScrollableState>(find.byType(Scrollable).first)
@@ -611,12 +621,18 @@ void main() {
           .jumpTo(0);
       await t.pumpAndSettle();
       await t.scrollUntilVisible(
-        find.text('今天优先处理的三件事'),
+        find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'),
         100,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('今天优先处理的三件事'), findsOneWidget);
-      expect(find.text('先核对发布依赖'), findsOneWidget);
+      expect(find.text('今天优先处理的三件事'), findsNothing);
+      expect(find.text('打开工作关系图'), findsNothing);
+      expect(find.byTooltip('长期记忆与发展分析'), findsNothing);
+      expect(find.text('用量'), findsNothing);
+      expect(find.text('建议草稿'), findsNothing);
+      expect(find.text('本人及授权公司范围'), findsNothing);
+      expect(find.byIcon(Icons.tune), findsNothing);
+      expect(find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'), findsOneWidget);
       expect(adapter.requests.any((r) => r.path.endsWith('/stream')), isTrue);
       expect(
         adapter.requests
@@ -628,6 +644,8 @@ void main() {
         adapter.requests.where((r) => r.path.endsWith('/confirm-task')),
         isEmpty,
       );
+      await tapVisible(t, find.text('行动规划'));
+      expect(find.text('先核对发布依赖'), findsOneWidget);
       await tapVisible(t, find.text('堵点风险'));
       expect(find.textContaining('1 个任务已逾期'), findsOneWidget);
       expect(find.text('AI风险推测 · 需核实实际影响'), findsOneWidget);
@@ -639,17 +657,17 @@ void main() {
     (t) async {
       await home(t, latest: 'job');
       adapter.createStatus = 503;
-      await tapVisible(t, find.text('生成分析草稿'));
+      await tapVisible(t, find.text('开始分析'));
       t
           .state<ScrollableState>(find.byType(Scrollable).first)
           .position
           .jumpTo(0);
       await t.pumpAndSettle();
       expect(find.textContaining('企业AI服务尚未配置'), findsOneWidget);
-      expect(find.text('先核对发布依赖'), findsOneWidget);
+      expect(find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'), findsOneWidget);
       adapter.createStatus = 429;
       adapter.failureCode = 'AI_BUDGET';
-      await tapVisible(t, find.text('生成分析草稿'));
+      await tapVisible(t, find.text('开始分析'));
       t
           .state<ScrollableState>(find.byType(Scrollable).first)
           .position
@@ -658,7 +676,7 @@ void main() {
       expect(find.textContaining('今日AI预算不足'), findsOneWidget);
       adapter.createStatus = 200;
       adapter.afterStream = 'FAILED';
-      await tapVisible(t, find.text('生成分析草稿'));
+      await tapVisible(t, find.text('开始分析'));
       await settle(t);
       t
           .state<ScrollableState>(find.byType(Scrollable).first)
@@ -666,7 +684,7 @@ void main() {
           .jumpTo(0);
       await t.pumpAndSettle();
       expect(find.textContaining('生成未完成'), findsOneWidget);
-      expect(find.text('先核对发布依赖'), findsOneWidget);
+      expect(find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'), findsOneWidget);
       expect(find.textContaining('上一次完成'), findsOneWidget);
       expect(adapter.requests.where((r) => r.path.endsWith('/retry')), isEmpty);
       await tapVisible(t, find.text('重试生成'));
@@ -682,7 +700,7 @@ void main() {
     (t) async {
       adapter.heldStream = StreamController<Uint8List>();
       final c = await home(t);
-      await tapVisible(t, find.text('生成分析草稿'));
+      await tapVisible(t, find.text('开始分析'));
       expect(find.textContaining('等待生成'), findsOneWidget);
       final streaming = adapter.requests.lastWhere(
         (r) => r.path.endsWith('/stream'),
@@ -707,11 +725,12 @@ void main() {
     '403 refresh clears previously rendered output and disables protected actions',
     (t) async {
       await home(t, latest: 'job');
-      expect(find.text('先核对发布依赖'), findsOneWidget);
+      expect(find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'), findsOneWidget);
       adapter.getStatus = 403;
-      await t.tap(find.byTooltip('刷新分析'));
+      adapter.createStatus = 403;
+      await tapVisible(t, find.text('开始分析'));
       await settle(t);
-      expect(find.text('先核对发布依赖'), findsNothing);
+      expect(find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'), findsNothing);
       expect(find.textContaining('访问已停止'), findsOneWidget);
       await close(t);
     },
@@ -927,7 +946,7 @@ void main() {
       expect(request.cancelToken!.isCancelled, isTrue);
       adapter.heldGet!.complete();
       await settle(t);
-      expect(find.text('先核对发布依赖'), findsNothing);
+      expect(find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'), findsNothing);
       expect(find.textContaining('访问已停止'), findsOneWidget);
       await close(t);
     },
@@ -950,11 +969,11 @@ void main() {
         1,
       );
       await t.scrollUntilVisible(
-        find.text('今天优先处理的三件事'),
+        find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'),
         100,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('先核对发布依赖'), findsOneWidget);
+      expect(find.text('来源显示发布依赖仍需确认，影响范围需要人工核实。'), findsOneWidget);
       await close(t);
     },
   );
@@ -1047,6 +1066,15 @@ void main() {
         ),
       );
     await font.load();
+    final displayFont = FontLoader(AppTypography.displayFamily)
+      ..addFont(
+        Future.value(
+          ByteData.sublistView(
+            File('assets/fonts/GenSenRoundedTW-B.ttf').readAsBytesSync(),
+          ),
+        ),
+      );
+    await displayFont.load();
     final icons = FontLoader('MaterialIcons')
       ..addFont(
         Future.value(

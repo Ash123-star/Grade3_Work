@@ -10,6 +10,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import java.net.*;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.ai-timeout-seconds=2", "app.memory-extract-enabled=false"
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class BackendIntegrationTest {
     @LocalServerPort int port;
