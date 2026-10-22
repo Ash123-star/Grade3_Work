@@ -85,7 +85,7 @@
 - [x] 10.4 配置独立入口/写入/OCR开关、限流预算、材料保留与清理任务，演练删除/备份恢复失效重放及停止在途执行；不把私有事项删除传播到正式交付
 - [x] 10.5 更新SpringDoc、`docs/openapi.json`、后端接口、OCR部署/许可/配置示例、迁移回滚和当前产品基线文档，示例不含真实密钥或个人数据
 - [x] 10.6 在当前批准批次实现完后统一运行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1`（资源不足用-DockerMaven）、Flutter analyze/test/APK构建和 `openspec.cmd validate --all --strict`；保存环境、完整命令、退出码、实际链路证据及限制
-- [ ] 10.7 检查本次差异和混合工作区，按仓库规范完成独立提交、工作分支推送和PR；附Issue、验收步骤/截图、迁移、风险及回滚，认证/混合改动阻塞必须如实记录
+- [x] 10.7 检查本次差异和混合工作区，按仓库规范完成独立提交、工作分支推送和PR；附Issue、验收步骤/截图、迁移、风险及回滚，认证/混合改动阻塞必须如实记录
 
 ## 11. Web新工作台（Should/P1，U3）
 

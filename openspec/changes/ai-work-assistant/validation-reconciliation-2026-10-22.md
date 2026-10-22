@@ -38,4 +38,4 @@ GitHub 公开 API 确认 main=dc00e2b、当时无开放 PR。初次 Git HTTPS �
 
 真实 Chrome 管理员登录、新办事台及任务审计导航通过，`live-web.log/.exit=0`；模拟器 emulator-5554 打开现有实际 API 版 App 成功。客户端生产代码与上一批已构建/安装 APK 一致，本次仅修改通知测试，不重复构建 APK，不把启动等同真机性能/完整交付验收。
 
-本地提交：后端与迁移 `5847b47`，界面与续办 `92e6600`，均已推送 `origin/codex/ai-work-assistant`，`push.exit=0`。用于审阅的真实模拟器截图（合成测试数据）为 `docs/images/ai-workbench-reconciled.png`；工作区安全备份和 stash 保留。草稿 PR 创建结果另补，未合并 main。
+本地提交：后端与迁移 `5847b47`，界面与续办 `92e6600`，均已推送 `origin/codex/ai-work-assistant`，`push.exit=0`。用于审阅的真实模拟器截图（合成测试数据）为 `docs/images/ai-workbench-reconciled.png`；工作区安全备份和 stash 保留。已创建 [草稿 PR #25](https://github.com/Ash123-star/Grade3_Work/pull/25)，`github-pr.exit=0`，附 #24、迁移、风险与验收步骤；未合并 main。后续文档提交曾遇 TLS EOF，原始失败保留，同步结果以远程 head 核对为准。
