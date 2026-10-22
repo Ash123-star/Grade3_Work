@@ -253,10 +253,12 @@ class PillTabs extends StatelessWidget {
     required this.labels,
     required this.selected,
     required this.onChanged,
+    this.wrapLabels = false,
   });
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onChanged;
+  final bool wrapLabels;
   @override
   Widget build(BuildContext context) => PaperSurface(
     color: const Color(0xFFFFF5C8),
@@ -307,7 +309,9 @@ class PillTabs extends StatelessWidget {
                                   child: Text(
                                     label,
                                     textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
+                                    overflow: wrapLabels
+                                        ? TextOverflow.visible
+                                        : TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       color: index == selected

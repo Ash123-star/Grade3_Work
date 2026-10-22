@@ -700,6 +700,59 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     if (mounted) setState(() => busy = false);
   }
 
+  Future<void> withdrawLog(Record item) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('撤回日志'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 300,
+          decoration: const InputDecoration(labelText: '撤回原因'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                Navigator.pop(dialog, controller.text.trim());
+              }
+            },
+            child: const Text('撤回'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || !mounted) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await ref
+          .read(repositoryProvider)
+          .execute(
+            'logs',
+            Command('withdraw', {
+              'id': item.id,
+              'reason': reason,
+            }, version: item.version),
+          );
+      refreshBusiness(ref);
+      if (mounted) notice(context, '日志已撤回，可以继续编辑');
+    } catch (failure) {
+      refreshBusiness(ref);
+      if (mounted) setState(() => error = '$failure');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   void edit(Record item, String kind) {
     if (kind == 'log-revise') {
       ref.read(logDateProvider.notifier).state =
@@ -949,6 +1002,17 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ),
                 ),
                 section('任务说明', f['任务内容'] ?? f['content'] ?? f['body']),
+                if (!AppConfig.mock && ['进行中', '需补充', '待验收'].contains(status))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push(
+                        '/tasks/${encode(item.id)}/delivery-check?version=${item.version}',
+                      ),
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: const Text('检查交付材料'),
+                    ),
+                  ),
                 if ((f['attachments'] as List? ?? []).isNotEmpty) ...[
                   const SectionHeader('任务附件'),
                   for (final id
@@ -1153,6 +1217,15 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ),
               ]);
             } else if (resource.startsWith('logs')) {
+              if (f['canWithdraw'] == true) {
+                actions.add(
+                  IconButton(
+                    tooltip: '撤回日志',
+                    onPressed: busy ? null : () => withdrawLog(item),
+                    icon: const Icon(Icons.undo),
+                  ),
+                );
+              }
               actions.add(
                 IconButton(
                   tooltip: '历史修订与已读',
@@ -1160,14 +1233,14 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   icon: const Icon(Icons.history),
                 ),
               );
-              if (item.ownerId == user.id) {
+              if (item.ownerId == user.id && f['canEdit'] != false) {
                 final isDraft = f['status'] == '草稿';
                 bottom = button(
                   isDraft ? '继续编辑草稿' : '申请修订日志',
                   () => edit(item, isDraft ? 'log-edit' : 'log-revise'),
                 );
-              } else if (user.manager) {
-                bottom = button('添加评语', () => edit(item, 'comment'));
+              } else if (isSubmittedDiary(item)) {
+                bottom = button('添加评论', () => edit(item, 'comment'));
               }
               children.addAll([
                 Text(
@@ -1241,7 +1314,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     },
                   ),
                 ],
-                const SectionHeader('上级评语'),
+                const SectionHeader('日志评论'),
                 if (f['commentsError'] != null)
                   RecordFailure(
                     f['commentsError'] as Object,
@@ -1249,7 +1322,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ),
                 if (f['commentsError'] == null &&
                     (f['comments'] as List? ?? []).isEmpty)
-                  const Text('暂无评语', style: TextStyle(color: CuteTokens.muted)),
+                  const Text('暂无评论', style: TextStyle(color: CuteTokens.muted)),
                 for (final comment in (f['comments'] as List? ?? []))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1259,7 +1332,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                             children: [
                               Text('${comment['text'] ?? ''}'),
                               Text(
-                                '作者 ${comment['actorId'] ?? '未提供'} · ${comment['time'] ?? '时间未提供'}',
+                                '作者 ${comment['authorName'] ?? comment['actorId'] ?? '未提供'} · ${comment['time'] ?? '时间未提供'}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: CuteTokens.muted,
