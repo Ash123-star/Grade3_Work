@@ -62,7 +62,7 @@ public class WorkExecutor {
             int changed=tx.execute(status->{int total=0,updated;do{updated=db.update("UPDATE ai_work_steps dependent SET state='FAILED',error_code='DEPENDENCY_FAILED',result='{}'::jsonb,lease_until=NULL WHERE dependent.state IN ('PENDING','WAITING') AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(dependent.dependencies) dep(step_key) JOIN ai_work_steps predecessor ON predecessor.company_id=dependent.company_id AND predecessor.work_id=dependent.work_id AND predecessor.plan_version=dependent.plan_version AND predecessor.step_key=dep.step_key WHERE predecessor.state IN ('FAILED','CANCELLED','SKIPPED'))");total+=updated;}while(updated>0);return total;});
             if(changed==0)return;
             for(var row:db.rows("SELECT w.id,w.company_id,w.owner_id FROM ai_work_items w WHERE w.deleted_at IS NULL AND w.state NOT IN ('CANCELLED','CANCEL_REQUESTED','SUCCEEDED','FAILED','PARTIAL','RECONCILING') AND EXISTS(SELECT 1 FROM ai_work_steps s WHERE s.company_id=w.company_id AND s.work_id=w.id AND s.state='FAILED') AND NOT EXISTS(SELECT 1 FROM ai_work_steps s WHERE s.company_id=w.company_id AND s.work_id=w.id AND s.state IN ('PENDING','RUNNING','WAITING','UNKNOWN'))")){
-                tx.executeWithoutResult(status->{Actor actor=new Actor(Db.str(row,"owner_id"),Db.str(row,"company_id"),"","","",false,false,false,"ACTIVE");var item=repo.owned(actor,Db.str(row,"id"),true);if(Set.of("CANCELLED","CANCEL_REQUESTED","SUCCEEDED","FAILED","PARTIAL").contains(item.get("state")))return;
+                tx.executeWithoutResult(status->{lockOwnerForSettlement(Db.str(row,"company_id"),Db.str(row,"id"));Actor actor=new Actor(Db.str(row,"owner_id"),Db.str(row,"company_id"),"","","",false,false,false,"ACTIVE");var item=repo.owned(actor,Db.str(row,"id"),true);if(Set.of("CANCELLED","CANCEL_REQUESTED","SUCCEEDED","FAILED","PARTIAL").contains(item.get("state")))return;
                     long receipts=db.count("SELECT count(*) FROM ai_action_receipts WHERE company_id=? AND work_id=?",actor.company(),row.get("id"));repo.state(actor,Db.str(row,"id"),receipts>0?"PARTIAL":"FAILED",Map.of("summary","前置步骤未完成，已保留已办理内容","errorCode","DEPENDENCY_FAILED"));});
             }
         }catch(Exception e){org.slf4j.LoggerFactory.getLogger(getClass()).warn("AI dependency reconciliation failed: {}",e.getClass().getSimpleName());}
@@ -134,12 +134,17 @@ public class WorkExecutor {
         String state=failed>0?(receipts.isEmpty()?"FAILED":"PARTIAL"):receipts.stream().anyMatch(r->"WAITING_REVIEW".equals(r.get("kind")))?"WAITING_REVIEW":receipts.stream().anyMatch(r->"NEEDS_MATERIAL".equals(r.get("kind")))?"WAITING_INPUT":"SUCCEEDED";
         repo.state(a,id,state,result);
     }
-    private void fail(Map<String,Object> step,Exception error){try{tx.executeWithoutResult(s->{var w=db.rows("SELECT * FROM ai_work_items WHERE company_id=? AND id=? AND deleted_at IS NULL FOR UPDATE",step.get("company_id"),step.get("work_id"));if(w.isEmpty())return;var row=w.getFirst();if(Set.of("CANCELLED","CANCEL_REQUESTED").contains(row.get("state")))return;
+    private void fail(Map<String,Object> step,Exception error){try{tx.executeWithoutResult(s->{lockOwnerForSettlement(Db.str(step,"company_id"),Db.str(step,"work_id"));var w=db.rows("SELECT * FROM ai_work_items WHERE company_id=? AND id=? AND deleted_at IS NULL FOR UPDATE",step.get("company_id"),step.get("work_id"));if(w.isEmpty())return;var row=w.getFirst();if(Set.of("CANCELLED","CANCEL_REQUESTED").contains(row.get("state")))return;
         String code=error instanceof ApiError api?api.code:"WORK_FAILED";boolean retry=Set.of("AI_PROVIDER_FAILED","OCR_UNAVAILABLE").contains(code)&&((Number)step.get("attempts")).intValue()<3;
         boolean unknown=error instanceof org.springframework.transaction.TransactionException||error instanceof org.springframework.dao.DataAccessResourceFailureException||error instanceof org.springframework.dao.TransientDataAccessResourceException;
         int changed=db.update("UPDATE ai_work_steps SET state=?,error_code=?,next_run_at=now()+interval '10 seconds',lease_until=NULL WHERE id=? AND fence=? AND state='RUNNING'",unknown?"UNKNOWN":retry?"PENDING":"FAILED",code,step.get("id"),step.get("fence"));if(changed==0)return;
         Actor a=new Actor(Db.str(row,"owner_id"),Db.str(row,"company_id"),"","","",false,false,false,"ACTIVE");long succeeded=db.count("SELECT count(*) FROM ai_action_receipts WHERE company_id=? AND work_id=?",a.company(),row.get("id"));repo.state(a,Db.str(row,"id"),unknown?"RECONCILING":retry?"QUEUED":succeeded>0?"PARTIAL":"FAILED",Map.of("summary",unknown?"正在核对办理结果，请稍候":failureMessage(code),"errorCode",code));
     });}catch(Exception ignored){/* 数据库不可用时由租约恢复；不输出用户原文或供应商响应。 */}}
+    // Settlement must use the same user -> item -> step order as cancellation.
+    // Lock without requiring ACTIVE: revoked users still need failed work settled.
+    private void lockOwnerForSettlement(String company,String id){
+        db.rows("SELECT u.id FROM users u JOIN ai_work_items w ON w.company_id=u.company_id AND w.owner_id=u.id WHERE w.company_id=? AND w.id=? FOR UPDATE OF u",company,id);
+    }
     private static String failureMessage(String code){return switch(code){
         case "INVALID_TRANSITION"->"任务当前还不能提交反馈，请先查看任务进展";
         case "FORBIDDEN"->"你目前没有办理这项操作的权限，材料已保留";
