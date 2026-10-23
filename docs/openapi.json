@@ -12,6 +12,115 @@
     "bearer" : [ ]
   } ],
   "paths" : {
+    "/api/task-labels/{id}" : {
+      "put" : {
+        "tags" : [ "task-label-controller" ],
+        "operationId" : "update",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TaskLabel"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/profiles/me" : {
       "put" : {
         "tags" : [ "dashboard-controller" ],
@@ -701,7 +810,7 @@
     "/api/tasks" : {
       "get" : {
         "tags" : [ "task-controller" ],
-        "description" : "在服务端组织数据范围内分页查询任务。列表项仅为 TaskListItem，永不返回阶段、完成情况、进度、正文或事件；ownerId 越权返回 403，其他公司 ownerId 返回 404。",
+        "description" : "在服务端组织数据范围内分页查询已生效任务。列表项仅为 TaskListItem，永不返回负责人、协作人、阶段、完成情况、进度、正文或事件。",
         "operationId" : "list",
         "parameters" : [ {
           "name" : "cursor",
@@ -730,7 +839,7 @@
             "default" : ""
           }
         }, {
-          "name" : "ownerId",
+          "name" : "participantId",
           "in" : "query",
           "required" : false,
           "schema" : {
@@ -840,7 +949,7 @@
       },
       "post" : {
         "tags" : [ "task-dispatch-controller" ],
-        "description" : "派发任务。同一派发人同一 Idempotency-Key 重放相同内容返回同一任务，内容不同返回 409 IDEMPOTENCY_CONFLICT；附件已关联其他任务返回 409 ATTACHMENT_BOUND；服务端字段返回 400 SERVER_MANAGED_FIELD。",
+        "description" : "提交任务创建审核。同一派发人同一 Idempotency-Key 重放相同内容返回同一审核申请，内容不同返回 409 IDEMPOTENCY_CONFLICT；审核批准前不是正式任务；附件已关联其他任务返回 409 ATTACHMENT_BOUND。",
         "operationId" : "dispatch",
         "parameters" : [ {
           "name" : "Idempotency-Key",
@@ -1193,6 +1302,220 @@
                 "additionalProperties" : {
                   "type" : "object"
                 }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{taskId}/comments" : {
+      "get" : {
+        "tags" : [ "task-comment-controller" ],
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "name" : "taskId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "task-comment-controller" ],
+        "description" : "公开任务评论与回复。要求 Idempotency-Key；空评论400、错误父评论400、重复键409、范围外任务404。评论、审计和 outbox 通知同一事务写入，评论不可编辑删除。",
+        "operationId" : "create",
+        "parameters" : [ {
+          "name" : "taskId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TaskComment"
               }
             }
           },
@@ -1724,6 +2047,306 @@
         }
       }
     },
+    "/api/tasks/{id}/deletions" : {
+      "post" : {
+        "tags" : [ "task-controller" ],
+        "description" : "提交任务删除审核申请。批准后仅归档，保留原任务摘要、申请、审核、理由和时间审计；不得物理删除。",
+        "operationId" : "deletion",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TaskDeletion"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/task-labels" : {
+      "get" : {
+        "tags" : [ "task-label-controller" ],
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "task-label-controller" ],
+        "operationId" : "create_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TaskLabel"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reviews/{id}/reroute" : {
       "post" : {
         "tags" : [ "review-controller" ],
@@ -1935,7 +2558,7 @@
     "/api/procedures" : {
       "get" : {
         "tags" : [ "procedure-controller" ],
-        "operationId" : "list_1",
+        "operationId" : "list_3",
         "parameters" : [ {
           "name" : "search",
           "in" : "query",
@@ -2059,7 +2682,7 @@
       },
       "post" : {
         "tags" : [ "procedure-controller" ],
-        "operationId" : "create",
+        "operationId" : "create_2",
         "parameters" : [ {
           "name" : "Idempotency-Key",
           "in" : "header",
@@ -4811,7 +5434,7 @@
     "/api/ai/work-items" : {
       "get" : {
         "tags" : [ "work-controller" ],
-        "operationId" : "list_2",
+        "operationId" : "list_4",
         "parameters" : [ {
           "name" : "cursor",
           "in" : "query",
@@ -4919,7 +5542,7 @@
       },
       "post" : {
         "tags" : [ "work-controller" ],
-        "operationId" : "create_1",
+        "operationId" : "create_3",
         "parameters" : [ {
           "name" : "Idempotency-Key",
           "in" : "header",
@@ -5830,7 +6453,7 @@
     "/api/ai/jobs" : {
       "post" : {
         "tags" : [ "ai-http-controller" ],
-        "operationId" : "create_2",
+        "operationId" : "create_4",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -6146,7 +6769,7 @@
     "/api/ai-memories" : {
       "get" : {
         "tags" : [ "memory-api" ],
-        "operationId" : "list_3",
+        "operationId" : "list_5",
         "parameters" : [ {
           "name" : "domain",
           "in" : "query",
@@ -6275,7 +6898,7 @@
       },
       "post" : {
         "tags" : [ "memory-api" ],
-        "operationId" : "create_3",
+        "operationId" : "create_5",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -7098,7 +7721,7 @@
     "/api/ai-maps/development/jobs" : {
       "post" : {
         "tags" : [ "development-api" ],
-        "operationId" : "create_4",
+        "operationId" : "create_6",
         "parameters" : [ {
           "name" : "Idempotency-Key",
           "in" : "header",
@@ -7626,7 +8249,7 @@
     "/api/reviews" : {
       "get" : {
         "tags" : [ "review-controller" ],
-        "operationId" : "list_4",
+        "operationId" : "list_6",
         "parameters" : [ {
           "name" : "cursor",
           "in" : "query",
@@ -8769,7 +9392,7 @@
     "/api/notifications" : {
       "get" : {
         "tags" : [ "notification-controller" ],
-        "operationId" : "list_5",
+        "operationId" : "list_7",
         "parameters" : [ {
           "name" : "cursor",
           "in" : "query",
@@ -8985,7 +9608,7 @@
       "get" : {
         "tags" : [ "log-controller" ],
         "description" : "分页查询本人草稿或组织范围内已提交日报。ownerId 其他公司返回 404，同公司范围外返回 403；非本人草稿永不返回。",
-        "operationId" : "list_6",
+        "operationId" : "list_8",
         "parameters" : [ {
           "name" : "cursor",
           "in" : "query",
@@ -17003,22 +17626,32 @@
       "TaskDraft" : {
         "type" : "object",
         "additionalProperties" : false,
-        "description" : "派发内容。phase、version、status、completion 等服务端字段不可提交（SERVER_MANAGED_FIELD）",
+        "description" : "创建返回审核申请，批准后才生成正式任务。参与人无主负责人/协作人语义；不接受 phase、status、completion、progress 等服务端字段。",
         "properties" : {
           "title" : {
             "type" : "string",
             "maxLength" : 200,
             "minLength" : 1
           },
-          "ownerId" : {
+          "participants" : {
+            "type" : "array",
+            "description" : "无角色、去重的任务参与人集合",
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 100,
+            "minItems" : 1,
+            "uniqueItems" : true
+          },
+          "startAt" : {
             "type" : "string",
-            "maxLength" : 20000,
-            "minLength" : 1
+            "format" : "date-time",
+            "description" : "可选，带时区 ISO8601 时间"
           },
           "deadline" : {
             "type" : "string",
             "format" : "date-time",
-            "description" : "含时区的 ISO8601 时间"
+            "description" : "带时区的 ISO8601 时间，精确到分钟"
           },
           "urgency" : {
             "type" : "string",
@@ -17033,18 +17666,9 @@
             "type" : "string",
             "maxLength" : 20000
           },
-          "progressNote" : {
+          "labelId" : {
             "type" : "string",
             "maxLength" : 20000
-          },
-          "collaborators" : {
-            "type" : "array",
-            "description" : "去重排序后参与幂等摘要；与主负责人重复时忽略",
-            "items" : {
-              "type" : "string"
-            },
-            "maxItems" : 100,
-            "uniqueItems" : true
           },
           "attachments" : {
             "type" : "array",
@@ -17056,18 +17680,67 @@
             "uniqueItems" : true
           }
         },
-        "required" : [ "deadline", "ownerId", "title" ]
+        "required" : [ "deadline", "participants", "title" ]
       },
-      "TaskListItem" : {
+      "TaskParticipant" : {
         "type" : "object",
         "additionalProperties" : false,
-        "description" : "任务列表安全投影；不返回 phase、status、completion、progress、正文、事件或任何替代状态字段。",
         "properties" : {
           "id" : {
             "type" : "string",
             "maxLength" : 20000
           },
-          "owner_id" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 20000
+          },
+          "avatar_id" : {
+            "type" : "string",
+            "maxLength" : 20000
+          }
+        },
+        "required" : [ "id", "name" ]
+      },
+      "TaskLabel" : {
+        "type" : "object",
+        "additionalProperties" : false,
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 1
+          },
+          "category" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 1
+          },
+          "color" : {
+            "type" : "string",
+            "pattern" : "^#[0-9a-fA-F]{6}$"
+          },
+          "departmentId" : {
+            "type" : "string",
+            "maxLength" : 20000
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "ACTIVE", "DISABLED" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "category", "color", "name" ]
+      },
+      "TaskListItem" : {
+        "type" : "object",
+        "additionalProperties" : false,
+        "description" : "任务列表安全投影；不返回 owner、collaborator、phase、status、completion、progress、正文、事件或任何替代状态字段。",
+        "properties" : {
+          "id" : {
             "type" : "string",
             "maxLength" : 20000
           },
@@ -17079,9 +17752,22 @@
             "type" : "string",
             "maxLength" : 20000
           },
+          "start_at" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
           "deadline" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "participants" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TaskParticipant"
+            }
+          },
+          "label" : {
+            "$ref" : "#/components/schemas/TaskLabel"
           },
           "version" : {
             "type" : "integer",
@@ -17093,7 +17779,7 @@
             "format" : "date-time"
           }
         },
-        "required" : [ "created_at", "deadline", "id", "issuer_id", "owner_id", "title", "version" ]
+        "required" : [ "created_at", "deadline", "id", "issuer_id", "title", "version" ]
       },
       "TaskRevision" : {
         "type" : "object",
@@ -17179,6 +17865,40 @@
           }
         },
         "required" : [ "deadline", "reason", "version" ]
+      },
+      "TaskDeletion" : {
+        "type" : "object",
+        "additionalProperties" : false,
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "reason" : {
+            "type" : "string",
+            "maxLength" : 20000,
+            "minLength" : 1
+          }
+        },
+        "required" : [ "reason", "version" ]
+      },
+      "TaskComment" : {
+        "type" : "object",
+        "additionalProperties" : false,
+        "properties" : {
+          "text" : {
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 1
+          },
+          "parentId" : {
+            "type" : "string",
+            "maxLength" : 20000,
+            "minLength" : 1
+          }
+        },
+        "required" : [ "text" ]
       },
       "LogContent" : {
         "type" : "object",
@@ -17371,10 +18091,10 @@
           "aiWorkSubmitAuthorization" : {
             "type" : "boolean"
           },
-          "aiWorkAuthorizationMaxObjects" : {
+          "aiWorkAuthorizationMaxActions" : {
             "type" : "integer",
             "format" : "int32",
-            "maximum" : 100,
+            "maximum" : 5,
             "minimum" : 1
           },
           "aiWorkAuthorizationMaxDays" : {
@@ -17383,10 +18103,10 @@
             "maximum" : 30,
             "minimum" : 1
           },
-          "aiWorkAuthorizationMaxActions" : {
+          "aiWorkAuthorizationMaxObjects" : {
             "type" : "integer",
             "format" : "int32",
-            "maximum" : 5,
+            "maximum" : 100,
             "minimum" : 1
           }
         },
