@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/log_edit_window.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'catalog.dart';
 import 'form_page.dart';
@@ -266,7 +268,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                 children: [
                   for (final value
                       in resource == 'notifications'
-                          ? ['全部', '任务', '审批', '日志', '截止提醒', '审核结果']
+                          ? ['全部', '任务', '审批', '评论', '待阅提醒', '截止提醒', '审核结果']
                           : resource == 'reviews'
                           ? ['全部', '待审', '已通过', '已驳回']
                           : ['全部', '日志', '任务', '组织'])
@@ -638,6 +640,26 @@ class DetailPage extends ConsumerStatefulWidget {
 }
 
 class _DetailPageState extends ConsumerState<DetailPage> {
+  Timer? logDeadlineTimer;
+  DateTime? scheduledLogDeadline;
+  void scheduleLogDeadline(Record item) {
+    final deadline = LogEditWindow(item).until;
+    if (deadline == scheduledLogDeadline) return;
+    scheduledLogDeadline = deadline;
+    logDeadlineTimer?.cancel();
+    if (deadline != null && deadline.isAfter(DateTime.now())) {
+      logDeadlineTimer = Timer(deadline.difference(DateTime.now()), () {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    logDeadlineTimer?.cancel();
+    super.dispose();
+  }
+
   bool busy = false;
   String? error;
   late final Session initialLogIdentity = ref.read(sessionProvider);
@@ -1160,7 +1182,9 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   icon: const Icon(Icons.history),
                 ),
               );
-              if (item.ownerId == user.id) {
+              scheduleLogDeadline(item);
+              if (item.ownerId == user.id &&
+                  LogEditWindow(item).canEditAt(DateTime.now())) {
                 final isDraft = f['status'] == '草稿';
                 bottom = button(
                   isDraft ? '继续编辑草稿' : '申请修订日志',
@@ -1187,6 +1211,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       : '提交状态未确认'} v${item.version}',
                   style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                 ),
+                if (f['editableUntil'] != null)
+                  Text('可申请修订至 ${prettyDate(f['editableUntil'])}'),
                 if (isSubmittedDiary(item) &&
                     businessEventTime(f['submittedAt']) != null)
                   Padding(

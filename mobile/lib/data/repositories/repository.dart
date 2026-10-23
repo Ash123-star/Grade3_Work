@@ -250,6 +250,8 @@ class HttpRepository implements Repository {
   Map<String, dynamic> _query(Query query) => {
     if (query.cursor != null) 'cursor': query.cursor,
     if (query.ownerId != null) 'ownerId': query.ownerId,
+    if (query.departmentId != null && query.departmentId!.isNotEmpty)
+      'departmentId': query.departmentId,
     'limit': 30,
     if (query.search.isNotEmpty) 'search': query.search,
     if (query.from != null) 'date': _date(query),
@@ -297,7 +299,13 @@ class HttpRepository implements Repository {
       }
       fields['姓名'] = raw['name'];
     }
-    if (raw['department'] != null) fields['departmentName'] = raw['department'];
+    if (raw['department'] is Map) {
+      fields['departmentId'] = raw['department']['id'];
+      fields['departmentName'] = raw['department']['name'];
+    } else if (raw['department'] != null) {
+      fields['departmentName'] = raw['department'];
+    }
+    if (raw['author'] is Map) fields['authorName'] = raw['author']['name'];
     if (raw['kind'] != null && raw['target_id'] != null) {
       fields['targetId'] = raw['target_id'];
       fields['targetResource'] = switch (raw['kind']) {
@@ -426,7 +434,8 @@ class HttpRepository implements Repository {
       fields['type'] = switch (raw['type']) {
         'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' => '任务',
         'DEADLINE' => '截止提醒',
-        'LOG_SUBMITTED' || 'LOG_COMMENT' => '日志',
+        'LOG_SUBMITTED' => '待阅提醒',
+        'LOG_COMMENT' || 'TASK_COMMENT' => '评论',
         'REVIEW_PENDING' => '审批',
         'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
         _ => '${raw['type'] ?? '消息'}',
@@ -435,6 +444,7 @@ class HttpRepository implements Repository {
         'TASK_ASSIGNED' ||
         'TASK_EVENT' ||
         'TASK_REVISED' ||
+        'TASK_COMMENT' ||
         'DEADLINE' => 'tasks',
         'LOG_SUBMITTED' || 'LOG_COMMENT' => 'logs',
         'REVIEW_PENDING' || 'REVIEW_APPROVED' || 'REVIEW_REJECTED' => 'reviews',
@@ -649,8 +659,12 @@ class HttpRepository implements Repository {
   ) {
     if (kind == 'comments') {
       return {
+        ...raw,
         'text': raw['text'] ?? '',
         'actorId': raw['actor_id'],
+        'authorName': raw['author_name'],
+        'parentCommentId': raw['parent_id'],
+        'parentId': raw['parent_id'],
         'time': raw['created_at'],
       };
     }
@@ -686,6 +700,19 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _taskDraft(Command command) {
     final v = _values(command);
+    if ([
+      'startAt',
+      'participantIds',
+      'tagId',
+      '参与人',
+      '标签',
+    ].any(v.containsKey)) {
+      throw const ApiFailure(
+        FailureKind.unavailable,
+        '当前服务端尚未支持开始时间、多人参与人或标签，请等待任务接口升级',
+        code: 'CLIENT_CONTRACT_UNAVAILABLE',
+      );
+    }
     return {
       'title': v['title'] ?? v['任务名称'],
       'ownerId': v['ownerId'],
@@ -724,6 +751,13 @@ class HttpRepository implements Repository {
   Future<Record> execute(String resource, Command command) async {
     try {
       final v = {...command.values};
+      if (resource == 'tasks/comments') {
+        throw const ApiFailure(
+          FailureKind.unavailable,
+          '当前服务端尚未提供任务评论接口',
+          code: 'CLIENT_CONTRACT_UNAVAILABLE',
+        );
+      }
       if (resource == 'auth') {
         final body = switch (command.action) {
           'login' => {'account': v['账号'], 'password': v['密码']},
@@ -825,6 +859,21 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'logs') {
+        if (command.action == 'withdraw') {
+          if (command.version == null) {
+            throw const ApiFailure(FailureKind.validation, '请刷新日志后再撤回');
+          }
+          return await _postRecord(
+            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
+            {
+              'version': command.version,
+              'reason': v['reason'] ?? v['撤回原因'] ?? '',
+            },
+          );
+        }
+        if (['edit', 'update', 'delete'].contains(command.action)) {
+          throw const ApiFailure(FailureKind.unavailable, '已提交日志需要申请审核修订');
+        }
         if (command.action == 'read') {
           final id = _commandId(command);
           final response = await dio.post<dynamic>(
@@ -884,7 +933,11 @@ class HttpRepository implements Repository {
       if (resource == 'logs/comments') {
         return await _postRecord(
           '/logs/${Uri.encodeComponent(_commandId(command))}/comments',
-          {'text': v['评语'] ?? v['text']},
+          {
+            'text': v['评语'] ?? v['text'],
+            if (v['parentId'] != null || v['parentCommentId'] != null)
+              'parentId': v['parentId'] ?? v['parentCommentId'],
+          },
         );
       }
       if (resource == 'reviews') {

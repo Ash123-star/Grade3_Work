@@ -130,17 +130,19 @@ class Query {
     this.search = '',
     this.cursor,
     this.ownerId,
+    this.departmentId,
     this.from,
     this.to,
   });
   final String search;
-  final String? cursor, ownerId;
+  final String? cursor, ownerId, departmentId;
   final DateTime? from, to;
   Map<String, dynamic> toJson() => {
     'search': search,
     'limit': 30,
     if (cursor != null) 'cursor': cursor,
     if (ownerId != null) 'ownerId': ownerId,
+    if (departmentId != null) 'departmentId': departmentId,
     if (from != null) 'from': from!.toUtc().toIso8601String(),
     if (to != null) 'to': to!.toUtc().toIso8601String(),
   };

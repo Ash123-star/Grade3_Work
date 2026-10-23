@@ -52,6 +52,8 @@ class ApiFailure implements Exception {
       'ACCOUNT_DISABLED' => '账号已停用，请联系管理员',
       'PASSWORD_UNCHANGED' => '新密码需与原密码不同',
       'PASSWORD_POLICY' => '密码至少12个字符，UTF-8编码不超过72字节',
+      'LOG_EDIT_WINDOW_EXPIRED' => '日报首次提交已满24小时，不能再修改或撤回',
+      'RATE_LIMITED' => '请求过于频繁，请稍后再试',
       _ => switch (kind) {
         FailureKind.unauthorized => '登录已失效，请重新登录',
         FailureKind.forbidden => '你没有访问这项内容的权限',

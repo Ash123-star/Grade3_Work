@@ -1,5 +1,13 @@
 # 前端接口草案
 
+## 2026-10-22 week6 已核对增量
+
+以 main dc00e2b 后端为准：下属日志 Query 增加 departmentId，分页保留 search/ownerId/date/period；日志 department 对象映射 departmentId/departmentName、author 映射 authorName。服务端能力字段完整保留，LogEditWindow 用于窗口展示，撤回不重置首次提交时间。
+
+日志评论回复将 HCJ parentCommentId 转换为请求 parentId，读取保留评论 id/作者/父评论/时间；POST 不自动重试。日志撤回 action=withdraw 发送 version/reason；已提交日志继续使用 request-review。过期和限流有明确提示。
+
+startAt/participantIds/tagId 与 tasks/comments 尚无后端契约，正式客户端明确拒绝，旧任务字段迁移未完成。SSE 沿用现有实现。HCJ 页面未合并，数据层通过不代表页面接通。详细证据和未完成项见 ../../docs/zhw-week6-validation.md。
+
 本契约用于 UI 框架接入，尚非已经上线的服务。所有请求使用 HTTPS；认证后附加 Bearer token，服务端再次验证 company_id、角色和对象范围。客户端不接收 DeepSeek 密钥。
 
 ## 2026-10-13 接口交接状态
