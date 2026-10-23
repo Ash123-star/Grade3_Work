@@ -1,8 +1,101 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 
 void main() {
+  test(
+    'withdrawal preserves first submission window and invalidates pending review',
+    () async {
+      var now = DateTime.utc(2026, 10, 21, 8);
+      final store = DemoStore();
+      final author = MockRepository(
+        const Session(id: 'u2', role: UserRole.employee),
+        store: store,
+        clock: () => now,
+      );
+      final reviewer = MockRepository(
+        const Session(),
+        store: store,
+        clock: () => now,
+      );
+      final log = await author.execute(
+        'logs',
+        const Command('submit', {
+          'title': '窗口验证',
+          'businessDate': '2026-10-21',
+          '今日工作': '原文',
+        }),
+      );
+      await expectLater(
+        author.execute(
+          'logs',
+          Command('update', {
+            'id': log.id,
+            '今日工作': '直接覆盖',
+          }, version: log.version),
+        ),
+        throwsA(isA<ApiFailure>()),
+      );
+      var review = await author.execute(
+        'logs',
+        Command('request-review', {
+          'id': log.id,
+          '今日工作': '修订',
+          '修改理由': '补充',
+        }, version: log.version),
+      );
+      final draft = await author.execute(
+        'logs',
+        Command('withdraw', {
+          'id': log.id,
+          'reason': '补充后重提',
+        }, version: log.version),
+      );
+      expect(isSubmittedDiary(draft), isFalse);
+      expect(draft.fields['submittedAt'], log.fields['submittedAt']);
+      final resubmitted = await author.execute(
+        'logs',
+        Command('submit', {'id': log.id}, version: draft.version),
+      );
+      expect(resubmitted.fields['submittedAt'], log.fields['submittedAt']);
+      for (var i = 0; i < 2; i++) {
+        review = await reviewer.execute(
+          'reviews',
+          Command('approve', {'id': review.id}, version: review.version),
+        );
+      }
+      await expectLater(
+        reviewer.execute(
+          'reviews',
+          Command('approve', {'id': review.id}, version: review.version),
+        ),
+        throwsA(
+          isA<ApiFailure>().having((e) => e.kind, 'kind', FailureKind.conflict),
+        ),
+      );
+      final withdrawn = await author.execute(
+        'logs',
+        Command('withdraw', {
+          'id': log.id,
+          'reason': '补充',
+        }, version: resubmitted.version),
+      );
+      now = now.add(const Duration(hours: 24));
+      expect((await author.detail('logs', log.id)).fields['canEdit'], isFalse);
+      await expectLater(
+        author.execute(
+          'logs',
+          Command('save-draft', {
+            'id': log.id,
+            '今日工作': '超时',
+          }, version: withdrawn.version),
+        ),
+        throwsA(isA<ApiFailure>()),
+      );
+      expect((await author.detail('logs', log.id)).fields['今日工作'], '原文');
+    },
+  );
   test(
     'one shared demo preserves dispatch receive feedback return acceptance archive across users',
     () async {
@@ -111,27 +204,28 @@ void main() {
           '今日工作': '原始内容',
         }),
       );
-      final second = await employee.execute(
-        'logs',
-        const Command('submit', {
-          'title': '日报',
-          'businessDate': date,
-          '今日工作': '第二次内容',
-        }),
+      await expectLater(
+        employee.execute(
+          'logs',
+          const Command('submit', {
+            'title': '日报',
+            'businessDate': date,
+            '今日工作': '第二次内容',
+          }),
+        ),
+        throwsA(
+          isA<ApiFailure>().having((e) => e.kind, 'kind', FailureKind.conflict),
+        ),
       );
-      expect(first.id, second.id);
       var request = await employee.execute(
         'logs',
         Command('request-review', {
-          'id': second.id,
+          'id': first.id,
           '今日工作': '修订内容',
           '修改理由': '补充记录',
-        }, version: second.version),
+        }, version: first.version),
       );
-      expect(
-        (await employee.detail('logs', second.id)).fields['今日工作'],
-        '第二次内容',
-      );
+      expect((await employee.detail('logs', first.id)).fields['今日工作'], '原始内容');
       for (var i = 0; i < 3; i++) {
         request = await manager.execute(
           'reviews',
@@ -139,7 +233,7 @@ void main() {
         );
       }
       expect(request.fields['reviewState'], '已通过');
-      expect((await employee.detail('logs', second.id)).fields['今日工作'], '修订内容');
+      expect((await employee.detail('logs', first.id)).fields['今日工作'], '修订内容');
       final subordinate = (await manager.list(
         'logs/subordinates',
         const Query(ownerId: 'u2'),

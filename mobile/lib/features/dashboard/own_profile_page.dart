@@ -4,7 +4,6 @@ import 'package:cute_ui/cute_ui.dart' show SectionHeader;
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
-import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/common/detail_pages.dart';
@@ -46,14 +45,18 @@ class OwnProfilePage extends ConsumerWidget {
                     children: [
                       ProtectedAvatar(
                         name: user.name,
-                        attachmentId: value.fields['avatarAttachmentId'] as String?,
+                        attachmentId:
+                            value.fields['avatarAttachmentId'] as String?,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(user.name, style: Theme.of(context).textTheme.titleLarge),
+                            Text(
+                              user.name,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
                             Text(value.subtitle),
                             Text('${user.role.label} · 组织与角色只读'),
                           ],
@@ -62,7 +65,9 @@ class OwnProfilePage extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text('${value.fields['个人介绍'] ?? value.fields['body'] ?? '暂无个人介绍'}'),
+                  Text(
+                    '${value.fields['个人介绍'] ?? value.fields['body'] ?? '暂无个人介绍'}',
+                  ),
                 ],
               ),
             ),
@@ -80,15 +85,16 @@ class OwnProfilePage extends ConsumerWidget {
             loading: () => const LoadingSkeleton(),
             error: (error, _) => RecordFailure(
               error,
-              retry: () => ref.invalidate(
-                memberRecordsProvider(('logs', user.id)),
-              ),
+              retry: () =>
+                  ref.invalidate(memberRecordsProvider(('logs', user.id))),
             ),
             data: (page) {
               final items = page.items.where(isSubmittedDiary).toList()
-                ..sort((a, b) => '${b.fields['businessDate']}'.compareTo(
-                  '${a.fields['businessDate']}',
-                ));
+                ..sort(
+                  (a, b) => '${b.fields['businessDate']}'.compareTo(
+                    '${a.fields['businessDate']}',
+                  ),
+                );
               if (items.isEmpty) {
                 return const EmptyIllustration(
                   title: '暂无已提交日志',

@@ -38,6 +38,8 @@ public class OrganizationController {
     @PostMapping("/{kind}/revisions") public Map<String, Object> unit(HttpServletRequest request, @PathVariable String kind, @RequestBody Map<String, Object> body) { return service.unit(Actor.current(request), kind, body); }
     /** 管理员分页审计：cursor/limit，返回items/total/nextCursor；非法400、越权403；只读无版本。 */
     @GetMapping("/audit") public Map<String, Object> audit(HttpServletRequest request, @RequestParam(defaultValue = "0") int cursor, @RequestParam(defaultValue = "30") int limit) { return service.audit(Actor.current(request), cursor, limit); }
+    /** ADMIN只读任务审计：可选taskId及cursor/limit；返回items/total/nextCursor，范围外ID返回空。非法分页400、非管理员403；无版本/幂等键，保留历史前后值。 */
+    @GetMapping("/task-audit") public Map<String,Object> taskAudit(HttpServletRequest request,@RequestParam(required=false) String taskId,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit) { return service.taskAudit(Actor.current(request),taskId,cursor,limit); }
     /** 兼容旧审核应用调用点；组织验证统一由应用验证器维护。 */
     public static void validateUser(Db db, String company, String id, Map<String, Object> candidate) { OrganizationValidation.validateUser(db, company, id, candidate); }
 }

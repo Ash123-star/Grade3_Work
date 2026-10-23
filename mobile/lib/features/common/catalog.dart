@@ -93,6 +93,12 @@ const screens = <String, ScreenSpec>{
     manager: true,
   ),
   'note': ScreenSpec('私人备注', 'private-notes', fields: ['备注'], action: 'save'),
+  'log-withdraw': ScreenSpec(
+    '撤回日志',
+    'logs',
+    fields: ['撤回原因'],
+    action: 'withdraw',
+  ),
   'log-edit': ScreenSpec(
     '写工作日志',
     'logs',
@@ -100,10 +106,10 @@ const screens = <String, ScreenSpec>{
     action: 'submit',
   ),
   'log-revise': ScreenSpec(
-    '编辑已提交日志',
+    '申请修订日志',
     'logs',
-    fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时'],
-    action: 'update',
+    fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时', '修改理由'],
+    action: 'request-review',
   ),
   'comment': ScreenSpec(
     '日志评语',

@@ -108,9 +108,7 @@ void main() {
           ..addFont(
             Future.value(
               ByteData.sublistView(
-                File(
-                  materialIconsFontPath,
-                ).readAsBytesSync(),
+                File(materialIconsFontPath).readAsBytesSync(),
               ),
             ),
           );
@@ -211,12 +209,8 @@ void main() {
           expect(t.takeException(), isNull, reason: '$name $config');
           await capture(name);
           if (name == 'task') {
-            final more = find.byTooltip('更多操作');
-            expect(t.getCenter(more).dx, greaterThan(config.$1 * .7));
-            expect(t.getSize(more).height, greaterThanOrEqualTo(48));
-            await t.tap(more);
-            await t.pumpAndSettle();
-            expect(find.text('我的私人备注'), findsOneWidget);
+            expect(find.text('接收任务'), findsOneWidget);
+            expect(find.text('转派任务'), findsNothing);
           }
           if (name == 'inbox') {
             await t.tap(find.text('未读'));
@@ -243,17 +237,20 @@ void main() {
             }
             expect(t.getSize(day).width, lessThan(config.$1 / 7));
             expect(t.getSize(day).height, greaterThanOrEqualTo(48));
-            final previews = find.descendant(
-              of: day,
-              matching: find.textContaining('完成工作台'),
+            final previews = find.byWidgetPredicate(
+              (w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith(
+                    'month-span:tasks:',
+                  ),
             );
-            expect(previews, findsNWidgets(2));
+            expect(previews, findsNWidgets(3));
             expect(
               find.descendant(of: day, matching: find.textContaining('任·')),
               findsNothing,
             );
             expect(find.text('任：任务 · 日：日志 · 点击日期查看全文'), findsNothing);
-            expect(find.text('+1'), findsWidgets);
+            expect(find.text('完成工作'), findsNWidgets(3));
             await t.ensureVisible(day);
             await t.pumpAndSettle();
             await capture('month-selected');

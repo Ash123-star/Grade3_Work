@@ -26,6 +26,7 @@ String event(int sequence, {String id = 'notice', int? row}) =>
 class LiveAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   final streams = <StreamController<Uint8List>>[];
+  final streamOpened = Completer<void>();
   int streamStatus = 200, notices = 0, people = 31;
   bool jsonStream = false, badCursor = false, laterForbidden = false;
   Completer<void>? meGate;
@@ -42,6 +43,7 @@ class LiveAdapter implements HttpClientAdapter {
         !jsonStream) {
       final s = StreamController<Uint8List>(onCancel: () => canceled++);
       streams.add(s);
+      if (!streamOpened.isCompleted) streamOpened.complete();
       return ResponseBody(
         s.stream,
         200,
@@ -210,19 +212,25 @@ void main() {
     'gateway sends actual auth Accept and replay header and rejects response format',
     () async {
       final a = LiveAdapter(), cancel = CancelToken();
-      final received = <NotificationSignal>[];
-      final sub = NotificationStream(
-        liveRepo(a).dio,
-      ).connect(41, cancel).listen(received.add);
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      final received = Completer<NotificationSignal>();
+      final sub = NotificationStream(liveRepo(a).dio)
+          .connect(41, cancel)
+          .listen((signal) {
+            if (signal.sequence != null && !received.isCompleted) {
+              received.complete(signal);
+            }
+          });
+      await a.streamOpened.future.timeout(const Duration(seconds: 5));
       final o = a.requests.single;
       expect(o.path, '/notifications/stream');
       expect(o.headers['Authorization'], 'Bearer live-token');
       expect(o.headers['Accept'], 'text/event-stream');
       expect(o.headers['Last-Event-ID'], '41');
       a.send(event(42));
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(received.last.sequence, 42);
+      expect(
+        (await received.future.timeout(const Duration(seconds: 5))).sequence,
+        42,
+      );
       cancel.cancel();
       await sub.cancel();
       await a.streams.single.close();
@@ -498,10 +506,7 @@ void main() {
     testWidgets('actual recovery inbox renders at360dp text1.5', (t) async {
       for (final (family, path) in [
         ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
-        (
-          'MaterialIcons',
-          materialIconsFontPath,
-        ),
+        ('MaterialIcons', materialIconsFontPath),
       ]) {
         await (FontLoader(family)..addFont(
               Future.value(ByteData.sublistView(File(path).readAsBytesSync())),

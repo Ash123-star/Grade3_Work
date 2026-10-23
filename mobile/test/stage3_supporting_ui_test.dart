@@ -1,3 +1,4 @@
+import 'support/workflow_fixture.dart';
 import 'support/local_test_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,7 +31,7 @@ void main() {
     addTearDown(t.view.resetDevicePixelRatio);
     final c = testContainer(
       overrides: [
-        if (store != null) demoStoreProvider.overrideWithValue(store),
+        demoStoreProvider.overrideWithValue(store ?? workflowFixture()),
         if (failedAction)
           repositoryProvider.overrideWith(
             (ref) => FailedActionRepository(
@@ -85,7 +86,7 @@ void main() {
       expect(find.text('请填写验收意见'), findsOneWidget);
       c.read(routerProvider).go('/form/transfer?id=accept&version=1');
       await t.pumpAndSettle();
-      expect(find.text('当前生效 · v1'), findsOneWidget);
+      expect(find.text('交付验收'), findsWidgets);
       expect(
         find.byWidgetPredicate((w) => w is Text && w.data == '陈一诺'),
         findsOneWidget,

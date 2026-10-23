@@ -11,7 +11,6 @@ import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
-import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/features/dashboard/dashboard_pages.dart';
 import 'calendar_agenda_test.dart' show agendaStore;
 import 'support/local_test_state.dart';
@@ -151,7 +150,7 @@ void main() {
         final picture = await render.toImage(pixelRatio: 1);
         final png = await picture.toByteData(format: ui.ImageByteFormat.png);
         final file = File(
-          'docs/evidence/week5/month-tasks-${size.width.toInt()}x${size.height.toInt()}-$scale.png',
+          '../output/flutter-evidence/week5/month-tasks-${size.width.toInt()}x${size.height.toInt()}-$scale.png',
         );
         file.parent.createSync(recursive: true);
         file.writeAsBytesSync(png!.buffer.asUint8List());
@@ -242,10 +241,7 @@ void main() {
         c.read(routerProvider).go('/ai');
         await settleLocalIo(t);
         await capture('ai-top-${width.toInt()}');
-        final list = find.descendant(
-          of: find.byType(PageFrame).last,
-          matching: find.byType(ListView),
-        );
+        final list = find.byType(ListView);
         await t.drag(list.first, const Offset(0, -400));
         await t.pumpAndSettle();
         expect(find.text('建议草稿').hitTestable(), findsNothing);

@@ -148,11 +148,15 @@ void main() {
           home: Builder(
             builder: (context) => PageFrame(
               title: '重复页名',
+              showTitle: false,
               child: TextButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) =>
-                        const PageFrame(title: '二级页名', child: Text('正文')),
+                    builder: (_) => const PageFrame(
+                      title: '二级页名',
+                      showTitle: false,
+                      child: Text('正文'),
+                    ),
                   ),
                 ),
                 child: const Text('打开'),
@@ -171,6 +175,7 @@ void main() {
         MaterialApp(
           home: PageFrame(
             title: '操作页名',
+            showTitle: false,
             actions: [TextButton(onPressed: () {}, child: const Text('消息'))],
             child: const Text('正文'),
           ),

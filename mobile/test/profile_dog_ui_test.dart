@@ -5,7 +5,7 @@ import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/features/dashboard/task_management_page.dart';
-import 'package:pandora_mobile/shared/generated_assets.dart';
+import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'support/local_test_state.dart';
 
 void main() {
@@ -34,7 +34,7 @@ void main() {
     container.read(routerProvider).go('/me');
     await settleLocalIo(tester);
     await tester.pumpAndSettle();
-    expect(find.byType(DogAvatar), findsWidgets);
+    expect(find.byType(ProtectedAvatar), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('任务管理'),
       180,

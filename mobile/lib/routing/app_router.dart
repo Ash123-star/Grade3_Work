@@ -28,6 +28,8 @@ import 'package:pandora_mobile/features/ai_map/ai_job_pages.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_tools.dart';
 import 'package:pandora_mobile/features/ai_map/long_term_memory_page.dart'
     as memory;
+import 'package:pandora_mobile/features/ai_map/workbench_page.dart';
+import 'package:pandora_mobile/features/ai_map/work_management_pages.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -64,6 +66,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/ai/directions',
+        builder: (_, _) => const LegacyDirectionPage(),
+      ),
+      GoRoute(
+        path: '/ai/work/:id',
+        builder: (_, s) => WorkDetailPage(
+          s.pathParameters['id']!,
+          key: ValueKey(s.uri.toString()),
+        ),
+      ),
+      GoRoute(
+        path: '/ai/work-settings',
+        builder: (_, _) => const WorkSettingsPage(),
+      ),
+      GoRoute(path: '/ai/procedures', builder: (_, _) => const ProcedurePage()),
+      GoRoute(
+        path: '/ai/procedures/:id',
+        builder: (_, s) => ProcedurePage(id: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/tasks/:id/delivery-check',
+        builder: (_, s) => DeliveryCheckPage(
+          s.pathParameters['id']!,
+          int.tryParse(s.uri.queryParameters['version'] ?? '') ?? 0,
+        ),
+      ),
       GoRoute(path: '/ai/memory', builder: (_, _) => const memory.AiPage()),
       GoRoute(
         path: '/logs/subordinates',
@@ -74,49 +103,53 @@ final routerProvider = Provider<GoRouter>((ref) {
             BranchPager(shell: shell, children: children),
         builder: (context, state, shell) => Scaffold(
           body: shell,
-          bottomNavigationBar: ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: PaperSurface(
-              skin: TuantuanAssets.detailSections['mint'],
-              padding: EdgeInsets.zero,
-              child: NavigationBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                animationDuration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 160),
-                selectedIndex: shell.currentIndex,
-                onDestinationSelected: (i) => shell.goBranch(i),
-                destinations: const [
-                  NavigationDestination(
-                    icon: TuantuanIcon('mindmap', size: 26),
-                    selectedIcon: TuantuanIcon('mindmap', size: 26),
-                    label: '导图',
+          bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
+              ? null
+              : ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
                   ),
-                  NavigationDestination(
-                    icon: TuantuanIcon('calendar', size: 26),
-                    selectedIcon: TuantuanIcon('calendar', size: 26),
-                    label: '视图',
+                  child: PaperSurface(
+                    skin: TuantuanAssets.detailSections['mint'],
+                    padding: EdgeInsets.zero,
+                    child: NavigationBar(
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      animationDuration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 160),
+                      selectedIndex: shell.currentIndex,
+                      onDestinationSelected: (i) => shell.goBranch(i),
+                      destinations: const [
+                        NavigationDestination(
+                          icon: TuantuanIcon('mindmap', size: 26),
+                          selectedIcon: TuantuanIcon('mindmap', size: 26),
+                          label: '导图',
+                        ),
+                        NavigationDestination(
+                          icon: TuantuanIcon('calendar', size: 26),
+                          selectedIcon: TuantuanIcon('calendar', size: 26),
+                          label: '视图',
+                        ),
+                        NavigationDestination(
+                          icon: TuantuanIcon('log', size: 26),
+                          selectedIcon: TuantuanIcon('log', size: 26),
+                          label: '日志',
+                        ),
+                        NavigationDestination(
+                          icon: TuantuanIcon('ai', size: 26),
+                          selectedIcon: TuantuanIcon('ai', size: 26),
+                          label: 'AI地图',
+                        ),
+                        NavigationDestination(
+                          icon: TuantuanIcon('members', size: 26),
+                          selectedIcon: TuantuanIcon('members', size: 26),
+                          label: '我的',
+                        ),
+                      ],
+                    ),
                   ),
-                  NavigationDestination(
-                    icon: TuantuanIcon('log', size: 26),
-                    selectedIcon: TuantuanIcon('log', size: 26),
-                    label: '日志',
-                  ),
-                  NavigationDestination(
-                    icon: TuantuanIcon('ai', size: 26),
-                    selectedIcon: TuantuanIcon('ai', size: 26),
-                    label: 'AI地图',
-                  ),
-                  NavigationDestination(
-                    icon: TuantuanIcon('members', size: 26),
-                    selectedIcon: TuantuanIcon('members', size: 26),
-                    label: '我的',
-                  ),
-                ],
-              ),
-            ),
-          ),
+                ),
         ),
         branches: [
           StatefulShellBranch(

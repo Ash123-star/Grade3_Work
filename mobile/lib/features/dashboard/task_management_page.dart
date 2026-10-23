@@ -160,102 +160,106 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('筛选任务', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              _FilterChoice(
-                label: '标签',
-                value: nextTag,
-                color: tagColors[nextTag],
-                onTap: () async {
-                  final value = await showPremiumTagPicker(
-                    context,
-                    options: [
-                      for (final value in tags)
-                        PremiumTagOption(
-                          value,
-                          value,
-                          value == '全部标签'
-                              ? const Color(0xFFE9EEF5)
-                              : tagColors[value] ?? const Color(0xFFDDF1FA),
-                        ),
-                    ],
-                    selected: nextTag,
-                  );
-                  if (value != null) setSheetState(() => nextTag = value);
-                },
-              ),
-              _FilterChoice(
-                label: '参与人',
-                value: nextParticipant,
-                onTap: () async {
-                  final value = await showPremiumOptionPicker(
-                    context,
-                    title: '选择参与人',
-                    options: participants.toList(),
-                    selected: nextParticipant,
-                  );
-                  if (value != null) {
-                    setSheetState(() => nextParticipant = value);
-                  }
-                },
-              ),
-              _FilterChoice(
-                label: '截止日期',
-                value: nextDeadline == null ? '不限' : _dayLabel(nextDeadline!),
-                onTap: () async {
-                  final value = await showPremiumDatePicker(
-                    context,
-                    initial: nextDeadline ?? DateTime.now(),
-                    title: '选择截止日期',
-                  );
-                  if (value != null) setSheetState(() => nextDeadline = value);
-                },
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => setSheetState(() => nextDeadline = null),
-                  icon: const Icon(Icons.clear),
-                  label: const Text('清除截止日期'),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('筛选任务', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                _FilterChoice(
+                  label: '标签',
+                  value: nextTag,
+                  color: tagColors[nextTag],
+                  onTap: () async {
+                    final value = await showPremiumTagPicker(
+                      context,
+                      options: [
+                        for (final value in tags)
+                          PremiumTagOption(
+                            value,
+                            value,
+                            value == '全部标签'
+                                ? const Color(0xFFE9EEF5)
+                                : tagColors[value] ?? const Color(0xFFDDF1FA),
+                          ),
+                      ],
+                      selected: nextTag,
+                    );
+                    if (value != null) setSheetState(() => nextTag = value);
+                  },
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          tag = '全部标签';
-                          participant = '全部参与人';
-                          deadline = null;
-                        });
-                        Navigator.pop(sheetContext, true);
-                      },
-                      child: const Text('清空筛选'),
-                    ),
+                _FilterChoice(
+                  label: '参与人',
+                  value: nextParticipant,
+                  onTap: () async {
+                    final value = await showPremiumOptionPicker(
+                      context,
+                      title: '选择参与人',
+                      options: participants.toList(),
+                      selected: nextParticipant,
+                    );
+                    if (value != null) {
+                      setSheetState(() => nextParticipant = value);
+                    }
+                  },
+                ),
+                _FilterChoice(
+                  label: '截止日期',
+                  value: nextDeadline == null ? '不限' : _dayLabel(nextDeadline!),
+                  onTap: () async {
+                    final value = await showPremiumDatePicker(
+                      context,
+                      initial: nextDeadline ?? DateTime.now(),
+                      title: '选择截止日期',
+                    );
+                    if (value != null) {
+                      setSheetState(() => nextDeadline = value);
+                    }
+                  },
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => setSheetState(() => nextDeadline = null),
+                    icon: const Icon(Icons.clear),
+                    label: const Text('清除截止日期'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        setState(() {
-                          tag = nextTag;
-                          participant = nextParticipant;
-                          deadline = nextDeadline;
-                        });
-                        Navigator.pop(sheetContext, true);
-                      },
-                      child: const Text('应用'),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            tag = '全部标签';
+                            participant = '全部参与人';
+                            deadline = null;
+                          });
+                          Navigator.pop(sheetContext, true);
+                        },
+                        child: const Text('清空筛选'),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          setState(() {
+                            tag = nextTag;
+                            participant = nextParticipant;
+                            deadline = nextDeadline;
+                          });
+                          Navigator.pop(sheetContext, true);
+                        },
+                        child: const Text('应用'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

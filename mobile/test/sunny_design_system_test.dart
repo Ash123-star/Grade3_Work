@@ -45,9 +45,12 @@ void main() {
     expect(halfway.canvas, Color.lerp(original.canvas, Colors.black, .5));
     expect(halfway.buttonRadius, 22);
     expect(halfway.pressDuration.inMilliseconds, 200);
-    expect(theme.colorScheme.onPrimaryContainer, const Color(0xFF246447));
+    expect(
+      theme.colorScheme.onPrimaryContainer,
+      SunnyPalette.onPrimaryContainer,
+    );
     expect(theme.colorScheme.secondaryContainer, original.ai);
-    expect(theme.colorScheme.tertiaryContainer, original.success);
+    expect(theme.colorScheme.tertiaryContainer, const Color(0xFFFFE9D4));
     expect(
       theme.navigationBarTheme.iconTheme!.resolve({
         WidgetState.selected,

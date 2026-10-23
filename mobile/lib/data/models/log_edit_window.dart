@@ -13,8 +13,8 @@ class LogEditWindow {
   }
 
   bool canEditAt(DateTime now) {
-    if (!submitted) return true;
     if (record.fields['canEdit'] == false) return false;
+    if (!submitted && until == null) return true;
     final deadline = until;
     return deadline != null && now.isBefore(deadline);
   }

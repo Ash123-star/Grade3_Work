@@ -51,12 +51,14 @@ public class OrganizationApplicationService implements OrganizationApi {
     }
     public Map<String, Object> policy(Actor actor) { requireActive(actor); actor.requireAdmin(); return repository.policy(actor.company()); }
     @Transactional public Map<String, Object> policyRevision(Actor actor, Map<String, Object> body) {
-        requireActive(actor); actor.requireAdmin(); Db.fields(body, "version", "reason", "taskTeamReview", "taskDepartmentReview");
+        requireActive(actor); actor.requireAdmin(); Db.fields(body, "version", "reason", "taskTeamReview", "taskDepartmentReview", "aiWorkCreateAuthorization", "aiWorkSubmitAuthorization", "aiWorkAuthorizationMaxDays", "aiWorkAuthorizationMaxObjects", "aiWorkAuthorizationMaxActions");
         var candidate = new LinkedHashMap<>(repository.policyValues(actor.company())); var before = new LinkedHashMap<>(candidate);
         for (String key : List.of("taskTeamReview", "taskDepartmentReview")) if (body.containsKey(key)) {
             if (!(body.get(key) instanceof Boolean)) throw ApiError.bad("INVALID_POLICY", "复核策略必须为布尔值");
             candidate.put(key, body.get(key));
         }
+        for(String key:cn.workpanel.module.aiwork.domain.AuthorizationPolicy.FIELDS)if(body.containsKey(key))candidate.put(key,body.get(key));
+        candidate.putAll(cn.workpanel.module.aiwork.domain.AuthorizationPolicy.from(candidate).values());
         return reviews.create(actor, "POLICY", actor.company(), Db.version(body), before, candidate, Db.required(body, "reason"));
     }
     @Transactional public Map<String, Object> reviewer(Actor actor, Map<String, Object> body) {
@@ -85,4 +87,9 @@ public class OrganizationApplicationService implements OrganizationApi {
         return reviews.create(actor, kind.equals("teams") ? "TEAM" : "DEPARTMENT", id, version, before, candidate, Db.required(body, "reason"));
     }
     public Map<String, Object> audit(Actor actor, int cursor, int limit) { requireActive(actor); actor.requireAdmin(); Business.page(cursor, limit); return repository.audit(actor.company(), cursor, limit); }
+    public Map<String,Object> taskAudit(Actor actor,String taskId,int cursor,int limit) {
+        requireActive(actor); actor.requireAdmin(); Business.page(cursor,limit);
+        if(taskId!=null&&taskId.length()>100) throw ApiError.bad("INVALID_TASK_ID","任务ID过长");
+        return repository.taskAudit(actor.company(),taskId,cursor,limit);
+    }
 }

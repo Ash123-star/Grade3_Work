@@ -306,10 +306,25 @@ final logDayRecordsProvider = FutureProvider.autoDispose
       return readCompleteList(
         ref.watch(repositoryProvider),
         key.$1,
-        Query(ownerId: key.$2, from: range?.from, to: range?.to),
+        Query(
+          ownerId: key.$2,
+          from: range?.from,
+          to: range?.to,
+          departmentId: key.$1 == 'logs/subordinates'
+              ? ref.watch(subordinateLogFilterProvider).$1
+              : null,
+          search: key.$1 == 'logs/subordinates'
+              ? ref.watch(subordinateLogFilterProvider).$2
+              : '',
+        ),
         isActive: () => active,
       );
     });
+
+final subordinateLogFilterProvider = StateProvider<(String?, String)>((ref) {
+  ref.watch(sessionProvider.select((s) => (s.id, s.token)));
+  return (null, '');
+});
 
 final logFilterDateProvider = StateProvider<DateTime?>((ref) => DateTime.now());
 

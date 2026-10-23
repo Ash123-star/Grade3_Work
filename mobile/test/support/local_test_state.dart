@@ -53,3 +53,16 @@ Future<void> settleLocalIo(WidgetTester tester) async {
   }
   await tester.pump();
 }
+
+/// Await an observable completion rather than assuming native encryption/SQLite
+/// finishes within a fixed 60 ms while the full suite is running concurrently.
+Future<void> waitForLocalState(WidgetTester tester, Finder completion) async {
+  for (var i = 0; i < 100; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
+    await tester.pump(const Duration(milliseconds: 30));
+    if (completion.evaluate().isNotEmpty) return;
+  }
+  expect(completion, findsWidgets, reason: 'Local operation did not complete');
+}

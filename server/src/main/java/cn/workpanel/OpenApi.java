@@ -24,21 +24,28 @@ public class OpenApi {
         registration.addProperty("account",new StringSchema().pattern("^[a-zA-Z0-9_.-]{3,64}$")); registration.addProperty("password",text().minLength(12).description("UTF-8 编码不超过 72 字节")); registration.addProperty("phone",new StringSchema().pattern("^1[3-9][0-9]{9}$")); registration.addProperty("name",text().minLength(1)); registration.addProperty("departmentId",text().minLength(1)); c.addSchemas("Registration",registration);
         var login=object("account","password"); login.addProperty("account",text()); login.addProperty("password",text()); c.addSchemas("Login",login);
         var password=object("oldPassword","newPassword"); password.addProperty("oldPassword",text()); password.addProperty("newPassword",text().minLength(12)); c.addSchemas("PasswordChange",password);
-        var task=object("title","ownerId","deadline"); task.addProperty("title",new StringSchema().minLength(1).maxLength(200)); task.addProperty("ownerId",text().minLength(1)); task.addProperty("deadline",new DateTimeSchema().description("含时区的 ISO8601 时间")); task.addProperty("urgency",new StringSchema()._enum(List.of("URGENT","NORMAL","LOW"))._default("NORMAL"));
-        for(String field:List.of("group","content","progressNote")) task.addProperty(field,text()); task.addProperty("collaborators",ids().description("去重排序后参与幂等摘要；与主负责人重复时忽略")); task.addProperty("attachments",ids().description("仅本人上传且未关联任务的附件，已关联其他任务返回 ATTACHMENT_BOUND")); task.setDescription("派发内容。phase、version、status、completion 等服务端字段不可提交（SERVER_MANAGED_FIELD）"); c.addSchemas("TaskDraft",task);
-        var taskListItem=object("id","owner_id","issuer_id","title","deadline","version","created_at"); taskListItem.addProperty("id",text()); taskListItem.addProperty("owner_id",text()); taskListItem.addProperty("issuer_id",text()); taskListItem.addProperty("title",text()); taskListItem.addProperty("deadline",new DateTimeSchema()); taskListItem.addProperty("version",version()); taskListItem.addProperty("created_at",new DateTimeSchema()); taskListItem.setDescription("任务列表安全投影；不返回 phase、status、completion、progress、正文、事件或任何替代状态字段。"); c.addSchemas("TaskListItem",taskListItem);
+        var task=object("title","participants","deadline"); task.addProperty("title",new StringSchema().minLength(1).maxLength(200)); task.addProperty("participants",ids().minItems(1).description("无角色、去重的任务参与人集合")); task.addProperty("startAt",new DateTimeSchema().description("可选，带时区 ISO8601 时间")); task.addProperty("deadline",new DateTimeSchema().description("带时区的 ISO8601 时间，精确到分钟")); task.addProperty("urgency",new StringSchema()._enum(List.of("URGENT","NORMAL","LOW"))._default("NORMAL"));
+        for(String field:List.of("group","content","labelId")) task.addProperty(field,text()); task.addProperty("attachments",ids().description("仅本人上传且未关联任务的附件，已关联其他任务返回 ATTACHMENT_BOUND")); task.setDescription("创建返回审核申请，批准后才生成正式任务。参与人无主负责人/协作人语义；不接受 phase、status、completion、progress 等服务端字段。"); c.addSchemas("TaskDraft",task);
+        var participant=object("id","name"); participant.addProperty("id",text()); participant.addProperty("name",text()); participant.addProperty("avatar_id",text()); c.addSchemas("TaskParticipant",participant);
+        var label=object("name","category","color"); label.addProperty("name",text().minLength(1).maxLength(100)); label.addProperty("category",text().minLength(1).maxLength(100)); label.addProperty("color",new StringSchema().pattern("^#[0-9a-fA-F]{6}$")); label.addProperty("departmentId",text()); label.addProperty("status",new StringSchema()._enum(List.of("ACTIVE","DISABLED"))); label.addProperty("version",version()); c.addSchemas("TaskLabel",label);
+        var taskListItem=object("id","issuer_id","title","deadline","version","created_at"); taskListItem.addProperty("id",text()); taskListItem.addProperty("issuer_id",text()); taskListItem.addProperty("title",text()); taskListItem.addProperty("start_at",new DateTimeSchema().nullable(true)); taskListItem.addProperty("deadline",new DateTimeSchema()); taskListItem.addProperty("participants",new ArraySchema().items(ref("TaskParticipant"))); taskListItem.addProperty("label",ref("TaskLabel")); taskListItem.addProperty("version",version()); taskListItem.addProperty("created_at",new DateTimeSchema()); taskListItem.setDescription("任务列表安全投影；不返回 owner、collaborator、phase、status、completion、progress、正文、事件或任何替代状态字段。"); c.addSchemas("TaskListItem",taskListItem);
         c.addSchemas("TaskRevision",revision("TaskDraft","candidate"));
         var event=object("type","version"); event.addProperty("type",new StringSchema()._enum(List.of("RECEIVED","FEEDBACK","ACCEPTED","RETURNED","ARCHIVED","WITHDRAWN"))); event.addProperty("version",version()); event.addProperty("text",text().maxLength(2000).description("反馈、退回、撤回必填（1–2000 字）")); c.addSchemas("TaskEvent",event);
         var reassignment=object("ownerId","version","reason"); reassignment.addProperty("ownerId",text().minLength(1)); reassignment.addProperty("version",version()); reassignment.addProperty("reason",text().minLength(1)); c.addSchemas("TaskReassignment",reassignment);
         var reschedule=object("deadline","version","reason"); reschedule.addProperty("deadline",new DateTimeSchema().description("带时区的 ISO-8601 时间，且不得与当前截止时间相同")); reschedule.addProperty("version",version()); reschedule.addProperty("reason",text().minLength(1)); c.addSchemas("TaskReschedule",reschedule);
+        var deletion=object("version","reason"); deletion.addProperty("version",version()); deletion.addProperty("reason",text().minLength(1)); c.addSchemas("TaskDeletion",deletion);
+        var taskComment=object("text"); taskComment.addProperty("text",text().minLength(1).maxLength(2000)); taskComment.addProperty("parentId",text().minLength(1)); c.addSchemas("TaskComment",taskComment);
         var log=object(); for(String field:List.of("work","blockers","tomorrow")) log.addProperty(field,text()); log.addProperty("hours",new NumberSchema().minimum(java.math.BigDecimal.ZERO).maximum(java.math.BigDecimal.valueOf(24))); log.addProperty("taskIds",ids()); c.addSchemas("LogContent",log);
         var draft=object("businessDate","body","version"); draft.addProperty("businessDate",new DateSchema()); draft.addProperty("body",ref("LogContent")); draft.addProperty("version",version()); c.addSchemas("LogDraft",draft); c.addSchemas("LogRevision",revision("LogContent","body"));
         var v=object("version"); v.addProperty("version",version()); c.addSchemas("Version",v);
         var comment=object("text"); comment.addProperty("text",text().minLength(1)); c.addSchemas("Comment",comment);
+        var logComment=object("text"); logComment.addProperty("text",text().minLength(1).maxLength(2000)); logComment.addProperty("parentId",text().minLength(1)); c.addSchemas("LogComment",logComment);
         var decision=object("approve"); decision.addProperty("approve",new BooleanSchema()); decision.addProperty("reason",text().description("驳回必填")); c.addSchemas("ReviewDecision",decision);
         var reviewer=object("version","reason"); reviewer.addProperty("version",version()); reviewer.addProperty("reason",text().minLength(1)); c.addSchemas("ReviewerApplication",reviewer);
         var membership=object("version","reason","departmentId"); membership.addProperty("version",version()); membership.addProperty("reason",text().minLength(1)); membership.addProperty("departmentId",text().minLength(1)); c.addSchemas("MembershipApplication",membership);
         var policy=object("version","reason"); policy.addProperty("version",version()); policy.addProperty("reason",text().minLength(1)); policy.addProperty("taskTeamReview",new BooleanSchema()); policy.addProperty("taskDepartmentReview",new BooleanSchema()); c.addSchemas("ReviewPolicy",policy);
+        for(String key:List.of("aiWorkCreateAuthorization","aiWorkSubmitAuthorization"))policy.addProperty(key,new BooleanSchema());
+        for(var entry:Map.of("aiWorkAuthorizationMaxDays",30,"aiWorkAuthorizationMaxObjects",100,"aiWorkAuthorizationMaxActions",5).entrySet())policy.addProperty(entry.getKey(),new IntegerSchema().minimum(java.math.BigDecimal.ONE).maximum(java.math.BigDecimal.valueOf(entry.getValue())));
         var organization=object("version","reason"); organization.addProperty("version",version()); organization.addProperty("reason",text().minLength(1)); for(String field:List.of("name","departmentId","teamId","managerId")) organization.addProperty(field,text()); organization.addProperty("role",new StringSchema()._enum(List.of("ADMIN","FOUNDER","DIRECTOR","LEADER","EMPLOYEE"))); organization.addProperty("status",new StringSchema()._enum(List.of("ACTIVE","DISABLED"))); organization.addProperty("dispatchEnabled",new BooleanSchema()); organization.addProperty("companyReviewer",new BooleanSchema()); c.addSchemas("UserRevision",organization);
         var unit=object("name","version","reason"); unit.addProperty("id",text()); unit.addProperty("name",text().minLength(1)); unit.addProperty("departmentId",text().description("团队必填")); unit.addProperty("version",version()); unit.addProperty("reason",text().minLength(1)); c.addSchemas("UnitRevision",unit);
         var item=object("title","version"); item.addProperty("id",text()); item.addProperty("title",text().minLength(1)); item.addProperty("text",text()); item.addProperty("version",version()); item.addProperty("pinned",new BooleanSchema()); item.addProperty("archived",new BooleanSchema()); item.addProperty("position",new IntegerSchema().minimum(java.math.BigDecimal.ZERO).maximum(java.math.BigDecimal.valueOf(10000))); c.addSchemas("PersonalItem",item);
@@ -101,8 +108,8 @@ public class OpenApi {
         return api->{
             var bodies=Map.ofEntries(
                 Map.entry("POST /api/auth/register","Registration"),Map.entry("POST /api/auth/login","Login"),Map.entry("POST /api/auth/password","PasswordChange"),
-                Map.entry("POST /api/tasks","TaskDraft"),Map.entry("POST /api/tasks/{id}/events","TaskEvent"),Map.entry("POST /api/tasks/{id}/reassignments","TaskReassignment"),Map.entry("POST /api/tasks/{id}/reschedules","TaskReschedule"),Map.entry("POST /api/tasks/{id}/revisions","TaskRevision"),
-                Map.entry("PUT /api/logs/draft","LogDraft"),Map.entry("POST /api/logs/{id}/submit","Version"),Map.entry("POST /api/logs/{id}/revisions","LogRevision"),Map.entry("POST /api/logs/{id}/comments","Comment"),
+                Map.entry("POST /api/tasks","TaskDraft"),Map.entry("POST /api/tasks/{id}/events","TaskEvent"),Map.entry("POST /api/tasks/{id}/reassignments","TaskReassignment"),Map.entry("POST /api/tasks/{id}/reschedules","TaskReschedule"),Map.entry("POST /api/tasks/{id}/revisions","TaskRevision"),Map.entry("POST /api/tasks/{id}/deletions","TaskDeletion"),Map.entry("POST /api/tasks/{taskId}/comments","TaskComment"),Map.entry("POST /api/task-labels","TaskLabel"),Map.entry("PUT /api/task-labels/{id}","TaskLabel"),
+                Map.entry("PUT /api/logs/draft","LogDraft"),Map.entry("POST /api/logs/{id}/submit","Version"),Map.entry("POST /api/logs/{id}/withdraw","ReviewerApplication"),Map.entry("POST /api/logs/{id}/revisions","LogRevision"),Map.entry("POST /api/logs/{id}/comments","LogComment"),
                 Map.entry("POST /api/reviews/{id}/decision","ReviewDecision"),Map.entry("POST /api/organization/membership-application","MembershipApplication"),Map.entry("POST /api/organization/reviewer-application","ReviewerApplication"),Map.entry("POST /api/organization/review-policy/revisions","ReviewPolicy"),Map.entry("POST /api/organization/users/{id}/revisions","UserRevision"),Map.entry("POST /api/organization/{kind}/revisions","UnitRevision"),
                 Map.entry("POST /api/dashboard/company/revisions","CompanyItemRevision"),Map.entry("POST /api/dashboard/personal","PersonalItem"),Map.entry("PUT /api/private-notes","PrivateNote"),Map.entry("PUT /api/profiles/me","Profile"),
                 Map.entry("POST /api/ai/jobs","AiJobRequest"),Map.entry("PUT /api/ai/jobs/{id}/draft","AiDraftEdit"),Map.entry("POST /api/ai/jobs/{id}/confirm-task","ConfirmTask"),Map.entry("POST /api/ai-maps/edges","MapEdge"),
@@ -120,18 +127,32 @@ public class OpenApi {
                 Map.entry("POST /api/ai-memories/index-jobs/{id}/retry","KnowledgeIndexRetry"),
                 Map.entry("DELETE /api/ai-memories/{id}","MemoryForgetJob"),Map.entry("GET /api/ai-memories/forget-jobs/{id}","MemoryForgetJob"));
             var dispatch=api.getPaths().get("/api/tasks"); if(dispatch!=null&&dispatch.getPost()!=null) {
-                var op=dispatch.getPost(); op.setDescription("派发任务。同一派发人同一 Idempotency-Key 重放相同内容返回同一任务，内容不同返回 409 IDEMPOTENCY_CONFLICT；附件已关联其他任务返回 409 ATTACHMENT_BOUND；服务端字段返回 400 SERVER_MANAGED_FIELD。");
+                var op=dispatch.getPost(); op.setDescription("提交任务创建审核。同一派发人同一 Idempotency-Key 重放相同内容返回同一审核申请，内容不同返回 409 IDEMPOTENCY_CONFLICT；审核批准前不是正式任务；附件已关联其他任务返回 409 ATTACHMENT_BOUND。");
                 if(op.getParameters()!=null) op.getParameters().stream().filter(p->"Idempotency-Key".equals(p.getName())).forEach(p->{ p.setRequired(true); p.setSchema(new StringSchema().minLength(1).maxLength(128)); p.setDescription("1–128 位，按派发人隔离"); });
             }
-            if(dispatch!=null&&dispatch.getGet()!=null) dispatch.getGet().setDescription("在服务端组织数据范围内分页查询任务。列表项仅为 TaskListItem，永不返回阶段、完成情况、进度、正文或事件；ownerId 越权返回 403，其他公司 ownerId 返回 404。");
+            if(dispatch!=null&&dispatch.getGet()!=null) dispatch.getGet().setDescription("在服务端组织数据范围内分页查询已生效任务。列表项仅为 TaskListItem，永不返回负责人、协作人、阶段、完成情况、进度、正文或事件。");
             var taskEvents=api.getPaths().get("/api/tasks/{id}/events"); if(taskEvents!=null&&taskEvents.getPost()!=null) taskEvents.getPost().setDescription("生命周期动作。非法状态转换返回 409 INVALID_TRANSITION；旧版本返回 409 VERSION_CONFLICT；未知动作返回 400 INVALID_EVENT。反馈、退回、撤回必须提供 text。");
             var reassignment=api.getPaths().get("/api/tasks/{id}/reassignments"); if(reassignment!=null&&reassignment.getPost()!=null) reassignment.getPost().setDescription("提交转派复核申请；申请不会立即更换负责人。新旧负责人相同返回 400 SAME_OWNER，终态返回 409 INVALID_TRANSITION。");
             var reschedule=api.getPaths().get("/api/tasks/{id}/reschedules"); if(reschedule!=null&&reschedule.getPost()!=null) reschedule.getPost().setDescription("提交改期复核申请；申请不会立即改期。必须提供带时区、不同于当前值的 deadline。");
+            var deletion=api.getPaths().get("/api/tasks/{id}/deletions"); if(deletion!=null&&deletion.getPost()!=null) deletion.getPost().setDescription("提交任务删除审核申请。批准后仅归档，保留原任务摘要、申请、审核、理由和时间审计；不得物理删除。");
+            var comments=api.getPaths().get("/api/tasks/{taskId}/comments"); if(comments!=null&&comments.getPost()!=null) comments.getPost().setDescription("公开任务评论与回复。要求 Idempotency-Key；空评论400、错误父评论400、重复键409、范围外任务404。评论、审计和 outbox 通知同一事务写入，评论不可编辑删除。");
             var logDraft=api.getPaths().get("/api/logs/draft"); if(logDraft!=null&&logDraft.getPut()!=null) logDraft.getPut().setDescription("保存本人每日唯一日报草稿。草稿仅本人可读；version 过期返回 409，已提交日报须走候选修订。");
             var logSubmit=api.getPaths().get("/api/logs/{id}/submit"); if(logSubmit!=null&&logSubmit.getPost()!=null) logSubmit.getPost().setDescription("仅日报本人可按当前 version 提交。提交会记录时间和历史版本；重复或旧版本提交返回 409。");
-            var logRevision=api.getPaths().get("/api/logs/{id}/revisions"); if(logRevision!=null&&logRevision.getPost()!=null) logRevision.getPost().setDescription("已提交日报的候选修订。草稿返回 400 DRAFT_LOG；审核通过时发生版本冲突将拒绝覆盖。");
+            var logRevision=api.getPaths().get("/api/logs/{id}/revisions"); if(logRevision!=null&&logRevision.getPost()!=null) logRevision.getPost().setDescription("已提交日报在首次提交后不足24小时可申请修订，过期409 LOG_EDIT_WINDOW_EXPIRED（管理员无例外）；窗口内申请可窗口外审批。草稿400 DRAFT_LOG；版本冲突拒绝覆盖。");
             var logs=api.getPaths().get("/api/logs"); if(logs!=null&&logs.getGet()!=null) logs.getGet().setDescription("分页查询本人草稿或组织范围内已提交日报。ownerId 其他公司返回 404，同公司范围外返回 403；非本人草稿永不返回。");
-            var subordinates=api.getPaths().get("/api/logs/subordinates"); if(subordinates!=null&&subordinates.getGet()!=null) subordinates.getGet().setDescription("下属日报固定入口。仅管理者可用，只返回组织范围内他人的已提交日报；草稿永不出现。");
+            var subordinates=api.getPaths().get("/api/logs/subordinates"); if(subordinates!=null&&subordinates.getGet()!=null) subordinates.getGet().setDescription("下属日报固定入口。departmentId、date/period、search（最多100字）组合过滤，返回当前页groups及兼容items/total/nextCursor；部门取人员当前归属。未知或范围外部门空结果，员工403，草稿不返回。");
+            var logView=new ObjectSchema(); logView.setAdditionalProperties(true);
+            logView.addProperty("submittedAt",new DateTimeSchema().nullable(true));
+            logView.addProperty("editableUntil",new DateTimeSchema().nullable(true));
+            logView.addProperty("canEdit",new BooleanSchema()); logView.addProperty("canWithdraw",new BooleanSchema());
+            var identity=object("id","name"); identity.addProperty("id",text()); identity.addProperty("name",text());
+            logView.addProperty("author",identity); logView.addProperty("department",identity);
+            logView.setDescription("兼容原日志字段；新增能力字段由服务端当前时间和身份计算，不能替代写入权限校验。");
+            api.getComponents().addSchemas("LogAccessView",logView);
+            var logPage=object("items","total","nextCursor"); logPage.addProperty("items",new ArraySchema().items(ref("LogAccessView"))); logPage.addProperty("total",new IntegerSchema().format("int64")); logPage.addProperty("nextCursor",text());
+            var group=object("department","items"); group.addProperty("department",identity); group.addProperty("items",new ArraySchema().items(ref("LogAccessView")));
+            logPage.addProperty("groups",new ArraySchema().items(group).description("下属入口分组当前日志页；同部门可跨页"));
+            api.getComponents().addSchemas("LogAccessPage",logPage);
             api.getPaths().forEach((path,item)->item.readOperationsMap().forEach((method,op)->{
                 String name=bodies.get(method.name()+" "+path); if(name!=null&&op.getRequestBody()!=null) op.getRequestBody().setContent(new Content().addMediaType("application/json",new MediaType().schema(ref(name))));
                 String response=responses.get(method.name()+" "+path);
@@ -139,9 +160,23 @@ public class OpenApi {
                     String status=Set.of("POST /api/ai-maps/development/jobs","POST /api/ai-maps/development/jobs/{id}/retry","DELETE /api/ai-memories/{id}","POST /api/ai-memories/index-rebuild","POST /api/ai-memories/index-jobs/{id}/retry").contains(method.name()+" "+path)?"202":"200";
                     op.getResponses().addApiResponse(status,new ApiResponse().description("当前授权结果").content(new Content().addMediaType("application/json",new MediaType().schema(ref(response)))));
                 }
+                String logResponse=null;
+                if(method==PathItem.HttpMethod.GET&&Set.of("/api/logs","/api/logs/subordinates").contains(path)) logResponse="LogAccessPage";
+                if(method==PathItem.HttpMethod.GET&&path.equals("/api/logs/{id}")||method==PathItem.HttpMethod.PUT&&path.equals("/api/logs/draft")||method==PathItem.HttpMethod.POST&&Set.of("/api/logs/{id}/submit","/api/logs/{id}/withdraw").contains(path)) logResponse="LogAccessView";
+                if(logResponse!=null) op.getResponses().addApiResponse("200",new ApiResponse().description("当前日志及操作能力").content(new Content().addMediaType("application/json",new MediaType().schema(ref(logResponse)))));
                 if(Set.of("/api/health","/api/auth/login","/api/auth/register","/api/auth/departments").contains(path)) op.setSecurity(List.of());
                 for(String status:List.of("400","401","403","404","409","429","503")) op.getResponses().addApiResponse(status,new ApiResponse().description("错误码及 traceId，详情参见后端接口说明").content(new Content().addMediaType("application/json",new MediaType().schema(ref("Error")))));
             }));
+            // 显式记录管理别名，避免前端依靠未登记路径；复制对象不改变普通业务接口。
+            var adminPaths=new LinkedHashMap<String,PathItem>();
+            api.getPaths().forEach((path,item)->{
+                if(path.startsWith("/api/")&&Security.adminWorkspaceAllowed(path.substring(4))) {
+                    var copy=io.swagger.v3.core.util.Json.mapper().convertValue(item,PathItem.class);
+                    copy.readOperations().forEach(op->{ op.setOperationId("adminWorkspace_"+op.getOperationId()); op.setDescription("独立工作台管理员入口：每次请求必须为当前有效ADMIN，否则401/403。"+Objects.toString(op.getDescription(),"")); });
+                    adminPaths.put("/api/admin/workspace"+path.substring(4),copy);
+                }
+            });
+            api.getPaths().putAll(adminPaths);
         };
     }
 }

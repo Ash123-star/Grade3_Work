@@ -428,7 +428,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
             ),
           const SectionHeader('近 7 天任务派发'),
           SizedBox(
-            height: 150,
+            height: 108 + MediaQuery.textScalerOf(context).scale(44),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -449,7 +449,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                         return Column(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Text('$n'),
+                            Text('$n', maxLines: 1),
                             Container(
                               height: (n * 24.0).clamp(0, 100),
                               margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -459,7 +459,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text('${day.day}日'),
+                            Text('${day.day}日', maxLines: 1),
                           ],
                         );
                       },

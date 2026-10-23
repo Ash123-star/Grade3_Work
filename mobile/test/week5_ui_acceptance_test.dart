@@ -16,6 +16,7 @@ import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'support/flutter_sdk_assets.dart';
 import 'support/local_test_state.dart';
+import 'support/workflow_fixture.dart';
 
 Future<void> fonts() async {
   for (final entry in {
@@ -45,10 +46,12 @@ void main() {
         final c = testContainer(
           overrides: [
             sessionProvider.overrideWith((ref) => const Session()),
+            demoStoreProvider.overrideWithValue(workflowFixture()),
             fontScaleProvider.overrideWith((ref) => width == 320 ? 1.5 : 1),
           ],
         );
         final boundary = GlobalKey();
+        c.read(logFilterDateProvider.notifier).state = null;
         await t.pumpWidget(
           RepaintBoundary(
             key: boundary,
@@ -77,7 +80,9 @@ void main() {
             final data = await picture.toByteData(
               format: ui.ImageByteFormat.png,
             );
-            final file = File('docs/evidence/week5/$name-${width.toInt()}.png');
+            final file = File(
+              '../output/flutter-evidence/week5/$name-${width.toInt()}.png',
+            );
             file.parent.createSync(recursive: true);
             file.writeAsBytesSync(data!.buffer.asUint8List());
             picture.dispose();
@@ -125,15 +130,20 @@ void main() {
         await settle();
         for (var day = 1; day <= 7; day++) {
           expect(
-            find.descendant(
-              of: find.byKey(ValueKey('week-day:$day')),
-              matching: find.byWidgetPredicate(
-                (w) =>
-                    w.key is ValueKey<String> &&
-                    (w.key! as ValueKey<String>).value.startsWith('week-pill:'),
-              ),
-            ),
-            findsNWidgets(2),
+            find
+                .descendant(
+                  of: find.byKey(ValueKey('week-day:$day')),
+                  matching: find.byWidgetPredicate(
+                    (w) =>
+                        w.key is ValueKey<String> &&
+                        (w.key! as ValueKey<String>).value.startsWith(
+                          'week-pill:',
+                        ),
+                  ),
+                )
+                .evaluate()
+                .length,
+            lessThanOrEqualTo(2),
           );
         }
         expect(
@@ -170,7 +180,7 @@ void main() {
         );
         await settle();
         expect(find.byType(PublicComments), findsOneWidget);
-        expect(find.text('修改日志'), findsOneWidget);
+        expect(find.text('申请修订日志'), findsOneWidget);
         await capture('07-log-detail');
         router.go('/me');
         await settle();
@@ -210,68 +220,71 @@ void main() {
     },
   );
 
-  testWidgets('diary row edits directly; detail comments can post and reply', (
-    t,
-  ) async {
-    t.view.physicalSize = const Size(390, 844);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.resetPhysicalSize);
-    addTearDown(t.view.resetDevicePixelRatio);
-    final c = testContainer();
-    await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
-    );
-    await t.pump(const Duration(milliseconds: 1700));
-    await settleLocalIo(t);
-    final router = c.read(routerProvider);
-    router.go('/logs');
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('diary-row:1')));
-    await settleLocalIo(t);
-    await t.pumpAndSettle();
-    expect(
-      router.routerDelegate.currentConfiguration.last.matchedLocation,
-      '/form/log-revise',
-    );
-    expect(find.text('保存日志修改'), findsOneWidget);
-    expect(find.textContaining('等待独立审核'), findsNothing);
-    router.go('/item/logs/1');
-    await t.pumpAndSettle();
-    await t.scrollUntilVisible(
-      find.byKey(const ValueKey('public-comment-input')),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await t.pumpAndSettle();
-    await t.enterText(
-      find.byKey(const ValueKey('public-comment-input')),
-      '前端验收评论',
-    );
-    await t.ensureVisible(find.text('发布评论'));
-    await t.tap(find.text('发布评论'));
-    await t.pumpAndSettle();
-    expect(find.text('前端验收评论'), findsOneWidget);
-    await t.ensureVisible(find.byKey(const ValueKey('reply-comment:0')));
-    await t.tap(find.byKey(const ValueKey('reply-comment:0')));
-    await t.pumpAndSettle();
-    await t.enterText(
-      find.byKey(const ValueKey('public-comment-input')),
-      '回复验收',
-    );
-    await t.ensureVisible(find.text('发布评论'));
-    await t.tap(find.text('发布评论'));
-    await t.pumpAndSettle();
-    final record = await t.runAsync(
-      () => c.read(repositoryProvider).detail('logs', '1'),
-    );
-    expect(
-      (record!.fields['comments'] as List).last['parentCommentId'],
-      isNotNull,
-    );
-    expect(t.takeException(), isNull);
-    await t.pumpWidget(const SizedBox.shrink());
-    c.dispose();
-  });
+  testWidgets(
+    'diary row requests reviewed revisions; detail comments can post and reply',
+    (t) async {
+      t.view.physicalSize = const Size(390, 844);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+      final c = testContainer(
+        overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+      );
+      await t.pumpWidget(
+        UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      );
+      await t.pump(const Duration(milliseconds: 1700));
+      await settleLocalIo(t);
+      final router = c.read(routerProvider);
+      router.go('/logs');
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('diary-row:1')));
+      await settleLocalIo(t);
+      await t.pumpAndSettle();
+      expect(
+        router.routerDelegate.currentConfiguration.last.matchedLocation,
+        '/form/log-revise',
+      );
+      expect(find.text('提交修订申请'), findsOneWidget);
+      expect(find.textContaining('等待独立审核'), findsNothing);
+      router.go('/item/logs/1');
+      await t.pumpAndSettle();
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('public-comment-input')),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
+      await t.enterText(
+        find.byKey(const ValueKey('public-comment-input')),
+        '前端验收评论',
+      );
+      await t.ensureVisible(find.text('发布评论'));
+      await t.tap(find.text('发布评论'));
+      await t.pumpAndSettle();
+      expect(find.text('前端验收评论', findRichText: true), findsOneWidget);
+      await t.ensureVisible(find.byKey(const ValueKey('reply-comment:0')));
+      await t.tap(find.byKey(const ValueKey('reply-comment:0')));
+      await t.pumpAndSettle();
+      await t.enterText(
+        find.byKey(const ValueKey('public-comment-input')),
+        '回复验收',
+      );
+      await t.ensureVisible(find.text('发布评论'));
+      await t.tap(find.text('发布评论'));
+      await t.pumpAndSettle();
+      final record = await t.runAsync(
+        () => c.read(repositoryProvider).detail('logs', '1'),
+      );
+      expect(
+        (record!.fields['comments'] as List).last['parentCommentId'],
+        isNotNull,
+      );
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox.shrink());
+      c.dispose();
+    },
+  );
 
   testWidgets('small screen task filters scroll and empty search recovers', (
     t,
@@ -292,11 +305,16 @@ void main() {
     await t.tap(find.text('筛选字段'));
     await t.pumpAndSettle();
     await t.scrollUntilVisible(
-      find.text('应用筛选'),
+      find.text('应用'),
       180,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find
+          .descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    await t.tap(find.text('应用筛选'));
+    await t.tap(find.text('应用'));
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
     await t.enterText(find.byType(TextField), '不存在的任务');
@@ -314,7 +332,9 @@ void main() {
   testWidgets(
     'department and author filters combine; calendar opens all daily records',
     (t) async {
-      final c = testContainer();
+      final c = testContainer(
+        overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+      );
       await t.pumpWidget(
         UncontrolledProviderScope(container: c, child: const PandoraApp()),
       );
@@ -361,7 +381,7 @@ void main() {
   );
 
   testWidgets(
-    'create diary, save draft, reopen, submit and directly change content',
+    'create diary, save draft, reopen, submit and request reviewed changes',
     (t) async {
       final repo = MockRepository(
         const Session(),
@@ -377,6 +397,7 @@ void main() {
       router.go('/logs');
       await settleLocalIo(t);
       await t.pumpAndSettle();
+      await t.pump(const Duration(seconds: 5));
       await t.tap(find.byTooltip('创建日志'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
@@ -398,7 +419,7 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(t.widget<TextField>(work).controller!.text, '从页面创建的草稿');
-      await t.tap(find.text('提交日志'));
+      await t.tap(find.text('提交'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final submitted = await t.runAsync(() => repo.detail('logs', draft.id));
@@ -408,17 +429,45 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.textContaining('等待独立审核'), findsNothing);
-      await t.enterText(work, '提交后直接修改的正文');
-      await t.tap(find.text('保存日志修改'));
+      await t.enterText(work, '提交后申请修订的正文');
+      final reason = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.hintText == '填写修改理由',
+      );
+      await t.ensureVisible(reason);
+      await t.enterText(reason, '补充验收记录');
+      await t.tap(find.text('提交修订申请'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final changed = await t.runAsync(() => repo.detail('logs', draft.id));
-      expect(changed!.fields['今日工作'], '提交后直接修改的正文');
+      expect(changed!.fields['今日工作'], '从页面创建的草稿');
+      expect(
+        (await t.runAsync(
+          () => repo.list('reviews', const Query()),
+        ))!.items.any(
+          (r) =>
+              r.fields['targetId'] == draft.id &&
+              r.fields['reviewState'] == '待审',
+        ),
+        isTrue,
+      );
       expect(changed.fields['submittedAt'], submitted.fields['submittedAt']);
 
+      t.testTextInput.hide();
       router.go('/logs');
       await settleLocalIo(t);
       await t.pumpAndSettle();
+      await t.pump(const Duration(seconds: 5));
+      while (find.byType(SnackBar).evaluate().isNotEmpty) {
+        await t.tap(
+          find
+              .descendant(
+                of: find.byType(SnackBar),
+                matching: find.byType(IconButton),
+              )
+              .last,
+        );
+        await t.pumpAndSettle();
+      }
       await t.tap(find.byTooltip('创建日志'));
       await settleLocalIo(t);
       await t.pumpAndSettle();

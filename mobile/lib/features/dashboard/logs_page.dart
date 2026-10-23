@@ -131,8 +131,14 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                 hintText: '搜索姓名或日志内容',
                 prefixIcon: Icon(Icons.search),
               ),
-              onChanged: (value) =>
-                  setState(() => search = value.trim().toLowerCase()),
+              onChanged: (value) => setState(() {
+                search = value.trim().toLowerCase();
+                final filter = ref.read(subordinateLogFilterProvider);
+                ref.read(subordinateLogFilterProvider.notifier).state = (
+                  filter.$1,
+                  search,
+                );
+              }),
             ),
             const SizedBox(height: 12),
             people!.when(
@@ -162,7 +168,25 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                             selected: department,
                           );
                           if (selected != null && mounted) {
-                            setState(() => department = selected);
+                            setState(() {
+                              department = selected;
+                              final person = page.items
+                                  .where(
+                                    (p) =>
+                                        p.fields['departmentName'] == selected,
+                                  )
+                                  .firstOrNull;
+                              ref
+                                  .read(subordinateLogFilterProvider.notifier)
+                                  .state = (
+                                selected == '全部部门'
+                                    ? null
+                                    : (person?.fields['department_id'] ??
+                                              person?.fields['departmentId'])
+                                          ?.toString(),
+                                search,
+                              );
+                            });
                           }
                         },
                         icon: const Icon(Icons.apartment_outlined, size: 18),
@@ -219,15 +243,9 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                     if (r.ownerId == user.id || !isSubmittedDiary(r)) {
                       return false;
                     }
-                    final author = authors[r.ownerId];
-                    final group =
-                        '${author?.fields['departmentName'] ?? '未分组'}';
-                    if (department != '全部部门' && department != group) {
-                      return false;
-                    }
-                    return '${author?.title ?? r.fields['authorName'] ?? r.ownerId} ${r.title} ${r.fields['今日工作'] ?? r.fields['body'] ?? ''}'
-                        .toLowerCase()
-                        .contains(search);
+                    // Filtering belongs to the server: account matches need not
+                    // appear in the displayed author name or diary body.
+                    return true;
                   }).toList()..sort(
                     (a, b) => '${b.fields['businessDate']}'.compareTo(
                       '${a.fields['businessDate']}',
@@ -243,7 +261,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
               for (final r in items) {
                 final d = DateTime.tryParse('${r.fields['businessDate']}');
                 final group = team
-                    ? '${authors[r.ownerId]?.fields['departmentName'] ?? '未分组'}'
+                    ? '${r.fields['departmentName'] ?? authors[r.ownerId]?.fields['departmentName'] ?? '未分组'}'
                     : d == null
                     ? '未标记日期'
                     : '${d.year}年${d.month}月';

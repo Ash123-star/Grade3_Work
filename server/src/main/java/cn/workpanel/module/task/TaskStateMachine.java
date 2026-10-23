@@ -39,7 +39,8 @@ public final class TaskStateMachine {
         }
     }
 
-    public enum Role { PRIMARY, COLLABORATOR, ISSUER, ADMIN, OTHER }
+    /** PRIMARY/COLLABORATOR 只保留为历史兼容枚举；新规则只使用 PARTICIPANT。 */
+    public enum Role { PARTICIPANT, ISSUER, ADMIN, OTHER, @Deprecated PRIMARY, @Deprecated COLLABORATOR }
 
     public enum Result { ALLOWED, FORBIDDEN, INVALID_TRANSITION }
 
@@ -69,8 +70,8 @@ public final class TaskStateMachine {
 
     private static boolean mayPerform(Action action, EnumSet<Role> roles) {
         return switch (action) {
-            case RECEIVED -> roles.contains(Role.PRIMARY);
-            case FEEDBACK -> roles.contains(Role.PRIMARY) || roles.contains(Role.COLLABORATOR);
+            case RECEIVED -> roles.contains(Role.PARTICIPANT) || roles.contains(Role.PRIMARY);
+            case FEEDBACK -> roles.contains(Role.PARTICIPANT) || roles.contains(Role.PRIMARY) || roles.contains(Role.COLLABORATOR);
             case ACCEPTED, RETURNED, ARCHIVED, WITHDRAWN, REASSIGN, RESCHEDULE ->
                     roles.contains(Role.ISSUER) || roles.contains(Role.ADMIN);
         };
