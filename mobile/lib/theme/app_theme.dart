@@ -31,15 +31,78 @@ class AppTypography {
   );
 }
 
+class WorkMotion {
+  static const press = Duration(milliseconds: 120);
+  static const overlay = Duration(milliseconds: 200);
+  static const card = Duration(milliseconds: 220);
+  static const success = Duration(milliseconds: 300);
+  static Duration duration(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context) || !TickerMode.of(context)
+      ? Duration.zero
+      : card;
+  static AnimationStyle dialog(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context) || !TickerMode.of(context)
+      ? AnimationStyle.noAnimation
+      : const AnimationStyle(
+          duration: overlay,
+          reverseDuration: press,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+}
+
+/// 暂停后台与离屏装饰，保留完整状态文字及交互。
+class WorkMotionScope extends StatefulWidget {
+  const WorkMotionScope({required this.child, super.key});
+  final Widget child;
+  @override
+  State<WorkMotionScope> createState() => _WorkMotionScopeState();
+}
+
+class _WorkMotionScopeState extends State<WorkMotionScope>
+    with WidgetsBindingObserver {
+  bool foreground = true;
+  @override
+  void initState() {
+    super.initState();
+    foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (mounted) {
+      setState(() => foreground = state == AppLifecycleState.resumed);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => TickerMode(
+    enabled: foreground && !MediaQuery.disableAnimationsOf(context),
+    child: widget.child,
+  );
+}
+
 class SunnyPalette {
-  static const primary = Color(0xFF55D8A5);
-  static const primaryStrong = Color(0xFF319E7A);
-  static const onPrimary = Color(0xFF193A2D);
+  static const primary = Color(0xFFF08A3C);
+  static const primaryStrong = Color(0xFFB65B1F);
+  static const onPrimary = Color(0xFF44210D);
+  static const primaryContainer = Color(0xFFFFE3C2);
+  static const onPrimaryContainer = Color(0xFF65380F);
   static const paper = Color(0xFFFFFDF4);
   static const surface = Color(0xFFFFFFFF);
   static const ink = Color(0xFF43514B);
   static const muted = Color(0xFF7F8B83);
   static const mint = Color(0xFFE6FAEF);
+  static const successInk = Color(0xFF287653);
   static const blue = Color(0xFFDDF1FA);
   static const purple = Color(0xFFF1E7FF);
   static const orange = Color(0xFFFFF4B8);
@@ -48,12 +111,21 @@ class SunnyPalette {
   static const calendarEntries = [coral, mint, blue, purple];
 }
 
+/// Quiet surfaces for the Shiba brand pages; business colors stay semantic.
+class DogBrandPalette {
+  static const canvas = Color(0xFFF8F6F2);
+  static const surface = Color(0xFFFFFEFC);
+  static const line = Color(0xFFEAE5DE);
+  static const ink = Color(0xFF403B36);
+  static const muted = Color(0xFF80776E);
+}
+
 /// Semantic roles owned by the app, separate from immutable illustration colors.
 class SunnyPaperTokens extends ThemeExtension<SunnyPaperTokens> {
   const SunnyPaperTokens({
     this.canvas = SunnyPalette.paper,
-    this.pressed = const Color(0xFF319E7A),
-    this.actionEdge = const Color(0xFF247B5D),
+    this.pressed = const Color(0xFFD9752F),
+    this.actionEdge = const Color(0xFFB65B1F),
     this.focus = const Color(0xFF8B4AC9),
     this.warm = const Color(0xFFFFF4B8),
     this.ai = SunnyPalette.purple,
@@ -149,21 +221,21 @@ ThemeData appTheme() {
     seedColor: SunnyPalette.primary,
     primary: SunnyPalette.primary,
     onPrimary: SunnyPalette.onPrimary,
-    primaryContainer: SunnyPalette.mint,
-    onPrimaryContainer: const Color(0xFF246447),
+    primaryContainer: SunnyPalette.primaryContainer,
+    onPrimaryContainer: SunnyPalette.onPrimaryContainer,
     secondary: const Color(0xFF7650B6),
     onSecondary: Colors.white,
     secondaryContainer: const Color(0xFFF1E7FF),
     onSecondaryContainer: const Color(0xFF7650B6),
-    tertiary: const Color(0xFF319E7A),
+    tertiary: const Color(0xFFC66A2E),
     onTertiary: Colors.white,
-    tertiaryContainer: SunnyPalette.mint,
-    onTertiaryContainer: const Color(0xFF246447),
+    tertiaryContainer: const Color(0xFFFFE9D4),
+    onTertiaryContainer: const Color(0xFF65380F),
     surface: SunnyPalette.surface,
     onSurface: SunnyPalette.ink,
     onSurfaceVariant: SunnyPalette.muted,
-    outline: const Color(0xFFB7CFC2),
-    outlineVariant: const Color(0xFFE1EEE7),
+    outline: const Color(0xFFD8C3AE),
+    outlineVariant: const Color(0xFFECE1D4),
     error: const Color(0xFFC94E5B),
     errorContainer: SunnyPalette.coral,
   );
@@ -253,7 +325,7 @@ ThemeData appTheme() {
       backgroundColor: SunnyPalette.surface,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
-      dragHandleColor: Color(0xFFB7CFC2),
+      dragHandleColor: Color(0xFFD8C3AE),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -314,11 +386,11 @@ ThemeData appTheme() {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFB7CFC2), width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFFD8C3AE), width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF319E7A), width: 2),
+        borderSide: const BorderSide(color: SunnyPalette.primaryStrong, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -331,12 +403,12 @@ ThemeData appTheme() {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: SunnyPalette.surface,
-      indicatorColor: SunnyPalette.mint,
+      indicatorColor: SunnyPalette.primaryContainer,
       height: 76,
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
           color: states.contains(WidgetState.selected)
-              ? const Color(0xFF319E7A)
+              ? SunnyPalette.primaryStrong
               : SunnyPalette.muted,
         ),
       ),
@@ -345,7 +417,7 @@ ThemeData appTheme() {
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: states.contains(WidgetState.selected)
-              ? const Color(0xFF319E7A)
+              ? SunnyPalette.primaryStrong
               : SunnyPalette.muted,
         ),
       ),

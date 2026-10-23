@@ -142,23 +142,38 @@ Pass "org scope correct (leader can dispatch alice, not cross-dept bob)"
 
 # 8. Task dispatch + idempotency + authorization
 $deadline = (Get-Date).Date.AddDays(1).AddHours(23).AddMinutes(59).ToString('yyyy-MM-ddTHH:mm:sszzz')
-$taskBody = @{ title='product-task'; ownerId=$script:ids['alice']; deadline=$deadline; urgency='NORMAL'; content='task content'; collaborators=@() }
+$startAt = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz')
+$taskBody = @{ title='product-task'; participants=@($script:ids['alice']); startAt=$startAt; deadline=$deadline; urgency='NORMAL'; content='task content' }
 $created = Invoke-Api 200 POST '/tasks' 'leader' $taskBody 'product-task'
-$task = $created.id
-Pass "task dispatched id=$task"
+$task = $created.target_id
+if ($created.status -ne 'PENDING' -or -not $task) { throw 'task creation did not return a pending review' }
+Pass 'task creation returned pending review'
 $replay = Invoke-Api 200 POST '/tasks' 'leader' $taskBody 'product-task'
-if ($replay.id -ne $task) { throw 'idempotent replay returned different task' }
-Pass 'same idempotency key replays same task'
+if ($replay.id -ne $created.id) { throw 'idempotent replay returned different review' }
+Pass 'same idempotency key replays same review'
 $conflict = $taskBody.Clone(); $conflict['title'] = 'different content'
 Invoke-Api 409 POST '/tasks' 'leader' $conflict 'product-task' | Out-Null
 Pass 'idempotency key with different content -> 409'
 Invoke-Api 403 POST '/tasks' 'alice' @{ title='employee dispatch'; ownerId=$script:ids['alice']; deadline=$deadline; urgency='NORMAL'; content='x'; collaborators=@() } 'employee-dispatch' | Out-Null
 Pass 'employee without dispatch right -> 403'
+Invoke-Api 404 GET "/tasks/$task" 'alice' | Out-Null
+Approve-Review $created.id 'leader' | Out-Null
+$effectiveTask = Invoke-Api 200 GET "/tasks/$task" 'alice'
+if (-not ($effectiveTask.participants | Where-Object { $_.id -eq $script:ids['alice'] }) -or
+    -not $effectiveTask.start_at) { throw 'approved task lost participants or start time' }
+Pass 'task becomes visible after independent review with participants/start time'
 $row = (Invoke-Api 200 GET '/tasks' 'alice').items[0]
 foreach ($f in @('phase','status','completion','events')) {
     if ($row.PSObject.Properties.Name -contains $f) { throw "task list leaked forbidden field: $f" }
 }
 Pass 'task list has no phase/status/completion/events field'
+$taskComment = Invoke-Api 200 POST "/tasks/$task/comments" 'leader' @{ text='task public comment' } 'task-comment-1'
+$taskReply = Invoke-Api 200 POST "/tasks/$task/comments" 'alice' @{ text='task reply'; parentId=$taskComment.id } 'task-reply-1'
+if ($taskReply.parent_id -ne $taskComment.id -or -not $taskReply.nickname) { throw 'task reply metadata missing' }
+Invoke-Api 409 POST "/tasks/$task/comments" 'alice' @{ text='task reply'; parentId=$taskComment.id } 'task-reply-1' | Out-Null
+Invoke-Api 400 POST "/tasks/$task/comments" 'alice' @{ text='no key' } | Out-Null
+Invoke-Api 404 GET "/tasks/$task/comments" 'bob' | Out-Null
+Pass 'task comments preserve reply relation, reject duplicate key/missing key and peer read'
 
 # 9. Task lifecycle: received -> feedback -> accepted -> archived, version concurrency
 $received = Invoke-Api 200 POST "/tasks/$task/events" 'alice' @{ type='RECEIVED'; version=1 }

@@ -5,6 +5,7 @@ import 'models.dart';
 class LogEditWindow {
   const LogEditWindow(this.record);
   final Record record;
+  bool get submitted => isSubmittedDiary(record);
 
   DateTime? get until =>
       DateTime.tryParse('${record.fields['editableUntil']}') ??

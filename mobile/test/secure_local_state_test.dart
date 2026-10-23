@@ -1,4 +1,5 @@
 import 'support/flutter_sdk_assets.dart';
+import 'support/workflow_fixture.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -326,7 +327,9 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.resetPhysicalSize);
       addTearDown(t.view.resetDevicePixelRatio);
-      final c = testContainer();
+      final c = testContainer(
+        overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+      );
       addTearDown(c.dispose);
       final day = DateTime(2026, 10, 13);
       c.read(logDateProvider.notifier).state = day;
@@ -335,12 +338,13 @@ void main() {
       await t.pumpWidget(
         UncontrolledProviderScope(container: c, child: const PandoraApp()),
       );
-      c.read(routerProvider).go('/form/log-edit');
+      c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await t.pumpAndSettle();
       await settleLocalIo(t);
       await t.pumpAndSettle();
       await t.enterText(find.byType(TextFormField).first, '真实加密编辑链路');
       await t.tap(find.text('保存草稿'));
+      await waitForLocalState(t, find.text('草稿已加密保存到此设备'));
       await t.pumpAndSettle();
       final saved = await t.runAsync(
         () => store.read(DraftLocation.diary('u1', day)),
@@ -348,7 +352,7 @@ void main() {
       expect(saved!.fields['今日工作'], '真实加密编辑链路');
       c.read(routerProvider).go('/logs');
       await t.pumpAndSettle();
-      c.read(routerProvider).go('/form/log-edit');
+      c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await t.pumpAndSettle();
       await settleLocalIo(t);
       await t.pumpAndSettle();
@@ -446,7 +450,9 @@ void main() {
   testWidgets(
     'failed encryption keeps editor input and recovers with explicit save',
     (t) async {
-      final c = testContainer();
+      final c = testContainer(
+        overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+      );
       addTearDown(c.dispose);
       final secure = c.read(secureValuesProvider) as MemorySecureValues;
       secure.failRead = true;
@@ -455,12 +461,13 @@ void main() {
       await t.pumpWidget(
         UncontrolledProviderScope(container: c, child: const PandoraApp()),
       );
-      c.read(routerProvider).go('/form/log-edit');
+      c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.textContaining('草稿读取失败'), findsOneWidget);
       await t.enterText(find.byType(TextFormField).first, '本机失败仍保留');
       await t.tap(find.text('保存草稿'));
+      await waitForLocalState(t, find.textContaining('草稿保存失败'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.textContaining('草稿保存失败'), findsOneWidget);
@@ -473,6 +480,7 @@ void main() {
       );
       secure.failRead = false;
       await t.tap(find.text('保存草稿'));
+      await waitForLocalState(t, find.text('草稿已加密保存到此设备'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final draft = await t.runAsync(
@@ -527,10 +535,7 @@ void main() {
   testWidgets('render safe restart recovery at360dp and1.5 text', (t) async {
     for (final item in [
       ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
-      (
-        'MaterialIcons',
-        materialIconsFontPath,
-      ),
+      ('MaterialIcons', materialIconsFontPath),
     ]) {
       final loader = FontLoader(item.$1)
         ..addFont(

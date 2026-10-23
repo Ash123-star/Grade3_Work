@@ -80,7 +80,7 @@ flutter run -d web-server --web-hostname 127.0.0.1 --web-port 5175
 
 ## 当前 UI 设计基线（2026-10-13）
 
-后续实现以[团团记账气质 UI 设计基线](docs/tuantuan-ui-design-system.md)为唯一视觉基线：奶油纸张、薄荷主色、浅黄/珊瑚/浅蓝语义分区、圆角卡片、原创 Q 版小猪角色、彩色业务图标和克制动效。旧版阳光纸张/动漫橙设计稿已从当前文档集中清理。素材生成规则见[image-2.5 素材提示词](docs/image-2.5-ui-asset-generation-prompts.md)。
+当前 mobile 视觉采用暖白画布、分组表面、细边线和留白；柴犬只作少量品牌装饰，不代表用户身份或业务状态。真实用户头像、任务状态、权限、成功、失败和加载均保留各自语义。素材记录见 `assets/licenses/generated-ui-sources.json` 与 OpenSpec `frontend-requirements-adjustment`；实际资源包与设备显示仍以统一验收为准。
 
 2026-10-13 已依 [阶段 3 设计](docs/stage-3-page-layout-and-interaction-design.md) 重建五个主页、连续日志编辑、任务时间线和审批对比布局，同时重排辅助表单、成员、设置和状态页，补齐验收成果、转派旧值、本人时间线与只读日志版本。正式附件、AI、管理/统计和安全草稿/会话恢复客户端已接现有契约；[实际 Flutter 八屏截图](docs/evidence/stage3-rebuild/stage3-rebuild-contact-sheet.png)、[组件与六姿态](docs/evidence/stage3-rebuild/41-sunny-component-states.png) 与[验收记录](docs/stage-3-verification.md)属于上一轮阳光纸张/动漫橙主题实现，不能证明团团记账新视觉已完成。团团记账风格目前处于设计基线和素材生成阶段，后续需按新文档重新迁移组件和页面。帮助反馈/退回补充/精细AI范围缺少现有服务端契约，真实服务/数据库/设备尚未联调，不能视为线上能力完成。
 

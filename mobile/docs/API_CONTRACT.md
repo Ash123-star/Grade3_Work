@@ -1,12 +1,22 @@
 # 前端接口草案
 
-## 2026-10-22 week6 已核对增量
+## 2026-10-23 PR #33 主线整合
+
+基线更新到 main 808d9d6。下方dc00e2b的后端缺口仅是历史记录。新任务将界面participantIds/tagId转换为请求participants/labelId，保留startAt、deadline和审核申请响应；任务详情的服务端label映射为tagId/tagName/tagColor/tagCategory，参与人姓名映射沿用主线规则。
+
+任务评论POST /tasks/{id}/comments支持parentId并要求Command.idempotencyKey；GET tasks/{id}/comments及GET task-labels已登记Repository列表入口。日志评论仍没有幂等键、不自动重试，读取同时提供actorName与authorName。标签选择器的静态数据替换、任务评论页面完整读取及最新任务真实链路仍待后续验收，不以Repository契约测试替代。
+
+## 2026-10-22 week6 旧基线记录（dc00e2b）
 
 以 main dc00e2b 后端为准：下属日志 Query 增加 departmentId，分页保留 search/ownerId/date/period；日志 department 对象映射 departmentId/departmentName、author 映射 authorName。服务端能力字段完整保留，LogEditWindow 用于窗口展示，撤回不重置首次提交时间。
 
 日志评论回复将 HCJ parentCommentId 转换为请求 parentId，读取保留评论 id/作者/父评论/时间；POST 不自动重试。日志撤回 action=withdraw 发送 version/reason；已提交日志继续使用 request-review。过期和限流有明确提示。
 
 startAt/participantIds/tagId 与 tasks/comments 尚无后端契约，正式客户端明确拒绝，旧任务字段迁移未完成。SSE 沿用现有实现。HCJ 页面未合并，数据层通过不代表页面接通。详细证据和未完成项见 ../../docs/zhw-week6-validation.md。
+
+## 2026-10-23 任务显示元数据
+
+派发和修改沿用 `tagId`、`participantIds` 标识；任务读响应应同时返回 `tagName` 和与ID顺序一致的 `participantNames`，或包含真实姓名的participants对象列表。适配层接受camelCase与snake_case。显示名不参与权限判断；内置标签ID统一映射中文，未知标签且无名称显示“标签名称未提供”，缺失成员姓名显示“成员姓名未提供”，不得把ID当姓名或查询越权人员补名。Mock按已有演示组织的真实姓名补全新建和历史任务，只是本地显示契约，不证明真实服务联调通过。
 
 本契约用于 UI 框架接入，尚非已经上线的服务。所有请求使用 HTTPS；认证后附加 Bearer token，服务端再次验证 company_id、角色和对象范围。客户端不接收 DeepSeek 密钥。
 
@@ -40,6 +50,8 @@ POST /{resource} 接收 `{action, values, version?}`，修改命令在 values �
 
 ## 页面与接口
 
+完整的页面、操作、接口状态和后端实现输入见 [`api-surface-coverage.md`](api-surface-coverage.md)。本文件以下内容描述已确认的通用请求规则；待定契约不代表已有可调用 URL。
+
 | 页面入口 | resource | action / 行为 |
 | --- | --- | --- |
 | /form/login、register、password | auth | login/register/password，注册不允许 role 参数 |
@@ -58,13 +70,13 @@ POST /{resource} 接收 `{action, values, version?}`，修改命令在 values �
 
 任务表单必填 title、deadline、ownerId；仅一个主负责人。派发页不显示完成情况字段，流转事件放到详情。API 日期字段转换使用 UTC，显示采用业务日期。
 
-## 待接入的异步边界
+## 已接入与待定的异步边界
 
 附件已接POST `/attachments` multipart file，1字节至10MB，返回id/filename/size；任务提交引用实际ID，GET `/attachments/{id}`受认证字节保存，使用Content-Disposition安全文件名。头像保存同样引用实际上传ID。未有DELETE接口，移除表单文件不代表服务端清理；成果反馈接口不支持附件关联时禁用上传。真实设备文件对话框/服务未验收。
 
-SSE 建议 GET /notifications/stream，事件携带 id、type、objectId，支持 Last-Event-ID 重连；由后端事务 outbox 保证最终投递，客户端按事件 ID 去重并刷新未读数。当前 UI 使用 repository 拉取，SSE 消费器属于服务接入阶段。
+通知 SSE 已由服务端 `GET /notifications/stream` 和 Flutter `NotificationStream` 接入；事件携带 id/sequence，支持 Last-Event-ID 重连。客户端按序号刷新列表，服务端事务 outbox 负责最终投递。AI 作业 SSE 使用独立 `/ai/jobs/{id}/stream`。
 
-正式AI已有客户端接入：POST `/ai/jobs`、GET `/ai/jobs/{id}`、DELETE取消、POST retry、PUT draft、GET stream、POST confirm-task、GET usage及GET/POST地图，详细见下方。演示固定样例不调用外部模型。导出使用已有同步CSV GET `/analytics/export` 和实际字节保存，无异步job或短期URL契约。
+正式 AI 已有客户端接入：POST `/ai/jobs`、GET `/ai/jobs/{id}`、DELETE 取消、POST retry、PUT draft、GET stream、POST confirm-task、GET usage 及 GET/POST 地图，详细见下方。演示固定样例不调用外部模型。AI 范围选择和确认 job 版本原子保护仍是待定契约。导出使用已有同步 CSV GET `/analytics/export` 和实际字节保存，无异步 job 或短期 URL 契约。
 
 ## 界面范围
 

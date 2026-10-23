@@ -10,6 +10,7 @@ import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
+import 'package:pandora_mobile/features/dashboard/dashboard_pages.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/pandora_splash.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
@@ -108,9 +109,7 @@ void main() {
           ..addFont(
             Future.value(
               ByteData.sublistView(
-                File(
-                  materialIconsFontPath,
-                ).readAsBytesSync(),
+                File(materialIconsFontPath).readAsBytesSync(),
               ),
             ),
           );
@@ -211,12 +210,8 @@ void main() {
           expect(t.takeException(), isNull, reason: '$name $config');
           await capture(name);
           if (name == 'task') {
-            final more = find.byTooltip('更多操作');
-            expect(t.getCenter(more).dx, greaterThan(config.$1 * .7));
-            expect(t.getSize(more).height, greaterThanOrEqualTo(48));
-            await t.tap(more);
-            await t.pumpAndSettle();
-            expect(find.text('我的私人备注'), findsOneWidget);
+            expect(find.text('接收任务'), findsOneWidget);
+            expect(find.text('转派任务'), findsNothing);
           }
           if (name == 'inbox') {
             await t.tap(find.text('未读'));
@@ -241,25 +236,44 @@ void main() {
               expect(rect.right, lessThanOrEqualTo(grid.right));
               expect(rect.right, lessThanOrEqualTo(config.$1));
             }
-            expect(t.getSize(day).width, lessThan(config.$1 / 7));
+            expect(t.getSize(day).width, closeTo(config.$1 / 7, .001));
             expect(t.getSize(day).height, greaterThanOrEqualTo(48));
-            final previews = find.descendant(
-              of: day,
-              matching: find.textContaining('完成工作台'),
+            final previews = find.byWidgetPredicate(
+              (w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith(
+                    'month-span:tasks:',
+                  ),
             );
-            expect(previews, findsNWidgets(2));
+            final previewCount = previews.evaluate().length;
+            expect(previewCount, inInclusiveRange(1, 3));
+            for (final preview in previews.evaluate()) {
+              expect(
+                t.getRect(find.byWidget(preview.widget)).bottom,
+                lessThanOrEqualTo(t.getRect(day).bottom),
+              );
+            }
             expect(
               find.descendant(of: day, matching: find.textContaining('任·')),
               findsNothing,
             );
             expect(find.text('任：任务 · 日：日志 · 点击日期查看全文'), findsNothing);
-            expect(find.text('+1'), findsWidgets);
+            expect(find.text('完成工作台交'), findsNWidgets(previewCount));
             await t.ensureVisible(day);
             await t.pumpAndSettle();
             await capture('month-selected');
             await t.tap(day);
             await t.pumpAndSettle();
             expect(find.byTooltip('关闭当天记录'), findsOneWidget);
+            for (var i = 0; i < 3; i++) {
+              expect(
+                find.descendant(
+                  of: find.byType(BottomSheet),
+                  matching: find.text('完成工作台交互稿与客户访谈记录$i'),
+                ),
+                findsOneWidget,
+              );
+            }
             expect(
               find.descendant(of: day, matching: find.byType(TuantuanSkin)),
               findsNothing,
@@ -271,7 +285,12 @@ void main() {
             await t.scrollUntilVisible(
               find.text('设置'),
               250,
-              scrollable: find.byType(Scrollable).first,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(ProfilePage),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
             );
             await t.pumpAndSettle();
             await capture('profile-actions');

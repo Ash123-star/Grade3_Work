@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/attachments.dart';
+import 'package:pandora_mobile/data/repositories/ai_work_repository.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 
@@ -71,9 +72,10 @@ class AttachmentEditor extends ConsumerStatefulWidget {
     required this.onChanged,
     this.avatar = false,
     this.enabled = true,
+    this.aiWork = false,
   });
   final ValueChanged<AttachmentSelection> onChanged;
-  final bool avatar, enabled;
+  final bool avatar, enabled, aiWork;
   @override
   ConsumerState<AttachmentEditor> createState() => _AttachmentEditorState();
 }
@@ -112,6 +114,39 @@ class _AttachmentEditorState extends ConsumerState<AttachmentEditor> {
       for (final file in files) {
         file.validate(avatar: widget.avatar);
       }
+      if (widget.aiWork) {
+        final caps = await ref.read(workCapabilitiesProvider.future);
+        if (!authorized) return;
+        final limits = caps.limits;
+        final maximum = (limits['files'] as num?)?.toInt() ?? 5;
+        final fileBytes =
+            (limits['fileBytes'] as num?)?.toInt() ?? maximumAttachmentBytes;
+        final totalBytes =
+            (limits['totalBytes'] as num?)?.toInt() ?? 30 * 1024 * 1024;
+        final formats =
+            (limits['formats'] as List? ??
+            ['png', 'jpg', 'jpeg', 'pdf', 'docx', 'xlsx']);
+        if (files.any(
+          (f) => !formats.contains(f.name.split('.').last.toLowerCase()),
+        )) {
+          throw const ApiFailure(
+            FailureKind.validation,
+            '请添加图片、PDF、Word或Excel文件',
+          );
+        }
+        final total = [
+          ...entries.map((e) => e.file),
+          ...files,
+        ].fold<int>(0, (n, f) => n + f.bytes.length);
+        if (entries.length + files.length > maximum ||
+            files.any((f) => f.bytes.length > fileBytes) ||
+            total > totalBytes) {
+          throw ApiFailure(
+            FailureKind.validation,
+            '一次最多添加$maximum份材料，每份不超过${fileBytes ~/ (1024 * 1024)}MB，总大小不超过${totalBytes ~/ (1024 * 1024)}MB',
+          );
+        }
+      }
       if (widget.avatar) {
         for (final e in entries) {
           e.cancellation?.cancel();
@@ -147,6 +182,7 @@ class _AttachmentEditorState extends ConsumerState<AttachmentEditor> {
     try {
       final result = await repository.uploadAttachment(
         entry.file,
+        aiWork: widget.aiWork,
         cancelToken: token,
         onProgress: (sent, total) {
           if (authorized && !token.isCancelled && entries.contains(entry)) {
@@ -251,7 +287,7 @@ class _AttachmentEditorState extends ConsumerState<AttachmentEditor> {
                       ? '上传中'
                       : '上传未完成'}',
                 ),
-                if (e.sending) LinearProgressIndicator(value: e.progress),
+                if (e.sending) SunnyProgressBar(value: e.progress ?? 0),
                 if (e.error != null)
                   Text(
                     '上传失败：${e.error}',
@@ -325,7 +361,7 @@ class ProtectedAvatar extends ConsumerWidget {
           loading: () => SizedBox(
             width: radius * 2,
             height: radius * 2,
-            child: const Center(child: CircularProgressIndicator()),
+            child: const Center(child: SunnyLoadingIndicator()),
           ),
           error: (_, _) => Semantics(
             label: '头像未能加载，点击重试',

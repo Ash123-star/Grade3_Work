@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,590 +9,18 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
-import 'package:pandora_mobile/shared/sunny_widgets.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
-import 'package:pandora_mobile/features/common/demo_pages.dart';
+import 'package:pandora_mobile/features/calendar/calendar_content.dart';
+export 'dashboard_home.dart';
+export 'logs_page.dart';
 export 'package:pandora_mobile/features/ai_map/ai_map_page.dart';
 
 String dayLabel(DateTime d) =>
     '${d.month}月${d.day}日 周${['一', '二', '三', '四', '五', '六', '日'][d.weekday - 1]}';
 String savedTime(DateTime d) =>
     '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-
-class DashboardPage extends ConsumerWidget {
-  const DashboardPage({super.key});
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(sessionProvider);
-    final draftState = ref.watch(todayDraftProvider(user.id));
-    final draft = draftState.valueOrNull;
-    final unread = ref
-        .watch(recordsProvider('notifications'))
-        .valueOrNull
-        ?.items
-        .where((r) => r.fields['read'] != true)
-        .length;
-    final specs = [
-      ('公司重点', SunnyPalette.blue, 'dashboard/company'),
-      ('公司任务', SunnyPalette.orange, 'tasks'),
-      ('个人重点', SunnyPalette.purple, 'dashboard/personal'),
-      ('个人日志', SunnyPalette.mint, 'logs'),
-    ];
-    Widget tile(int index) {
-      final spec = specs[index];
-      final provider = index >= 2
-          ? memberRecordsProvider((spec.$3, user.id))
-          : recordsProvider(spec.$3);
-      return PaperSurface(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-        skin: TuantuanAssets
-            .surfaces[['blue', 'warm', 'lavender', 'mint'][index]],
-        color: spec.$2,
-        cornerDecoration: TuantuanAssets
-            .cardCorners[['blue', 'warm', 'lavender', 'mint'][index]],
-        onTap: () =>
-            index == 3 ? context.go('/logs') : openList(context, spec.$3),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                TuantuanIconTile(
-                  icon: ['mindmap', 'task', 'ai', 'log'][index],
-                  color: spec.$2,
-                  size: MediaQuery.textScalerOf(context).scale(1) > 1.3
-                      ? 36
-                      : 40,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    spec.$1,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (index == 3 && draftState.hasError)
-              TextButton(
-                onPressed: () => ref.invalidate(todayDraftProvider(user.id)),
-                child: const Text('本机草稿读取失败，重试'),
-              ),
-            if (index == 3 && draft != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '今天草稿',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '保存于 ${savedTime(draft)} · 继续写',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: CuteTokens.muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ref
-                .watch(provider)
-                .when(
-                  loading: () => const LinearProgressIndicator(),
-                  error: (_, _) => const Text('暂时不可用'),
-                  data: (page) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (page.items.isEmpty && !(index == 3 && draft != null))
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text('暂无记录'),
-                        ),
-                      for (final item in page.items.take(
-                        index == 3 && draft != null ? 1 : 2,
-                      ))
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                index == 1
-                                    ? '截止 ${_shortDeadline(item.fields['deadline'])}'
-                                    : index == 3
-                                    ? '${item.fields['businessDate'] ?? ''} · 已提交'
-                                    : item.subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: CuteTokens.muted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-            const SizedBox(height: 4),
-            const Row(
-              children: [
-                TuantuanStatusPill('查看全部', color: SunnyPalette.surface),
-                SizedBox(width: 4),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 16,
-                  color: SunnyPalette.muted,
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    return PageFrame(
-      title: '导图',
-      fab: user.manager && user.dispatch
-          ? FloatingActionButton(
-              heroTag: 'dashboard-dispatch',
-              tooltip: '派发任务',
-              onPressed: () => openForm(context, 'dispatch'),
-              child: const Icon(Icons.add),
-            )
-          : null,
-      child: PageBody(
-        bottomPadding: 88,
-        children: [
-          SunnyWelcome(
-            title: '你好，${user.name}',
-            subtitle: '${dayLabel(DateTime.now())} · 从重要的事开始',
-            mascotAsset: 'welcome',
-            action: TextButton.icon(
-              onPressed: () => openList(context, 'notifications'),
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: .8),
-              ),
-              icon: const Icon(Icons.notifications_none_rounded, size: 18),
-              label: Text(
-                '消息 ${unread ?? '—'}',
-                style: const TextStyle(color: SunnyPalette.ink),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          for (var row = 0; row < 2; row++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: tile(row * 2)),
-                    const SizedBox(width: 12),
-                    Expanded(child: tile(row * 2 + 1)),
-                  ],
-                ),
-              ),
-            ),
-          PaperSurface(
-            skin: TuantuanAssets.metric,
-            onTap: () {
-              ref.read(selectedDateProvider.notifier).state = DateTime.now();
-              context.go('/view');
-            },
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '打开今天的时间视图',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  '查看任务期限与工作记录',
-                  style: TextStyle(color: CuteTokens.muted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          const DemoLabel(),
-        ],
-      ),
-    );
-  }
-}
-
-String _shortDeadline(dynamic value) {
-  final date = DateTime.tryParse('$value')?.toLocal();
-  return date == null ? '未设置' : '${date.month}月${date.day}日 ${savedTime(date)}';
-}
-
-class LogsPage extends ConsumerStatefulWidget {
-  const LogsPage({super.key, this.subordinates = false});
-  final bool subordinates;
-  @override
-  ConsumerState<LogsPage> createState() => _LogsPageState();
-}
-
-class _LogsPageState extends ConsumerState<LogsPage> {
-  String? member;
-  int period = 0;
-  @override
-  Widget build(BuildContext context) {
-    final user = ref.watch(sessionProvider);
-    final team = widget.subordinates;
-    if (team && !user.manager) {
-      return const PageFrame(
-        title: '下属日志',
-        child: EmptyIllustration(showCharacter: false, title: '无权访问'),
-      );
-    }
-    final date = ref.watch(logFilterDateProvider);
-    final editDate = date ?? DateTime.now();
-    final resource = team ? 'logs/subordinates' : 'logs';
-    final data = ref.watch(
-      logDayRecordsProvider((resource, team ? member : user.id)),
-    );
-    final existing = data.valueOrNull?.items
-        .where(
-          (r) =>
-              r.fields['businessDate'] ==
-              editDate.toIso8601String().split('T').first,
-        )
-        .firstOrNull;
-    final draftState = ref.watch(todayDraftProvider(user.id));
-    final draft = draftState.valueOrNull;
-    Future<void> edit({bool today = false}) async {
-      final chosen = today ? DateTime.now() : editDate;
-      ref.read(logDateProvider.notifier).state = chosen;
-      final item = today
-          ? data.valueOrNull?.items
-                .where(
-                  (r) =>
-                      r.fields['businessDate'] ==
-                      chosen.toIso8601String().split('T').first,
-                )
-                .firstOrNull
-          : existing;
-      await context.push(
-        '/form/${item == null || item.fields['status'] == '草稿' ? 'log-edit' : 'log-revise'}${item == null ? '' : '?id=${encode(item.id)}&version=${item.version}'}',
-      );
-      ref.invalidate(todayDraftProvider(user.id));
-    }
-
-    return PageFrame(
-      title: team ? '下属日志' : '日志',
-      actions: [
-        if (!team && user.manager)
-          TextButton(
-            onPressed: () => context.push('/logs/subordinates'),
-            child: const Text('下属日志 ›'),
-          ),
-      ],
-      bottom: team
-          ? null
-          : BottomActions(
-              primary: SunnyPrimaryButton.icon(
-                onPressed: data.isLoading || data.hasError
-                    ? null
-                    : () => edit(),
-                icon: const Icon(Icons.add),
-                label: Text(
-                  existing != null
-                      ? '${existing.fields['status'] == '草稿' ? '继续编辑' : '申请修订'}${date == null ? '今天' : dayLabel(editDate)}日志'
-                      : date == null
-                      ? '写今天日志'
-                      : '写${editDate.month}月${editDate.day}日日志',
-                ),
-              ),
-            ),
-      child: PageBody(
-        children: [
-          if (!team)
-            PillTabs(
-              labels: const ['日报', '周报', '月报'],
-              selected: period,
-              onChanged: (v) => setState(() => period = v),
-            ),
-          if (team) ...[
-            const Text(
-              '仅展示授权范围内已提交日志，不含草稿',
-              style: TextStyle(color: CuteTokens.muted),
-            ),
-            const SizedBox(height: 12),
-            ref
-                .watch(recordsProvider('organization'))
-                .when(
-                  loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => ErrorPanel('$e'),
-                  data: (page) => DropdownButtonFormField<String>(
-                    initialValue: member,
-                    decoration: const InputDecoration(labelText: '选择下属'),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('全部下属')),
-                      for (final person in page.items.where(
-                        (p) => p.id != user.id,
-                      ))
-                        DropdownMenuItem(
-                          value: person.id,
-                          child: Text(person.title),
-                        ),
-                    ],
-                    onChanged: (v) => setState(() => member = v),
-                  ),
-                ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              TextButton.icon(
-                icon: const Icon(Icons.expand_more, size: 18),
-                label: Text(date == null ? '全部日期' : dayLabel(date)),
-                onPressed: () async {
-                  final next = await showDatePicker(
-                    context: context,
-                    initialDate: editDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2040),
-                  );
-                  if (next != null) {
-                    ref.read(logFilterDateProvider.notifier).state = next;
-                  }
-                },
-              ),
-              if (date != null)
-                TextButton(
-                  onPressed: () =>
-                      ref.read(logFilterDateProvider.notifier).state = null,
-                  child: const Text('全部日期'),
-                ),
-            ],
-          ),
-          if (!team) ...[
-            if (draftState.hasError)
-              ErrorPanel(
-                '本机加密草稿暂时无法读取，请重试；不要清除设备数据。',
-                retry: () => ref.invalidate(todayDraftProvider(user.id)),
-              ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                '今天，慢慢写也没关系',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-            ),
-            if (date == null && (existing == null || draft != null))
-              PaperSurface(
-                color: const Color(0xFFFFF0DA),
-                onTap: data.hasError || data.isLoading
-                    ? null
-                    : () => edit(today: true),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            draft == null ? '开始今天的日志' : '今天的日志草稿',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            draft == null
-                                ? '记录工作与下一步 →'
-                                : '${savedTime(draft)} 本机保存 · 继续写 →',
-                            style: const TextStyle(
-                              color: CuteTokens.muted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const TuantuanMascot('welcome', size: 62),
-                  ],
-                ),
-              ),
-          ],
-          const SizedBox(height: 16),
-          if (!team && period > 0)
-            PeriodReport(initialPeriod: period == 1 ? '周' : '月'),
-          if (period == 0 || team)
-            data.when(
-              loading: () => const LoadingSkeleton(),
-              error: (e, _) => ErrorPanel(
-                '$e',
-                retry: () => ref.invalidate(logDayRecordsProvider),
-              ),
-              data: (page) {
-                final items =
-                    page.items
-                        .where(
-                          (r) =>
-                              !team ||
-                              r.ownerId != user.id && isSubmittedDiary(r),
-                        )
-                        .toList()
-                      ..sort(
-                        (a, b) => '${b.fields['businessDate']}'.compareTo(
-                          '${a.fields['businessDate']}',
-                        ),
-                      );
-                if (items.isEmpty) {
-                  return const EmptyIllustration(
-                    title: '暂无日志',
-                    subtitle: '可以更换日期或开始填写',
-                  );
-                }
-                String group(Record r) {
-                  final d = DateTime.tryParse('${r.fields['businessDate']}');
-                  if (d == null) return '未标记日期';
-                  if (period != 1) return '${d.year}年${d.month}月';
-                  final mon = d.subtract(Duration(days: d.weekday - 1));
-                  return '${mon.month}月${mon.day}日起一周';
-                }
-
-                String? last;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final r in items) ...[
-                      if (group(r) != last)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 12),
-                          child: Text(
-                            last = group(r),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: CuteTokens.muted,
-                            ),
-                          ),
-                        ),
-                      _DiaryRow(
-                        record: r,
-                        onTap: () => openItem(context, resource, r.id),
-                        onMember: team
-                            ? () => context.push(
-                                '/me/team/${encode(r.ownerId)}/logs${date == null ? '' : '?date=${date.toIso8601String().split('T').first}'}',
-                              )
-                            : null,
-                      ),
-                    ],
-                  ],
-                );
-              },
-            ),
-          const DemoLabel(),
-        ],
-      ),
-    );
-  }
-}
-
-class _DiaryRow extends StatelessWidget {
-  const _DiaryRow({required this.record, required this.onTap, this.onMember});
-  final Record record;
-  final VoidCallback onTap;
-  final VoidCallback? onMember;
-  @override
-  Widget build(BuildContext context) {
-    final d = DateTime.tryParse('${record.fields['businessDate']}');
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 48,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${d?.day ?? '—'}',
-                    style: const TextStyle(
-                      fontFamily: AppTypography.displayFamily,
-                      fontSize: 27,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    d == null
-                        ? '未知'
-                        : '周${['一', '二', '三', '四', '五', '六', '日'][d.weekday - 1]}',
-                    style: const TextStyle(
-                      color: CuteTokens.muted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    record.title,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${record.fields['status'] ?? '已提交'} · v${record.version}',
-                    style: const TextStyle(
-                      color: Color(0xFF246447),
-                      fontSize: 12,
-                    ),
-                  ),
-                  if (onMember != null)
-                    TextButton.icon(
-                      onPressed: onMember,
-                      icon: const Icon(Icons.person_outline, size: 18),
-                      label: Text(
-                        '查看 ${record.fields['authorName'] ?? record.ownerId} 的工作台',
-                      ),
-                    ),
-                  const Divider(height: 24),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class CalendarPage extends ConsumerStatefulWidget {
   const CalendarPage({super.key, this.initialPeriod});
@@ -614,19 +43,88 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   }
 
   @override
-  Widget build(BuildContext context) => PageFrame(
-    title: '视图',
-    actions: [
-      TextButton(
-        onPressed: () =>
-            ref.read(selectedDateProvider.notifier).state = DateTime.now(),
-        child: const Text('今天'),
+  Widget build(BuildContext context) {
+    final user = ref.watch(sessionProvider);
+    final period = ref.watch(periodProvider);
+    final page = PageFrame(
+      title: '视图',
+      showTitle: false,
+      fab: user.manager && user.dispatch
+          ? FloatingActionButton(
+              heroTag: 'view-dispatch',
+              tooltip: '新增任务',
+              onPressed: () => openForm(context, 'dispatch'),
+              child: const Icon(Icons.add),
+            )
+          : null,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: period == '月' ? 0 : 16),
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: period == '月' ? 12 : 0),
+              child: const DateControls(),
+            ),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, viewport) => period == '月'
+                    ? Column(
+                        children: [
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, monthViewport) =>
+                                  CalendarContent(
+                                    availableHeight: monthViewport.maxHeight,
+                                  ),
+                            ),
+                          ),
+                          SizedBox(
+                            height: user.manager && user.dispatch ? 72 : null,
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                left: 16,
+                                right: user.manager && user.dispatch ? 88 : 16,
+                              ),
+                              child: const Align(
+                                alignment: Alignment.centerLeft,
+                                child: DemoLabel(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView(
+                        padding: EdgeInsets.only(
+                          bottom: user.manager && user.dispatch ? 80 : 16,
+                        ),
+                        children: [
+                          CalendarContent(
+                            availableHeight:
+                                viewport.maxHeight -
+                                (user.manager && user.dispatch ? 104 : 40),
+                          ),
+                          const DemoLabel(),
+                        ],
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ],
-    child: const PageBody(
-      children: [DateControls(), CalendarContent(), DemoLabel()],
-    ),
-  );
+    );
+    return SiblingSwipe(
+      index: ['日', '周', '月'].indexOf(period),
+      itemCount: 3,
+      onStep: (step) {
+        const periods = ['日', '周', '月'];
+        final next = periods.indexOf(period) + step;
+        if (next < 0 || next >= periods.length) return false;
+        ref.read(periodProvider.notifier).state = periods[next];
+        return true;
+      },
+      child: page,
+    );
+  }
 }
 
 class ProfilePage extends ConsumerWidget {
@@ -637,54 +135,115 @@ class ProfilePage extends ConsumerWidget {
     final profile = ref.watch(itemProvider(('organization/profile', user.id)));
     final unread = ref.watch(recordsProvider('notifications'));
     final reviews = ref.watch(recordsProvider('reviews'));
-    Widget link(String title, VoidCallback tap) => ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      leading: TuantuanIconTile(
-        icon: switch (title) {
-          '消息中心' => 'notification',
-          '工作统计' => 'report',
-          '审批中心' || '我的申请' => 'approval',
-          '设置' => 'settings',
-          '帮助与反馈' => 'help',
-          '审计记录' => 'log',
-          _ => 'members',
-        },
-        color: SunnyPalette.mint,
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      trailing: const Icon(Icons.chevron_right, size: 18),
-      subtitle: Text(switch (title) {
-        '消息中心' => '任务、审批与工作提醒',
-        '工作统计' => '查看授权范围内的工作数据',
-        '审批中心' || '我的申请' => '核对版本与审核进度',
-        '下属工作台' => '查看团队成员的工作概览',
-        '组织与成员' => '查看组织范围和人员资料',
-        '组织与权限' => '组织配置与权限申请',
-        _ => '查看变更与操作记录',
-      }, style: Theme.of(context).textTheme.bodySmall),
-      onTap: tap,
-    );
-    Widget metric(String title, String caption, VoidCallback tap) => Expanded(
+    Widget link(String title, VoidCallback tap, {String? badge}) => Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: tap,
+        borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+          child: Row(
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              Text(
-                caption,
-                style: const TextStyle(fontSize: 12, color: CuteTokens.muted),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF4E8),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: TuantuanIcon(switch (title) {
+                    '消息中心' => 'notification',
+                    '任务管理' => 'task',
+                    '工作统计' || '审计记录' => 'report',
+                    '审批中心' || '我的申请' => 'approval',
+                    '组织与权限' || '人员展示' => 'members',
+                    '设置' => 'settings',
+                    '帮助与反馈' => 'help',
+                    _ => 'members',
+                  }, size: 27),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      switch (title) {
+                        '消息中心' => '任务、审批与工作提醒',
+                        '工作统计' => '查看授权范围内的工作数据',
+                        '审批中心' || '我的申请' => '核对审核进度',
+                        '任务管理' => '查看本人及下属全部任务',
+                        '人员展示' => '按部门查看授权范围内的成员',
+                        '组织与权限' => '组织配置与权限申请',
+                        '设置' => '偏好与隐私',
+                        '帮助与反馈' => '使用指南',
+                        _ => '查看变更与操作记录',
+                      },
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF82796F),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (badge != null) ...[
+                const SizedBox(width: 8),
+                SunnyStatusBadge(
+                  label: badge,
+                  icon: Icons.circle,
+                  color: const Color(0xFFB76B4D),
+                ),
+              ],
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: Color(0xFF9A9186),
               ),
             ],
           ),
         ),
       ),
     );
+    Widget sectionTitle(String title) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+      child: Row(
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+    Widget group(List<Widget> rows) => PaperSurface(
+      color: DogBrandPalette.surface,
+      borderColor: DogBrandPalette.line,
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0)
+              const Padding(
+                padding: EdgeInsets.only(left: 56),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Color(0xFFEDE8E0),
+                ),
+              ),
+            rows[i],
+          ],
+        ],
+      ),
+    );
     return PageFrame(
       title: '我的',
+      showTitle: false,
       actions: [
         TextButton(
           onPressed: () => openForm(context, 'profile-edit'),
@@ -695,136 +254,110 @@ class ProfilePage extends ConsumerWidget {
         children: [
           PaperSurface(
             onTap: () => context.push('/me/profile'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            color: DogBrandPalette.surface,
+            borderColor: DogBrandPalette.line,
+            padding: const EdgeInsets.all(16),
+            child: Stack(
               children: [
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ProtectedAvatar(
-                      name: user.name,
-                      attachmentId:
-                          profile.valueOrNull?.fields['avatarAttachmentId']
-                              as String?,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user.name,
-                            style: const TextStyle(
-                              fontFamily: AppTypography.displayFamily,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          if (profile.valueOrNull?.subtitle.isNotEmpty == true)
-                            Text(
-                              profile.valueOrNull!.subtitle,
-                              style: const TextStyle(
-                                color: CuteTokens.muted,
-                                fontSize: 12,
+                    Row(
+                      children: [
+                        ProtectedAvatar(
+                          name: user.name,
+                          attachmentId:
+                              profile.valueOrNull?.fields['avatarAttachmentId']
+                                  as String?,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user.name,
+                                style: const TextStyle(
+                                  fontFamily: AppTypography.displayFamily,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                            ),
-                          const SizedBox(height: 8),
-                          AppLabelBadge(user.role.label),
-                        ],
+                              const SizedBox(height: 6),
+                              if (profile.valueOrNull?.subtitle.isNotEmpty ==
+                                  true)
+                                Text(
+                                  profile.valueOrNull!.subtitle,
+                                  style: const TextStyle(
+                                    color: CuteTokens.muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                              AppLabelBadge(user.role.label),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: DogBrandPalette.muted,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    profile.when(
+                      loading: () => const SunnyStatusBadge(
+                        label: '正在加载资料',
+                        icon: Icons.sync_rounded,
+                      ),
+                      error: (_, _) => const Text('资料暂不可用'),
+                      data: (p) => Text(
+                        '${p.fields['个人介绍'] ?? p.fields['body'] ?? '暂无个人介绍'}',
+                        style: const TextStyle(
+                          color: CuteTokens.muted,
+                          height: 1.6,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const TuantuanDecoration('paper_clip', size: 36),
                   ],
                 ),
-                const SizedBox(height: 16),
-                profile.when(
-                  loading: () => const LinearProgressIndicator(),
-                  error: (_, _) => const Text('资料暂不可用'),
-                  data: (p) => Text(
-                    '${p.fields['个人介绍'] ?? p.fields['body'] ?? '暂无个人介绍'}',
-                    style: const TextStyle(
-                      color: CuteTokens.muted,
-                      height: 1.6,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          PaperSurface(
-            color: const Color(0xFFFFF0DA),
-            child: Row(
-              children: [
-                metric(
-                  '${unread.valueOrNull?.items.where((r) => r.fields['read'] != true).length ?? '—'} 条未读消息',
-                  '打开消息中心 →',
-                  () => openList(context, 'notifications'),
-                ),
-                if (user.manager)
-                  metric(
-                    '${reviews.valueOrNull?.items.where((r) => r.ownerId != user.id && r.fields['reviewState'] == '待审').length ?? '—'} 项待审批',
-                    '进入审批 →',
-                    () => context.push('/me/reviews'),
-                  ),
-              ],
+          sectionTitle('工作'),
+          group([
+            link(
+              '消息中心',
+              () => openList(context, 'notifications'),
+              badge:
+                  '${unread.valueOrNull?.items.where((r) => r.fields['read'] != true).length ?? '—'}',
             ),
-          ),
-          const SectionHeader('工作'),
-          PaperSurface(
-            padding: const EdgeInsets.all(10),
-            color: SunnyPalette.blue,
-            cornerDecoration: TuantuanAssets.cardCorners['blue'],
-            child: Column(
-              children: [
-                link('消息中心', () => openList(context, 'notifications')),
-                const Divider(height: 1),
-                if (user.manager)
-                  link('工作统计', () => context.push('/me/statistics')),
-                if (user.manager) const Divider(height: 1),
-                link(
-                  user.manager ? '审批中心' : '我的申请',
-                  () => context.push('/me/reviews'),
-                ),
-              ],
+            link('任务管理', () => context.push('/me/tasks')),
+            if (user.manager)
+              link('工作统计', () => context.push('/me/statistics')),
+            link(
+              user.manager ? '审批中心' : '我的申请',
+              () => context.push('/me/reviews'),
+              badge: user.manager
+                  ? '${reviews.valueOrNull?.items.where((r) => r.ownerId != user.id && r.fields['reviewState'] == '待审').length ?? '—'}'
+                  : null,
             ),
-          ),
-          if (user.manager) ...[
-            const SectionHeader('管理'),
-            PaperSurface(
-              padding: const EdgeInsets.all(10),
-              color: SunnyPalette.mint,
-              cornerDecoration: TuantuanAssets.cardCorners['mint'],
-              child: Column(
-                children: [
-                  link('下属工作台', () => context.push('/me/team')),
-                  const Divider(height: 1),
-                  link('组织与成员', () => context.push('/me/organization')),
-                  if (user.administrator) ...[
-                    const Divider(height: 1),
-                    link('组织与权限', () => context.push('/me/admin')),
-                    const Divider(height: 1),
-                    link('审计记录', () => openList(context, 'audit')),
-                  ],
-                ],
-              ),
-            ),
+          ]),
+          if (user.administrator) ...[
+            sectionTitle('管理'),
+            group([
+              link('组织与权限', () => context.push('/me/admin')),
+              link('审计记录', () => openList(context, 'audit')),
+            ]),
           ],
-          const SizedBox(height: 24),
-          TuantuanRecordCard(
-            icon: 'settings',
-            title: '设置',
-            subtitle: '偏好与隐私',
-            onTap: () => context.push('/me/settings'),
-          ),
-          const SizedBox(height: 12),
-          TuantuanRecordCard(
-            icon: 'help',
-            title: '帮助与反馈',
-            subtitle: '使用指南',
-            onTap: () => context.push('/me/help'),
-          ),
+          sectionTitle('人员'),
+          group([link('人员展示', () => context.push('/me/people'))]),
+          sectionTitle('其他'),
+          group([
+            link('设置', () => context.push('/me/settings')),
+            link('帮助与反馈', () => context.push('/me/help')),
+          ]),
           const DemoLabel(),
         ],
       ),

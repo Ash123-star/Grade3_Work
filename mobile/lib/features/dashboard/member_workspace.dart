@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_pager.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +9,9 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/features/common/detail_pages.dart';
 
 String memberDayLabel(DateTime date) =>
@@ -94,7 +97,7 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
     return '/me/team/${encode(widget.memberId)}/$category${date == null ? '' : '?date=${date.toIso8601String().split('T').first}'}';
   }
 
-  void retry() {
+  void retry(String category) {
     ref.invalidate(itemProvider(('organization', widget.memberId)));
     for (final resource in [
       'dashboard/personal',
@@ -103,12 +106,11 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
     ]) {
       ref.invalidate(memberRecordsProvider((resource, widget.memberId)));
     }
-    ref.invalidate(memberWorkspaceProvider((widget.memberId, widget.category)));
+    ref.invalidate(memberWorkspaceProvider((widget.memberId, category)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final memberId = widget.memberId, category = widget.category;
     if (!valid) {
       return PageFrame(
         title: '下属工作台',
@@ -120,14 +122,15 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
               subtitle: '日期或分类无效，请从成员列表重新进入',
             ),
             OutlinedButton(
-              onPressed: () => context.go('/me/team'),
+              onPressed: () => context.go('/me/people'),
               child: const Text('返回成员列表'),
             ),
           ],
         ),
       );
     }
-    if (!ref.watch(sessionProvider).manager) {
+    final session = ref.watch(sessionProvider);
+    if (!session.manager || !session.canReadBusiness) {
       return const PageFrame(
         title: '下属工作台',
         child: EmptyIllustration(
@@ -137,7 +140,22 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
         ),
       );
     }
+    return SiblingPager(
+      key: ValueKey(widget.memberId),
+      index: memberCategories.indexOf(widget.category),
+      itemCount: memberCategories.length,
+      onSelected: (index) => context.replace(route(memberCategories[index])),
+      itemBuilder: (context, index) => Consumer(
+        builder: (context, ref, _) =>
+            _categoryPage(context, ref, memberCategories[index]),
+      ),
+    );
+  }
+
+  Widget _categoryPage(BuildContext context, WidgetRef ref, String category) {
+    final memberId = widget.memberId;
     return PageFrame(
+      key: PageStorageKey('member:$memberId:$category'),
       title: '下属工作台',
       child: !ready
           ? const LoadingSkeleton()
@@ -149,12 +167,12 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                   loading: () => const LoadingSkeleton(),
                   error: (e, _) => PageBody(
                     children: [
-                      RecordFailure(e, retry: retry),
+                      RecordFailure(e, retry: () => retry(category)),
                       if (e is ApiFailure &&
                           e.kind == FailureKind.forbidden) ...[
                         const Text('成员范围已不可访问，受保护资料与记录已清除。'),
                         OutlinedButton(
-                          onPressed: retry,
+                          onPressed: () => retry(category),
                           child: const Text('重新检查访问权限'),
                         ),
                       ],
@@ -167,7 +185,8 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                   data: (member) => PageBody(
                     children: [
                       PaperSurface(
-                        color: CuteTokens.blue,
+                        color: const Color(0xFFFFFCF7),
+                        borderColor: const Color(0xFFEEDCCB),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -190,7 +209,11 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                                     ),
                                   ),
                                 ),
-                                const Icon(Icons.lock_outline, size: 18),
+                                const Icon(
+                                  Icons.lock_outline_rounded,
+                                  size: 18,
+                                  color: DogBrandPalette.muted,
+                                ),
                               ],
                             ),
                             const SizedBox(height: 8),
@@ -259,9 +282,9 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                                       ),
                               ),
                               onPressed: () async {
-                                final next = await showDatePicker(
-                                  context: context,
-                                  initialDate:
+                                final next = await showPremiumDatePicker(
+                                  context,
+                                  initial:
                                       ref.read(
                                         memberLogDateProvider(memberId),
                                       ) ??

@@ -1,5 +1,7 @@
 # 甄浩文 week6 客户端契约：实现与验证记录
 
+本报告记录dc00e2b旧基线的验收。Issue #32 / Draft PR #33 的最新main整合状态见 docs/zhw-week6-main-integration.md；下方“后端尚未提供”不再代表main 808d9d6的现状。
+
 日期：2026-10-23。分支：`zhw`，基线 `dc00e2b`。关联 OpenSpec `zhw-week6-client-contract`；远端 Issue 创建此前被拒绝，本地跟踪 `docs/issues/zhw-week6-client-contract.md`。HCJ 压缩包及解压目录仅作为前端字段参考，未合入 main。
 
 ## 已实现并验证

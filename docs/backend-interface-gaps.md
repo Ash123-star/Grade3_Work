@@ -1,6 +1,8 @@
 # Flutter 与后端接口缺口登记
 
-更新日期：2026-10-13（Asia/Shanghai）
+更新日期：2026-10-20（Asia/Shanghai）
+
+2026-10-20 补充：移动端完整覆盖矩阵见 `mobile/docs/api-surface-coverage.md`。该矩阵区分已接入、字段待对齐、待定契约、本地/演示四种状态，作为后端围绕前端接口实现的输入；未定案路径不视为现有接口。
 
 ## 核对结论
 
@@ -17,6 +19,9 @@ OpenAPI 快照包含下述现有路径，例如 `/api/ai/jobs/{id}/confirm-task`
 | API-GAP-03 日志阅读人员清单 | Should | 缺少读取接口 | 已有 `POST /api/logs/{id}/read` 登记本人阅读；没有读取该日志阅读人员/时间的列表接口。 | 设计授权管理者可读的阅读登记查询，限定已提交日志和组织范围，并明确分页、字段最小化及未读/已读语义。验收覆盖正常清单、无记录、草稿拒绝、范围外拒绝及分页。具体路径待设计，不预设 `/reads`。 |
 | API-GAP-04 AI 范围筛选 | Must | 已有接口能力不足 | `POST /api/ai/jobs` 只接收日期、周期、用途和可选来源；数据范围隐式取当前 Actor，没有客户端选择或过滤范围的正式参数。 | 先确定产品允许的范围选项及角色上限，再设计请求契约；服务端必须将请求范围与 Actor 权限取交集并在每次检索/读取时重验，不能让客户端扩大范围。验收覆盖个人/授权范围、越权范围拒绝或安全收窄、范围变化后的来源失效、敏感信息不进入模型。不是新增 URL 的既定需求。 |
 | API-GAP-05 AI 确认版本原子保护 | Must | 已有接口并发条件不足 | 已有 `POST /api/ai/jobs/{id}/confirm-task` 和 `Idempotency-Key`，但确认请求没有 AI job `version` 前置条件；客户端先 GET 核对再 POST 仍存在竞态。 | 为确认命令设计可原子校验的 job 版本/候选版本条件，并与任务创建及幂等语义共同定义事务边界。验收覆盖 job 并发编辑后拒绝过期确认、同键同载荷重放、同键异载荷冲突、确认失败不产生部分任务。具体字段和事务实现待评审。 |
+| API-GAP-06 任务字段与标签字典 | Must | 前后端 DTO 不兼容 | Flutter 任务表单提交 `startAt`、`tagId`、`participantIds`；后端 `TaskDraftNormalizer` 仍接受旧 `group/collaborators` 字段，标签选项目前硬编码。 | 统一任务新建、修订、详情、列表 DTO 与校验，定义标签字典读取/维护及组织范围；补齐有效/无效时间、跨组织参与人/标签、版本冲突和旧任务兼容验收。 |
+| API-GAP-07 已提交日志直接修改 | Must | 缺少独立操作契约 | `PUT /api/logs/draft` 只保存未提交草稿；产品要求首提后 24 小时直接修改。客户端对 `logs/update` 显式返回 unavailable，不再误调用 draft。 | 定义服务端首提时间、允许字段、版本/并发策略和窗口边界；验收 24 小时内、到期、超期、重试和并发修改。 |
+| API-GAP-08 任务评论与回复 | Should | 无服务端资源或关联字段 | Flutter Mock 支持任务评论/回复；服务端无任务评论路径，日志评论只接 `text`，不支持 `parentCommentId`。 | 确定评论资源、可见范围、父子关系、分页、幂等和不可编辑/删除；未定案前真实模式不得发送回复字段或报告任务评论成功。 |
 
 ## 不属于缺失接口的已核对事项
 
@@ -24,10 +29,11 @@ OpenAPI 快照包含下述现有路径，例如 `/api/ai/jobs/{id}/confirm-task`
 - 任务成果反馈已由 `POST /api/tasks/{id}/events` 的 `FEEDBACK` 提供；缺的是派发者“退回补充”转换，不是员工成果反馈接口。
 - AI 创建、草稿、SSE、取消、重试、用量、地图边和人工确认路径均已存在；范围选择和确认版本并发条件不足。
 - 附件上传/下载、头像、组织、审核、统计导出、通知 SSE 和消息已读路径均在当前 Controller/OpenAPI 中找到。设备端文件选择/保存仍是客户端设备验收，不是后端缺接口。
-- 当前正式 UI 对支持反馈提交与退回补充采用禁用/明确提示，但“我的反馈”通用列表仍可能发出未受后端支持的 `GET /feedback` 或 `GET /feedback/{id}`，需在客户端接入前完成契约决策；Mock 演示行为不能作为服务端能力证据。
+- “我的反馈”无服务端读取/提交接口；Flutter 正式模式的未知 resource 已显式失败，不再把 `/feedback` 或 `/feedback/{id}` 当作约定路径。Mock 演示行为不能作为服务端能力证据。
+- 当前任务表单与后端任务白名单字段不一致（API-GAP-06），因此 HTTP 路径存在也不能视作任务新建已完成真实接入。
 
 ## 开发与分工约束
 
-以上每个缺口进入实现前，应分别创建或关联 Issue，并建立覆盖后端、OpenAPI 快照、Flutter 调用、权限、迁移（如需要）、集成测试和部署说明的 OpenSpec change。设计阶段须比较至少两种可行契约路线，确定角色范围、状态迁移、字段、错误、幂等、并发和回滚后，再分配后端与客户端负责人。接口定案前，Flutter 不得调用推测路径；数据库变化只新增 `server` Flyway 迁移。
+以上每个缺口进入实现前，应分别创建或关联 Issue，并建立覆盖后端、OpenAPI 快照、Flutter 调用、权限、迁移（如需要）、集成测试和部署说明的 OpenSpec change。设计阶段须比较至少两种可行契约路线，确定角色范围、状态迁移、字段、错误、幂等、并发和回滚后，再分配后端与客户端负责人。接口定案前，Flutter 不得调用推测路径；数据库变化只新增 `server` Flyway 迁移。统一覆盖与显式路由修复关联 `mobile-api-surface-contracts`。
 
 关联跟踪：`openspec/changes/flutter-stage3-layout-rebuild/tasks.md` 3.6、`openspec/changes/flutter-backend-contract-integration/tasks.md` 2.1，以及本地 Issue `docs/issues/flutter-backend-interface-gaps.md`。

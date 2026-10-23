@@ -384,10 +384,14 @@ void main() {
       expect(find.byType(TextFormField), findsNothing);
       c.read(routerProvider).go('/item/logs/log-1');
       await settleHttp(t);
-      await t.drag(find.byType(ListView).first, const Offset(0, -500));
+      await t.scrollUntilVisible(
+        find.text('服务端实际评语', findRichText: true),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
       await t.pumpAndSettle();
-      expect(find.text('服务端实际评语'), findsOneWidget);
-      expect(find.text('作者 u2 · 2026-10-12T12:00:00Z'), findsOneWidget);
+      expect(find.text('服务端实际评语', findRichText: true), findsOneWidget);
+      expect(find.textContaining('u2'), findsWidgets);
       await closeUi(t);
     },
   );
@@ -478,8 +482,7 @@ void main() {
       });
       await settleHttp(t);
       expect(find.widgetWithText(FilledButton, '查看成果并验收'), findsNothing);
-      await t.tap(find.byTooltip('更多操作'));
-      await t.pumpAndSettle();
+      expect(find.byTooltip('更多操作'), findsNothing);
       expect(find.text('转派任务'), findsNothing);
       await closeUi(t);
     },

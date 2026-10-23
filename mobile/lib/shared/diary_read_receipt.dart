@@ -85,7 +85,7 @@ class _DiaryReadReceiptState extends ConsumerState<DiaryReadReceipt> {
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: SunnyLoadingIndicator(size: 18),
                   )
                 : const Icon(Icons.done_all),
             label: Text(busy ? '正在记录…' : '记录已读'),

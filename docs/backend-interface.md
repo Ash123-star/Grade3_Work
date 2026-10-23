@@ -25,7 +25,7 @@
 
 ## 任务 `/tasks`
 
-`GET /tasks` 列表故意不返回完成情况或状态列；流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 创建任务需要 `title,deadline,ownerId`，支持协作人、附件和 `Idempotency-Key`。
+`GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
 
 `POST /tasks/{id}/events` 请求至少包含当前 `version` 和 `type`。事件枚举及附加字段如下：
 
@@ -41,7 +41,11 @@
 
 事件更新使用乐观锁；版本不匹配返回 `409 VERSION_CONFLICT`，字段缺失或时间格式错误返回 `400`。事件写入和任务更新在同一事务中完成。
 
-`POST /tasks/{id}/revisions` 修改已发布任务并携带版本，必要时进入审核。无派发资格返回 403。
+`POST /tasks/{id}/revisions` 修改已发布任务并携带版本、理由和候选内容，批准后才生效；候选可调整参与人、唯一标签、开始/截止时间和说明。`POST /tasks/{id}/deletions` 带 `{version,reason}` 提交删除审核，批准后归档而非物理删除。两个操作均拒绝旧版本覆盖。
+
+转派/改期继续走专用复核申请；`REASSIGNED`/`RESCHEDULED` 只在审核生效后写入时间线，不能通过事件接口直接写入。
+
+`GET/POST /tasks/{taskId}/comments` 读取或新增任务公开评论。评论包含作者、昵称、头像标识、时间、正文与可选 `parentId`；有任务读取权限者可读，派发人、参与人或管理员可写。新增必须给 `Idempotency-Key`，评论不可编辑或删除，评论、审计与通知 outbox 同一事务写入。标签由 `GET/POST/PUT /task-labels` 管理，直接写入仅创始人可用，更新携带 `version`。
 
 ## 日志 `/logs`
 
@@ -105,6 +109,8 @@ Content-Type: application/json
 - 日志评论 `POST /api/logs/{id}/comments`：text为1至2000字，可选parentId回复同一日志评论；返回id/actor_id/author_name/text/parent_id/created_at。所有已有日志可见权限的人可评论，24小时后仍可追加，禁止编辑删除。重复POST产生新评论（无幂等键），客户端避免自动重试。草稿403、不可见404、非法文本或回复目标400。GET返回同样字段，旧字段保留；不扩大同级或跨公司日志可见范围。通知日志作者及仍有权限的被回复人，同人去重，事务outbox不带正文。
 
 ## week6 Flutter 联调边界（2026-10-22）
+
+本节为dc00e2b旧基线记录。2026-10-23 PR #33整合main 808d9d6后，新任务后端已提供participants、labelId、startAt与任务评论；客户端将HCJ别名映射为实际请求字段，任务评论需要幂等键，日志评论不需要。当前整合证据和未完成页面链路见docs/zhw-week6-main-integration.md。
 
 - Flutter 下属日志查询可将 `departmentId`、`search`、`date`、`period` 与分页参数交给 `GET /logs/subordinates`；服务端仍负责部门和人员范围授权。`date` 是上海业务日期，客户端筛选控件不代表服务端权限。
 - Flutter 将 `LOG_EDIT_WINDOW_EXPIRED` 映射为明确的不可修改/不可撤回提示。`submittedAt`、`editableUntil`、`canEdit`、`canWithdraw` 是展示提示；写操作仍以服务端响应为准。客户端当前修订使用审核申请流程，不宣称为 HCJ 所需的直接编辑。

@@ -1,0 +1,6 @@
+# Optional synthetic-material and isolated crash acceptance tooling (Python 3.13).
+Pillow==12.1.0
+python-docx==1.2.0
+openpyxl==3.1.5
+reportlab==5.0.1
+psycopg2-binary==2.9.12

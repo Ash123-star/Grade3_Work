@@ -1,6 +1,6 @@
 # 甄浩文 week6 客户端契约
 
-优先级：MVP。关联 OpenSpec：zhw-week6-client-contract。远端 Issue 此前创建被拒绝，尚无编号。
+优先级：MVP。关联 OpenSpec：zhw-week6-client-contract。远端 Issue #32，Draft PR #33。下表保留dc00e2b的发现记录；main 808d9d6已提供新任务后端，本批主线整合继续由变更tasks第3节跟踪。
 
 范围与验收：管理者组合筛选下属日志且分页条件不丢失；评论及回复完整读取、写入失败不自动重试；窗口过期提示明确；旧会话与 SSE 继续隔离。异常包含超时、非法回复和未支持的任务字段。
 

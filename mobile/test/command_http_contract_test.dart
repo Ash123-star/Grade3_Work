@@ -85,6 +85,31 @@ void main() {
   Matcher failure(FailureKind kind) =>
       isA<ApiFailure>().having((e) => e.kind, 'kind', kind);
 
+  test('log withdrawal carries optimistic version and reason', () async {
+    await repo.execute(
+      'logs',
+      const Command('withdraw', {'id': 'log-1', '撤回原因': '补充说明'}, version: 5),
+    );
+    expect(adapter.requests.single.path, '/logs/log-1/withdraw');
+    expect(adapter.requests.single.data, {'version': 5, 'reason': '补充说明'});
+  });
+
+  test('log reply maps frontend parentCommentId to backend parentId', () async {
+    await repo.execute(
+      'logs/comments',
+      const Command('comment', {
+        'id': 'log-1',
+        'text': '回复',
+        'parentCommentId': 'parent-1',
+      }),
+    );
+    expect(adapter.requests.single.path, '/logs/log-1/comments');
+    expect(adapter.requests.single.data, {
+      'text': '回复',
+      'parentId': 'parent-1',
+    });
+  });
+
   test(
     'existing object actions retain ID in task/log/comment/review/notification paths',
     () async {
@@ -141,6 +166,41 @@ void main() {
       }
       await expectLater(
         repo.execute('tasks', const Command('return', {'id': 'task-1'})),
+        throwsA(failure(FailureKind.unavailable)),
+      );
+      expect(adapter.requests, isEmpty);
+    },
+  );
+
+  test(
+    'unregistered list/detail resources fail before HTTP requests',
+    () async {
+      for (final resource in ['feedback', 'organization/teams']) {
+        await expectLater(
+          repo.list(resource, const Query()),
+          throwsA(failure(FailureKind.unavailable)),
+        );
+        await expectLater(
+          repo.detail(resource, 'record-1'),
+          throwsA(failure(FailureKind.unavailable)),
+        );
+      }
+      expect(adapter.requests, isEmpty);
+    },
+  );
+
+  test(
+    'submitted log update never writes through the draft endpoint',
+    () async {
+      await expectLater(
+        repo.execute(
+          'logs',
+          const Command('update', {
+            'id': 'submitted-log',
+            'businessDate': '2026-10-20',
+            '今日工作': '修订内容',
+          }, version: 3),
+        ),
         throwsA(failure(FailureKind.unavailable)),
       );
       expect(adapter.requests, isEmpty);
@@ -344,7 +404,7 @@ void main() {
       await t.pumpAndSettle();
       await t.enterText(find.byType(TextFormField).first, '不能丢失的工作正文');
       adapter.submitStatus = 503;
-      await t.tap(find.widgetWithText(FilledButton, '提交日志'));
+      await t.tap(find.widgetWithText(FilledButton, '提交'));
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 80)),
       );
@@ -362,7 +422,7 @@ void main() {
       c.read(routerProvider).go('/dashboard');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      c.read(routerProvider).go('/form/log-edit');
+      c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(
@@ -373,7 +433,7 @@ void main() {
         '不能丢失的工作正文',
       );
       adapter.submitStatus = 200;
-      await t.tap(find.widgetWithText(FilledButton, '提交日志'));
+      await t.tap(find.widgetWithText(FilledButton, '提交'));
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 80)),
       );

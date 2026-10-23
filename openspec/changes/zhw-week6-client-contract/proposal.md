@@ -10,4 +10,4 @@ week6 HCJ 前端与 dc00e2b 后端有字段和流程差异，客户端需接通�
 
 ## Impact
 
-影响 mobile 数据层、日志入口、接口文档、scripts/e2e-smoke.ps1；无数据库迁移或服务端业务修改。Issue 远端创建此前被拒绝，以 docs/issues/zhw-week6-client-contract.md 暂存。
+影响 mobile 数据层、日志入口、接口文档、scripts/e2e-smoke.ps1；无数据库迁移或服务端业务修改。关联远端 Issue #32 与 Draft PR #33，本地范围记录见 docs/issues/zhw-week6-client-contract.md。

@@ -2,7 +2,7 @@
 <resources>
     <style name="LaunchTheme">
         <item name="android:windowSplashScreenBackground">@color/paper_splash</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/launch_image</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/brand_splash_mark</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/paper_splash</item>
     </style>
 </resources>

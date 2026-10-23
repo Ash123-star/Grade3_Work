@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:dio/dio.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
@@ -13,6 +14,7 @@ abstract interface class Repository {
   Future<Record> execute(String resource, Command command);
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
+    bool aiWork = false,
     CancelToken? cancelToken,
     void Function(int, int)? onProgress,
   });
@@ -112,6 +114,7 @@ class HttpRepository implements Repository {
   @override
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
+    bool aiWork = false,
     CancelToken? cancelToken,
     void Function(int, int)? onProgress,
   }) async {
@@ -119,6 +122,7 @@ class HttpRepository implements Repository {
     try {
       final response = await dio.post<Map<String, dynamic>>(
         '/attachments',
+        queryParameters: aiWork ? {'purpose': 'AI_WORK'} : null,
         data: FormData.fromMap({
           'file': MultipartFile.fromBytes(
             file.bytes,
@@ -259,6 +263,8 @@ class HttpRepository implements Repository {
   };
 
   String _pathForList(String resource) => switch (resource) {
+    'tasks' => '/tasks',
+    'logs' => '/logs',
     'logs/subordinates' => '/logs/subordinates',
     'dashboard/company' => '/dashboard/company',
     'dashboard/personal' => '/dashboard/personal',
@@ -268,7 +274,12 @@ class HttpRepository implements Repository {
     'audit' => '/organization/audit',
     'analytics' => '/analytics',
     'ai-maps' => '/ai-maps',
-    _ => '/$resource',
+    'organization/departments' => '/organization/departments',
+    'reviews' => '/reviews',
+    'notifications' => '/notifications',
+    'task-labels' => '/task-labels',
+    _ when RegExp(r'^tasks/[^/]+/comments$').hasMatch(resource) => '/$resource',
+    _ => throw ApiFailure(FailureKind.unavailable, '列表接口尚未登记：$resource'),
   };
 
   Record _record(Map<String, dynamic> raw) {
@@ -338,10 +349,100 @@ class HttpRepository implements Repository {
       fields['businessDate'] = raw['business_date'];
     }
     if (raw.containsKey('created_at')) fields['createdAt'] = raw['created_at'];
+    if (raw['author'] is Map) {
+      fields['authorName'] = (raw['author'] as Map)['name'];
+    }
+    if (raw.containsKey('submittedAt')) {
+      fields['submittedAt'] = raw['submittedAt'];
+    }
     if (raw.containsKey('submitted_at')) {
       fields['submittedAt'] = raw['submitted_at'];
     }
     if (raw.containsKey('deadline')) fields['deadline'] = raw['deadline'];
+    if (raw['label'] is Map) {
+      final label = raw['label'] as Map;
+      fields['tagId'] = label['id'];
+      fields['tagName'] = label['name'];
+      fields['tagCategory'] = label['category'];
+      fields['tagColor'] = label['color'];
+    }
+    if (raw['author_id'] != null && raw['body'] is String) {
+      fields['text'] = raw['body'];
+      fields['actorId'] = raw['author_id'];
+      fields['actorName'] = raw['nickname'];
+      fields['parentCommentId'] = raw['parent_id'];
+      fields['avatarAttachmentId'] = raw['avatar_id'];
+    }
+    if (raw.containsKey('start_at')) fields['startAt'] = raw['start_at'];
+    if (raw.containsKey('startAt')) fields['startAt'] = raw['startAt'];
+    if (raw.containsKey('tag_id')) fields['tagId'] = raw['tag_id'];
+    if (raw.containsKey('tagId')) fields['tagId'] = raw['tagId'];
+    if (raw.containsKey('tag_name')) fields['tagName'] = raw['tag_name'];
+    if (raw.containsKey('tagName')) fields['tagName'] = raw['tagName'];
+    if (raw.containsKey('tag_category')) {
+      fields['tagCategory'] = raw['tag_category'];
+    }
+    if (raw.containsKey('tagCategory')) {
+      fields['tagCategory'] = raw['tagCategory'];
+    }
+    if (raw.containsKey('tag_color')) fields['tagColor'] = raw['tag_color'];
+    if (raw.containsKey('tagColor')) fields['tagColor'] = raw['tagColor'];
+    if (raw['participant_ids'] is List) {
+      fields['participantIds'] = raw['participant_ids'];
+    }
+    if (raw['participantIds'] is List) {
+      fields['participantIds'] = raw['participantIds'];
+    }
+    if (fields['participant_names'] is List &&
+        fields['participantNames'] is! List) {
+      fields['participantNames'] = fields['participant_names'];
+    }
+    if (raw['participants'] is List) {
+      final values = (raw['participants'] as List).indexed.where((entry) {
+        final value = entry.$2;
+        final id = value is Map
+            ? value['id'] ?? value['user_id'] ?? value['userId']
+            : value;
+        return id != null && '$id'.trim().isNotEmpty;
+      }).toList();
+      final existingNames = fields['participantNames'] is List
+          ? fields['participantNames'] as List
+          : const [];
+      final existingIds = fields['participantIds'] ?? fields['participant_ids'];
+      final namesById = <String, dynamic>{
+        if (existingIds is List)
+          for (
+            var i = 0;
+            i < existingIds.length && i < existingNames.length;
+            i++
+          )
+            '${existingIds[i]}'.trim(): existingNames[i],
+      };
+      String fallbackName(String id, int originalIndex) =>
+          '${namesById[id] ?? (existingIds is! List && originalIndex < existingNames.length ? existingNames[originalIndex] : '')}';
+      fields['participantIds'] = [
+        for (final (_, value) in values)
+          value is Map
+              ? '${value['id'] ?? value['user_id'] ?? value['userId']}'
+              : '$value',
+      ];
+      fields['participantNames'] = [
+        for (final (index, value) in values)
+          value is Map
+              ? '${value['name'] ?? value['display_name'] ?? value['displayName'] ?? value['title'] ?? fallbackName('${value['id'] ?? value['user_id'] ?? value['userId']}'.trim(), index)}'
+              : fallbackName('$value'.trim(), index),
+      ];
+    }
+    if (fields.containsKey('tagId') ||
+        fields.containsKey('tagName') ||
+        fields.containsKey('tag_id') ||
+        fields.containsKey('tag_name')) {
+      fields['tagName'] = taskTagLabel(fields);
+    }
+    if (fields['participantIds'] is List ||
+        fields['participantNames'] is List) {
+      fields['participantNames'] = taskParticipantNames(fields);
+    }
     for (final pair in [
       ('work', '今日工作'),
       ('blockers', '遇到的阻碍'),
@@ -592,7 +693,7 @@ class HttpRepository implements Repository {
         'reviews' => '/reviews/${Uri.encodeComponent(id)}',
         'ai-maps' => '/ai-maps',
         'private-notes' => '/private-notes',
-        _ => '/$resource/${Uri.encodeComponent(id)}',
+        _ => throw ApiFailure(FailureKind.unavailable, '详情接口尚未登记：$resource'),
       };
       final response = await _getWithRetry<dynamic>(path);
       if (resource == 'private-notes' || resource == 'ai-maps') {
@@ -663,6 +764,7 @@ class HttpRepository implements Repository {
         'text': raw['text'] ?? '',
         'actorId': raw['actor_id'],
         'authorName': raw['author_name'],
+        'actorName': raw['author_name'],
         'parentCommentId': raw['parent_id'],
         'parentId': raw['parent_id'],
         'time': raw['created_at'],
@@ -700,36 +802,56 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _taskDraft(Command command) {
     final v = _values(command);
-    if ([
-      'startAt',
-      'participantIds',
-      'tagId',
-      '参与人',
-      '标签',
-    ].any(v.containsKey)) {
-      throw const ApiFailure(
-        FailureKind.unavailable,
-        '当前服务端尚未支持开始时间、多人参与人或标签，请等待任务接口升级',
-        code: 'CLIENT_CONTRACT_UNAVAILABLE',
-      );
+    // 已发布旧契约仍可读取和修订；新表单字段明确出现时保留新模型，不将多人静默降级。
+    if (!v.containsKey('participantIds') &&
+        !v.containsKey('参与人') &&
+        !v.containsKey('tagId') &&
+        !v.containsKey('标签') &&
+        !v.containsKey('startAt') &&
+        !v.containsKey('participants') &&
+        !v.containsKey('labelId')) {
+      return {
+        'title': v['title'] ?? v['任务名称'],
+        'ownerId': v['ownerId'],
+        'deadline': v['deadline'],
+        'group': v['所属分组'] ?? v['group'] ?? '',
+        'content': v['任务内容'] ?? v['内容'] ?? v['content'] ?? '',
+        'urgency': switch ('${v['紧急程度'] ?? v['urgency'] ?? '普通'}') {
+          '紧急' || 'URGENT' => 'URGENT',
+          '不紧急' || 'LOW' => 'LOW',
+          _ => 'NORMAL',
+        },
+        'progressNote': v['进度备注'] ?? v['progressNote'] ?? '',
+        'collaborators': v['collaborators'] ?? const <String>[],
+        'attachments': v['attachments'] ?? const <String>[],
+      }..removeWhere((key, value) => value == null);
     }
+    final tag = '${v['labelId'] ?? v['tagId'] ?? v['标签'] ?? ''}'.trim();
+    final participants =
+        v['participants'] ??
+        v['participantIds'] ??
+        v['参与人'] ??
+        (v['ownerId'] == null ? const <String>[] : [v['ownerId']]);
     return {
       'title': v['title'] ?? v['任务名称'],
-      'ownerId': v['ownerId'],
+      'participants': participants is List
+          ? participants
+          : '${participants ?? ''}'
+                .split('、')
+                .map((value) => value.trim())
+                .where((value) => value.isNotEmpty)
+                .toList(),
+      'startAt': v['startAt'],
       'deadline': v['deadline'],
-      'group': v['所属分组'] ?? v['group'],
       'content': v['任务内容'] ?? v['内容'] ?? v['content'],
       'urgency': switch ('${v['紧急程度'] ?? v['urgency'] ?? '普通'}') {
         '紧急' || 'URGENT' => 'URGENT',
         '不紧急' || 'LOW' => 'LOW',
         _ => 'NORMAL',
       },
-      'progressNote': v['进度备注'] ?? v['progressNote'],
-      'collaborators':
-          v['collaborators'] ??
-          (v['协作人'] is String && '${v['协作人']}'.isNotEmpty
-              ? ['${v['协作人']}']
-              : const <String>[]),
+      if (tag.isNotEmpty) 'labelId': tag,
+      if (v['acceptanceChecklist'] != null)
+        'acceptanceChecklist': v['acceptanceChecklist'],
       'attachments': v['attachments'] ?? const <String>[],
     }..removeWhere((key, value) => value == null);
   }
@@ -752,10 +874,22 @@ class HttpRepository implements Repository {
     try {
       final v = {...command.values};
       if (resource == 'tasks/comments') {
-        throw const ApiFailure(
-          FailureKind.unavailable,
-          '当前服务端尚未提供任务评论接口',
-          code: 'CLIENT_CONTRACT_UNAVAILABLE',
+        if (command.idempotencyKey == null ||
+            command.idempotencyKey!.trim().isEmpty) {
+          throw const ApiFailure(
+            FailureKind.validation,
+            '任务评论需要幂等键',
+            code: 'IDEMPOTENCY_REQUIRED',
+          );
+        }
+        return await _postRecord(
+          '/tasks/${Uri.encodeComponent(_commandId(command))}/comments',
+          {
+            'text': v['text'] ?? v['评语'],
+            if (v['parentId'] != null || v['parentCommentId'] != null)
+              'parentId': v['parentId'] ?? v['parentCommentId'],
+          },
+          idempotencyKey: command.idempotencyKey,
         );
       }
       if (resource == 'auth') {
@@ -923,6 +1057,12 @@ class HttpRepository implements Repository {
               submitVersion ?? 1,
             );
           }
+        }
+        if (command.action == 'update') {
+          throw const ApiFailure(
+            FailureKind.unavailable,
+            '已提交日志修改接口尚未定案；当前不会误写入草稿',
+          );
         }
         return await _putRecord('/logs/draft', {
           'businessDate': v['businessDate'],

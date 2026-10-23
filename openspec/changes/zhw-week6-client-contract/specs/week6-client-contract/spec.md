@@ -28,3 +28,14 @@ The client MUST reject unsupported modern task fields without dropping them or c
 #### Scenario: Unsupported task payload
 - **WHEN** a request supplies startAt, participantIds or tagId before backend support
 - **THEN** it fails explicitly before any task POST
+
+### Requirement: Supported main task contract
+After integrating the task backend, the client SHALL translate HCJ participantIds and tagId to participants and labelId and retain pending review responses as review records. Task comment POST requests MUST carry an idempotency key and SHALL preserve parentId.
+
+#### Scenario: Modern task request
+- **WHEN** HCJ supplies participants, start time and one tag
+- **THEN** the request uses the backend field names and a pending review is not reported as an effective task
+
+#### Scenario: Comment without idempotency
+- **WHEN** a task comment command has no idempotency key
+- **THEN** the client rejects it before sending a POST

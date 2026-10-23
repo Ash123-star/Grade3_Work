@@ -23,8 +23,8 @@ Future<PageResult> readCompleteList(
       resource,
       Query(
         search: query.search,
-        ownerId: query.ownerId,
         departmentId: query.departmentId,
+        ownerId: query.ownerId,
         from: query.from,
         to: query.to,
         cursor: cursor,

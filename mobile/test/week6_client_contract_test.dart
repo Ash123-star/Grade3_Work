@@ -151,26 +151,107 @@ void main() {
     expect(requests, hasLength(1));
   });
 
-  test('未支持任务字段不得被丢弃后创建旧任务', () async {
-    for (final field in ['participantIds', 'startAt', 'tagId']) {
-      await expectLater(
-        repository.execute(
-          'tasks',
-          Command('create', {
-            'title': '新任务',
-            field: field == 'participantIds' ? ['u'] : 'value',
-          }),
-        ),
-        throwsA(
-          isA<ApiFailure>().having(
-            (e) => e.code,
-            'code',
-            'CLIENT_CONTRACT_UNAVAILABLE',
-          ),
-        ),
-      );
-    }
+  test('主线新任务契约将HCJ字段映射为participants和labelId并保留审核响应', () async {
+    response = {
+      'id': 'review-1',
+      'status': 'PENDING',
+      'applicant_id': 'u',
+      'kind': 'TASK_CREATE',
+      'target_id': 'task-1',
+    };
+    final result = await repository.execute(
+      'tasks',
+      const Command('create', {
+        'title': '新任务',
+        'participantIds': ['u', 'v'],
+        'tagId': 'label-1',
+        'startAt': '2026-10-23T09:00:00+08:00',
+        'deadline': '2026-10-24T18:00:00+08:00',
+        'content': '完整说明',
+      }, idempotencyKey: 'create-key'),
+    );
+    final body = requests.single.data as Map;
+    expect(body['participants'], ['u', 'v']);
+    expect(body['labelId'], 'label-1');
+    expect(body['startAt'], '2026-10-23T09:00:00+08:00');
+    expect(body.containsKey('participantIds'), false);
+    expect(body.containsKey('ownerId'), false);
+    expect(body.containsKey('tagId'), false);
+    expect(requests.single.headers['Idempotency-Key'], 'create-key');
+    expect(result.id, 'review-1');
+    expect(result.fields['reviewState'], '待审');
+  });
+
+  test('新任务评论需要幂等键并保留回复关系', () async {
+    await expectLater(
+      repository.execute(
+        'tasks/comments',
+        const Command('comment', {'id': 'task', 'text': '回复'}),
+      ),
+      throwsA(
+        isA<ApiFailure>().having((e) => e.code, 'code', 'IDEMPOTENCY_REQUIRED'),
+      ),
+    );
     expect(requests, isEmpty);
+    await repository.execute(
+      'tasks/comments',
+      const Command('comment', {
+        'id': 'task',
+        'text': '回复',
+        'parentCommentId': 'parent',
+      }, idempotencyKey: 'reply-key'),
+    );
+    expect(requests.single.path, '/tasks/task/comments');
+    expect(requests.single.headers['Idempotency-Key'], 'reply-key');
+    expect(requests.single.data, {'text': '回复', 'parentId': 'parent'});
+  });
+
+  test('服务端标签元数据和任务评论保持真实姓名颜色', () async {
+    response = {
+      'id': 'task',
+      'participants': [
+        {'id': 'u', 'name': '员工'},
+      ],
+      'label': {
+        'id': 'label',
+        'name': '自定义标签',
+        'color': '#123456',
+        'category': '公司',
+      },
+    };
+    final task = await repository.detail('tasks', 'task');
+    expect(task.fields['participantIds'], ['u']);
+    expect(task.fields['participantNames'], ['员工']);
+    expect(task.fields['tagName'], '自定义标签');
+    expect(task.fields['tagColor'], '#123456');
+    response = {
+      'items': [
+        {'id': 'label', 'name': '自定义标签', 'color': '#123456', 'version': 2},
+      ],
+    };
+    final labels = await repository.list('task-labels', const Query());
+    expect(requests.last.path, '/task-labels');
+    expect(labels.items.single.fields['color'], '#123456');
+    expect(labels.items.single.version, 2);
+    response = {
+      'items': [
+        {
+          'id': 'comment',
+          'body': '正文',
+          'author_id': 'u',
+          'nickname': '员工',
+          'parent_id': 'parent',
+          'avatar_id': 'avatar',
+        },
+      ],
+    };
+    final comments = await repository.list(
+      'tasks/task/comments',
+      const Query(),
+    );
+    expect(comments.items.single.fields['text'], '正文');
+    expect(comments.items.single.fields['actorName'], '员工');
+    expect(comments.items.single.fields['parentCommentId'], 'parent');
   });
 
   test('精确24小时、服务端拒绝和撤回后重用原窗口', () {

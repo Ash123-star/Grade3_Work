@@ -5,12 +5,12 @@ import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
-import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/features/dashboard/management_page.dart';
 
 typedef CsvSaver = Future<String?> Function(String name, Uint8List bytes);
@@ -38,13 +38,6 @@ class ServerAnalyticsPage extends ConsumerWidget {
     final tree = ref.watch(organizationTreeProvider).valueOrNull;
     return PageFrame(
       title: '工作统计',
-      actions: [
-        IconButton(
-          tooltip: '导出报表',
-          onPressed: () => context.push('/export'),
-          icon: const Icon(Icons.download_outlined),
-        ),
-      ],
       child: PageBody(
         children: [
           const DateControls(),
@@ -286,7 +279,7 @@ class _AnalyticsExportPageState extends ConsumerState<AnalyticsExportPage> {
           const DateControls(),
           const Text('范围与工作统计相同，服务端再次校验每条记录权限。'),
           const SizedBox(height: 20),
-          DropdownButtonFormField<String>(
+          PremiumDropdownField<String>(
             initialValue: resource,
             decoration: const InputDecoration(labelText: '导出内容'),
             items: const [

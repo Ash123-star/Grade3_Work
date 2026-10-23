@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/routing/branch_pager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +16,8 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
-import 'package:pandora_mobile/features/dashboard/organization_browser.dart';
+import 'package:pandora_mobile/features/dashboard/personnel_page.dart';
+import 'package:pandora_mobile/features/dashboard/task_management_page.dart';
 import 'package:pandora_mobile/features/dashboard/own_profile_page.dart';
 import 'package:pandora_mobile/core/state/session_lifecycle.dart';
 import 'package:pandora_mobile/core/config.dart';
@@ -24,7 +26,10 @@ import 'package:pandora_mobile/features/dashboard/server_analytics_page.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/features/ai_map/ai_job_pages.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_tools.dart';
-import 'package:pandora_mobile/features/ai_map/long_term_memory_page.dart' as memory;
+import 'package:pandora_mobile/features/ai_map/long_term_memory_page.dart'
+    as memory;
+import 'package:pandora_mobile/features/ai_map/workbench_page.dart';
+import 'package:pandora_mobile/features/ai_map/work_management_pages.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -62,62 +67,93 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(
-        path: '/ai/memory',
-        builder: (_, _) => const memory.AiPage(),
+        path: '/ai/directions',
+        builder: (_, _) => const LegacyDirectionPage(),
       ),
+      GoRoute(
+        path: '/ai/work/:id',
+        builder: (_, s) => WorkDetailPage(
+          s.pathParameters['id']!,
+          key: ValueKey(s.uri.toString()),
+        ),
+      ),
+      GoRoute(
+        path: '/ai/work-settings',
+        builder: (_, _) => const WorkSettingsPage(),
+      ),
+      GoRoute(path: '/ai/procedures', builder: (_, _) => const ProcedurePage()),
+      GoRoute(
+        path: '/ai/procedures/:id',
+        builder: (_, s) => ProcedurePage(id: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/tasks/:id/delivery-check',
+        builder: (_, s) => DeliveryCheckPage(
+          s.pathParameters['id']!,
+          int.tryParse(s.uri.queryParameters['version'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(path: '/ai/memory', builder: (_, _) => const memory.AiPage()),
       GoRoute(
         path: '/logs/subordinates',
         builder: (_, _) => const LogsPage(subordinates: true),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
+        navigatorContainerBuilder: (context, shell, children) =>
+            BranchPager(shell: shell, children: children),
         builder: (context, state, shell) => Scaffold(
           body: shell,
-          bottomNavigationBar: ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: PaperSurface(
-              skin: TuantuanAssets.detailSections['mint'],
-              padding: EdgeInsets.zero,
-              child: NavigationBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                animationDuration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 160),
-                selectedIndex: shell.currentIndex,
-                onDestinationSelected: (i) => shell.goBranch(i),
-                destinations: const [
-                NavigationDestination(
-                  icon: TuantuanIcon('mindmap', size: 26),
-                  selectedIcon: TuantuanIcon('mindmap', size: 26),
-                  label: '导图',
+          bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
+              ? null
+              : ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  child: PaperSurface(
+                    skin: TuantuanAssets.detailSections['mint'],
+                    padding: EdgeInsets.zero,
+                    child: NavigationBar(
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      animationDuration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 160),
+                      selectedIndex: shell.currentIndex,
+                      onDestinationSelected: (i) => shell.goBranch(i),
+                      destinations: const [
+                        NavigationDestination(
+                          icon: TuantuanIcon('mindmap', size: 26),
+                          selectedIcon: TuantuanIcon('mindmap', size: 26),
+                          label: '导图',
+                        ),
+                        NavigationDestination(
+                          icon: TuantuanIcon('calendar', size: 26),
+                          selectedIcon: TuantuanIcon('calendar', size: 26),
+                          label: '视图',
+                        ),
+                        NavigationDestination(
+                          icon: TuantuanIcon('log', size: 26),
+                          selectedIcon: TuantuanIcon('log', size: 26),
+                          label: '日志',
+                        ),
+                        NavigationDestination(
+                          icon: TuantuanIcon('ai', size: 26),
+                          selectedIcon: TuantuanIcon('ai', size: 26),
+                          label: 'AI地图',
+                        ),
+                        NavigationDestination(
+                          icon: TuantuanIcon('members', size: 26),
+                          selectedIcon: TuantuanIcon('members', size: 26),
+                          label: '我的',
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                NavigationDestination(
-                  icon: TuantuanIcon('calendar', size: 26),
-                  selectedIcon: TuantuanIcon('calendar', size: 26),
-                  label: '视图',
-                ),
-                NavigationDestination(
-                  icon: TuantuanIcon('log', size: 26),
-                  selectedIcon: TuantuanIcon('log', size: 26),
-                  label: '日志',
-                ),
-                NavigationDestination(
-                  icon: TuantuanIcon('ai', size: 26),
-                  selectedIcon: TuantuanIcon('ai', size: 26),
-                  label: 'AI地图',
-                ),
-                NavigationDestination(
-                  icon: TuantuanIcon('members', size: 26),
-                  selectedIcon: TuantuanIcon('members', size: 26),
-                  label: '我的',
-                ),
-                ],
-              ),
-            ),
-          ),
         ),
         branches: [
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/dashboard',
@@ -126,6 +162,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/view',
@@ -148,14 +185,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(path: '/logs', builder: (_, _) => const LogsPage()),
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [GoRoute(path: '/ai', builder: (_, _) => const AiPage())],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(path: '/me', builder: (_, _) => const ProfilePage()),
             ],
@@ -163,6 +203,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/me/profile', builder: (_, _) => const OwnProfilePage()),
+      GoRoute(path: '/me/people', builder: (_, _) => const PersonnelPage()),
+      GoRoute(
+        path: '/tasks/received',
+        builder: (_, _) => const ReceivedTasksPage(),
+      ),
+      GoRoute(path: '/me/tasks', builder: (_, _) => const TaskManagementPage()),
       GoRoute(
         path: '/attachments/:id',
         builder: (_, s) => AttachmentDownloadPage(
@@ -178,28 +224,34 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: '/me/organization',
-        builder: (_, _) => const OrganizationBrowser(),
-      ),
-      GoRoute(
-        path: '/me/team',
-        builder: (_, _) => const ListPage('organization'),
-      ),
-      GoRoute(
         path: '/me/team/:memberId',
-        builder: (_, s) => MemberWorkspace(
-          s.pathParameters['memberId']!,
-          businessDate: s.uri.queryParameters['date'],
-          key: ValueKey(s.uri.toString()),
+        pageBuilder: (_, s) => NoTransitionPage<void>(
+          key: ValueKey(
+            'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+          ),
+          child: MemberWorkspace(
+            s.pathParameters['memberId']!,
+            businessDate: s.uri.queryParameters['date'],
+            key: ValueKey(
+              'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+            ),
+          ),
         ),
       ),
       GoRoute(
         path: '/me/team/:memberId/:category',
-        builder: (_, s) => MemberWorkspace(
-          s.pathParameters['memberId']!,
-          category: s.pathParameters['category']!,
-          businessDate: s.uri.queryParameters['date'],
-          key: ValueKey(s.uri.toString()),
+        pageBuilder: (_, s) => NoTransitionPage<void>(
+          key: ValueKey(
+            'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+          ),
+          child: MemberWorkspace(
+            s.pathParameters['memberId']!,
+            category: s.pathParameters['category']!,
+            businessDate: s.uri.queryParameters['date'],
+            key: ValueKey(
+              'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+            ),
+          ),
         ),
       ),
       GoRoute(

@@ -33,9 +33,9 @@ public class MemoryModel {
         this.redis=redis;this.limiter=limiter;this.key=key;this.url=url;this.model=model;
         this.daily=daily;this.maxTokens=maxTokens;this.timeout=timeout;
     }
-    boolean configured() { return !key.isBlank(); }
-    record Answer(Map<String,Object> json,int tokens) {}
-    Answer complete(Actor actor,String purpose,String system,Map<String,Object> input) throws Exception {
+    public boolean configured() { return !key.isBlank(); }
+    public record Answer(Map<String,Object> json,int tokens) {}
+    public Answer complete(Actor actor,String purpose,String system,Map<String,Object> input) throws Exception {
         Actor a=memory.fresh(actor); if(!configured()) throw new ApiError(503,"AI_NOT_CONFIGURED","DeepSeek 尚未配置");
         String body=db.write(Map.of("model",model,"stream",false,"max_tokens",maxTokens,"response_format",Map.of("type","json_object"),"messages",List.of(Map.of("role","system","content",system),Map.of("role","user","content",db.write(input)))));
         if(body.length()>16000) throw ApiError.bad("AI_INPUT_TOO_LARGE","检索上下文超出预算");

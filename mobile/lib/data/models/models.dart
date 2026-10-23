@@ -128,9 +128,9 @@ class PageResult {
 class Query {
   const Query({
     this.search = '',
+    this.departmentId,
     this.cursor,
     this.ownerId,
-    this.departmentId,
     this.from,
     this.to,
   });
