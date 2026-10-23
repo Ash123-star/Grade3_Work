@@ -9,7 +9,7 @@ import java.util.*;
 /** 派发请求的字段白名单、服务端字段拒绝、默认值与去重排序；纯函数，不访问数据库。 */
 public final class TaskDraftNormalizer {
     private TaskDraftNormalizer() {}
-    static final Set<String> ALLOWED=Set.of("title","ownerId","deadline","group","content","urgency","progressNote","collaborators","attachments","acceptanceChecklist");
+    static final Set<String> ALLOWED=Set.of("title","participants","startAt","deadline","group","content","urgency","labelId","attachments","acceptanceChecklist","ownerId","collaborators","progressNote");
     static final Set<String> SERVER_MANAGED=Set.of("id","issuerId","phase","status","state","version","completion","completed","progress","createdAt");
     static final Set<String> URGENCY=Set.of("URGENT","NORMAL","LOW");
     static final int MAX_REFERENCES=100;
@@ -18,13 +18,22 @@ public final class TaskDraftNormalizer {
         for(String key:raw.keySet()) if(SERVER_MANAGED.contains(key)) throw ApiError.bad("SERVER_MANAGED_FIELD","字段由服务端管理: "+key);
         Db.fields(raw,ALLOWED.toArray(String[]::new));
         String title=Db.required(raw,"title"); if(title.length()>200) throw ApiError.bad("TITLE_LENGTH","标题过长");
-        String owner=Db.required(raw,"ownerId");
+        var participants=new TreeSet<>(ids(raw,"participants"));
+        // 仅兼容尚未升级的写入方；规范化结果不保留负责人/协作人字段。
+        if(participants.isEmpty()) { participants.add(Db.required(raw,"ownerId")); participants.addAll(ids(raw,"collaborators")); }
+        if(participants.isEmpty()) throw ApiError.bad("INVALID_LIST","至少需要一名参与人");
         String deadline=Db.required(raw,"deadline");
         try { OffsetDateTime.parse(deadline); } catch(DateTimeException e) { throw ApiError.bad("INVALID_DATE","deadline 必须带时区"); }
+        String startAt=text(raw,"startAt");
+        if(startAt!=null) try { OffsetDateTime.parse(startAt); } catch(DateTimeException e) { throw ApiError.bad("INVALID_DATE","startAt 必须带时区"); }
         Object u=raw.getOrDefault("urgency","NORMAL");
         if(!(u instanceof String urgency)||!URGENCY.contains(urgency)) throw ApiError.bad("INVALID_URGENCY","urgency: URGENT/NORMAL/LOW");
-        var collaborators=new TreeSet<>(ids(raw,"collaborators")); collaborators.remove(owner);
-        return new TaskDraft(title,owner,deadline,urgency,text(raw,"group"),text(raw,"content"),text(raw,"progressNote"),List.copyOf(collaborators),List.copyOf(new TreeSet<>(ids(raw,"attachments"))),AcceptanceChecklist.normalize(raw.get("acceptanceChecklist")));
+        String content=text(raw,"content");
+        String legacyProgress=text(raw,"progressNote");
+        if(legacyProgress!=null) content=(content==null?"":content)+(content==null||content.isEmpty()?"":"\n\n")+legacyProgress;
+        String labelId=text(raw,"labelId");
+        return new TaskDraft(title,List.copyOf(participants),startAt,deadline,urgency,text(raw,"group"),content,labelId,
+                List.copyOf(new TreeSet<>(ids(raw,"attachments"))),AcceptanceChecklist.normalize(raw.get("acceptanceChecklist")));
     }
 
     /** v2 摘要：基于规范化内容，顺序与重复不影响结果。 */

@@ -44,8 +44,14 @@ public class TaskLifecycleService {
         }
 
         int nextVersion = currentVersion + 1;
-        Db.conflict(db.update("UPDATE tasks SET phase=?,version=? WHERE id=? AND version=?",
-                decision.next().name(), nextVersion, taskId, currentVersion));
+        var nextBody=new LinkedHashMap<>(db.read(task.get("body")));
+        if(action==TaskStateMachine.Action.FEEDBACK) {
+            String prior=Db.str(nextBody,"content");
+            String block="["+actor.id()+" 反馈] "+text;
+            nextBody.put("content",prior.isBlank()?block:prior+"\n\n"+block);
+        }
+        Db.conflict(db.update("UPDATE tasks SET phase=?,body=?::jsonb,version=? WHERE id=? AND version=?",
+                decision.next().name(), db.write(nextBody), nextVersion, taskId, currentVersion));
         var eventBody = new LinkedHashMap<String, Object>();
         if (text != null) eventBody.put("text", text);
         TaskTimeline.append(db, actor, taskId, action.name(), eventBody,
@@ -76,7 +82,7 @@ public class TaskLifecycleService {
         var recipients = new LinkedHashSet<String>();
         var task = db.one("SELECT issuer_id FROM tasks WHERE id=? AND company_id=?", taskId, actor.company());
         recipients.add(Db.str(task, "issuer_id"));
-        for (var participant : db.rows("SELECT user_id FROM task_assignees WHERE task_id=?", taskId)) {
+        for (var participant : db.rows("SELECT user_id FROM task_participants WHERE task_id=?", taskId)) {
             recipients.add(Db.str(participant, "user_id"));
         }
         for (String recipient : recipients) {

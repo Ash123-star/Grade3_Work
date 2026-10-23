@@ -11,12 +11,12 @@ import static org.mockito.Mockito.*;
 class TaskRolesTest {
     private static final Map<String, Object> TASK = Map.of("id", "task1", "owner_id", "owner", "issuer_id", "issuer");
 
-    @Test void onePersonMayHoldPrimaryIssuerAndCollaboratorRoles() {
+    @Test void onePersonMayHoldParticipantIssuerAndAdminRoles() {
         Db db = mock(Db.class); when(db.count(anyString(), any(), any())).thenReturn(1L);
         Actor actor = new Actor("owner", "c1", "ADMIN", "d1", "t1", true, false, false, "ACTIVE");
         var roles = TaskRoles.resolve(db, actor, Map.of("id", "task1", "owner_id", "owner", "issuer_id", "owner"));
-        assertEquals(EnumSet.of(TaskStateMachine.Role.PRIMARY, TaskStateMachine.Role.ISSUER,
-                TaskStateMachine.Role.COLLABORATOR, TaskStateMachine.Role.ADMIN), roles);
+        assertEquals(EnumSet.of(TaskStateMachine.Role.PARTICIPANT, TaskStateMachine.Role.ISSUER,
+                TaskStateMachine.Role.ADMIN), roles);
     }
 
     @Test void managerWithReadScopeButNoTaskRoleGetsNoLifecycleRole() {

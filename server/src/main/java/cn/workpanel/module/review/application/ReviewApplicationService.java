@@ -23,8 +23,8 @@ public class ReviewApplicationService {
         Business.page(cursor,limit);
         return repository.list(actor,cursor,limit);
     }
-    static final Set<String> SUPPORTED_KINDS=Set.of("POLICY","MEMBERSHIP","REVIEWER","USER","DEPARTMENT","TEAM","COMPANY_ITEM","LOG","TASK","TASK_REASSIGN","TASK_RESCHEDULE","MEMORY","PROCEDURE");
-    static final Set<String> TASK_KINDS=Set.of("TASK","TASK_REASSIGN","TASK_RESCHEDULE");
+    static final Set<String> SUPPORTED_KINDS=Set.of("POLICY","MEMBERSHIP","REVIEWER","USER","DEPARTMENT","TEAM","COMPANY_ITEM","LOG","TASK","TASK_REASSIGN","TASK_RESCHEDULE","MEMORY","PROCEDURE","TASK_CREATE","TASK_DELETE");
+    static final Set<String> TASK_KINDS=Set.of("TASK","TASK_REASSIGN","TASK_RESCHEDULE","TASK_CREATE","TASK_DELETE");
     final Map<String,ReviewedRevisionApplication> applications;
 
     @Transactional

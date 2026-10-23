@@ -53,15 +53,15 @@ class TaskRevisionServiceTest {
         var current = task("FEEDBACK", 2);
         when(db.rows(startsWith("SELECT * FROM users"), eq("next-owner"), eq("c1")))
                 .thenReturn(List.of(Map.of("id", "next-owner", "company_id", "c1", "department_id", "d1", "team_id", "t1")));
-        when(db.rows(startsWith("SELECT user_id FROM task_assignees"), any())).thenReturn(List.of());
+        when(db.rows(startsWith("SELECT user_id FROM task_participants"), any())).thenReturn(List.of());
         when(db.update(anyString(), any(Object[].class))).thenReturn(1);
         when(db.one(anyString(), any(Object[].class))).thenReturn(Map.of("issuer_id", "issuer"));
         service.applyReassignment(db, ISSUER, current, 2, Map.of("ownerId", "next-owner"), "职责调整");
         verify(db).update(contains("SET owner_id=?,body=?::jsonb,phase='DISPATCHED',version=?"),
                 eq("next-owner"), anyString(), eq(3), eq("task1"), eq(2));
-        verify(db).update(contains("DELETE FROM task_assignees WHERE task_id=? AND user_id IN (?,?)"),
-                eq("task1"), eq("owner"), eq("next-owner"));
-        verify(db).update(contains("VALUES (?,?,'PRIMARY',?)"), eq("task1"), eq("next-owner"), eq("c1"));
+        verify(db).update(contains("DELETE FROM task_participants WHERE task_id=? AND user_id=?"),
+                eq("task1"), eq("owner"));
+        verify(db).update(contains("INSERT INTO task_participants"), eq("task1"), eq("next-owner"), eq("c1"));
         verify(db).update(contains("INSERT INTO task_events"), eq("c1"), eq("task1"), eq("issuer"),
                 eq("REASSIGNED"), anyString(), eq("FEEDBACK"), eq("DISPATCHED"), eq(3));
     }

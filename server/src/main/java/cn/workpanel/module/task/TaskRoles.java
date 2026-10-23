@@ -11,13 +11,14 @@ public final class TaskRoles {
 
     public static EnumSet<TaskStateMachine.Role> resolve(Db db, Actor actor, Map<String, Object> task) {
         var roles = EnumSet.noneOf(TaskStateMachine.Role.class);
-        if (actor.id().equals(Db.str(task, "owner_id"))) roles.add(TaskStateMachine.Role.PRIMARY);
         if (actor.id().equals(Db.str(task, "issuer_id"))) roles.add(TaskStateMachine.Role.ISSUER);
         if (actor.admin()) roles.add(TaskStateMachine.Role.ADMIN);
-        if (db.count("SELECT count(*) FROM task_assignees WHERE task_id=? AND user_id=? AND kind='COLLABORATOR'",
+        if (db.count("SELECT count(*) FROM task_participants WHERE task_id=? AND user_id=?",
                 Db.str(task, "id"), actor.id()) > 0) {
-            roles.add(TaskStateMachine.Role.COLLABORATOR);
+            roles.add(TaskStateMachine.Role.PARTICIPANT);
         }
+        // V16 回填前或异常旧库的只读兼容：旧 owner 仅映射为参与人，不向接口泄露角色。
+        if(actor.id().equals(Db.str(task,"owner_id"))) roles.add(TaskStateMachine.Role.PARTICIPANT);
         if (roles.isEmpty()) roles.add(TaskStateMachine.Role.OTHER);
         return roles;
     }

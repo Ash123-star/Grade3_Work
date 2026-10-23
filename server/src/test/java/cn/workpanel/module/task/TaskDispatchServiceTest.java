@@ -35,7 +35,7 @@ class TaskDispatchServiceTest {
     @Test void createsTaskWithFixedInitialState() {
         var result=service.dispatch(LEADER,raw(),"k1");
         verify(db).one(contains("pg_advisory_xact_lock"),eq("u-leader:k1"));
-        verify(db).update(contains("'DISPATCHED',1)"),any(),eq("c1"),eq("u-a"),eq("u-leader"),eq("整理周报"),anyString(),anyString());
+        verify(db).update(contains("'DISPATCHED',1)"),any(),eq("c1"),eq("u-a"),eq("u-leader"),eq("整理周报"),isNull(),anyString(),anyString());
         verify(db).update(contains("INSERT INTO task_events"),any(Object[].class));
         verify(db).update(contains("INSERT INTO idempotency_keys"),eq("c1"),eq("u-leader"),eq("k1"),anyString(),anyString());
         assertFalse(result.containsKey("phase")); assertTrue(result.containsKey("events"));

@@ -43,12 +43,12 @@ class TaskComponentsTest {
         verify(db).rows(contains("status='ACTIVE'"),eq("u-pending"),eq("c1"));
     }
 
-    @Test void assignWritesPrimaryThenCollaborators() {
+    @Test void assignWritesUniqueParticipantCollection() {
         Db db=mock(Db.class); when(db.write(any())).thenReturn("{}");
         TaskParticipants.assign(db,LEADER,"task1",draft("u-a",List.of("u-b","u-c")));
-        verify(db).update(contains("'PRIMARY'"),eq("task1"),eq("u-a"),eq("c1"));
-        verify(db).update(contains("'COLLABORATOR'"),eq("task1"),eq("u-b"),eq("c1"));
-        verify(db).update(contains("'COLLABORATOR'"),eq("task1"),eq("u-c"),eq("c1"));
+        verify(db).update(contains("INSERT INTO task_participants"),eq("task1"),eq("u-a"),eq("c1"));
+        verify(db).update(contains("INSERT INTO task_participants"),eq("task1"),eq("u-b"),eq("c1"));
+        verify(db).update(contains("INSERT INTO task_participants"),eq("task1"),eq("u-c"),eq("c1"));
         verify(db,times(3)).notify(eq(LEADER),anyString(),eq("TASK_ASSIGNED"),eq("task1"),anyString());
     }
 
