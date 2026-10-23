@@ -17,8 +17,8 @@
 | 历史版本/评语 | 已提交日志独立 GET `/logs/{id}/versions` 与 `/comments`；版本正文与当前正文分离 | 客户端已映射真实正文、作者ID和时间。局部网络错误可重试；401/403清除受保护正文。HTTP/UI测试通过，真实服务仍待联调。 |
 | 日志阅读登记 | 显式POST `/logs/{id}/read`，请求空对象，响应`{"ok":true}`；只有已提交且有权阅读的日志可登记，不修改正文/version。GET详情/历史无登记副作用 | 客户端精确编码非空ID、严格确认、忙碌锁/失败重试/401403整页清理及旧会话隔离已通过13项HTTP/UI测试。GET日志不返回阅读人员清单，且没有read-list GET；缺失说明不可用，不能以本次POST推断其他人已读。`submitted_at`仅实际返回时展示上海时间；真实服务/数据库仍未联调。 |
 | 重点详情 | 服务端仅有公司/个人重点分页列表，没有单对象 GET | 客户端从授权分页定位ID，成员个人重点保留ownerId上下文；缺失或403明确恢复，不代用首项。 |
-| 任务/通知读取 | task详情无phase但有sequence事件；通知字段is_read/recipient_id/type/object_id | 客户端按事件恢复生命周期和操作，REVISED重新接收；未知事件不猜动作。通知仅已知类型跳转真实目标。 |
-| 任务变更 | UI 提供旧值、候选输入及审核说明 | 转派/延期客户端改用已有 revisions 提交完整候选，经 HTTP 测试保留有效版；服务端独立审核/数据库仍未联调。退回补充无契约，真实UI禁提交。 |
+| 任务/通知读取 | 任务列表仅返回参与人、标签、带时区时间和安全投影；详情含时间线；通知字段is_read/recipient_id/type/object_id | 客户端读取 `participants`、服务端标签颜色、`start_at` 与 `deadline`；详情按事件恢复既有操作，列表不接收或展示完成情况、阶段或替代状态字段。通知仅已知类型跳转真实目标。 |
+| 任务变更 | 创建、通用修改和删除均提交审核申请；评论为公开只追加记录 | 客户端创建/修改发送 `participants`、可选 `labelId`、`startAt` 和带时区 `deadline`，不发送 `ownerId`、`collaborators` 或 `progressNote`；创建响应是待审申请，不能当作正式任务使用。任务评论用独立 `/tasks/{id}/comments` 并携带幂等键；标签接口为 `/task-labels`。 |
 | 认证状态 | 登录返回status/must_change_password/expiresAt；GET auth/me；改密撤销全部会话，logout撤销当前会话 | 客户端已接待确认刷新、强制改密、到期/明确会话错误跳转、服务端退出和前台验证。原生安全凭证/启动me验证已接；验证前不挂载业务。网络失败明确重试，401/身份变化清理；普通对象403不误退出。真实Keystore/服务撤销仍待联调。 |
 | AI/上传/导出/反馈 | 正式AI作业、受控附件及同步CSV已有服务端契约；支持反馈尚无契约。当前反馈列表通用映射可能请求 `GET /feedback`、详情可能请求 `GET /feedback/{id}`，但后端没有对应 Controller | AI/附件/导出客户端接入及HTTP/UI测试，详见下方；支持反馈查询/提交、真实服务/设备链路仍未完成。集中缺口登记见 [backend-interface-gaps.md](../../docs/backend-interface-gaps.md)。 |
 
@@ -54,7 +54,7 @@ POST /{resource} 接收 `{action, values, version?}`，修改命令在 values �
 | 分析、导出 | analytics、analytics/export | 当前区间和范围，导出结果不得越权 |
 | AI 地图 | ai-maps、ai | summarize，建议包含来源和生成时间 |
 
-任务表单必填 title、deadline、ownerId；仅一个主负责人。派发页不显示完成情况字段，流转事件放到详情。API 日期字段转换使用 UTC，显示采用业务日期。
+任务表单必填 `title`、`participants`、带时区 `deadline`；参与人是无角色且去重的集合，不再有主负责人或协作人语义。可选字段为 `startAt`、`labelId`、`group`、`content`、`urgency`、附件和验收清单。派发页不显示完成情况字段，任务列表也不得返回完成情况或替代状态字段；流转事件仅在详情时间线中读取。API 日期字段转换使用 UTC，显示采用业务日期。
 
 ## 已接入与待定的异步边界
 

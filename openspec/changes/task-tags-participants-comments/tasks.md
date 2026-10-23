@@ -28,6 +28,8 @@
 ## 5. 契约与测试
 
 - [ ] 5.1 更新 `OpenApi.java`、`docs/openapi.json`、`docs/backend-interface.md`：审核创建/修改/删除、参与人、标签、评论、幂等、版本与错误契约
+- [x] 5.1a 在不改 Flutter 页面/布局/导航的前提下，对接任务请求层和响应字段映射：参与人、标签、审核创建、评论及错误契约
+- [x] 5.1b 增加 Flutter 请求契约测试：创建/修改不发送旧负责人或进度字段，待审创建响应不作为正式任务处理，读取映射使用参与人和服务端标签颜色（2026-10-23：`flutter test --no-pub test/command_http_contract_test.dart test/attachment_assignment_http_test.dart`，29 项通过）
 - [ ] 5.2 单元测试：草稿和参与人去重、标签范围与创始人权限、审核候选/生效、评论合法性、重复与事务回滚
 - [ ] 5.3 PostgreSQL/Redis 集成测试：创建/修改/删除批准与驳回、无自审、时区、单标签、越权读取、评论回复/通知、重复提交和版本冲突
 - [ ] 5.4 回归验证既有派发幂等与生命周期，并记录受影响的历史接口兼容性
@@ -35,5 +37,5 @@
 ## 6. 交付
 
 - [ ] 6.1 运行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven`，记录明确退出码与报告。2026-10-23 当前合并工作区运行 400 项，其中 106 项失败：任务模块既有 `TaskDispatchIntegrationTest` 的 23 项通过；剩余失败集中于共享 `BackendIntegrationTest` 的测试库隔离/会话级联，以及 AI 办事模块仍按旧任务“负责人、创建即生效”契约调用。未获得全仓绿灯前不得报告全量后端回归通过。
-- [x] 6.2 运行 `openspec.cmd validate task-tags-participants-comments --strict`（2026-10-20 通过）；全仓校验需在具备本地文件访问权限的环境复跑
+- [x] 6.2 运行 `openspec.cmd validate --all --strict`（2026-10-23：33 项通过，0 项失败）
 - [ ] 6.3 提交前检查差异、无密钥/构建产物/个人文件；由用户自行提交、推送和创建 PR
