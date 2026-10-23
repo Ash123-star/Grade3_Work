@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -537,7 +538,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         },
       );
     }
-    return PageFrame(
+    final page = PageFrame(
       title: 'AI地图',
       showTitle: false,
       child: PageBody(
@@ -587,6 +588,17 @@ class _AiPageState extends ConsumerState<AiPage> {
           content,
         ],
       ),
+    );
+    return SiblingSwipe(
+      index: tab,
+      itemCount: 3,
+      onStep: (step) {
+        final next = tab + step;
+        if (next < 0 || next > 2) return false;
+        changeTab(next);
+        return true;
+      },
+      child: page,
     );
   }
 

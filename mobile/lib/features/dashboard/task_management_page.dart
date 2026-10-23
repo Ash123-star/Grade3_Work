@@ -1,8 +1,10 @@
+import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
@@ -114,18 +116,15 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
       final haystack = [
         item.title,
         '${fields['body'] ?? ''}',
-        '${fields['tagName'] ?? ''}',
-        '${fields['participantNames'] ?? ''}',
+        taskTagLabel(fields),
+        taskParticipantNames(fields).join(' '),
       ].join(' ').toLowerCase();
       if (query.isNotEmpty && !haystack.contains(query)) return false;
-      if (tag != '全部标签' && '${fields['tagName'] ?? ''}' != tag) {
+      if (tag != '全部标签' && taskTagLabel(fields) != tag) {
         return false;
       }
       if (participant != '全部参与人') {
-        final names = (fields['participantNames'] as List?)
-            ?.map((value) => '$value')
-            .toSet();
-        if (names?.contains(participant) != true) return false;
+        if (!taskParticipantNames(fields).contains(participant)) return false;
       }
       final due = DateTime.tryParse('${fields['deadline'] ?? ''}')?.toLocal();
       if (deadline != null &&
@@ -140,23 +139,18 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
   }
 
   Future<void> _showFilters(List<Record> rows) async {
-    final tags = <String>{
-      '全部标签',
-      ...rows.map((r) => '${r.fields['tagName'] ?? ''}'),
-    }..remove('');
+    final tags = <String>{'全部标签', ...rows.map((r) => taskTagLabel(r.fields))}
+      ..remove('');
     final participants = <String>{'全部参与人'};
     for (final row in rows) {
-      participants.addAll(
-        (row.fields['participantNames'] as List?)?.map((value) => '$value') ??
-            const <String>[],
-      );
+      participants.addAll(taskParticipantNames(row.fields));
     }
     var nextTag = tag;
     var nextParticipant = participant;
     var nextDeadline = deadline;
     final tagColors = {
       for (final row in rows)
-        '${row.fields['tagName'] ?? ''}': _tagColor(row.fields['tagColor']),
+        taskTagLabel(row.fields): _tagColor(row.fields['tagColor']),
     };
     final choice = await showModalBottomSheet<bool>(
       context: context,
@@ -284,7 +278,7 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
   Widget build(BuildContext context) {
     final user = ref.watch(sessionProvider);
     final state = ref.watch(recordsProvider('tasks'));
-    return PageFrame(
+    final page = PageFrame(
       title: '任务管理',
       fab: user.dispatch
           ? FloatingActionButton(
@@ -401,6 +395,17 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
         ],
       ),
     );
+    return SiblingSwipe(
+      index: segment,
+      itemCount: 3,
+      onStep: (step) {
+        final next = segment + step;
+        if (next < 0 || next > 2) return false;
+        setState(() => segment = next);
+        return true;
+      },
+      child: page,
+    );
   }
 }
 
@@ -422,9 +427,7 @@ class _TaskRecordCard extends StatelessWidget {
     final f = item.fields;
     final tagColor =
         _colorFromHex('${f['tagColor'] ?? ''}') ?? SunnyPalette.blue;
-    final participants = (f['participantNames'] as List?)
-        ?.map((value) => '$value')
-        .join('、');
+    final participants = taskParticipantNames(f).join('、');
     final deadline = businessEventTime(f['deadline']);
     return PaperSurface(
       skin: TuantuanAssets.surfaces[received ? 'blue' : 'warm'],
@@ -468,7 +471,7 @@ class _TaskRecordCard extends StatelessWidget {
                   runSpacing: 4,
                   children: [
                     AppLabelBadge(
-                      '${f['tagName'] ?? '未分类'}',
+                      taskTagLabel(f),
                       color: tagColor,
                       compact: true,
                     ),
@@ -494,7 +497,7 @@ class _TaskRecordCard extends StatelessWidget {
                     '开始 ${_taskDate(f['startAt'])} · 截止 ${deadline == null ? '未设置' : '${deadline.month}月${deadline.day}日 ${_taskTime(deadline)}'}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  if (participants != null && participants.isNotEmpty)
+                  if (participants.isNotEmpty)
                     Text(
                       '参与人 $participants',
                       style: Theme.of(context).textTheme.bodySmall,

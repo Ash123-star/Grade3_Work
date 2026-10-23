@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:pandora_mobile/data/models/log_edit_window.dart';
+import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,7 +31,7 @@ class ListPage extends ConsumerStatefulWidget {
 
 class _ListPageState extends ConsumerState<ListPage> {
   String search = '', filter = '全部', group = '全部标签', deadline = '全部期限';
-  String? owner;
+  String? owner, ownerName;
   int inbox = 0;
   String auditActor = '';
   DateTime? auditDate;
@@ -104,6 +105,7 @@ class _ListPageState extends ConsumerState<ListPage> {
           readingAll = false;
           messageError = null;
           owner = null;
+          ownerName = null;
         });
       }
     });
@@ -221,8 +223,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                     '全部标签',
                     group,
                     ...data.valueOrNull?.items.map(
-                          (r) =>
-                              '${r.fields['tagName'] ?? r.fields['tagId'] ?? '未分类'}',
+                          (r) => taskTagLabel(r.fields),
                         ) ??
                         <String>[],
                   }.toList(),
@@ -241,14 +242,22 @@ class _ListPageState extends ConsumerState<ListPage> {
                         isScrollControlled: true,
                         builder: (_) => const PersonPicker(),
                       );
-                      if (p != null && mounted) setState(() => owner = p.id);
+                      if (p != null && mounted) {
+                        setState(() {
+                          owner = p.id;
+                          ownerName = p.title;
+                        });
+                      }
                     },
                     icon: const Icon(Icons.person_outline, size: 18),
-                    label: Text(owner == null ? '参与人' : '参与人 $owner'),
+                    label: Text(owner == null ? '参与人' : '参与人 $ownerName'),
                   ),
                 if (owner != null)
                   TextButton(
-                    onPressed: () => setState(() => owner = null),
+                    onPressed: () => setState(() {
+                      owner = null;
+                      ownerName = null;
+                    }),
                     child: const Text('清除人员'),
                   ),
               ],
@@ -350,9 +359,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                             .contains(owner)) {
                       return false;
                     }
-                    if (group != '全部标签' &&
-                        '${r.fields['tagName'] ?? r.fields['tagId'] ?? '未分类'}' !=
-                            group) {
+                    if (group != '全部标签' && taskTagLabel(r.fields) != group) {
                       return false;
                     }
                     final due = DateTime.tryParse('${r.fields['deadline']}');
@@ -552,17 +559,8 @@ class _ListPageState extends ConsumerState<ListPage> {
 
   Widget _taskCard(BuildContext context, Record record, VoidCallback onTap) {
     final f = record.fields;
-    final participantNames =
-        (f['participantNames'] as List?)
-            ?.map((value) => '$value')
-            .where((value) => value.trim().isNotEmpty)
-            .toList() ??
-        (f['participantIds'] as List?)
-            ?.map((value) => '$value')
-            .where((value) => value.trim().isNotEmpty)
-            .toList() ??
-        const <String>[];
-    final tagName = '${f['tagName'] ?? f['tag_id'] ?? f['tagId'] ?? '未分类'}';
+    final participantNames = taskParticipantNames(f);
+    final tagName = taskTagLabel(f);
     final tagCategory = '${f['tagCategory'] ?? ''}';
     final tagColor = _recordColor(f['tagColor'] ?? f['tag_color']);
     return PaperSurface(
@@ -964,12 +962,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
               final participantIds = (f['participantIds'] as List? ?? const [])
                   .map((value) => '$value')
                   .toSet();
-              final participantNames =
-                  (f['participantNames'] as List?)
-                      ?.map((value) => '$value')
-                      .where((value) => value.trim().isNotEmpty)
-                      .toList() ??
-                  participantIds.toList();
+              final participantNames = taskParticipantNames(f);
               final canActOnTask =
                   participantIds.contains(user.id) || item.ownerId == user.id;
               final dispatcher =
@@ -998,7 +991,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       icon: Icons.flag_outlined,
                     ),
                     TuantuanStatusPill(
-                      '${f['tagCategory'] == null ? '' : '${f['tagCategory']} · '}${f['tagName'] ?? f['tagId'] ?? '未分类'}',
+                      '${f['tagCategory'] == null ? '' : '${f['tagCategory']} · '}${taskTagLabel(f)}',
                       color: _recordColor(f['tagColor'] ?? f['tag_color']),
                       icon: Icons.sell_outlined,
                     ),

@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/routing/branch_pager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -68,7 +69,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/logs/subordinates',
         builder: (_, _) => const LogsPage(subordinates: true),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
+        navigatorContainerBuilder: (context, shell, children) =>
+            BranchPager(shell: shell, children: children),
         builder: (context, state, shell) => Scaffold(
           body: shell,
           bottomNavigationBar: ClipRRect(
@@ -117,6 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
         branches: [
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/dashboard',
@@ -125,6 +129,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/view',
@@ -147,14 +152,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(path: '/logs', builder: (_, _) => const LogsPage()),
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [GoRoute(path: '/ai', builder: (_, _) => const AiPage())],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(path: '/me', builder: (_, _) => const ProfilePage()),
             ],
@@ -184,19 +192,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/me/team/:memberId',
-        builder: (_, s) => MemberWorkspace(
-          s.pathParameters['memberId']!,
-          businessDate: s.uri.queryParameters['date'],
-          key: ValueKey(s.uri.toString()),
+        pageBuilder: (_, s) => NoTransitionPage<void>(
+          key: ValueKey(
+            'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+          ),
+          child: MemberWorkspace(
+            s.pathParameters['memberId']!,
+            businessDate: s.uri.queryParameters['date'],
+            key: ValueKey(
+              'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+            ),
+          ),
         ),
       ),
       GoRoute(
         path: '/me/team/:memberId/:category',
-        builder: (_, s) => MemberWorkspace(
-          s.pathParameters['memberId']!,
-          category: s.pathParameters['category']!,
-          businessDate: s.uri.queryParameters['date'],
-          key: ValueKey(s.uri.toString()),
+        pageBuilder: (_, s) => NoTransitionPage<void>(
+          key: ValueKey(
+            'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+          ),
+          child: MemberWorkspace(
+            s.pathParameters['memberId']!,
+            category: s.pathParameters['category']!,
+            businessDate: s.uri.queryParameters['date'],
+            key: ValueKey(
+              'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+            ),
+          ),
         ),
       ),
       GoRoute(

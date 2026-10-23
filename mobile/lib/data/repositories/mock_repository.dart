@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/models/log_edit_window.dart';
+import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
 
 enum DemoScenario { normal, empty, offline, forbidden }
@@ -755,7 +756,9 @@ class MockRepository implements Repository {
             date.isBefore(query.to!);
       });
     }
-    final result = items.toList();
+    final result = items
+        .map((item) => resource == 'tasks' ? _withTaskDisplay(item) : item)
+        .toList();
     if (resource == 'dashboard/personal') {
       result.sort(
         (a, b) => (int.tryParse('${a.fields['排序位置']}') ?? 0).compareTo(
@@ -867,8 +870,27 @@ class MockRepository implements Repository {
         },
       );
     }
-    return item;
+    return resource == 'tasks' ? _withTaskDisplay(item) : item;
   }
+
+  Map<String, dynamic> _taskDisplayFields(Map<String, dynamic> fields) => {
+    'tagName': taskTagLabel(fields),
+    'participantNames': taskParticipantNames(
+      fields,
+      namesById: {
+        for (final person in rows('organization')) person.id: person.title,
+      },
+    ),
+  };
+
+  Record _withTaskDisplay(Record item) => Record(
+    id: item.id,
+    title: item.title,
+    subtitle: item.subtitle,
+    ownerId: item.ownerId,
+    version: item.version,
+    fields: {...item.fields, ..._taskDisplayFields(item.fields)},
+  );
 
   Record copy(
     Record r,
@@ -1243,6 +1265,12 @@ class MockRepository implements Repository {
         _ => previous?.fields['status'] ?? '待接收',
       };
       fields['dispatcherId'] = previous?.fields['dispatcherId'] ?? session.id;
+      if (v.containsKey('tagId') &&
+          v['tagId'] != previous?.fields['tagId']) {
+        fields.remove('tagName');
+      }
+      if (v.containsKey('participantIds')) fields.remove('participantNames');
+      fields.addAll(_taskDisplayFields(fields));
     }
     if (resource == 'logs') {
       fields['status'] = action == 'save-draft' ? '草稿' : '已提交';

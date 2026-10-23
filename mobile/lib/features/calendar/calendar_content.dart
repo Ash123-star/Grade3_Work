@@ -479,16 +479,11 @@ class _MonthGrid extends StatelessWidget {
         ((first.weekday - 1 + DateTime(date.year, date.month + 1, 0).day) / 7)
             .ceil();
     final gridStart = first.subtract(Duration(days: first.weekday - 1));
-    final lanes = _monthLanes(
-      events,
-      gridStart,
-      gridStart.add(Duration(days: weeks * 7 - 1)),
-    );
     return PaperSurface(
       key: const ValueKey('calendar-month-grid'),
       decorated: true,
       skin: TuantuanAssets.surfaces['warm'],
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final cellWidth = constraints.maxWidth / 7;
@@ -502,6 +497,25 @@ class _MonthGrid extends StatelessWidget {
           final cellHeight = math.max(
             0.0,
             (height - 16 - weekdayHeight) / weeks,
+          );
+          final recordTop = math.max(
+            24.0,
+            MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
+          );
+          final barHeight =
+              MediaQuery.textScalerOf(
+                    context,
+                  ).scale(_monthRecordFontSize(cellWidth)) *
+                  1.15 +
+              3;
+          final capacity = ((cellHeight - recordTop - 2 + 1) / (barHeight + 1))
+              .floor()
+              .clamp(0, 5);
+          final lanes = _monthLanes(
+            events,
+            gridStart,
+            gridStart.add(Duration(days: weeks * 7 - 1)),
+            capacity,
           );
           return Column(
             children: [
@@ -521,7 +535,9 @@ class _MonthGrid extends StatelessWidget {
                                 padding: const EdgeInsets.only(bottom: 3),
                                 child: Text(
                                   _weekdays[i],
-                                  key: ValueKey('month-weekday:${_weekdays[i]}'),
+                                  key: ValueKey(
+                                    'month-weekday:${_weekdays[i]}',
+                                  ),
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
@@ -634,7 +650,8 @@ class _MonthGrid extends StatelessWidget {
                                                   top: 1,
                                                   right: 1,
                                                   child: DogAvatar(
-                                                    index: DogAssets.todayAvatar,
+                                                    index:
+                                                        DogAssets.todayAvatar,
                                                     size: 22,
                                                   ),
                                                 ),
@@ -652,7 +669,6 @@ class _MonthGrid extends StatelessWidget {
                         events,
                         start.add(Duration(days: week * 7)),
                         cellWidth,
-                        cellHeight,
                         lanes,
                       ),
                     ],
@@ -671,7 +687,6 @@ List<Widget> _monthWeekBars(
   List<CalendarEvent> events,
   DateTime weekStart,
   double cellWidth,
-  double cellHeight,
   Map<String, int> lanes,
 ) {
   final weekEnd = weekStart.add(const Duration(days: 6));
@@ -695,13 +710,14 @@ List<Widget> _monthWeekBars(
         days = to.difference(from).inDays + 1;
     final starts = sameDay(from, event.firstDay),
         ends = sameDay(to, event.lastDay);
-    final dateHeader = MediaQuery.textScalerOf(context).scale(13) * 1.15 + 8;
-    const downshift = 8.0;
-    final barHeight = math.min(
-      15.0,
-      math.max(0.0, (cellHeight / 2 - dateHeader - downshift - 4) / 3),
+    final recordTop = math.max(
+      24.0,
+      MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
     );
-    final top = dateHeader + downshift + lane * (barHeight + 2);
+    final fontSize = _monthRecordFontSize(cellWidth);
+    final barHeight =
+        MediaQuery.textScalerOf(context).scale(fontSize) * 1.15 + 3;
+    final top = recordTop + lane * (barHeight + 1);
     bars.add(
       Positioned(
         key: ValueKey(
@@ -727,18 +743,19 @@ List<Widget> _monthWeekBars(
                   ? SizedBox(
                       width: cellWidth - (col == 0 ? 2 : 0),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            event.record.title.characters.take(4).toString(),
-                            maxLines: 1,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              height: 1,
-                              color: SunnyPalette.ink,
-                            ),
+                        padding: const EdgeInsets.symmetric(horizontal: 1),
+                        child: Text(
+                          event.record.title.characters.take(6).toString(),
+                          semanticsLabel: event.record.title,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.clip,
+                          style: TextStyle(
+                            fontSize: fontSize,
+                            height: 1.15,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0,
+                            color: SunnyPalette.ink,
                           ),
                         ),
                       ),
@@ -755,10 +772,16 @@ List<Widget> _monthWeekBars(
 
 String _calendarEventKey(CalendarEvent event) => event.record.id;
 
+// Six full-width characters fit on one line at the default text scale.
+// Larger accessibility text still clips rather than wrapping or adding dots.
+double _monthRecordFontSize(double cellWidth) =>
+    math.min(10.0, math.max(1.0, (cellWidth - 4) / 6));
+
 Map<String, int> _monthLanes(
   List<CalendarEvent> events,
   DateTime gridStart,
   DateTime gridEnd,
+  int capacity,
 ) {
   final candidates =
       events
@@ -777,7 +800,7 @@ Map<String, int> _monthLanes(
               ? duration
               : _calendarEventKey(a).compareTo(_calendarEventKey(b));
         });
-  final laneEvents = List.generate(3, (_) => <CalendarEvent>[]);
+  final laneEvents = List.generate(capacity, (_) => <CalendarEvent>[]);
   final dailyCounts = <DateTime, int>{};
   final result = <String, int>{};
   for (final event in candidates) {
@@ -791,7 +814,7 @@ Map<String, int> _monthLanes(
       !day.isAfter(to);
       day = day.add(const Duration(days: 1))
     ) {
-      if ((dailyCounts[day] ?? 0) >= 3) {
+      if ((dailyCounts[day] ?? 0) >= capacity) {
         exceedsDayCapacity = true;
         break;
       }

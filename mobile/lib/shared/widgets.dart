@@ -106,8 +106,15 @@ class PageBody extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 760),
         child: ListView(
           controller: controller,
-          padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
-          children: [?header, ...children],
+          padding: EdgeInsets.only(top: 8, bottom: bottomPadding),
+          children: [
+            ?header,
+            for (final child in children)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: child,
+              ),
+          ],
         ),
       ),
     );
@@ -135,46 +142,62 @@ class PageFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     final canGoBack = Navigator.of(context).canPop();
     final headerContent = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (showTitle)
-            Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showTitle || canGoBack)
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Row(
               children: [
-                const DogAvatar(index: DogAssets.friendly, size: 30),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: canGoBack ? const BackButton() : null,
                 ),
-              ],
-            ),
-          if (canGoBack || (actions?.isNotEmpty ?? false))
-            ConstrainedBox(
-              key: const ValueKey('page-scroll-actions'),
-              constraints: const BoxConstraints(minHeight: 40),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (canGoBack) const BackButton(),
+                if (showTitle) ...[
                   Expanded(
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: actions ?? const [],
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const DogAvatar(index: DogAssets.friendly, size: 30),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleLarge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 48),
                 ],
+              ],
+            ),
+          ),
+        if (actions?.isNotEmpty ?? false)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ConstrainedBox(
+              key: const ValueKey('page-scroll-actions'),
+              constraints: const BoxConstraints(minHeight: 40),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: actions!,
               ),
             ),
-        ],
-      );
+          ),
+      ],
+    );
     final header = showTitle || canGoBack || (actions?.isNotEmpty ?? false)
         ? Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
             child: headerContent,
           )
         : const SizedBox.shrink();
@@ -190,7 +213,10 @@ class PageFrame extends StatelessWidget {
               )
             : TuantuanPaperBackdrop(
                 child: Column(
-                  children: [header, Expanded(child: content)],
+                  children: [
+                    header,
+                    Expanded(child: content),
+                  ],
                 ),
               ),
       ),
@@ -365,18 +391,8 @@ class DateControls extends ConsumerWidget {
             ),
           ],
         ),
-        if (period == '月')
-          Row(
-            children: [
-              Expanded(child: tabs),
-              const SizedBox(width: 4),
-              today,
-            ],
-          )
-        else ...[
-          tabs,
-          Align(alignment: Alignment.centerRight, child: today),
-        ],
+        tabs,
+        Align(alignment: Alignment.centerRight, child: today),
         const SizedBox(height: 8),
       ],
     );

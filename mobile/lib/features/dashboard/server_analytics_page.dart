@@ -5,7 +5,6 @@ import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
-import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
@@ -39,13 +38,6 @@ class ServerAnalyticsPage extends ConsumerWidget {
     final tree = ref.watch(organizationTreeProvider).valueOrNull;
     return PageFrame(
       title: '工作统计',
-      actions: [
-        IconButton(
-          tooltip: '导出报表',
-          onPressed: () => context.push('/export'),
-          icon: const Icon(Icons.download_outlined),
-        ),
-      ],
       child: PageBody(
         children: [
           const DateControls(),

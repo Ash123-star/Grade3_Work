@@ -11,6 +11,7 @@ import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/models/log_edit_window.dart';
+import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
@@ -22,12 +23,7 @@ import 'package:pandora_mobile/shared/diary_task_links.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'catalog.dart';
 
-const _taskTagLabels = <String, String>{
-  'company-important': '重要',
-  'department-research': '研发',
-  'department-design': '设计',
-  'personal-today': '今日',
-};
+const _taskTagLabels = taskTagLabels;
 const _taskTagColors = <String, Color>{
   'company-important': Color(0xFFFFD9A8),
   'department-research': Color(0xFFBDEFD7),
@@ -194,16 +190,14 @@ class _FormPageState extends ConsumerState<FormPage> {
       selectedOwner = item.ownerId;
       final participantValues =
           item.fields['participantIds'] ?? item.fields['participant_ids'];
-      final participantNames = item.fields['participantNames'] is List
-          ? (item.fields['participantNames'] as List)
-          : const <dynamic>[];
+      final participantNames = taskParticipantNames(item.fields);
       if (participantValues is List) {
         for (final (index, value) in participantValues.indexed) {
           final id = '$value'.trim();
           if (id.isNotEmpty) {
             final name = index < participantNames.length
-                ? '${participantNames[index]}'
-                : id;
+                ? participantNames[index]
+                : '成员姓名未提供';
             participants[id] = Record(id: id, title: name);
           }
         }
@@ -1439,7 +1433,9 @@ class _FormPageState extends ConsumerState<FormPage> {
         : ['内容'];
     String value(String label) => switch (label) {
       '参与人' =>
-        '${(f['participantNames'] as List?)?.join('、') ?? f['participantIds'] ?? '未设置'}',
+        taskParticipantNames(f).isEmpty
+            ? '未设置'
+            : taskParticipantNames(f).join('、'),
       '截止时间' => f['deadline'] == null ? '未设置' : '${f['deadline']}',
       '业务日期' => '${f['businessDate'] ?? '未标记'}',
       '内容' => '${f['内容'] ?? f['body'] ?? '暂无内容'}',
@@ -1543,23 +1539,6 @@ class _FormPageState extends ConsumerState<FormPage> {
     return PageFrame(
       title: document ? (log ? '写日志' : '修改日志') : spec.title,
       showTitle: !auth,
-      actions: document
-          ? [
-              Padding(
-                padding: EdgeInsets.only(right: 16),
-                child: Center(
-                  child: Text(
-                    log
-                        ? '草稿'
-                        : windowOpen
-                        ? '24小时内可修改'
-                        : '已锁定',
-                    style: const TextStyle(color: CuteTokens.muted),
-                  ),
-                ),
-              ),
-            ]
-          : null,
       bottom: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1759,12 +1738,26 @@ class _FormPageState extends ConsumerState<FormPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        savedAt == null
-                            ? '尚未保存 · 草稿仅本人可见'
-                            : saved
-                            ? '上次本机保存 ${savedAt!.hour.toString().padLeft(2, '0')}:${savedAt!.minute.toString().padLeft(2, '0')}'
-                            : '保存中…',
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: log
+                                  ? '草稿 · '
+                                  : windowOpen
+                                  ? '24小时内可修改 · '
+                                  : '已锁定 · ',
+                            ),
+                            TextSpan(
+                              text: savedAt == null
+                                  ? '尚未保存 · 草稿仅本人可见'
+                                  : saved
+                                  ? '上次本机保存 ${savedAt!.hour.toString().padLeft(2, '0')}:${savedAt!.minute.toString().padLeft(2, '0')}'
+                                  : '保存中…',
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.start,
                         style: const TextStyle(
                           fontSize: 12,
                           color: CuteTokens.muted,

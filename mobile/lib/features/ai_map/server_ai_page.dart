@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -403,7 +404,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
       if (id != null && id != current?.id && alive && !busy) refresh(id);
     });
     final job = completed;
-    return PageFrame(
+    final page = PageFrame(
       title: 'AI地图',
       actions: [
         IconButton(
@@ -663,6 +664,18 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
           const SizedBox(height: 24),
         ],
       ),
+    );
+    return SiblingSwipe(
+      index: job == null ? 0 : tab,
+      itemCount: job == null ? 1 : 3,
+      onStep: (step) {
+        if (job == null) return false;
+        final next = tab + step;
+        if (next < 0 || next > 2) return false;
+        setState(() => tab = next);
+        return true;
+      },
+      child: page,
     );
   }
 }
