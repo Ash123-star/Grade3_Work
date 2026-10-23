@@ -37,6 +37,9 @@ void main() {
         ),
       );
       final drag = await tester.startGesture(const Offset(600, 250));
+      // Cross touch slop before measuring the content-following distance.
+      await drag.moveBy(const Offset(-20, 0));
+      await tester.pump();
       await drag.moveBy(const Offset(-220, 0));
       await tester.pump();
       await drag.moveBy(const Offset(-100, 0));

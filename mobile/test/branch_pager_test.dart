@@ -89,6 +89,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, '/view');
       await tester.tap(find.text('me').last);
+      // Rebuild the shell, then prime its post-frame navigation animation.
+      await tester.pump();
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 80));
       final pager = tester.widget<PageView>(
         find.byKey(const ValueKey('bottom-branch-pager')),

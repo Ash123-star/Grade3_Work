@@ -64,6 +64,8 @@ void main() {
             '成果说明': '已核对交付文件',
             '遇到的阻碍': '需核实版权',
             '主负责人': '陈一诺',
+            'participantIds': ['u2'],
+            'participantNames': ['陈一诺'],
             'deadline': '2026-10-14T18:00:00',
             'dispatcherId': 'u1',
           },

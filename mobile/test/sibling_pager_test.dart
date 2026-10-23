@@ -33,6 +33,8 @@ void main() {
       await tester.pump();
       await drag.moveBy(const Offset(-260, 0));
       await tester.pump();
+      await drag.moveBy(const Offset(-200, 0));
+      await tester.pump();
       final current = tester.getRect(find.byKey(const ValueKey('page-0')));
       final next = tester.getRect(find.byKey(const ValueKey('page-1')));
       expect(current.left, lessThan(0));
