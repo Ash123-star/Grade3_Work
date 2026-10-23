@@ -40,7 +40,7 @@ void main() {
           '密码': adminPassword,
         }),
       );
-      final admin = client(login.fields['accessToken'] as String);
+      var admin = client(login.fields['accessToken'] as String);
       if (login.fields['must_change_password'] == true) {
         final next = 'Changed!${adminPassword.substring(0, 48)}';
         await admin.execute(
@@ -49,6 +49,24 @@ void main() {
         );
         adminPassword = next;
         saved.writeAsStringSync(jsonEncode({'adminPassword': adminPassword}));
+        await expectLater(
+          admin.detail('auth', 'me'),
+          throwsA(
+            isA<ApiFailure>().having(
+              (e) => e.kind,
+              'kind',
+              FailureKind.unauthorized,
+            ),
+          ),
+        );
+        final renewed = await public.execute(
+          'auth',
+          Command('login', {
+            '账号': settings['ADMIN_ACCOUNT'],
+            '密码': adminPassword,
+          }),
+        );
+        admin = client(renewed.fields['accessToken'] as String);
       }
       try {
         final departments = (await public.dio.get<List<dynamic>>(
