@@ -23,6 +23,8 @@ function Invoke-Api {
     if ($Who) { $headers['Authorization'] = "Bearer $($script:tokens[$Who])" }
     if ($IdempotencyKey) { $headers['Idempotency-Key'] = $IdempotencyKey }
     $reqArgs = @{ Uri = "$BaseUrl$Path"; Method = $Method; Headers = $headers; TimeoutSec = 20; UseBasicParsing = $true }
+    # PS7 uses HttpResponseException instead of the PS5 WebException below.
+    if ($PSVersionTable.PSVersion.Major -ge 7) { $reqArgs['SkipHttpErrorCheck'] = $true }
     if ($null -ne $Body) {
         $reqArgs['ContentType'] = 'application/json; charset=utf-8'
         $reqArgs['Body'] = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 20 -Compress))
@@ -140,23 +142,38 @@ Pass "org scope correct (leader can dispatch alice, not cross-dept bob)"
 
 # 8. Task dispatch + idempotency + authorization
 $deadline = (Get-Date).Date.AddDays(1).AddHours(23).AddMinutes(59).ToString('yyyy-MM-ddTHH:mm:sszzz')
-$taskBody = @{ title='product-task'; ownerId=$script:ids['alice']; deadline=$deadline; urgency='NORMAL'; content='task content'; collaborators=@() }
+$startAt = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz')
+$taskBody = @{ title='product-task'; participants=@($script:ids['alice']); startAt=$startAt; deadline=$deadline; urgency='NORMAL'; content='task content' }
 $created = Invoke-Api 200 POST '/tasks' 'leader' $taskBody 'product-task'
-$task = $created.id
-Pass "task dispatched id=$task"
+$task = $created.target_id
+if ($created.status -ne 'PENDING' -or -not $task) { throw 'task creation did not return a pending review' }
+Pass 'task creation returned pending review'
 $replay = Invoke-Api 200 POST '/tasks' 'leader' $taskBody 'product-task'
-if ($replay.id -ne $task) { throw 'idempotent replay returned different task' }
-Pass 'same idempotency key replays same task'
+if ($replay.id -ne $created.id) { throw 'idempotent replay returned different review' }
+Pass 'same idempotency key replays same review'
 $conflict = $taskBody.Clone(); $conflict['title'] = 'different content'
 Invoke-Api 409 POST '/tasks' 'leader' $conflict 'product-task' | Out-Null
 Pass 'idempotency key with different content -> 409'
 Invoke-Api 403 POST '/tasks' 'alice' @{ title='employee dispatch'; ownerId=$script:ids['alice']; deadline=$deadline; urgency='NORMAL'; content='x'; collaborators=@() } 'employee-dispatch' | Out-Null
 Pass 'employee without dispatch right -> 403'
+Invoke-Api 404 GET "/tasks/$task" 'alice' | Out-Null
+Approve-Review $created.id 'leader' | Out-Null
+$effectiveTask = Invoke-Api 200 GET "/tasks/$task" 'alice'
+if (-not ($effectiveTask.participants | Where-Object { $_.id -eq $script:ids['alice'] }) -or
+    -not $effectiveTask.start_at) { throw 'approved task lost participants or start time' }
+Pass 'task becomes visible after independent review with participants/start time'
 $row = (Invoke-Api 200 GET '/tasks' 'alice').items[0]
 foreach ($f in @('phase','status','completion','events')) {
     if ($row.PSObject.Properties.Name -contains $f) { throw "task list leaked forbidden field: $f" }
 }
 Pass 'task list has no phase/status/completion/events field'
+$taskComment = Invoke-Api 200 POST "/tasks/$task/comments" 'leader' @{ text='task public comment' } 'task-comment-1'
+$taskReply = Invoke-Api 200 POST "/tasks/$task/comments" 'alice' @{ text='task reply'; parentId=$taskComment.id } 'task-reply-1'
+if ($taskReply.parent_id -ne $taskComment.id -or -not $taskReply.nickname) { throw 'task reply metadata missing' }
+Invoke-Api 409 POST "/tasks/$task/comments" 'alice' @{ text='task reply'; parentId=$taskComment.id } 'task-reply-1' | Out-Null
+Invoke-Api 400 POST "/tasks/$task/comments" 'alice' @{ text='no key' } | Out-Null
+Invoke-Api 404 GET "/tasks/$task/comments" 'bob' | Out-Null
+Pass 'task comments preserve reply relation, reject duplicate key/missing key and peer read'
 
 # 9. Task lifecycle: received -> feedback -> accepted -> archived, version concurrency
 $received = Invoke-Api 200 POST "/tasks/$task/events" 'alice' @{ type='RECEIVED'; version=1 }
@@ -181,11 +198,37 @@ if ((Invoke-Api 200 GET "/logs?ownerId=$($script:ids['alice'])" 'leader').items.
 Pass 'unsubmitted draft invisible to manager'
 Invoke-Api 403 GET "/logs?ownerId=$($script:ids['alice'])" 'bob' | Out-Null
 Pass 'peer cross-read of logs -> 403'
-Invoke-Api 200 POST "/logs/$log/submit" 'alice' @{ version=2 } | Out-Null
+$submitted = Invoke-Api 200 POST "/logs/$log/submit" 'alice' @{ version=2 }
+if (-not $submitted.submittedAt -or -not $submitted.editableUntil -or
+    -not $submitted.canEdit -or -not $submitted.canWithdraw) { throw 'missing diary edit capabilities' }
+if (([DateTimeOffset]$submitted.editableUntil - [DateTimeOffset]$submitted.submittedAt).TotalHours -ne 24) {
+    throw 'diary edit deadline is not 24 hours after first submission'
+}
 $sub = Invoke-Api 200 GET "/logs/subordinates?date=$businessDate" 'leader'
 if ($sub.total -lt 1) { throw 'subordinate entry did not return submitted log' }
 Invoke-Api 403 GET '/logs/subordinates' 'alice' | Out-Null
 Pass "subordinate log entry shows submitted log (total=$($sub.total)); employee access -> 403"
+
+# week6: current backend contract; revisions still require independent approval.
+$filtered = Invoke-Api 200 GET "/logs/subordinates?departmentId=product&search=rd%20work&date=$businessDate" 'leader'
+if (-not ($filtered.items | Where-Object { $_.id -eq $log })) { throw 'combined diary filters lost submitted diary' }
+if (-not $filtered.groups -or -not $filtered.items[0].author.id -or
+    $filtered.items[0].department.id -ne 'product') { throw 'missing department/author grouping' }
+$empty = Invoke-Api 200 GET "/logs/subordinates?departmentId=unknown-week6&date=$businessDate" 'leader'
+if ($empty.total -ne 0) { throw 'unknown department exposed logs' }
+Invoke-Api 400 GET ('/logs/subordinates?search=' + ('x' * 101)) 'leader' | Out-Null
+Pass 'department/search/date filters, grouping, unknown department and invalid search'
+$comment = Invoke-Api 200 POST "/logs/$log/comments" 'leader' @{ text='week6 public comment' }
+$reply = Invoke-Api 200 POST "/logs/$log/comments" 'alice' @{ text='week6 reply'; parentId=$comment.id }
+if ($reply.parent_id -ne $comment.id -or -not $reply.author_name) { throw 'reply relation or author missing' }
+$comments = Invoke-Api 200 GET "/logs/$log/comments" 'alice'
+if (-not ($comments | Where-Object { $_.id -eq $reply.id -and $_.parent_id -eq $comment.id })) {
+    throw 'reply did not round trip'
+}
+Invoke-Api 400 POST "/logs/$log/comments" 'alice' @{ text='' } | Out-Null
+Invoke-Api 400 POST "/logs/$log/comments" 'alice' @{ text='invalid reply'; parentId='missing-week6-comment' } | Out-Null
+Invoke-Api 404 GET "/logs/$log/comments" 'bob' | Out-Null
+Pass 'public comment/reply round trip, empty text, invalid parent and peer denial'
 
 # 11. Notification center reachable
 $notif = Invoke-Api 200 GET '/notifications' 'alice'

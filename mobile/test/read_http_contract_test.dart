@@ -16,6 +16,7 @@ class ReadAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   int focusStatus = 200, versionStatus = 200, commentStatus = 200;
   bool submitted = true;
+  DateTime? editDeadline;
   final task = <String, dynamic>{
     'id': 'task-1',
     'title': '真实任务内容',
@@ -54,6 +55,14 @@ class ReadAdapter implements HttpClientAdapter {
         'business_date': '2026-10-12',
         'owner_id': 'u1',
         'submitted': submitted,
+        if (editDeadline != null) ...{
+          'editableUntil': editDeadline!.toUtc().toIso8601String(),
+          'submittedAt': editDeadline!
+              .subtract(const Duration(hours: 24))
+              .toUtc()
+              .toIso8601String(),
+          'canEdit': true,
+        },
         'version': 3,
         'body': {
           'work': '当前生效正文',
@@ -346,6 +355,23 @@ void main() {
     await t.pumpWidget(const SizedBox.shrink());
     await t.pumpAndSettle();
   }
+
+  testWidgets(
+    'diary revision action disappears when its server deadline passes',
+    (t) async {
+      adapter.editDeadline = DateTime.now().add(const Duration(seconds: 3));
+      await launch(t, '/item/logs/log-1');
+      expect(find.text('申请修订日志'), findsOneWidget);
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 3100)),
+      );
+      await t.pump(const Duration(seconds: 4));
+      await t.pumpAndSettle();
+      expect(find.text('申请修订日志'), findsNothing);
+      expect(adapter.requests.any((r) => r.method == 'PUT'), false);
+      await closeUi(t);
+    },
+  );
 
   testWidgets(
     'historical document displays HTTP version body rather than current content',

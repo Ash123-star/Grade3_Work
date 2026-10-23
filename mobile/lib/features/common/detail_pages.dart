@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:pandora_mobile/data/models/log_edit_window.dart';
 import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +12,7 @@ import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/log_edit_window.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'catalog.dart';
@@ -270,7 +270,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                 children: [
                   for (final value
                       in resource == 'notifications'
-                          ? ['全部', '任务', '审批', '评论', '截止提醒', '审核结果']
+                          ? ['全部', '任务', '审批', '评论', '待阅提醒', '截止提醒', '审核结果']
                           : resource == 'reviews'
                           ? ['全部', '待审', '已通过', '已驳回']
                           : ['全部', '日志', '任务', '组织'])
@@ -731,25 +731,30 @@ class DetailPage extends ConsumerStatefulWidget {
 }
 
 class _DetailPageState extends ConsumerState<DetailPage> {
-  bool busy = false;
-  String? error;
-  late final Session initialLogIdentity = ref.read(sessionProvider);
-  ApiFailure? logAccessError;
-  Timer? windowTimer;
-  @override
-  void initState() {
-    super.initState();
-    windowTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && widget.resource.startsWith('logs')) setState(() {});
-    });
+  Timer? logDeadlineTimer;
+  DateTime? scheduledLogDeadline;
+  void scheduleLogDeadline(Record item) {
+    final deadline = LogEditWindow(item).until;
+    if (deadline == scheduledLogDeadline) return;
+    scheduledLogDeadline = deadline;
+    logDeadlineTimer?.cancel();
+    if (deadline != null && deadline.isAfter(DateTime.now())) {
+      logDeadlineTimer = Timer(deadline.difference(DateTime.now()), () {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   @override
   void dispose() {
-    windowTimer?.cancel();
+    logDeadlineTimer?.cancel();
     super.dispose();
   }
 
+  bool busy = false;
+  String? error;
+  late final Session initialLogIdentity = ref.read(sessionProvider);
+  ApiFailure? logAccessError;
   Future<void> action(Record item, String action) async {
     if (action == 'archive') {
       final yes = await showDialog<bool>(
@@ -1302,10 +1307,10 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ),
               ]);
             } else if (resource.startsWith('logs')) {
+              scheduleLogDeadline(item);
               final window = LogEditWindow(item);
               if (item.ownerId == user.id &&
-                  f['canWithdraw'] == true &&
-                  window.canEditAt(DateTime.now())) {
+                  window.canWithdrawAt(DateTime.now())) {
                 actions.add(
                   TextButton(
                     onPressed: busy ? null : () => edit(item, 'log-withdraw'),
@@ -1351,6 +1356,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   '${f['businessDate'] ?? ''} · 作者 ${f['authorName'] ?? item.ownerId} · ${f['status'] ?? (isSubmittedDiary(item) ? '已提交' : '提交状态未确认')}',
                   style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                 ),
+                if (f['editableUntil'] != null)
+                  Text('可申请修订至 ${prettyDate(f['editableUntil'])}'),
                 if (isSubmittedDiary(item) &&
                     businessEventTime(f['submittedAt']) != null)
                   Padding(

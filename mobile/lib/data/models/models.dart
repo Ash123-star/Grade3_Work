@@ -142,6 +142,7 @@ class Query {
     'limit': 30,
     if (cursor != null) 'cursor': cursor,
     if (ownerId != null) 'ownerId': ownerId,
+    if (departmentId != null) 'departmentId': departmentId,
     if (from != null) 'from': from!.toUtc().toIso8601String(),
     if (to != null) 'to': to!.toUtc().toIso8601String(),
   };

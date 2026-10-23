@@ -254,7 +254,8 @@ class HttpRepository implements Repository {
   Map<String, dynamic> _query(Query query) => {
     if (query.cursor != null) 'cursor': query.cursor,
     if (query.ownerId != null) 'ownerId': query.ownerId,
-    if (query.departmentId != null) 'departmentId': query.departmentId,
+    if (query.departmentId != null && query.departmentId!.isNotEmpty)
+      'departmentId': query.departmentId,
     'limit': 30,
     if (query.search.isNotEmpty) 'search': query.search,
     if (query.from != null) 'date': _date(query),
@@ -276,6 +277,8 @@ class HttpRepository implements Repository {
     'organization/departments' => '/organization/departments',
     'reviews' => '/reviews',
     'notifications' => '/notifications',
+    'task-labels' => '/task-labels',
+    _ when RegExp(r'^tasks/[^/]+/comments$').hasMatch(resource) => '/$resource',
     _ => throw ApiFailure(FailureKind.unavailable, '列表接口尚未登记：$resource'),
   };
 
@@ -308,8 +311,8 @@ class HttpRepository implements Repository {
       fields['姓名'] = raw['name'];
     }
     if (raw['department'] is Map) {
-      fields['departmentName'] = raw['department']['name'];
       fields['departmentId'] = raw['department']['id'];
+      fields['departmentName'] = raw['department']['name'];
     } else if (raw['department'] != null) {
       fields['departmentName'] = raw['department'];
     }
@@ -356,6 +359,20 @@ class HttpRepository implements Repository {
       fields['submittedAt'] = raw['submitted_at'];
     }
     if (raw.containsKey('deadline')) fields['deadline'] = raw['deadline'];
+    if (raw['label'] is Map) {
+      final label = raw['label'] as Map;
+      fields['tagId'] = label['id'];
+      fields['tagName'] = label['name'];
+      fields['tagCategory'] = label['category'];
+      fields['tagColor'] = label['color'];
+    }
+    if (raw['author_id'] != null && raw['body'] is String) {
+      fields['text'] = raw['body'];
+      fields['actorId'] = raw['author_id'];
+      fields['actorName'] = raw['nickname'];
+      fields['parentCommentId'] = raw['parent_id'];
+      fields['avatarAttachmentId'] = raw['avatar_id'];
+    }
     if (raw.containsKey('start_at')) fields['startAt'] = raw['start_at'];
     if (raw.containsKey('startAt')) fields['startAt'] = raw['startAt'];
     if (raw.containsKey('tag_id')) fields['tagId'] = raw['tag_id'];
@@ -518,8 +535,8 @@ class HttpRepository implements Repository {
       fields['type'] = switch (raw['type']) {
         'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' => '任务',
         'DEADLINE' => '截止提醒',
-        'LOG_SUBMITTED' => '日志',
-        'LOG_COMMENT' => '评论',
+        'LOG_SUBMITTED' => '待阅提醒',
+        'LOG_COMMENT' || 'TASK_COMMENT' => '评论',
         'REVIEW_PENDING' => '审批',
         'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
         _ => '${raw['type'] ?? '消息'}',
@@ -528,6 +545,7 @@ class HttpRepository implements Repository {
         'TASK_ASSIGNED' ||
         'TASK_EVENT' ||
         'TASK_REVISED' ||
+        'TASK_COMMENT' ||
         'DEADLINE' => 'tasks',
         'LOG_SUBMITTED' || 'LOG_COMMENT' => 'logs',
         'REVIEW_PENDING' || 'REVIEW_APPROVED' || 'REVIEW_REJECTED' => 'reviews',
@@ -742,11 +760,12 @@ class HttpRepository implements Repository {
   ) {
     if (kind == 'comments') {
       return {
-        'id': raw['id'],
-        'parentCommentId': raw['parent_id'],
-        'authorName': raw['author_name'],
+        ...raw,
         'text': raw['text'] ?? '',
         'actorId': raw['actor_id'],
+        'authorName': raw['author_name'],
+        'actorName': raw['author_name'],
+        'parentCommentId': raw['parent_id'],
         'parentId': raw['parent_id'],
         'time': raw['created_at'],
       };
@@ -787,7 +806,10 @@ class HttpRepository implements Repository {
     if (!v.containsKey('participantIds') &&
         !v.containsKey('参与人') &&
         !v.containsKey('tagId') &&
-        !v.containsKey('标签')) {
+        !v.containsKey('标签') &&
+        !v.containsKey('startAt') &&
+        !v.containsKey('participants') &&
+        !v.containsKey('labelId')) {
       return {
         'title': v['title'] ?? v['任务名称'],
         'ownerId': v['ownerId'],
@@ -804,12 +826,15 @@ class HttpRepository implements Repository {
         'attachments': v['attachments'] ?? const <String>[],
       }..removeWhere((key, value) => value == null);
     }
-    final tag = '${v['tagId'] ?? v['标签'] ?? ''}'.trim();
-    final participants = v['participantIds'] ?? v['参与人'];
+    final tag = '${v['labelId'] ?? v['tagId'] ?? v['标签'] ?? ''}'.trim();
+    final participants =
+        v['participants'] ??
+        v['participantIds'] ??
+        v['参与人'] ??
+        (v['ownerId'] == null ? const <String>[] : [v['ownerId']]);
     return {
       'title': v['title'] ?? v['任务名称'],
-      if (v['ownerId'] != null) 'ownerId': v['ownerId'],
-      'participantIds': participants is List
+      'participants': participants is List
           ? participants
           : '${participants ?? ''}'
                 .split('、')
@@ -824,7 +849,9 @@ class HttpRepository implements Repository {
         '不紧急' || 'LOW' => 'LOW',
         _ => 'NORMAL',
       },
-      if (tag.isNotEmpty) 'tagId': tag,
+      if (tag.isNotEmpty) 'labelId': tag,
+      if (v['acceptanceChecklist'] != null)
+        'acceptanceChecklist': v['acceptanceChecklist'],
       'attachments': v['attachments'] ?? const <String>[],
     }..removeWhere((key, value) => value == null);
   }
@@ -846,6 +873,25 @@ class HttpRepository implements Repository {
   Future<Record> execute(String resource, Command command) async {
     try {
       final v = {...command.values};
+      if (resource == 'tasks/comments') {
+        if (command.idempotencyKey == null ||
+            command.idempotencyKey!.trim().isEmpty) {
+          throw const ApiFailure(
+            FailureKind.validation,
+            '任务评论需要幂等键',
+            code: 'IDEMPOTENCY_REQUIRED',
+          );
+        }
+        return await _postRecord(
+          '/tasks/${Uri.encodeComponent(_commandId(command))}/comments',
+          {
+            'text': v['text'] ?? v['评语'],
+            if (v['parentId'] != null || v['parentCommentId'] != null)
+              'parentId': v['parentId'] ?? v['parentCommentId'],
+          },
+          idempotencyKey: command.idempotencyKey,
+        );
+      }
       if (resource == 'auth') {
         final body = switch (command.action) {
           'login' => {'account': v['账号'], 'password': v['密码']},
@@ -948,6 +994,9 @@ class HttpRepository implements Repository {
       }
       if (resource == 'logs') {
         if (command.action == 'withdraw') {
+          if (command.version == null) {
+            throw const ApiFailure(FailureKind.validation, '请刷新日志后再撤回');
+          }
           return await _postRecord(
             '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
             {
@@ -955,6 +1004,9 @@ class HttpRepository implements Repository {
               'reason': v['reason'] ?? v['撤回原因'] ?? '',
             },
           );
+        }
+        if (['edit', 'update', 'delete'].contains(command.action)) {
+          throw const ApiFailure(FailureKind.unavailable, '已提交日志需要申请审核修订');
         }
         if (command.action == 'read') {
           final id = _commandId(command);
@@ -966,12 +1018,6 @@ class HttpRepository implements Repository {
             throw const ApiFailure(FailureKind.server, '服务器未确认阅读登记，请重试');
           }
           return Record(id: id, title: '阅读已登记', fields: const {'ok': true});
-        }
-        if (command.action == 'withdraw') {
-          return await _postRecord(
-            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
-            {'version': command.version, 'reason': v['撤回原因']},
-          );
         }
         if (command.action == 'request-review') {
           return await _postRecord(
@@ -1029,8 +1075,8 @@ class HttpRepository implements Repository {
           '/logs/${Uri.encodeComponent(_commandId(command))}/comments',
           {
             'text': v['评语'] ?? v['text'],
-            if (v['parentCommentId'] != null || v['parentId'] != null)
-              'parentId': v['parentCommentId'] ?? v['parentId'],
+            if (v['parentId'] != null || v['parentCommentId'] != null)
+              'parentId': v['parentId'] ?? v['parentCommentId'],
           },
         );
       }

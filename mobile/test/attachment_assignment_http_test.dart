@@ -657,7 +657,8 @@ void main() {
                   .lastWhere((o) => o.path == '/tasks' && o.method == 'POST')
                   .data
               as Map;
-      expect(body['participantIds'], ['first', 'second']);
+      expect(body['participants'], ['first', 'second']);
+      expect(body.containsKey('participantIds'), false);
       expect(body['attachments'], ['uploaded-1']);
       expect(body.keys.contains('status'), isFalse);
       await close(t);
