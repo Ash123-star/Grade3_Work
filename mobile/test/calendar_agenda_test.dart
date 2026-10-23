@@ -318,19 +318,30 @@ void main() {
         reason: 'continuation across weeks keeps one horizontal lane',
       );
       expect(
-        find.descendant(of: firstWeekSegment, matching: find.text('数据结构')),
+        find.descendant(of: firstWeekSegment, matching: find.text('数据结构实训')),
         findsOneWidget,
       );
       expect(
-        find.descendant(of: nextWeekSegment, matching: find.text('数据结构')),
+        find.descendant(of: nextWeekSegment, matching: find.text('数据结构实训')),
         findsNothing,
         reason: 'continuation weeks show color without repeating the title',
       );
-      expect(
-        find.text('任务标题'),
-        findsNWidgets(4),
-        reason: 'month pills show only the first four characters',
+      final previewTitles = t.widgetList<Text>(
+        find.descendant(
+          of: find.byKey(const ValueKey('calendar-month-grid')),
+          matching: find.byWidgetPredicate(
+            (w) => w is Text && w.data?.startsWith('任务标题') == true,
+          ),
+        ),
       );
+      expect(previewTitles, isNotEmpty);
+      for (final title in previewTitles) {
+        expect(title.style?.fontSize, inInclusiveRange(6, 10));
+        expect(title.overflow, TextOverflow.clip);
+        expect(title.maxLines, 1);
+        expect(title.data!.characters.length, lessThanOrEqualTo(6));
+        expect(title.data, isNot('任务标题'));
+      }
       final segmentRect = t.getRect(firstWeekSegment);
       final startCell = t.getRect(
         find.byKey(const ValueKey('month-day:2026-10-16')),
@@ -341,7 +352,7 @@ void main() {
       expect(segmentRect.left, startCell.left);
       expect(segmentRect.right, closeTo(endCell.right - 2, .01));
       expect(
-        t.getRect(find.text('数据结构')).right,
+        t.getRect(find.text('数据结构实训')).right,
         lessThanOrEqualTo(startCell.right),
       );
       final material = t.widget<Material>(

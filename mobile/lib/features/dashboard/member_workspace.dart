@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_pager.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -96,7 +97,7 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
     return '/me/team/${encode(widget.memberId)}/$category${date == null ? '' : '?date=${date.toIso8601String().split('T').first}'}';
   }
 
-  void retry() {
+  void retry(String category) {
     ref.invalidate(itemProvider(('organization', widget.memberId)));
     for (final resource in [
       'dashboard/personal',
@@ -105,12 +106,11 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
     ]) {
       ref.invalidate(memberRecordsProvider((resource, widget.memberId)));
     }
-    ref.invalidate(memberWorkspaceProvider((widget.memberId, widget.category)));
+    ref.invalidate(memberWorkspaceProvider((widget.memberId, category)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final memberId = widget.memberId, category = widget.category;
     if (!valid) {
       return PageFrame(
         title: '下属工作台',
@@ -129,7 +129,8 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
         ),
       );
     }
-    if (!ref.watch(sessionProvider).manager) {
+    final session = ref.watch(sessionProvider);
+    if (!session.manager || !session.canReadBusiness) {
       return const PageFrame(
         title: '下属工作台',
         child: EmptyIllustration(
@@ -139,7 +140,22 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
         ),
       );
     }
+    return SiblingPager(
+      key: ValueKey(widget.memberId),
+      index: memberCategories.indexOf(widget.category),
+      itemCount: memberCategories.length,
+      onSelected: (index) => context.replace(route(memberCategories[index])),
+      itemBuilder: (context, index) => Consumer(
+        builder: (context, ref, _) =>
+            _categoryPage(context, ref, memberCategories[index]),
+      ),
+    );
+  }
+
+  Widget _categoryPage(BuildContext context, WidgetRef ref, String category) {
+    final memberId = widget.memberId;
     return PageFrame(
+      key: PageStorageKey('member:$memberId:$category'),
       title: '下属工作台',
       child: !ready
           ? const LoadingSkeleton()
@@ -151,12 +167,12 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                   loading: () => const LoadingSkeleton(),
                   error: (e, _) => PageBody(
                     children: [
-                      RecordFailure(e, retry: retry),
+                      RecordFailure(e, retry: () => retry(category)),
                       if (e is ApiFailure &&
                           e.kind == FailureKind.forbidden) ...[
                         const Text('成员范围已不可访问，受保护资料与记录已清除。'),
                         OutlinedButton(
-                          onPressed: retry,
+                          onPressed: () => retry(category),
                           child: const Text('重新检查访问权限'),
                         ),
                       ],

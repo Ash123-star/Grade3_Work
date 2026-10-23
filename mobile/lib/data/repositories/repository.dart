@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:dio/dio.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
@@ -375,18 +376,55 @@ class HttpRepository implements Repository {
     if (raw['participantIds'] is List) {
       fields['participantIds'] = raw['participantIds'];
     }
+    if (fields['participant_names'] is List &&
+        fields['participantNames'] is! List) {
+      fields['participantNames'] = fields['participant_names'];
+    }
     if (raw['participants'] is List) {
-      final values = raw['participants'] as List;
+      final values = (raw['participants'] as List).indexed.where((entry) {
+        final value = entry.$2;
+        final id = value is Map
+            ? value['id'] ?? value['user_id'] ?? value['userId']
+            : value;
+        return id != null && '$id'.trim().isNotEmpty;
+      }).toList();
+      final existingNames = fields['participantNames'] is List
+          ? fields['participantNames'] as List
+          : const [];
+      final existingIds = fields['participantIds'] ?? fields['participant_ids'];
+      final namesById = <String, dynamic>{
+        if (existingIds is List)
+          for (
+            var i = 0;
+            i < existingIds.length && i < existingNames.length;
+            i++
+          )
+            '${existingIds[i]}'.trim(): existingNames[i],
+      };
+      String fallbackName(String id, int originalIndex) =>
+          '${namesById[id] ?? (existingIds is! List && originalIndex < existingNames.length ? existingNames[originalIndex] : '')}';
       fields['participantIds'] = [
-        for (final value in values)
-          value is Map ? '${value['id'] ?? value['user_id'] ?? ''}' : '$value',
-      ].where((value) => value.isNotEmpty).toList();
-      fields['participantNames'] = [
-        for (final value in values)
+        for (final (_, value) in values)
           value is Map
-              ? '${value['name'] ?? value['display_name'] ?? value['title'] ?? value['id'] ?? ''}'
+              ? '${value['id'] ?? value['user_id'] ?? value['userId']}'
               : '$value',
       ];
+      fields['participantNames'] = [
+        for (final (index, value) in values)
+          value is Map
+              ? '${value['name'] ?? value['display_name'] ?? value['displayName'] ?? value['title'] ?? fallbackName('${value['id'] ?? value['user_id'] ?? value['userId']}'.trim(), index)}'
+              : fallbackName('$value'.trim(), index),
+      ];
+    }
+    if (fields.containsKey('tagId') ||
+        fields.containsKey('tagName') ||
+        fields.containsKey('tag_id') ||
+        fields.containsKey('tag_name')) {
+      fields['tagName'] = taskTagLabel(fields);
+    }
+    if (fields['participantIds'] is List ||
+        fields['participantNames'] is List) {
+      fields['participantNames'] = taskParticipantNames(fields);
     }
     for (final pair in [
       ('work', '今日工作'),

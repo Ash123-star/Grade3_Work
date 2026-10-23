@@ -289,13 +289,6 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
     ];
     return PageFrame(
       title: '工作统计',
-      actions: [
-        IconButton(
-          tooltip: '导出报表',
-          onPressed: () => context.push('/export'),
-          icon: const Icon(Icons.download_outlined),
-        ),
-      ],
       child: PageBody(
         children: [
           const DateControls(),

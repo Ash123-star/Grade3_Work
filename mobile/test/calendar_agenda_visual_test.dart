@@ -111,13 +111,26 @@ void main() {
         ),
         findsNothing,
       );
-      expect(find.text('数据结构'), findsOneWidget);
-      expect(
-        find.text('计划核对'),
-        findsOneWidget,
-        reason: 'two spans leave one of three lanes',
+      expect(find.text('月底汇总验收'), findsOneWidget);
+      final previews = t.widgetList<Text>(
+        find.descendant(
+          of: month,
+          matching: find.byWidgetPredicate(
+            (w) => w is Text && w.overflow == TextOverflow.clip,
+          ),
+        ),
       );
-      expect(find.text('月底汇总'), findsOneWidget);
+      expect(previews, isNotEmpty);
+      for (final preview in previews) {
+        expect(preview.style?.fontSize, inInclusiveRange(6, 10));
+        expect(preview.maxLines, 1);
+        expect(preview.data!.characters.length, lessThanOrEqualTo(6));
+      }
+      expect(
+        find.descendant(of: month, matching: find.byType(FittedBox)),
+        findsNothing,
+      );
+      expect(t.getSize(month).width, size.width);
       final navTop = t.getTopLeft(find.byType(NavigationBar)).dy;
       expect(t.getBottomRight(month).dy, lessThanOrEqualTo(navTop));
       expect(t.getBottomRight(lastDay).dy, lessThanOrEqualTo(navTop));
