@@ -32,6 +32,8 @@ POST /{resource} 接收 `{action, values, version?}`，修改命令在 values �
 
 ## 页面与接口
 
+完整的页面、操作、接口状态和后端实现输入见 [`api-surface-coverage.md`](api-surface-coverage.md)。本文件以下内容描述已确认的通用请求规则；待定契约不代表已有可调用 URL。
+
 | 页面入口 | resource | action / 行为 |
 | --- | --- | --- |
 | /form/login、register、password | auth | login/register/password，注册不允许 role 参数 |
@@ -50,13 +52,13 @@ POST /{resource} 接收 `{action, values, version?}`，修改命令在 values �
 
 任务表单必填 title、deadline、ownerId；仅一个主负责人。派发页不显示完成情况字段，流转事件放到详情。API 日期字段转换使用 UTC，显示采用业务日期。
 
-## 待接入的异步边界
+## 已接入与待定的异步边界
 
 附件已接POST `/attachments` multipart file，1字节至10MB，返回id/filename/size；任务提交引用实际ID，GET `/attachments/{id}`受认证字节保存，使用Content-Disposition安全文件名。头像保存同样引用实际上传ID。未有DELETE接口，移除表单文件不代表服务端清理；成果反馈接口不支持附件关联时禁用上传。真实设备文件对话框/服务未验收。
 
-SSE 建议 GET /notifications/stream，事件携带 id、type、objectId，支持 Last-Event-ID 重连；由后端事务 outbox 保证最终投递，客户端按事件 ID 去重并刷新未读数。当前 UI 使用 repository 拉取，SSE 消费器属于服务接入阶段。
+通知 SSE 已由服务端 `GET /notifications/stream` 和 Flutter `NotificationStream` 接入；事件携带 id/sequence，支持 Last-Event-ID 重连。客户端按序号刷新列表，服务端事务 outbox 负责最终投递。AI 作业 SSE 使用独立 `/ai/jobs/{id}/stream`。
 
-正式AI已有客户端接入：POST `/ai/jobs`、GET `/ai/jobs/{id}`、DELETE取消、POST retry、PUT draft、GET stream、POST confirm-task、GET usage及GET/POST地图，详细见下方。演示固定样例不调用外部模型。导出使用已有同步CSV GET `/analytics/export` 和实际字节保存，无异步job或短期URL契约。
+正式 AI 已有客户端接入：POST `/ai/jobs`、GET `/ai/jobs/{id}`、DELETE 取消、POST retry、PUT draft、GET stream、POST confirm-task、GET usage 及 GET/POST 地图，详细见下方。演示固定样例不调用外部模型。AI 范围选择和确认 job 版本原子保护仍是待定契约。导出使用已有同步 CSV GET `/analytics/export` 和实际字节保存，无异步 job 或短期 URL 契约。
 
 ## 界面范围
 

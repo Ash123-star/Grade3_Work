@@ -31,7 +31,8 @@ test('knowledge status and forget job reach a clear terminal state', async ({ pa
     const path = new URL(request.url()).pathname;
     let body: unknown;
     let status = 200;
-    if (path === '/api/auth/me') body = {role: 'ADMIN', must_change_password: false};
+    if (path === '/api/admin/workspace/ai/work-items') body = {items: []};
+    else if (path === '/api/auth/me') body = {role: 'ADMIN', must_change_password: false};
     else if (path === '/api/admin/workspace/ai-maps/development') body = {
       scopes: [{domain: 'PERSONAL', scopeType: 'SELF', scopeId: 'self', label: '个人'}],
       analysis: {},
@@ -56,6 +57,7 @@ test('knowledge status and forget job reach a clear terminal state', async ({ pa
   });
 
   await page.goto('/');
+  await page.getByRole('button', {name: '成长分析'}).click();
   await expect(page.getByText('有效记忆 1 条 · 已索引 0 条 · 更新中 1 条 · 待确认 1 条')).toBeVisible();
   await page.getByRole('button', {name: '管理记忆'}).click();
   await expect(page.getByText('完成模块评审')).toBeVisible();
@@ -73,7 +75,8 @@ test('analysis failures and missing evidence never reveal a sample conclusion', 
     const path = new URL(route.request().url()).pathname;
     let status = 200;
     let body: unknown;
-    if (path === '/api/auth/me') body = {role: 'ADMIN', must_change_password: false};
+    if (path === '/api/admin/workspace/ai/work-items') body = {items: []};
+    else if (path === '/api/auth/me') body = {role: 'ADMIN', must_change_password: false};
     else if (path === '/api/admin/workspace/ai-maps/development') {
       if (state === 'DENIED') {status = 403; body = {code: 'FORBIDDEN', message: '你没有访问这项内容的权限'};}
       else body = {
@@ -91,12 +94,14 @@ test('analysis failures and missing evidence never reveal a sample conclusion', 
     await route.fulfill({status, contentType: 'application/json', body: JSON.stringify(body)});
   });
   await page.goto('/');
+  await page.getByRole('button', {name: '成长分析'}).click();
   await expect(page.getByText('本次没有检索到相关有效证据')).toBeVisible();
   await expect(page.getByText('图谱暂不可用，使用文本证据')).toBeVisible();
   await expect(page.getByText('有效记忆 1 条 · 已索引 0 条 · 更新中 1 条 · 待确认 0 条')).toBeVisible();
   for (const [next, text] of [['FAILED', 'DeepSeek 尚未配置'], ['STALE', '来源已变化，请更新分析'], ['DENIED', '你没有访问这项内容的权限']]) {
     state = next;
     await page.reload();
+    if (next !== 'DENIED') await page.getByRole('button', {name: '成长分析'}).click();
     await expect(page.getByText(text)).toBeVisible();
     await expect(page.getByText('从执行任务，走向独立推进')).toHaveCount(0);
   }

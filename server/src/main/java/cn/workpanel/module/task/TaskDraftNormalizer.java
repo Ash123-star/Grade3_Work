@@ -9,7 +9,7 @@ import java.util.*;
 /** 派发请求的字段白名单、服务端字段拒绝、默认值与去重排序；纯函数，不访问数据库。 */
 public final class TaskDraftNormalizer {
     private TaskDraftNormalizer() {}
-    static final Set<String> ALLOWED=Set.of("title","participants","startAt","deadline","group","content","urgency","labelId","attachments","ownerId","collaborators","progressNote");
+    static final Set<String> ALLOWED=Set.of("title","participants","startAt","deadline","group","content","urgency","labelId","attachments","acceptanceChecklist","ownerId","collaborators","progressNote");
     static final Set<String> SERVER_MANAGED=Set.of("id","issuerId","phase","status","state","version","completion","completed","progress","createdAt");
     static final Set<String> URGENCY=Set.of("URGENT","NORMAL","LOW");
     static final int MAX_REFERENCES=100;
@@ -32,7 +32,8 @@ public final class TaskDraftNormalizer {
         String legacyProgress=text(raw,"progressNote");
         if(legacyProgress!=null) content=(content==null?"":content)+(content==null||content.isEmpty()?"":"\n\n")+legacyProgress;
         String labelId=text(raw,"labelId");
-        return new TaskDraft(title,List.copyOf(participants),startAt,deadline,urgency,text(raw,"group"),content,labelId,List.copyOf(new TreeSet<>(ids(raw,"attachments"))));
+        return new TaskDraft(title,List.copyOf(participants),startAt,deadline,urgency,text(raw,"group"),content,labelId,
+                List.copyOf(new TreeSet<>(ids(raw,"attachments"))),AcceptanceChecklist.normalize(raw.get("acceptanceChecklist")));
     }
 
     /** v2 摘要：基于规范化内容，顺序与重复不影响结果。 */

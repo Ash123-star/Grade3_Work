@@ -13,6 +13,29 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.admin-account=integration-admin","app.admin-password=Initial-test-password-2026","app.admin-phone=13900000001"
 })
 class Week6AccessIntegrationTest extends MemberBHttpSupport {
+    @Test void approvedRoleChangeRevokesAllOldSessionsButRejectedChangeDoesNot() throws Exception {
+        var rejected=revision(director,Map.of("role","EMPLOYEE"));
+        var pending=call(200,"GET","/reviews/"+rejected.get("id").asText(),admin,null);
+        String judge=pending.get("steps").get(0).get("reviewer_id").asText();
+        call(200,"POST","/reviews/"+rejected.get("id").asText()+"/decision",judge,Map.of("approve",false,"reason","保留角色"));
+        call(200,"GET","/auth/me",director,null);
+        var accepted=revision(director,Map.of("role","EMPLOYEE"));
+        approve(accepted.get("id").asText(),admin);
+        assertEquals(0,db.count("SELECT count(*) FROM sessions WHERE user_id=?",director));
+        call(401,"GET","/auth/me",director,null);
+        call(401,"GET","/admin/workspace/auth/me",director,null);
+    }
+    @Test void workspaceDenialsArePersistedWithoutCredentialsOrPayloads() throws Exception {
+        var missing=call(401,"GET","/admin/workspace/auth/me?secret=never-store-this","missing",null);
+        var denied=call(403,"GET","/admin/workspace/auth/me",employee,null);
+        var anonymous=db.one("SELECT * FROM workspace_access_audit WHERE trace_id=?",missing.get("traceId").asText());
+        assertNull(anonymous.get("actor_id")); assertEquals(401,((Number)anonymous.get("status")).intValue());
+        var authenticated=db.one("SELECT * FROM workspace_access_audit WHERE trace_id=?",denied.get("traceId").asText());
+        assertEquals(employee,authenticated.get("actor_id")); assertEquals(company,authenticated.get("company_id"));
+        assertEquals("ADMIN_WORKSPACE",authenticated.get("endpoint"));
+        assertFalse(db.write(anonymous).contains("never-store-this"));
+        assertFalse(db.write(authenticated).contains(tokens.get(employee)));
+    }
     @Test void publicCommentsKeepScopeAndReplyNotificationsAtomic() throws Exception {
         String id=log(employee,true,Instant.now().minusSeconds(90000));
         var comment=call(200,"POST","/logs/"+id+"/comments",director,Map.of("text","公开评论"));

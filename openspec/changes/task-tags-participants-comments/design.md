@@ -21,7 +21,7 @@
 
 ### 1. 参与人集合为规范模型
 
-新增 `task_participants(task_id, user_id, company_id, created_at)`，主键为 `(task_id,user_id)`，不含角色列。`V16` 从 `tasks.owner_id` 与 `task_assignees` 回填，并以唯一主键消除重复。新写入只写 `task_participants`；旧的 `owner_id`、`task_assignees` 不再对外返回，也不再决定新任务权限。
+新增 `task_participants(task_id, user_id, company_id, created_at)`，主键为 `(task_id,user_id)`，不含角色列。`V20` 从 `tasks.owner_id` 与 `task_assignees` 回填，并以唯一主键消除重复。新写入只写 `task_participants`；旧的 `owner_id`、`task_assignees` 不再对外返回，也不再决定新任务权限。
 
 详情与列表通过 `TaskParticipants.list` 返回 `participants`（含用户 ID、昵称、头像标识），任务可读范围为派发人、参与人或满足既有组织范围的人员。旧任务若因迁移异常缺少参与人，读取时以 `owner_id`/`task_assignees` 联合去重作为后备，确保兼容读取。
 
@@ -57,7 +57,7 @@
 
 ### 6. 迁移、回滚与验证
 
-当前最高版本为 V15，因此实现新增 V16/V17；若主线在实现期间前进，必须将未发布迁移顺延到新的最大版本之后。迁移仅新增列/表、回填数据、扩展约束和触发器，不能修改 V1–V15。旧代码在回滚时会忽略新表与 `start_at`，但一旦新接口写入新审核种类，不支持数据库向下迁移；应用回滚须先停止新写入。
+主线当前最高版本为 V19，因此实现使用 V20/V21；任务治理原先在分支中的 V16/V17 未发布，合并主线时顺延。迁移仅新增列/表、回填数据、扩展约束和触发器，不能修改 V1–V19。V20 重新创建审核类型约束时保留主线既有 `PROCEDURE` 类型。旧代码在回滚时会忽略新表与 `start_at`，但一旦新接口写入新审核种类，不支持数据库向下迁移；应用回滚须先停止新写入。
 
 单元测试覆盖草稿规范化、参与人去重、标签权限/范围、评论校验和事务失败；集成测试使用 PostgreSQL/Redis 覆盖创建/修改/删除批准和驳回、时区、范围、单标签、评论回复/通知、重复与版本冲突。最终运行后端验证和 OpenSpec 严格校验，并记录实际结果。
 

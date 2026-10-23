@@ -48,6 +48,7 @@ class TaskDispatchIntegrationTest {
             jdbc.update("INSERT INTO teams(id,company_id,department_id,name) VALUES (?,?,?,?),(?,?,?,?)",c+"-t1",c,c+"-d1","研发一组",c+"-t2",c,c+"-d1","研发二组");
         }
         user("leader",company,"LEADER","d1","t1","ACTIVE",true);
+        user("founder",company,"FOUNDER",null,null,"ACTIVE",true);
         user("leader2",company,"LEADER","d1","t2","ACTIVE",true);
         user("director",company,"DIRECTOR","d1",null,"ACTIVE",true);
         user("alice",company,"EMPLOYEE","d1","t1","ACTIVE",false);
@@ -62,6 +63,9 @@ class TaskDispatchIntegrationTest {
         // 专用转派/改期申请由公司复核人最终生效；日志修订还会经过直属团队和部门复核。
         jdbc.update("UPDATE users SET company_reviewer=true WHERE id=?",id.get("reviewer"));
     }
+
+    /** 每个 HTTP 场景独立计数，避免测试数量增加后误触发生产限流器。 */
+    @BeforeEach void resetApiRateLimits() { redis.delete(redis.keys("workpanel:api:*")); }
 
     void user(String who,String c,String role,String dept,String team,String status,boolean dispatch) {
         String uid=c+"-"+who; id.put(who,uid);
@@ -364,6 +368,43 @@ class TaskDispatchIntegrationTest {
         assertEquals(tasks,companyTasks());
     }
 
+    /** 标签由创始人维护；任务仅保存一个活动且可见标签，并返回服务端颜色。 */
+    @Test void labelsEnforceFounderScopeSingleLinkAndVersion() throws Exception {
+        var label=call(200,"POST","/task-labels","founder",Map.of("name","紧急事项","category","业务","color","#2A7FFF"),null);
+        String labelId=label.get("id").asText();
+        assertEquals("#2A7FFF",label.get("color").asText());
+        assertEquals("FORBIDDEN",call(403,"POST","/task-labels","leader",Map.of("name","越权","category","业务","color","#2A7FFF"),null).get("code").asText());
+
+        var taskBody=body("标签任务","alice"); taskBody.put("labelId",labelId);
+        var task=dispatch("leader",taskBody,key());
+        assertEquals(labelId,task.get("label").get("id").asText());
+        assertEquals("#2A7FFF",task.get("label").get("color").asText());
+        assertEquals(1,count("SELECT count(*) FROM task_label_links WHERE task_id=?",task.get("id").asText()));
+
+        var stale=new LinkedHashMap<String,Object>(Map.of("name","紧急事项","category","业务","color","#2A7FFF","status","DISABLED","version",0));
+        assertEquals("VERSION_CONFLICT",call(409,"PUT","/task-labels/"+labelId,"founder",stale,null).get("code").asText());
+        stale.put("version",1);
+        assertEquals("DISABLED",call(200,"PUT","/task-labels/"+labelId,"founder",stale,null).get("status").asText());
+        var disabled=body("停用标签","alice"); disabled.put("labelId",labelId);
+        assertEquals("INVALID_LABEL",error(400,"leader",disabled,key()));
+    }
+
+    /** 评论公开可读但仅任务范围内可写；回复、幂等、空内容和追加约束均由服务端执行。 */
+    @Test void taskCommentsValidateScopeRepliesAndAppendOnly() throws Exception {
+        String taskId=dispatch("leader",body("评论任务","alice","amy"),key()).get("id").asText();
+        String commentKey=key();
+        var first=call(200,"POST","/tasks/"+taskId+"/comments","alice",Map.of("text","已完成初稿"),commentKey);
+        assertEquals(id.get("alice"),first.get("author_id").asText());
+        var reply=call(200,"POST","/tasks/"+taskId+"/comments","leader",Map.of("text","收到，请补充截图","parentId",first.get("id").asText()),key());
+        assertEquals(first.get("id").asText(),reply.get("parent_id").asText());
+        assertEquals(2,call(200,"GET","/tasks/"+taskId+"/comments","amy",null,null).get("items").size());
+        assertEquals("INVALID_COMMENT",call(400,"POST","/tasks/"+taskId+"/comments","alice",Map.of("text","   "),key()).get("code").asText());
+        assertEquals("DUPLICATE_COMMENT",call(409,"POST","/tasks/"+taskId+"/comments","alice",Map.of("text","已完成初稿"),commentKey).get("code").asText());
+        assertEquals("NOT_FOUND",call(404,"GET","/tasks/"+taskId+"/comments","outsider",null,null).get("code").asText());
+        assertThrows(Exception.class,()->jdbc.update("UPDATE task_comments SET body='篡改' WHERE id=?",first.get("id").asText()));
+        assertThrows(Exception.class,()->jdbc.update("DELETE FROM task_comments WHERE id=?",reply.get("id").asText()));
+    }
+
     /** 转派和改期在复核通过前不生效；最终生效使用申请时版本，过期申请不得覆盖后来变更。 */
     @Test void approvedReassignmentAndRescheduleRespectReviewAndVersion() throws Exception {
         String taskId=dispatch("leader",body("复核转派改期","alice"),key()).get("id").asText();
@@ -403,6 +444,48 @@ class TaskDispatchIntegrationTest {
         var conflict=call(409,"POST","/reviews/"+stale.get("id").asText()+"/decision","reviewer",
                 Map.of("approve",true,"reason","版本已过期"),null);
         assertEquals("VERSION_CONFLICT",conflict.get("code").asText());
+        assertEquals("RECEIVED",db.one("SELECT phase FROM tasks WHERE id=?",staleTask).get("phase"));
+        assertEquals(2,((Number)db.one("SELECT version FROM tasks WHERE id=?",staleTask).get("version")).intValue());
+    }
+
+    /** 删除必须走独立审核：驳回不改任务，批准只归档；等待审核的旧版本不得覆盖新状态。 */
+    @Test void deletionRequiresIndependentReviewAndNeverPhysicallyRemovesTask() throws Exception {
+        String rejectedTask=dispatch("leader",body("删除驳回任务","alice"),key()).get("id").asText();
+        var rejected=call(200,"POST","/tasks/"+rejectedTask+"/deletions","leader",
+                Map.of("version",1,"reason","不再需要"),null);
+        assertEquals("TASK_DELETE",rejected.get("kind").asText());
+        assertEquals("DISPATCHED",db.one("SELECT phase FROM tasks WHERE id=?",rejectedTask).get("phase"));
+        // 申请人不在审核链中，不能给自己的删除申请作决定。
+        assertEquals("FORBIDDEN",call(403,"POST","/reviews/"+rejected.get("id").asText()+"/decision","leader",
+                Map.of("approve",true,"reason","自审"),null).get("code").asText());
+        var firstPending=db.rows("SELECT reviewer_id FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position LIMIT 1",rejected.get("id").asText()).getFirst();
+        String rejector=id.entrySet().stream().filter(e->e.getValue().equals(firstPending.get("reviewer_id"))).map(Map.Entry::getKey).findFirst().orElseThrow();
+        call(200,"POST","/reviews/"+rejected.get("id").asText()+"/decision",rejector,
+                Map.of("approve",false,"reason","仍需保留"),null);
+        assertEquals("DISPATCHED",db.one("SELECT phase FROM tasks WHERE id=?",rejectedTask).get("phase"));
+        assertEquals(1,((Number)db.one("SELECT version FROM tasks WHERE id=?",rejectedTask).get("version")).intValue());
+
+        String approvedTask=dispatch("leader",body("删除归档任务","alice"),key()).get("id").asText();
+        var approved=call(200,"POST","/tasks/"+approvedTask+"/deletions","leader",
+                Map.of("version",1,"reason","需求取消"),null);
+        approveTaskRevision(approved.get("id").asText());
+        assertEquals(1,count("SELECT count(*) FROM tasks WHERE id=?",approvedTask));
+        assertEquals("ARCHIVED",db.one("SELECT phase FROM tasks WHERE id=?",approvedTask).get("phase"));
+        assertEquals(2,((Number)db.one("SELECT version FROM tasks WHERE id=?",approvedTask).get("version")).intValue());
+        assertEquals("TASK_DELETED_BY_REVIEW",db.one("SELECT action FROM audit_logs WHERE object_id=? ORDER BY created_at DESC LIMIT 1",approvedTask).get("action"));
+
+        String staleTask=dispatch("leader",body("删除版本冲突任务","alice"),key()).get("id").asText();
+        var stale=call(200,"POST","/tasks/"+staleTask+"/deletions","leader",
+                Map.of("version",1,"reason","等待审核"),null);
+        event(staleTask,"alice","RECEIVED",1,null);
+        var pending=db.rows("SELECT reviewer_id FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position",stale.get("id").asText());
+        for(int i=0;i<pending.size()-1;i++) {
+            String who=id.entrySet().stream().filter(e->e.getValue().equals(pending.get(i).get("reviewer_id"))).map(Map.Entry::getKey).findFirst().orElseThrow();
+            call(200,"POST","/reviews/"+stale.get("id").asText()+"/decision",who,Map.of("approve",true,"reason","同意"),null);
+        }
+        String finalReviewer=id.entrySet().stream().filter(e->e.getValue().equals(pending.getLast().get("reviewer_id"))).map(Map.Entry::getKey).findFirst().orElseThrow();
+        assertEquals("VERSION_CONFLICT",call(409,"POST","/reviews/"+stale.get("id").asText()+"/decision",finalReviewer,
+                Map.of("approve",true,"reason","版本已变化"),null).get("code").asText());
         assertEquals("RECEIVED",db.one("SELECT phase FROM tasks WHERE id=?",staleTask).get("phase"));
         assertEquals(2,((Number)db.one("SELECT version FROM tasks WHERE id=?",staleTask).get("version")).intValue());
     }

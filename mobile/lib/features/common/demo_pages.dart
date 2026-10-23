@@ -8,6 +8,7 @@ import 'package:cute_ui/cute_ui.dart'
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
@@ -128,7 +129,7 @@ class _AiGraphState extends ConsumerState<AiGraph> {
                                 top: 320,
                                 width: 220,
                                 child: PaperSurface(
-                                  color: CuteTokens.mint,
+                                  color: const Color(0xFFFFE9D4),
                                   onTap: () => context.go('/ai'),
                                   child: const Text('人工核对后加入行动规划'),
                                 ),
@@ -298,7 +299,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
       child: PageBody(
         children: [
           const DateControls(),
-          DropdownButtonFormField<String>(
+          PremiumDropdownField<String>(
             initialValue: department,
             decoration: const InputDecoration(labelText: '部门'),
             items: [
@@ -309,7 +310,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
             onChanged: (v) => setState(() => department = v!),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
+          PremiumDropdownField<String>(
             initialValue: owner,
             decoration: const InputDecoration(labelText: '人员'),
             items: [
@@ -342,7 +343,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                             return PaperSurface(
                               color: row == 0
                                   ? CuteTokens.blue
-                                  : CuteTokens.mint,
+                                  : const Color(0xFFFFE9D4),
                               onTap: () => showTuantuanBottomSheet<void>(
                                 context: context,
                                 showDragHandle: true,
@@ -354,7 +355,8 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                                       Text(
                                         metric.$1,
                                         style: const TextStyle(
-                                          fontFamily: AppTypography.displayFamily,
+                                          fontFamily:
+                                              AppTypography.displayFamily,
                                           fontSize: 20,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -415,7 +417,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                     '$dept · ${dispatched.where((r) => dept == '技术部' ? r.ownerId == 'u3' : r.ownerId != 'u3').length} 项',
                   ),
                   const SizedBox(height: 8),
-                  LinearProgressIndicator(
+                  SunnyProgressBar(
                     value: dispatched.isEmpty
                         ? 0
                         : dispatched
@@ -426,15 +428,14 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                                   )
                                   .length /
                               dispatched.length,
-                    minHeight: 14,
-                    borderRadius: BorderRadius.circular(7),
+                    height: 14,
                   ),
                 ],
               ),
             ),
           const SectionHeader('近 7 天任务派发'),
           SizedBox(
-            height: 150,
+            height: 108 + MediaQuery.textScalerOf(context).scale(44),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -455,7 +456,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                         return Column(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Text('$n'),
+                            Text('$n', maxLines: 1),
                             Container(
                               height: (n * 24.0).clamp(0, 100),
                               margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -465,7 +466,7 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text('${day.day}日'),
+                            Text('${day.day}日', maxLines: 1),
                           ],
                         );
                       },
@@ -630,14 +631,7 @@ class _GuidePageState extends State<GuidePage> {
     child: PageBody(
       children: [
         const SizedBox(height: 32),
-        TuantuanMascot(
-          step == 0
-              ? 'welcome'
-              : step == 1
-              ? 'empty'
-              : 'ai',
-          size: 120,
-        ),
+        DogPose(index: [0, 5, 10, 14][step], size: 120),
         const SizedBox(height: 24),
         Text(
           pages[step].$2,
@@ -729,7 +723,7 @@ class LogHistory extends ConsumerWidget {
             ref
                 .watch(recordsProvider('reviews'))
                 .when(
-                  loading: () => const LinearProgressIndicator(),
+                  loading: () => const SunnyLoadingIndicator(),
                   error: (e, s) => Text('$e'),
                   data: (page) {
                     final requests = page.items
@@ -885,7 +879,7 @@ class ReportSummary extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => ref
       .watch(datedRecordsProvider('logs'))
       .when(
-        loading: () => const LinearProgressIndicator(),
+        loading: () => const SunnyLoadingIndicator(),
         error: (e, s) => Text('$e'),
         data: (page) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,

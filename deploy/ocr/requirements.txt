@@ -1,0 +1,6 @@
+fastapi==0.115.12
+uvicorn==0.34.3
+paddlepaddle==3.0.0
+paddleocr==3.0.3
+paddlex==3.0.3
+Pillow==11.3.0

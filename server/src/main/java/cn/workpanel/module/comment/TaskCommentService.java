@@ -21,7 +21,8 @@ public class TaskCommentService {
     @Transactional public Map<String,Object> create(Actor actor,String taskId,Map<String,Object> raw,String clientKey) {
         var task=TaskAccess.readable(db,actor,taskId,true); authorizeWriter(actor,task);
         Db.fields(raw,"text","parentId");
-        String text=Db.required(raw,"text"); if(text.length()>2000) throw ApiError.bad("INVALID_COMMENT","评论长度必须为 1–2000 字");
+        Object textValue=raw.get("text");
+        if(!(textValue instanceof String text)||text.trim().isEmpty()||text.length()>2000) throw ApiError.bad("INVALID_COMMENT","评论长度必须为 1–2000 字");
         if(clientKey==null||clientKey.isBlank()||clientKey.length()>128) throw ApiError.bad("IDEMPOTENCY_REQUIRED","评论需要 1–128 位幂等键");
         String parent=raw.containsKey("parentId")?Db.required(raw,"parentId"):null;
         if(parent!=null&&db.count("SELECT count(*) FROM task_comments WHERE id=? AND task_id=?",parent,taskId)!=1) throw ApiError.bad("INVALID_PARENT_COMMENT","父评论不属于当前任务");

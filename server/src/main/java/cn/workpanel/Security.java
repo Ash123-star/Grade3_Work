@@ -20,10 +20,10 @@ public class Security {
     @Bean BCryptPasswordEncoder passwords() { return new BCryptPasswordEncoder(12); }
     @Bean SecurityFilterChain apiSecurityChain(HttpSecurity http, CorsConfigurationSource cors) throws Exception { return http.csrf(c->c.disable()).cors(c->c.configurationSource(cors)).authorizeHttpRequests(a->a.anyRequest().permitAll()).sessionManagement(s->s.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)).build(); }
     @Bean CorsConfigurationSource cors(@Value("${app.cors-origins}") String origins) {
-        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(Arrays.asList(origins.split(","))); c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS")); c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key","Last-Event-ID")); c.setExposedHeaders(List.of("X-Trace-Id","Content-Disposition"));
+        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(Arrays.asList(origins.split(","))); c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS")); c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key","Last-Event-ID","If-Match")); c.setExposedHeaders(List.of("X-Trace-Id","Content-Disposition"));
         UrlBasedCorsConfigurationSource source=new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**",c); return source;
     }
-    @Bean FilterRegistrationBean<OncePerRequestFilter> authentication(Db db,Limiter limiter) {
+    @Bean FilterRegistrationBean<OncePerRequestFilter> authentication(Db db,Limiter limiter,WorkspaceAccessAudit accessAudit) {
         var filter=new OncePerRequestFilter() {
             @Override protected void doFilterInternal(HttpServletRequest r,HttpServletResponse s,FilterChain chain) throws IOException,ServletException {
                 String trace=Db.id(); r.setAttribute("traceId",trace); s.setHeader("X-Trace-Id",trace);
@@ -38,7 +38,7 @@ public class Security {
                         if(path.startsWith("/api/admin/workspace/")) {
                             a.requireAdmin();
                             String target=path.substring("/api/admin/workspace".length());
-                            if(!(target.startsWith("/ai-maps/")||target.startsWith("/ai-memories")||target.equals("/organization/audit")||target.equals("/organization/task-audit")||target.equals("/auth/me"))) throw ApiError.notFound();
+                            if(!adminWorkspaceAllowed(target)) throw ApiError.notFound();
                             // 管理入口复用已鉴权业务 Controller，身份仍是本次请求从数据库读取的 Actor。
                             // 不根据 User-Agent 或可伪造客户端头改变 Android 的公共业务权限。
                             r.getRequestDispatcher("/api"+target).forward(r,s);
@@ -47,10 +47,12 @@ public class Security {
                     }
                     chain.doFilter(r,s);
                 } catch(ApiError e) { s.setStatus(e.status); s.setContentType("application/json;charset=UTF-8"); s.getWriter().write(db.write(Errors.body(e.code,e.getMessage(),r))); }
+                finally { accessAudit.denied(r,s.getStatus()); }
             }
         };
         var registration=new FilterRegistrationBean<OncePerRequestFilter>(filter); registration.setOrder(-90); return registration;
     }
+    public static boolean adminWorkspaceAllowed(String target){return target.startsWith("/ai-maps/")||target.startsWith("/ai-memories")||target.equals("/organization/audit")||target.equals("/organization/task-audit")||target.equals("/auth/me")||target.matches("/ai/work-(?:items|authorizations)(?:/[^/]+(?:/(?:messages|confirm|retry|cancel|stream|revoke))?)?")||Set.of("/ai/work-capabilities","/ai/work-authorization-options","/ai/work-authorization-policy").contains(target)||target.matches("/(?:procedures|tasks)/[^/]+")||target.matches("/attachments(?:/[^/]+)?");}
     public static Actor authenticate(Db db,String authorization) {
         if(authorization==null||!authorization.startsWith("Bearer ")) throw new ApiError(401,"UNAUTHENTICATED","请登录");
         var users=db.rows("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>now() AND u.status<>'DISABLED'",Db.hash(authorization.substring(7)));

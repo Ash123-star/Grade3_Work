@@ -1,3 +1,4 @@
+import 'support/workflow_fixture.dart';
 import 'support/local_test_state.dart';
 import 'package:pandora_mobile/core/state/local_state.dart';
 import 'package:pandora_mobile/data/local/draft_store.dart';
@@ -10,7 +11,6 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
-import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_page.dart';
 
 void main() {
@@ -20,7 +20,9 @@ void main() {
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.resetPhysicalSize);
     addTearDown(t.view.resetDevicePixelRatio);
-    final c = testContainer();
+    final c = testContainer(
+      overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+    );
     addTearDown(c.dispose);
     c.read(logDateProvider.notifier).state = DateTime(2025, 2, 3);
     await t.pumpWidget(
@@ -48,12 +50,7 @@ void main() {
         (await t.runAsync(() => store.read(location)))?.fields['今日工作'],
         '核对移动端验收范围',
       );
-      expect(
-        find.byWidgetPredicate(
-          (w) => w is TuantuanMascot && w.pose == 'success',
-        ),
-        findsOneWidget,
-      );
+      expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
       expect(prefs.getString('draft:u1:2025-02-03:今日工作'), isNull);
       c.read(selectedDateProvider.notifier).state = DateTime(2027, 1, 1);
       c.read(logFilterDateProvider.notifier).state = DateTime(2024, 1, 1);
@@ -64,12 +61,12 @@ void main() {
       );
       final hours = find.byType(TextFormField).last;
       await t.enterText(hours, 'NaN');
-      await t.tap(find.text('提交日志'));
+      await t.tap(find.text('提交'));
       await t.pumpAndSettle();
       expect(find.text('工时应在0到24之间'), findsOneWidget);
       await t.enterText(hours, '7.5');
       c.read(scenarioProvider.notifier).state = DemoScenario.offline;
-      await t.tap(find.text('提交日志'));
+      await t.tap(find.text('提交'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.text('提交失败，内容已保留'), findsOneWidget);
@@ -154,9 +151,9 @@ void main() {
             .onPressed,
         isNull,
       );
-      await t.ensureVisible(find.text('重新读取最新版本'));
+      await t.ensureVisible(find.text('重新读取最新内容'));
       await t.pumpAndSettle();
-      await t.tap(find.text('重新读取最新版本'));
+      await t.tap(find.text('重新读取最新内容'));
       await t.pumpAndSettle();
       await t.tap(find.widgetWithText(FilledButton, '重新读取'));
       await t.pumpAndSettle();
@@ -180,11 +177,7 @@ void main() {
       final c = await launch(t, '/item/tasks/1');
       expect(find.text('接收任务'), findsOneWidget);
       expect(find.text('转派任务'), findsNothing);
-      await t.tap(find.byTooltip('更多操作'));
-      await t.pumpAndSettle();
-      expect(find.text('转派任务'), findsOneWidget);
-      await t.tapAt(const Offset(10, 350));
-      await t.pumpAndSettle();
+      expect(find.byTooltip('更多操作'), findsNothing);
       await t.tap(find.text('接收任务'));
       await t.pumpAndSettle();
       expect(find.text('提交成果反馈'), findsOneWidget);
@@ -198,14 +191,12 @@ void main() {
   testWidgets('AI joins once then edits and completes account-scoped drafts', (
     t,
   ) async {
-    final c = await launch(t, '/ai');
-    await t.tap(find.text('团队走向'));
-    await t.pumpAndSettle();
+    final c = await launch(t, '/ai/directions');
     await t.ensureVisible(find.text('加入行动规划'));
     await t.pumpAndSettle();
     await t.tap(find.text('加入行动规划'));
     await t.pumpAndSettle();
-    expect(c.read(aiActionDraftsProvider('u1')).length, 3);
+    expect(c.read(aiActionDraftsProvider('u1')).length, 2);
     await t.ensureVisible(find.text('发展分析'));
     await t.pumpAndSettle();
     await t.tap(find.text('发展分析'));
@@ -214,7 +205,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('加入行动规划'));
     await t.pumpAndSettle();
-    expect(c.read(aiActionDraftsProvider('u1')).length, 3);
+    expect(c.read(aiActionDraftsProvider('u1')).length, 2);
     await t.ensureVisible(find.text('编辑').first);
     await t.pumpAndSettle();
     await t.tap(find.text('编辑').first);

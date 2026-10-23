@@ -70,6 +70,9 @@ class AssociationAdapter extends ReadAdapter {
         'owner_id': 'u1',
         'business_date': '2026-10-12',
         'submitted': submitted,
+        'submitted_at': submitted
+            ? DateTime.now().toUtc().toIso8601String()
+            : null,
         'version': 3,
         'body': {'work': '多任务日报正文', 'taskIds': links},
       });
@@ -279,6 +282,12 @@ void main() {
         DiaryTaskLinks.parse(t.widget<DiaryTaskLinksEditor>(editor).value),
         ['task-0', 'task-30'],
       );
+      await t.scrollUntilVisible(
+        find.text('添加').hitTestable(),
+        100,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
       await t.tap(find.text('添加'));
       await t.pumpAndSettle();
       await t.tap(find.text('取消').last);
@@ -287,6 +296,12 @@ void main() {
         DiaryTaskLinks.parse(t.widget<DiaryTaskLinksEditor>(editor).value),
         ['task-0', 'task-30'],
       );
+      await t.scrollUntilVisible(
+        find.text('添加').hitTestable(),
+        100,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
       await t.tap(find.text('添加'));
       await t.pumpAndSettle();
       await t.enterText(find.byType(TextField).last, '实际任务正文1');
@@ -371,11 +386,7 @@ void main() {
     await font.load();
     await (FontLoader('MaterialIcons')..addFont(
           Future.value(
-            ByteData.sublistView(
-              File(
-                materialIconsFontPath,
-              ).readAsBytesSync(),
-            ),
+            ByteData.sublistView(File(materialIconsFontPath).readAsBytesSync()),
           ),
         ))
         .load();
@@ -385,6 +396,12 @@ void main() {
       scale: 1.5,
     );
     await t.ensureVisible(find.byType(DiaryTaskLinksEditor));
+    await t.pumpAndSettle();
+    await t.scrollUntilVisible(
+      find.text('添加').hitTestable(),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
     await t.pumpAndSettle();
     await t.tap(find.text('添加'));
     await t.pumpAndSettle();

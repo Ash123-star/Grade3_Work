@@ -13,6 +13,7 @@ abstract interface class Repository {
   Future<Record> execute(String resource, Command command);
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
+    bool aiWork = false,
     CancelToken? cancelToken,
     void Function(int, int)? onProgress,
   });
@@ -112,6 +113,7 @@ class HttpRepository implements Repository {
   @override
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
+    bool aiWork = false,
     CancelToken? cancelToken,
     void Function(int, int)? onProgress,
   }) async {
@@ -119,6 +121,7 @@ class HttpRepository implements Repository {
     try {
       final response = await dio.post<Map<String, dynamic>>(
         '/attachments',
+        queryParameters: aiWork ? {'purpose': 'AI_WORK'} : null,
         data: FormData.fromMap({
           'file': MultipartFile.fromBytes(
             file.bytes,
@@ -250,6 +253,7 @@ class HttpRepository implements Repository {
   Map<String, dynamic> _query(Query query) => {
     if (query.cursor != null) 'cursor': query.cursor,
     if (query.ownerId != null) 'ownerId': query.ownerId,
+    if (query.departmentId != null) 'departmentId': query.departmentId,
     'limit': 30,
     if (query.search.isNotEmpty) 'search': query.search,
     if (query.from != null) 'date': _date(query),
@@ -257,6 +261,8 @@ class HttpRepository implements Repository {
   };
 
   String _pathForList(String resource) => switch (resource) {
+    'tasks' => '/tasks',
+    'logs' => '/logs',
     'logs/subordinates' => '/logs/subordinates',
     'dashboard/company' => '/dashboard/company',
     'dashboard/personal' => '/dashboard/personal',
@@ -266,7 +272,10 @@ class HttpRepository implements Repository {
     'audit' => '/organization/audit',
     'analytics' => '/analytics',
     'ai-maps' => '/ai-maps',
-    _ => '/$resource',
+    'organization/departments' => '/organization/departments',
+    'reviews' => '/reviews',
+    'notifications' => '/notifications',
+    _ => throw ApiFailure(FailureKind.unavailable, '列表接口尚未登记：$resource'),
   };
 
   Record _record(Map<String, dynamic> raw) {
@@ -297,7 +306,13 @@ class HttpRepository implements Repository {
       }
       fields['姓名'] = raw['name'];
     }
-    if (raw['department'] != null) fields['departmentName'] = raw['department'];
+    if (raw['department'] is Map) {
+      fields['departmentName'] = raw['department']['name'];
+      fields['departmentId'] = raw['department']['id'];
+    } else if (raw['department'] != null) {
+      fields['departmentName'] = raw['department'];
+    }
+    if (raw['author'] is Map) fields['authorName'] = raw['author']['name'];
     if (raw['kind'] != null && raw['target_id'] != null) {
       fields['targetId'] = raw['target_id'];
       fields['targetResource'] = switch (raw['kind']) {
@@ -330,10 +345,49 @@ class HttpRepository implements Repository {
       fields['businessDate'] = raw['business_date'];
     }
     if (raw.containsKey('created_at')) fields['createdAt'] = raw['created_at'];
+    if (raw['author'] is Map) {
+      fields['authorName'] = (raw['author'] as Map)['name'];
+    }
+    if (raw.containsKey('submittedAt')) {
+      fields['submittedAt'] = raw['submittedAt'];
+    }
     if (raw.containsKey('submitted_at')) {
       fields['submittedAt'] = raw['submitted_at'];
     }
     if (raw.containsKey('deadline')) fields['deadline'] = raw['deadline'];
+    if (raw.containsKey('start_at')) fields['startAt'] = raw['start_at'];
+    if (raw.containsKey('startAt')) fields['startAt'] = raw['startAt'];
+    if (raw.containsKey('tag_id')) fields['tagId'] = raw['tag_id'];
+    if (raw.containsKey('tagId')) fields['tagId'] = raw['tagId'];
+    if (raw.containsKey('tag_name')) fields['tagName'] = raw['tag_name'];
+    if (raw.containsKey('tagName')) fields['tagName'] = raw['tagName'];
+    if (raw.containsKey('tag_category')) {
+      fields['tagCategory'] = raw['tag_category'];
+    }
+    if (raw.containsKey('tagCategory')) {
+      fields['tagCategory'] = raw['tagCategory'];
+    }
+    if (raw.containsKey('tag_color')) fields['tagColor'] = raw['tag_color'];
+    if (raw.containsKey('tagColor')) fields['tagColor'] = raw['tagColor'];
+    if (raw['participant_ids'] is List) {
+      fields['participantIds'] = raw['participant_ids'];
+    }
+    if (raw['participantIds'] is List) {
+      fields['participantIds'] = raw['participantIds'];
+    }
+    if (raw['participants'] is List) {
+      final values = raw['participants'] as List;
+      fields['participantIds'] = [
+        for (final value in values)
+          value is Map ? '${value['id'] ?? value['user_id'] ?? ''}' : '$value',
+      ].where((value) => value.isNotEmpty).toList();
+      fields['participantNames'] = [
+        for (final value in values)
+          value is Map
+              ? '${value['name'] ?? value['display_name'] ?? value['title'] ?? value['id'] ?? ''}'
+              : '$value',
+      ];
+    }
     for (final pair in [
       ('work', '今日工作'),
       ('blockers', '遇到的阻碍'),
@@ -426,7 +480,8 @@ class HttpRepository implements Repository {
       fields['type'] = switch (raw['type']) {
         'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' => '任务',
         'DEADLINE' => '截止提醒',
-        'LOG_SUBMITTED' || 'LOG_COMMENT' => '日志',
+        'LOG_SUBMITTED' => '日志',
+        'LOG_COMMENT' => '评论',
         'REVIEW_PENDING' => '审批',
         'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
         _ => '${raw['type'] ?? '消息'}',
@@ -582,7 +637,7 @@ class HttpRepository implements Repository {
         'reviews' => '/reviews/${Uri.encodeComponent(id)}',
         'ai-maps' => '/ai-maps',
         'private-notes' => '/private-notes',
-        _ => '/$resource/${Uri.encodeComponent(id)}',
+        _ => throw ApiFailure(FailureKind.unavailable, '详情接口尚未登记：$resource'),
       };
       final response = await _getWithRetry<dynamic>(path);
       if (resource == 'private-notes' || resource == 'ai-maps') {
@@ -649,8 +704,12 @@ class HttpRepository implements Repository {
   ) {
     if (kind == 'comments') {
       return {
+        'id': raw['id'],
+        'parentCommentId': raw['parent_id'],
+        'authorName': raw['author_name'],
         'text': raw['text'] ?? '',
         'actorId': raw['actor_id'],
+        'parentId': raw['parent_id'],
         'time': raw['created_at'],
       };
     }
@@ -686,23 +745,48 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _taskDraft(Command command) {
     final v = _values(command);
+    // 已发布旧契约仍可读取和修订；新表单字段明确出现时保留新模型，不将多人静默降级。
+    if (!v.containsKey('participantIds') &&
+        !v.containsKey('参与人') &&
+        !v.containsKey('tagId') &&
+        !v.containsKey('标签')) {
+      return {
+        'title': v['title'] ?? v['任务名称'],
+        'ownerId': v['ownerId'],
+        'deadline': v['deadline'],
+        'group': v['所属分组'] ?? v['group'] ?? '',
+        'content': v['任务内容'] ?? v['内容'] ?? v['content'] ?? '',
+        'urgency': switch ('${v['紧急程度'] ?? v['urgency'] ?? '普通'}') {
+          '紧急' || 'URGENT' => 'URGENT',
+          '不紧急' || 'LOW' => 'LOW',
+          _ => 'NORMAL',
+        },
+        'progressNote': v['进度备注'] ?? v['progressNote'] ?? '',
+        'collaborators': v['collaborators'] ?? const <String>[],
+        'attachments': v['attachments'] ?? const <String>[],
+      }..removeWhere((key, value) => value == null);
+    }
+    final tag = '${v['tagId'] ?? v['标签'] ?? ''}'.trim();
+    final participants = v['participantIds'] ?? v['参与人'];
     return {
       'title': v['title'] ?? v['任务名称'],
-      'ownerId': v['ownerId'],
+      if (v['ownerId'] != null) 'ownerId': v['ownerId'],
+      'participantIds': participants is List
+          ? participants
+          : '${participants ?? ''}'
+                .split('、')
+                .map((value) => value.trim())
+                .where((value) => value.isNotEmpty)
+                .toList(),
+      'startAt': v['startAt'],
       'deadline': v['deadline'],
-      'group': v['所属分组'] ?? v['group'],
       'content': v['任务内容'] ?? v['内容'] ?? v['content'],
       'urgency': switch ('${v['紧急程度'] ?? v['urgency'] ?? '普通'}') {
         '紧急' || 'URGENT' => 'URGENT',
         '不紧急' || 'LOW' => 'LOW',
         _ => 'NORMAL',
       },
-      'progressNote': v['进度备注'] ?? v['progressNote'],
-      'collaborators':
-          v['collaborators'] ??
-          (v['协作人'] is String && '${v['协作人']}'.isNotEmpty
-              ? ['${v['协作人']}']
-              : const <String>[]),
+      if (tag.isNotEmpty) 'tagId': tag,
       'attachments': v['attachments'] ?? const <String>[],
     }..removeWhere((key, value) => value == null);
   }
@@ -825,6 +909,15 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'logs') {
+        if (command.action == 'withdraw') {
+          return await _postRecord(
+            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
+            {
+              'version': command.version,
+              'reason': v['reason'] ?? v['撤回原因'] ?? '',
+            },
+          );
+        }
         if (command.action == 'read') {
           final id = _commandId(command);
           final response = await dio.post<dynamic>(
@@ -835,6 +928,12 @@ class HttpRepository implements Repository {
             throw const ApiFailure(FailureKind.server, '服务器未确认阅读登记，请重试');
           }
           return Record(id: id, title: '阅读已登记', fields: const {'ok': true});
+        }
+        if (command.action == 'withdraw') {
+          return await _postRecord(
+            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
+            {'version': command.version, 'reason': v['撤回原因']},
+          );
         }
         if (command.action == 'request-review') {
           return await _postRecord(
@@ -875,6 +974,12 @@ class HttpRepository implements Repository {
             );
           }
         }
+        if (command.action == 'update') {
+          throw const ApiFailure(
+            FailureKind.unavailable,
+            '已提交日志修改接口尚未定案；当前不会误写入草稿',
+          );
+        }
         return await _putRecord('/logs/draft', {
           'businessDate': v['businessDate'],
           'body': _diaryBody(v),
@@ -884,7 +989,11 @@ class HttpRepository implements Repository {
       if (resource == 'logs/comments') {
         return await _postRecord(
           '/logs/${Uri.encodeComponent(_commandId(command))}/comments',
-          {'text': v['评语'] ?? v['text']},
+          {
+            'text': v['评语'] ?? v['text'],
+            if (v['parentCommentId'] != null || v['parentId'] != null)
+              'parentId': v['parentCommentId'] ?? v['parentId'],
+          },
         );
       }
       if (resource == 'reviews') {

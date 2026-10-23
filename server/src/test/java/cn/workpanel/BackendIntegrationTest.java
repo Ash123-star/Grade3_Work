@@ -10,6 +10,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import java.net.*;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.ai-timeout-seconds=2", "app.memory-extract-enabled=false"
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class BackendIntegrationTest {
     @LocalServerPort int port;
@@ -126,8 +128,13 @@ class BackendIntegrationTest {
         assertEquals("APPROVED",result.get("status").asText()); return result;
     }
     void configure(String who,Map<String,Object> changes) throws Exception {
-        var body=new LinkedHashMap<>(changes); body.put("version",get("/auth/me",who).get("version").asInt()); body.put("reason","组织配置");
+        var before=get("/auth/me",who);
+        var body=new LinkedHashMap<>(changes); body.put("version",before.get("version").asInt()); body.put("reason","组织配置");
         var result=post("/organization/users/"+ids.get(who)+"/revisions","integration-admin",body); approve(result.get("id").asText(),"integration-admin");
+        if(changes.containsKey("role")&&!before.get("role").asText().equals(changes.get("role"))) {
+            call(401,"GET","/auth/me",who,null,null);
+            if(!"DISABLED".equals(changes.get("status"))) login(who,PASSWORD);
+        }
     }
     Map<String,Object> taskBody(String title,String owner) { return new LinkedHashMap<>(Map.of("title",title,"ownerId",ids.get(owner),"deadline",LocalDate.parse(date).atTime(23,59).atZone(ZoneId.of("Asia/Shanghai")).toOffsetDateTime().toString(),"urgency","NORMAL","content","任务内容","collaborators",List.of())); }
     JsonNode waitJob(String id,String who,String expected) throws Exception {

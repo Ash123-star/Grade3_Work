@@ -87,6 +87,7 @@ public class TaskRevisionService {
         Db.conflict(db.update("UPDATE tasks SET title=?,start_at=?::timestamptz,deadline=?::timestamptz,body=?::jsonb,version=? WHERE id=? AND version=?",
                 draft.title(),draft.startAt(),draft.deadline(), db.write(draft.body()), nextVersion, Db.str(task, "id"), expectedVersion));
         String phase = Db.str(task, "phase");
+        for(var item:draft.acceptanceChecklist()) db.update("INSERT INTO task_acceptance_items(company_id,task_id,version,item_id,body) VALUES (?,?,?,?,?::jsonb)",applicant.company(),Db.str(task,"id"),nextVersion,item.get("id"),db.write(item));
         TaskTimeline.append(db, applicant, Db.str(task, "id"), "REVISED", draft.body(), phase, phase, nextVersion);
         notifyParticipants(db, applicant, Db.str(task, "id"), nextVersion, "TASK_REVISED");
     }

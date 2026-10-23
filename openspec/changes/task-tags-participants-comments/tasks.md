@@ -1,12 +1,12 @@
 ## 0. 追溯与准备
 
 - [ ] 0.1 创建并关联任务治理 Issue 与 Sprint（编号待项目负责人提供）；在 PR 正文引用该编号
-- [x] 0.2 已核对当前最大 Flyway 版本为 V15，迁移从 V16 起编号；未修改 V1–V15
+- [x] 0.2 已在合并主线后核对当前最大 Flyway 版本为 V19；任务治理迁移顺延至 V20/V21，未修改 V1–V19
 
 ## 1. 数据库与兼容
 
-- [ ] 1.1 新增 V16 迁移：任务开始时间、无角色 `task_participants`、创建/删除审核类型、旧负责人/协作人去重回填、必要索引；在历史任务库上验证 Flyway 与兼容读取
-- [ ] 1.2 新增 V17 迁移：标签、单标签关联、评论、评论去重和只追加触发器；验证公司/部门外键、单标签约束与触发器
+- [ ] 1.1 新增 V20 迁移：任务开始时间、无角色 `task_participants`、创建/删除审核类型、旧负责人/协作人去重回填、必要索引；在历史任务库上验证 Flyway 与兼容读取
+- [ ] 1.2 新增 V21 迁移：标签、单标签关联、评论、评论去重和只追加触发器；验证公司/部门外键、单标签约束与触发器
 
 ## 2. 任务参与人和审核生效
 
@@ -34,6 +34,6 @@
 
 ## 6. 交付
 
-- [ ] 6.1 运行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven`，记录明确退出码与报告
+- [ ] 6.1 运行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven`，记录明确退出码与报告。2026-10-23 当前合并工作区运行 400 项，其中 106 项失败：任务模块既有 `TaskDispatchIntegrationTest` 的 23 项通过；剩余失败集中于共享 `BackendIntegrationTest` 的测试库隔离/会话级联，以及 AI 办事模块仍按旧任务“负责人、创建即生效”契约调用。未获得全仓绿灯前不得报告全量后端回归通过。
 - [x] 6.2 运行 `openspec.cmd validate task-tags-participants-comments --strict`（2026-10-20 通过）；全仓校验需在具备本地文件访问权限的环境复跑
 - [ ] 6.3 提交前检查差异、无密钥/构建产物/个人文件；由用户自行提交、推送和创建 PR

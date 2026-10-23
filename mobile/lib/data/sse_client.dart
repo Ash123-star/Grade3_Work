@@ -65,9 +65,8 @@ class SseClient {
       if (line.startsWith(':')) continue; // 注释/心跳行
       final colon = line.indexOf(':');
       final field = colon == -1 ? line : line.substring(0, colon);
-      final value = colon == -1
-          ? ''
-          : line.substring(colon + 1).replaceFirst(' ', '');
+      final raw = colon == -1 ? '' : line.substring(colon + 1);
+      final value = raw.startsWith(' ') ? raw.substring(1) : raw;
       switch (field) {
         case 'event':
           event = value;

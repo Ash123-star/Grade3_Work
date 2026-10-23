@@ -7,6 +7,7 @@ import 'package:pandora_mobile/data/models/ai.dart';
 import 'package:pandora_mobile/data/repositories/ai_repository.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'server_ai_page.dart';
 import 'graph_layout.dart';
@@ -593,7 +594,7 @@ class _ServerAiGraphPageState extends AiProtectedState<ServerAiGraphPage> {
             for (final isSource in [true, false])
               Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: DropdownButtonFormField<String>(
+                child: PremiumDropdownField<String>(
                   key: ValueKey(
                     '${isSource ? sourceId : targetId}:${nodes.length}',
                   ),

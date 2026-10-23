@@ -46,7 +46,7 @@ class DiaryTaskLinksEditor extends ConsumerWidget {
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         const SizedBox(height: 8),
-        if (state.isLoading) const LinearProgressIndicator(),
+        if (state.isLoading) const SunnyLoadingIndicator(),
         if (state.hasError)
           RecordFailure(
             state.error!,
@@ -85,13 +85,16 @@ class DiaryTaskLinksEditor extends ConsumerWidget {
                   ? null
                   : () async {
                       final captured = ref.read(sessionProvider);
-                      final selected = await showTuantuanBottomSheet<List<String>>(
-                        context: context,
-                        isScrollControlled: true,
-                        showDragHandle: true,
-                        builder: (_) =>
-                            DiaryTaskPicker(initial: ids, account: captured),
-                      );
+                      final selected =
+                          await showTuantuanBottomSheet<List<String>>(
+                            context: context,
+                            isScrollControlled: true,
+                            showDragHandle: true,
+                            builder: (_) => DiaryTaskPicker(
+                              initial: ids,
+                              account: captured,
+                            ),
+                          );
                       if (context.mounted &&
                           selected != null &&
                           _sameAccount(captured, ref.read(sessionProvider))) {
@@ -295,7 +298,7 @@ class DiaryTaskLinksReader extends ConsumerWidget {
     return data.when(
       skipLoadingOnRefresh: false,
       skipLoadingOnReload: false,
-      loading: () => const LinearProgressIndicator(),
+      loading: () => const SunnyLoadingIndicator(),
       error: (error, _) => RecordFailure(
         error,
         retry: () => ref.invalidate(recordsProvider('tasks')),

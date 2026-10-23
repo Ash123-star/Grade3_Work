@@ -32,6 +32,7 @@ public class TaskReviewedRevisionApplication implements ReviewedRevisionApplicat
                         target,applicant.company(),draft.ownerId(),applicant.id(),draft.title(),draft.startAt(),draft.deadline(),db.write(draft.body()));
                 TaskParticipants.assign(db,applicant,target,draft); TaskLabels.replace(db,applicant,target,draft);
                 TaskAttachments.bind(db,applicant,target,draft.attachments(),false);
+                for(var item:draft.acceptanceChecklist()) db.update("INSERT INTO task_acceptance_items(company_id,task_id,version,item_id,body) VALUES (?,?,1,?,?::jsonb)",applicant.company(),target,item.get("id"),db.write(item));
                 TaskTimeline.append(db,applicant,target,"DISPATCHED",draft.body(),null,"DISPATCHED",1);
                 db.audit(applicant,"TASK_CREATED_BY_REVIEW",target,Map.of(),draft.body(),reason);
             }

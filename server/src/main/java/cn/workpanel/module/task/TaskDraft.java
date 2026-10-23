@@ -4,13 +4,24 @@ import java.util.*;
 
 /** 规范化后的任务候选：参与人是无角色的去重集合。 */
 public record TaskDraft(String title,List<String> participants,String startAt,String deadline,String urgency,
-                        String group,String content,String labelId,List<String> attachments) {
-    public TaskDraft { participants=List.copyOf(participants); attachments=List.copyOf(attachments); }
+                        String group,String content,String labelId,List<String> attachments,
+                        List<Map<String,Object>> acceptanceChecklist) {
+    public TaskDraft {
+        participants=List.copyOf(participants);
+        attachments=List.copyOf(attachments);
+        acceptanceChecklist=List.copyOf(acceptanceChecklist);
+    }
 
     /** 仅供仍在编译的历史模块和迁移测试读取；新接口不得使用负责人/协作人语义。 */
     @Deprecated public TaskDraft(String title,String ownerId,String deadline,String urgency,String group,String content,
                                  String ignoredProgressNote,List<String> collaborators,List<String> attachments) {
-        this(title, legacyParticipants(ownerId,collaborators), null, deadline, urgency, group, content, null, attachments);
+        this(title, legacyParticipants(ownerId,collaborators), null, deadline, urgency, group, content, null, attachments, List.of());
+    }
+    /** 兼容主线既有交付清单输入，但不恢复负责人/协作人语义。 */
+    @Deprecated public TaskDraft(String title,String ownerId,String deadline,String urgency,String group,String content,
+                                 String ignoredProgressNote,List<String> collaborators,List<String> attachments,
+                                 List<Map<String,Object>> acceptanceChecklist) {
+        this(title, legacyParticipants(ownerId,collaborators), null, deadline, urgency, group, content, null, attachments, acceptanceChecklist);
     }
     @Deprecated public String ownerId() { return participants.isEmpty()?"":participants.getFirst(); }
     @Deprecated public List<String> collaborators() { return participants.size()<2?List.of():participants.subList(1,participants.size()); }
@@ -26,6 +37,7 @@ public record TaskDraft(String title,List<String> participants,String startAt,St
         m.put("title",title); m.put("participants",participants); m.put("deadline",deadline); m.put("urgency",urgency);
         if(startAt!=null) m.put("startAt",startAt); if(group!=null) m.put("group",group); if(content!=null) m.put("content",content); if(labelId!=null) m.put("labelId",labelId);
         m.put("attachments",attachments);
+        if(!acceptanceChecklist.isEmpty()) m.put("acceptanceChecklist",acceptanceChecklist);
         return m;
     }
 }

@@ -204,7 +204,7 @@ void main() {
       expect(adapter.requests.last.queryParameters['date'], isNull);
       await t.tap(find.text('全部日期'));
       await t.pumpAndSettle();
-      expect(find.byType(DatePickerDialog), findsOneWidget);
+      expect(find.byTooltip('上个月'), findsOneWidget);
       await t.tap(find.text('确定'));
       await settleLocalIo(t);
       expect(c.read(memberLogDateProvider('u2')), isNotNull);
@@ -223,10 +223,10 @@ void main() {
     (t) async {
       final adapter = MemberAdapter();
       final c = await launch(t, adapter, '/logs/subordinates');
-      expect(find.text('查看 u2 的工作台'), findsOneWidget);
-      await t.ensureVisible(find.text('查看 u2 的工作台'));
+      expect(find.text('查看 陈一诺 的日志'), findsOneWidget);
+      await t.ensureVisible(find.text('查看 陈一诺 的日志'));
       await t.pumpAndSettle();
-      await t.tap(find.text('查看 u2 的工作台'));
+      await t.tap(find.text('查看 陈一诺 的日志'));
       await settleLocalIo(t);
       expect(c.read(memberLogDateProvider('u2')), DateTime(2026, 1, 31));
       expect(find.text('正在查看：陈一诺'), findsOneWidget);
@@ -367,53 +367,49 @@ void main() {
     },
   );
 
-  testWidgets('actual router member and help screens render at360dp large text', (
-    t,
-  ) async {
-    for (final (family, path) in [
-      ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
-      (
-        'MaterialIcons',
-        materialIconsFontPath,
-      ),
-    ]) {
-      await (FontLoader(family)..addFont(
-            Future.value(ByteData.sublistView(File(path).readAsBytesSync())),
-          ))
-          .load();
-    }
-    for (final (route, name) in [
-      ('/me/team/u2', '47-member-overview-large'),
-      ('/me/team/u2/logs?date=2026-01-31', '48-member-logs-large'),
-      ('/me/help', '49-help-large'),
-    ]) {
-      final adapter = MemberAdapter();
-      final c = await launch(t, adapter, route, scale: 1.5);
-      final key = GlobalKey();
-      await t.pumpWidget(
-        RepaintBoundary(
-          key: key,
-          child: UncontrolledProviderScope(
-            container: c,
-            child: const PandoraApp(),
+  testWidgets(
+    'actual router member and help screens render at360dp large text',
+    (t) async {
+      for (final (family, path) in [
+        ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
+        ('MaterialIcons', materialIconsFontPath),
+      ]) {
+        await (FontLoader(family)..addFont(
+              Future.value(ByteData.sublistView(File(path).readAsBytesSync())),
+            ))
+            .load();
+      }
+      for (final (route, name) in [
+        ('/me/team/u2', '47-member-overview-large'),
+        ('/me/team/u2/logs?date=2026-01-31', '48-member-logs-large'),
+        ('/me/help', '49-help-large'),
+      ]) {
+        final adapter = MemberAdapter();
+        final c = await launch(t, adapter, route, scale: 1.5);
+        final key = GlobalKey();
+        await t.pumpWidget(
+          RepaintBoundary(
+            key: key,
+            child: UncontrolledProviderScope(
+              container: c,
+              child: const PandoraApp(),
+            ),
           ),
-        ),
-      );
-      await settleLocalIo(t);
-      expect(t.takeException(), isNull, reason: name);
-      final boundary =
-          key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-      await t.runAsync(() async {
-        final rendered = await boundary.toImage(pixelRatio: 1);
-        final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
-        final output = File(
-          '../output/flutter-evidence/$name.png',
         );
-        output.parent.createSync(recursive: true);
-        await output.writeAsBytes(png!.buffer.asUint8List());
-        rendered.dispose();
-      });
-      await t.pumpWidget(const SizedBox.shrink());
-    }
-  });
+        await settleLocalIo(t);
+        expect(t.takeException(), isNull, reason: name);
+        final boundary =
+            key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        await t.runAsync(() async {
+          final rendered = await boundary.toImage(pixelRatio: 1);
+          final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
+          final output = File('../output/flutter-evidence/$name.png');
+          output.parent.createSync(recursive: true);
+          await output.writeAsBytes(png!.buffer.asUint8List());
+          rendered.dispose();
+        });
+        await t.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
 }

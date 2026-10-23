@@ -1,5 +1,5 @@
 -- 任务治理：参与人集合、开始时间和审核后生效的创建/删除。
--- 仅新增结构和前向扩展；V1-V15 已发布迁移不得修改。
+-- 仅新增结构和前向扩展；V1-V19 已发布迁移不得修改。
 ALTER TABLE tasks ADD COLUMN start_at timestamptz;
 
 -- V2 中 task_assignees 的旧索引名与新表共享 PostgreSQL 关系命名空间。
@@ -37,5 +37,5 @@ ALTER TABLE review_requests DROP CONSTRAINT review_requests_kind_valid;
 ALTER TABLE review_requests ADD CONSTRAINT review_requests_kind_valid CHECK (kind IN (
     'MEMBERSHIP', 'REVIEWER', 'POLICY', 'USER', 'DEPARTMENT', 'TEAM',
     'COMPANY_ITEM', 'LOG', 'TASK', 'TASK_REASSIGN', 'TASK_RESCHEDULE',
-    'MEMORY', 'TASK_CREATE', 'TASK_DELETE'
+    'MEMORY', 'PROCEDURE', 'TASK_CREATE', 'TASK_DELETE'
 ));

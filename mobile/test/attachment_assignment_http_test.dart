@@ -158,6 +158,29 @@ void main() {
   });
   Matcher failure(FailureKind kind) =>
       isA<ApiFailure>().having((f) => f.kind, 'kind', kind);
+  test('file errors explain the repair and hide raw parser diagnostics', () {
+    for (final entry in {
+      'UNSUPPORTED_FILE': (415, '请添加PNG、JPEG、PDF、Word或Excel文件'),
+      'FILE_TYPE_MISMATCH': (415, '文件格式与名称不一致，请重新导出后添加'),
+      'FILE_LIMIT': (400, '材料超出处理范围，请缩小或拆分后重试'),
+      'FILE_TOO_LARGE': (413, '材料超出处理范围，请缩小或拆分后重试'),
+      'FILE_ENCRYPTED': (422, '请先解除文件加密，再添加材料'),
+    }.entries) {
+      final request = RequestOptions(path: '/attachments');
+      final error = ApiFailure.fromDio(
+        DioException(
+          requestOptions: request,
+          response: Response(
+            requestOptions: request,
+            statusCode: entry.value.$1,
+            data: {'code': entry.key, 'message': 'raw parser diagnostics'},
+          ),
+        ),
+      );
+      expect(error.kind, FailureKind.validation);
+      expect(error.message, entry.value.$2);
+    }
+  });
   test(
     'multipart sends exact bytes, receives actual metadata and rejects invalid files or response',
     () async {
@@ -195,6 +218,16 @@ void main() {
         repo.uploadAttachment(SelectedAttachment('x', Uint8List.fromList([1]))),
         throwsA(failure(FailureKind.forbidden)),
       );
+    },
+  );
+  test(
+    'AI material upload declares its purpose and keeps ordinary uploads compatible',
+    () async {
+      await repo.uploadAttachment(
+        SelectedAttachment('材料.pdf', Uint8List.fromList([1])),
+        aiWork: true,
+      );
+      expect(adapter.requests.single.queryParameters, {'purpose': 'AI_WORK'});
     },
   );
   test(
@@ -537,7 +570,7 @@ void main() {
     },
   );
   testWidgets(
-    'dispatch UI sends uploaded IDs and unique collaborators from actual member choices',
+    'dispatch UI preserves uploaded IDs and unique participants from actual member choices',
     (t) async {
       await launch(
         t,
@@ -547,34 +580,30 @@ void main() {
         ],
       );
       final title = find.byWidgetPredicate(
-        (w) =>
-            w is TextField &&
-            (w.decoration?.labelText ?? '').startsWith('任务名称'),
+        (w) => w is TextField && w.decoration?.hintText == '输入任务名称',
       );
       await t.enterText(title, '带附件的任务');
-      final date = find.byWidgetPredicate(
-        (w) =>
-            w is TextField &&
-            (w.decoration?.labelText ?? '').startsWith('截止时间'),
-      );
+      await t.ensureVisible(find.text('选择日期和时间').first);
+      await t.tap(find.text('选择日期和时间').first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('确定'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('确定'));
+      await t.pumpAndSettle();
+      final date = find.text('选择日期和时间').last;
       await t.ensureVisible(date);
       await t.pumpAndSettle();
       await t.tap(date);
       await t.pumpAndSettle();
-      final tomorrow = DateTime.now().add(const Duration(days: 1));
-      if (tomorrow.month != DateTime.now().month) {
-        await t.tap(
-          find.descendant(
-            of: find.byType(DatePickerDialog),
-            matching: find.byIcon(Icons.chevron_right),
-          ),
-        );
+      final tomorrow = DateTime.now().add(const Duration(days: 2));
+      if (tomorrow.month != DateTime.now().add(const Duration(days: 1)).month) {
+        await t.tap(find.byTooltip('下个月'));
         await t.pumpAndSettle();
       }
       await t.tap(
         find
             .descendant(
-              of: find.byType(DatePickerDialog),
+              of: find.byType(BottomSheet),
               matching: find.text('${tomorrow.day}'),
             )
             .last,
@@ -583,11 +612,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('确定'));
       await t.pumpAndSettle();
-      final primary = find.byWidgetPredicate(
-        (w) =>
-            w is TextField &&
-            (w.decoration?.labelText ?? '').startsWith('主负责人'),
-      );
+      final primary = find.widgetWithText(ActionChip, '添加');
       await t.ensureVisible(primary);
       await t.pumpAndSettle();
       await t.tap(primary);
@@ -595,9 +620,9 @@ void main() {
       await t.tap(find.text('第一页成员'));
       await t.pumpAndSettle();
       for (var i = 0; i < 2; i++) {
-        await t.ensureVisible(find.text('添加协作人'));
+        await t.ensureVisible(primary);
         await t.pumpAndSettle();
-        await t.tap(find.text('添加协作人'));
+        await t.tap(primary);
         await settle(t);
         await t.tap(find.text('加载更多成员'));
         await settle(t);
@@ -610,16 +635,29 @@ void main() {
         await t.pumpAndSettle();
       }
       expect(find.widgetWithText(InputChip, '第二页负责人'), findsOneWidget);
+      await t.ensureVisible(find.text('选择标签'));
+      await t.tap(find.text('选择标签'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('重要'));
+      await t.pumpAndSettle();
       await choose(t);
       await t.tap(find.widgetWithText(FilledButton, '派发任务'));
       await settle(t);
+      expect(
+        adapter.requests.any((o) => o.path == '/tasks' && o.method == 'POST'),
+        isTrue,
+        reason: t
+            .widgetList<Text>(find.byType(Text))
+            .map((w) => w.data)
+            .whereType<String>()
+            .join(' | '),
+      );
       final body =
           adapter.requests
                   .lastWhere((o) => o.path == '/tasks' && o.method == 'POST')
                   .data
               as Map;
-      expect(body['ownerId'], 'first');
-      expect(body['collaborators'], ['second']);
+      expect(body['participantIds'], ['first', 'second']);
       expect(body['attachments'], ['uploaded-1']);
       expect(body.keys.contains('status'), isFalse);
       await close(t);
@@ -640,11 +678,7 @@ void main() {
       final icons = FontLoader('MaterialIcons')
         ..addFont(
           Future.value(
-            ByteData.sublistView(
-              File(
-                materialIconsFontPath,
-              ).readAsBytesSync(),
-            ),
+            ByteData.sublistView(File(materialIconsFontPath).readAsBytesSync()),
           ),
         );
       await icons.load();
@@ -670,9 +704,7 @@ void main() {
         await t.runAsync(() async {
           final img = await render.toImage(pixelRatio: 1);
           final data = await img.toByteData(format: ui.ImageByteFormat.png);
-          final output = File(
-            '../output/flutter-evidence/$label.png',
-          );
+          final output = File('../output/flutter-evidence/$label.png');
           output.parent.createSync(recursive: true);
           output.writeAsBytesSync(data!.buffer.asUint8List());
           img.dispose();

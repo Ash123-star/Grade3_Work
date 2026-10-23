@@ -44,7 +44,6 @@ flutter:
     - assets/generated_ui/backgrounds/
     - assets/generated_ui/decorations/
     - assets/generated_ui/icons/
-    - assets/generated_ui/mascot/
     - assets/generated_ui/references/
     - assets/generated_ui/new_pack/textures/
     - assets/generated_ui/new_pack/decorations/
@@ -60,3 +59,7 @@ flutter:
     - assets/generated_ui/new_pack/backgrounds/illustration_layers/
     - assets/generated_ui/new_pack/ai/
     - assets/generated_ui/new_pack/skins/
+    - assets/generated_ui/dog/
+    - assets/generated_ui/dog/avatars/
+    - assets/generated_ui/dog/poses/
+    - assets/generated_ui/dog/backgrounds/
