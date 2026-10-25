@@ -52,7 +52,7 @@ void main() {
     },
   );
   test(
-    'first submission opens 24h window; revisions require review and preserve start',
+    'first submission opens a direct 24h edit window and preserves its start',
     () async {
       var now = DateTime.utc(2026, 10, 17, 4);
       final store = DemoStore()..records['logs'] = [];
@@ -76,26 +76,25 @@ void main() {
       );
       expect(submitted.fields['submittedAt'], now.toIso8601String());
       now = now.add(const Duration(hours: 23, minutes: 59));
-      final request = await repo.execute(
+      final edited = await repo.execute(
         'logs',
-        Command('request-review', {
+        Command('update-content', {
           'id': submitted.id,
-          '今日工作': '待审核修订',
-          '修改理由': '补充记录',
+          'work': '窗口内直接修订',
         }, version: submitted.version),
       );
-      final edited = await repo.detail('logs', submitted.id);
-      expect(edited.fields['今日工作'], '初稿');
+      expect(edited.fields['今日工作'], '窗口内直接修订');
       expect(edited.fields['submittedAt'], submitted.fields['submittedAt']);
-      expect(edited.fields.containsKey('versions'), isFalse);
-      expect(store.records['reviews']!.any((r) => r.id == request.id), isTrue);
+      expect(edited.fields['versions'], hasLength(1));
+      expect(store.records['reviews'], isEmpty);
       now = now.add(const Duration(minutes: 1));
-      for (final action in ['request-review', 'withdraw']) {
+      for (final action in ['update-content', 'request-review', 'withdraw']) {
         await expectLater(
           repo.execute(
             'logs',
             Command(action, {
               'id': edited.id,
+              'work': '越过窗口',
               '今日工作': '越过窗口',
               'reason': '边界验证',
             }, version: edited.version),

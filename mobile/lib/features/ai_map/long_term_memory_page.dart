@@ -395,7 +395,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         notice(
           context,
           result['status'] == 'PENDING'
-              ? '已提交独立审核，尚未生效'
+              ? '已提交直属上级审核，尚未生效'
               : result['message'] as String? ?? '记忆已更新',
         );
       }
@@ -514,7 +514,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                   : scenario == DemoScenario.offline
                   ? '分析暂时无法加载'
                   : '从真实工作记录开始',
-              subtitle: '当前为页面演示，连接企业服务后积累个人与公司记忆，不展示预设发展结论。',
+              subtitle: '完成工作记录后，可在这里查看已积累的个人与公司记忆。',
             ),
           ] else if (!user.active)
             const EmptyIllustration(

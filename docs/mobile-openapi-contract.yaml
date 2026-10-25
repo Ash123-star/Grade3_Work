@@ -1,0 +1,396 @@
+openapi: 3.1.0
+info:
+  title: 移动端业务接口补充契约
+  version: '2026-10-25'
+  description: |
+    PROPOSED 协议覆盖文件。只定义移动端与服务端的接口、字段、权限和错误语义，不表示当前服务端已经实现。
+    实现后必须合并到运行时 SpringDoc 与 docs/openapi.json。
+servers:
+  - url: /
+security:
+  - bearer: []
+paths:
+  /api/tasks:
+    get:
+      operationId: mobileListTasks
+      summary: 查询任务日历和任务列表
+      description: from/to 使用 UTC ISO-8601 左闭右开区间，服务端按 start_at < to AND deadline >= from 过滤；ownerId 必须重新校验组织范围。
+      parameters:
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+        - {name: search, in: query, schema: {type: string, maxLength: 200}}
+        - {name: participantId, in: query, schema: {type: string}}
+        - {name: ownerId, in: query, schema: {type: string}}
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: date, in: query, schema: {type: string, format: date}}
+        - {name: period, in: query, schema: {type: string, enum: [day, week, month], default: day}}
+      responses:
+        '200': {description: Authorized page, content: {application/json: {schema: {$ref: '#/components/schemas/TaskPage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/tasks/received-card:
+    get:
+      operationId: mobileReceivedTaskCards
+      summary: 查询导图接收任务卡片
+      description: 只返回当前用户实际接收且有权查看的任务历史；phase 必须区分撤回、验收和归档。
+      parameters:
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+        - {name: search, in: query, schema: {type: string, maxLength: 200}}
+      responses:
+        '200': {description: Received task cards, content: {application/json: {schema: {$ref: '#/components/schemas/ReceivedTaskPage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/logs:
+    get:
+      operationId: mobileListLogs
+      summary: 查询日报
+      parameters:
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+        - {name: ownerId, in: query, schema: {type: string}}
+        - {name: search, in: query, schema: {type: string, maxLength: 200}}
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: date, in: query, schema: {type: string, format: date}}
+        - {name: period, in: query, schema: {type: string, enum: [day, week, month], default: day}}
+      responses:
+        '200': {description: Authorized log page, content: {application/json: {schema: {$ref: '#/components/schemas/LogPage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/logs/subordinates:
+    get:
+      operationId: mobileListSubordinateLogs
+      summary: 查询下属已提交日报
+      description: 仅授权上级可用；ownerId、departmentId、search、from/to 在服务端组合过滤，草稿不可见。
+      parameters:
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+        - {name: ownerId, in: query, schema: {type: string}}
+        - {name: departmentId, in: query, schema: {type: string}}
+        - {name: search, in: query, schema: {type: string, maxLength: 100}}
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: date, in: query, schema: {type: string, format: date}}
+        - {name: period, in: query, schema: {type: string, enum: [day, week, month], default: day}}
+      responses:
+        '200': {description: Subordinate log page, content: {application/json: {schema: {$ref: '#/components/schemas/LogPage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/logs/subordinates/calendar:
+    get:
+      operationId: mobileSubordinateLogCalendar
+      summary: 查询成员月度日报状态
+      description: 入职前 UNKNOWN，未来 FUTURE，只有应提交但未提交才 MISSING。
+      parameters:
+        - {name: ownerId, in: query, required: true, schema: {type: string, minLength: 1}}
+        - {name: month, in: query, required: true, schema: {type: string, pattern: '^\\d{4}-\\d{2}$'}}
+      responses:
+        '200': {description: Month status, content: {application/json: {schema: {$ref: '#/components/schemas/MemberLogCalendar'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/logs/{id}/content:
+    put:
+      operationId: mobileUpdateSubmittedLogContent
+      summary: 首次提交后 24 小时内直接修改正文
+      description: 仅本人可用；原子校验 submitted_at + 24h、version 和正文非空，不重置首次提交时间。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogContentUpdate'}
+      responses:
+        '200': {description: Updated log, content: {application/json: {schema: {$ref: '#/components/schemas/LogAccessView'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/analytics:
+    get:
+      operationId: mobileAnalyticsSummary
+      summary: 查询多维统计汇总
+      description: 汇总、钻取和导出必须复用同一授权范围、日期窗口、组织过滤器和指标口径；零分母不得伪造比例。
+      parameters:
+        - {name: date, in: query, required: true, schema: {type: string, format: date}}
+        - {name: period, in: query, schema: {type: string, enum: [day, week, month], default: week}}
+        - {$ref: '#/components/parameters/GroupBy'}
+        - {$ref: '#/components/parameters/DepartmentId'}
+        - {$ref: '#/components/parameters/TeamId'}
+        - {$ref: '#/components/parameters/OwnerId'}
+      responses:
+        '200': {description: Summary, content: {application/json: {schema: {$ref: '#/components/schemas/AnalyticsSummary'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/analytics/details:
+    get:
+      operationId: mobileAnalyticsDetails
+      summary: 查询统计图表钻取明细
+      parameters:
+        - {name: date, in: query, required: true, schema: {type: string, format: date}}
+        - {name: period, in: query, schema: {type: string, enum: [day, week, month], default: week}}
+        - {$ref: '#/components/parameters/GroupBy'}
+        - {$ref: '#/components/parameters/DepartmentId'}
+        - {$ref: '#/components/parameters/TeamId'}
+        - {$ref: '#/components/parameters/OwnerId'}
+        - {name: metric, in: query, required: true, schema: {oneOf: [{type: string, enum: [dispatched, received, feedback, accepted, overdue, diarySubmitted, onTimeAcceptance]}, {type: string, pattern: '^phase:.+$'}]}}
+        - {name: groupId, in: query, schema: {type: string}}
+        - {name: bucket, in: query, schema: {type: string}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200': {description: Detail page, content: {application/json: {schema: {$ref: '#/components/schemas/AnalyticsDetailsPage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/analytics/export:
+    get:
+      operationId: mobileAnalyticsExport
+      summary: 导出当前统计范围
+      parameters:
+        - {name: date, in: query, required: true, schema: {type: string, format: date}}
+        - {name: period, in: query, schema: {type: string, enum: [day, week, month], default: week}}
+        - {name: resource, in: query, required: true, schema: {type: string, enum: [logs, tasks]}}
+        - {$ref: '#/components/parameters/GroupBy'}
+        - {$ref: '#/components/parameters/DepartmentId'}
+        - {$ref: '#/components/parameters/TeamId'}
+        - {$ref: '#/components/parameters/OwnerId'}
+      responses:
+        '200': {description: UTF-8 CSV with the same filters, content: {text/csv: {schema: {type: string, format: binary}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/profiles/me:
+    put:
+      operationId: mobileUpdateOwnProfile
+      summary: 更新本人可编辑资料
+      description: 姓名、部门、职位、角色和状态只读，不得由此接口修改。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProfileUpdate'}
+      responses:
+        '200': {description: Updated profile, content: {application/json: {schema: {$ref: '#/components/schemas/ProfileView'}}}}
+        default: {$ref: '#/components/responses/Error'}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+  parameters:
+    Cursor: {name: cursor, in: query, schema: {type: integer, minimum: 0, default: 0}}
+    Limit: {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 30}}
+    GroupBy: {name: groupBy, in: query, schema: {type: string, enum: [department, team, person], default: department}}
+    DepartmentId: {name: departmentId, in: query, schema: {type: string}}
+    TeamId: {name: teamId, in: query, schema: {type: string}}
+    OwnerId: {name: ownerId, in: query, schema: {type: string}}
+  responses:
+    Error:
+      description: 统一错误信封，必须区分 400/401/403/404/409/429/503
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    Error:
+      type: object
+      required: [code, message, traceId]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        traceId: {type: string}
+    Page:
+      type: object
+      required: [items, total, nextCursor]
+      properties:
+        items: {type: array, items: {type: object, additionalProperties: true}}
+        total: {type: integer, format: int64, minimum: 0}
+        nextCursor: {type: string, nullable: true}
+    TaskListItem:
+      type: object
+      additionalProperties: true
+      required: [id, title, deadline, version]
+      properties:
+        id: {type: string}
+        ownerId: {type: string, nullable: true}
+        owner_id: {type: string, nullable: true}
+        issuerId: {type: string, nullable: true}
+        issuer_id: {type: string, nullable: true}
+        title: {type: string}
+        startAt: {type: string, format: date-time, nullable: true}
+        start_at: {type: string, format: date-time, nullable: true}
+        deadline: {type: string, format: date-time}
+        participants: {type: array, items: {$ref: '#/components/schemas/TaskParticipant'}}
+        label: {$ref: '#/components/schemas/TaskLabel'}
+        tagColor: {type: string, pattern: '^#[0-9a-fA-F]{6}$', nullable: true}
+        tag_color: {type: string, pattern: '^#[0-9a-fA-F]{6}$', nullable: true}
+        version: {type: integer, minimum: 0}
+        createdAt: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time, nullable: true}
+    TaskPage:
+      allOf:
+        - {$ref: '#/components/schemas/Page'}
+        - {type: object, properties: {items: {type: array, items: {$ref: '#/components/schemas/TaskListItem'}}}}
+    ReceivedTaskCard:
+      type: object
+      required: [id, title, version, phase]
+      properties:
+        id: {type: string}
+        title: {type: string}
+        version: {type: integer, minimum: 0}
+        issuer_id: {type: string}
+        owner_id: {type: string}
+        start_at: {type: string, format: date-time, nullable: true}
+        deadline: {type: string, format: date-time}
+        dispatchAt: {type: string, format: date-time, nullable: true}
+        phase: {type: string, enum: [DISPATCHED, RECEIVED, FEEDBACK, ACCEPTED, ARCHIVED, WITHDRAWN]}
+        participants: {type: array, items: {$ref: '#/components/schemas/TaskParticipant'}}
+        label: {$ref: '#/components/schemas/TaskLabel'}
+    ReceivedTaskPage:
+      allOf:
+        - {$ref: '#/components/schemas/Page'}
+        - {type: object, properties: {items: {type: array, items: {$ref: '#/components/schemas/ReceivedTaskCard'}}}}
+    TaskParticipant:
+      type: object
+      required: [id, name]
+      properties: {id: {type: string}, name: {type: string}}
+    TaskLabel:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        category: {type: string}
+        color: {type: string, pattern: '^#[0-9a-fA-F]{6}$'}
+        version: {type: integer, minimum: 0}
+    LogAccessView:
+      type: object
+      additionalProperties: true
+      required: [id, version, submittedAt, editableUntil, canEdit, canWithdraw]
+      properties:
+        id: {type: string}
+        version: {type: integer, minimum: 0}
+        businessDate: {type: string, format: date, nullable: true}
+        business_date: {type: string, format: date}
+        submittedAt: {type: string, format: date-time, nullable: true}
+        editableUntil: {type: string, format: date-time, nullable: true}
+        canEdit: {type: boolean}
+        canWithdraw: {type: boolean}
+        author: {type: object, properties: {id: {type: string}, name: {type: string}}}
+        department: {type: object, properties: {id: {type: string}, name: {type: string}}}
+        body: {type: object, additionalProperties: true}
+    LogPage:
+      allOf:
+        - {$ref: '#/components/schemas/Page'}
+        - {type: object, properties: {items: {type: array, items: {$ref: '#/components/schemas/LogAccessView'}}, groups: {type: array, items: {type: object, additionalProperties: true}}}}
+    MemberLogCalendar:
+      type: object
+      required: [ownerId, month, days]
+      properties:
+        ownerId: {type: string}
+        month: {type: string, pattern: '^\\d{4}-\\d{2}$'}
+        employmentStartDate: {type: string, format: date, nullable: true}
+        days: {type: object, additionalProperties: {type: string, enum: [SUBMITTED, MISSING, FUTURE, UNKNOWN]}}
+    LogContentUpdate:
+      type: object
+      additionalProperties: false
+      required: [work, version]
+      properties:
+        work: {type: string, minLength: 1, maxLength: 20000}
+        version: {type: integer, minimum: 0}
+    Metric:
+      type: object
+      required: [numerator, denominator, rate]
+      properties:
+        numerator: {type: integer, format: int64, minimum: 0}
+        denominator: {type: integer, format: int64, minimum: 0}
+        rate: {type: number, minimum: 0, maximum: 1, nullable: true}
+        definition: {type: string}
+    AnalyticsSummary:
+      type: object
+      required: [range, updatedAt, filters, groupedComparison, taskPhaseDistribution, trend]
+      properties:
+        range: {type: object, additionalProperties: true}
+        updatedAt: {type: string, format: date-time}
+        groupBy: {type: string, enum: [department, team, person]}
+        filters: {$ref: '#/components/schemas/AnalyticsFilters'}
+        dispatched: {type: integer, format: int64}
+        received: {type: integer, format: int64}
+        feedback: {type: integer, format: int64}
+        accepted: {type: integer, format: int64}
+        overdue: {type: integer, format: int64}
+        onTimeAcceptance: {$ref: '#/components/schemas/Metric'}
+        dailySubmission: {$ref: '#/components/schemas/Metric'}
+        groupedComparison: {type: array, items: {$ref: '#/components/schemas/AnalyticsGroup'}}
+        departmentComparison: {type: array, items: {$ref: '#/components/schemas/AnalyticsGroup'}}
+        taskPhaseDistribution: {type: array, items: {$ref: '#/components/schemas/TaskPhaseCount'}}
+        departmentDistribution: {type: array, items: {type: object, additionalProperties: true}}
+        trend: {type: array, items: {$ref: '#/components/schemas/AnalyticsTrendPoint'}}
+        dailyTrend: {type: array, items: {$ref: '#/components/schemas/AnalyticsTrendPoint'}}
+    AnalyticsFilters:
+      type: object
+      properties:
+        date: {type: string, format: date}
+        period: {type: string, enum: [day, week, month]}
+        groupBy: {type: string, enum: [department, team, person]}
+        departmentId: {type: string, nullable: true}
+        teamId: {type: string, nullable: true}
+        ownerId: {type: string, nullable: true}
+    AnalyticsGroup:
+      type: object
+      required: [groupId, groupName]
+      properties:
+        groupId: {type: string}
+        groupName: {type: string}
+        dispatched: {type: integer, format: int64, minimum: 0}
+        received: {type: integer, format: int64, minimum: 0}
+        feedback: {type: integer, format: int64, minimum: 0}
+        accepted: {type: integer, format: int64, minimum: 0}
+        overdue: {type: integer, format: int64, minimum: 0}
+        diarySubmitted: {type: integer, format: int64, minimum: 0}
+    TaskPhaseCount:
+      type: object
+      required: [phase, count]
+      properties:
+        phase: {type: string}
+        count: {type: integer, format: int64, minimum: 0}
+    AnalyticsTrendPoint:
+      type: object
+      required: [date]
+      properties:
+        date: {type: string, format: date}
+        dispatched: {type: integer, format: int64, minimum: 0}
+        received: {type: integer, format: int64, minimum: 0}
+        feedback: {type: integer, format: int64, minimum: 0}
+        accepted: {type: integer, format: int64, minimum: 0}
+        overdue: {type: integer, format: int64, minimum: 0}
+        diarySubmitted: {type: integer, format: int64, minimum: 0}
+    AnalyticsDetailsPage:
+      allOf:
+        - {$ref: '#/components/schemas/Page'}
+        - {type: object, required: [metric, groupBy], properties: {metric: {type: string}, groupBy: {type: string, enum: [department, team, person]}, items: {type: array, items: {type: object, additionalProperties: true}}}}
+    ProfileUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 0}
+        introduction: {type: string, maxLength: 20000}
+        phone: {type: string, nullable: true, pattern: '^1[3-9][0-9]{9}$'}
+        email: {type: string, nullable: true, format: email, maxLength: 320}
+        gender: {type: string, nullable: true, maxLength: 32}
+        age: {type: integer, nullable: true, minimum: 0}
+        avatarAttachmentId: {type: string, nullable: true}
+    ProfileView:
+      type: object
+      additionalProperties: true
+      properties:
+        id: {type: string}
+        name: {type: string}
+        version: {type: integer, minimum: 0}
+        position: {type: string, nullable: true}
+        role: {type: string, nullable: true}
+        status: {type: string, nullable: true}
+        phone: {type: string, nullable: true}
+        email: {type: string, nullable: true}
+        gender: {type: string, nullable: true}
+        age: {type: integer, nullable: true, minimum: 0}
+        department: {type: object, additionalProperties: true}
+        profile: {$ref: '#/components/schemas/ProfileFields'}
+    ProfileFields:
+      type: object
+      additionalProperties: false
+      properties:
+        version: {type: integer, minimum: 0}
+        introduction: {type: string, nullable: true, maxLength: 20000}
+        phone: {type: string, nullable: true, pattern: '^1[3-9][0-9]{9}$'}
+        email: {type: string, nullable: true, format: email, maxLength: 320}
+        gender: {type: string, nullable: true, maxLength: 32}
+        age: {type: integer, nullable: true, minimum: 0}
+        avatarAttachmentId: {type: string, nullable: true}

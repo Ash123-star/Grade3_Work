@@ -6,6 +6,10 @@
 
 根路径为 `/api`。除公开登录、注册和健康检查外均需 `Authorization: Bearer <session-token>`。每个响应带 `X-Trace-Id`；错误体为 `{code,message,traceId}`。列表使用 `{items,total,nextCursor}`，`cursor` 为偏移量，`limit` 范围 1–100。时间使用 UTC ISO-8601，业务日期按 `Asia/Shanghai` 且周一为周首。
 
+移动端补充协议见 [`mobile-openapi-contract.yaml`](mobile-openapi-contract.yaml)，并由 `docs/openapi.json` 的 `x-mobile-contract` 标记引用。对该覆盖文件列出的 path、operation 和 schema，以覆盖文件为权威定义；它是待服务端实现的正式协议草案，优先定义移动端真实调用所需的路径、参数、字段、权限和错误语义，但不代表当前运行代码已经提供这些路由。服务端实现后必须同步 SpringDoc、`docs/openapi.json` 和移动端 HTTP contract tests。
+
+移动端与服务端的逐项缺口、当前实现状态和后端接手验收要求见 [`mobile/docs/backend-contract-gaps-mobile-page-experience-refresh.md`](../mobile/docs/backend-contract-gaps-mobile-page-experience-refresh.md)。其中“缺失/不匹配”只表示协议或运行端点尚未兑现，不表示移动端 Mock 已替代服务端业务。
+
 写请求只接受文档列出的字段。更新请求携带 `version`；创建请求可携带 `Idempotency-Key`。版本冲突返回 `409`，越权对象通常返回 `404`，明确的人员筛选越权返回 `403`。
 
 ## 认证 `/auth`
@@ -26,6 +30,10 @@
 ## 任务 `/tasks`
 
 `GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
+
+`GET /tasks?date=YYYY-MM-DD&period=day|week|month` 使用上海业务日期按任务区间相交筛选：`start_at < 范围结束 && deadline >= 范围开始`，并排除开始时间晚于截止时间的无效区间。月范围扩展到该月月历首个可见周一至末个可见周一的右侧边界，以便月初/月末灰色日期格和跨月续段读取到同一任务；组织数据范围与分页权限不变。
+
+移动端新月历调用的正式目标形状为 `GET /tasks?from=<inclusive-ISO8601>&to=<exclusive-ISO8601>&ownerId=<optional-id>`；导图接收卡片使用 `GET /tasks/received-card?cursor&limit&search`，返回 `id/title/version/dispatchAt/phase` 和卡片所需的参与人、标签字段。`phase` 必须区分 `DISPATCHED/RECEIVED/FEEDBACK/ACCEPTED/ARCHIVED/WITHDRAWN`，服务端不得让客户端从缺失字段推导完成状态。
 
 `POST /tasks/{id}/events` 请求至少包含当前 `version` 和 `type`。事件枚举及附加字段如下：
 
@@ -51,13 +59,15 @@
 
 `GET /logs` 只返回本人或授权范围内已提交日志；`GET /logs/subordinates` 是下属日志入口，上级不能读取草稿。`PUT /logs/draft` 按用户和上海业务日期保存唯一草稿；`POST /logs/{id}/submit` 提交；`POST /logs/{id}/revisions` 修改已提交版本并进入审核；`GET /logs/{id}/versions`、`POST /logs/{id}/read`、`GET/POST /logs/{id}/comments` 分别用于历史、已读和评语。
 
+移动端日期范围列表同时支持 `from/to`；成员月状态使用 `GET /logs/subordinates/calendar?ownerId=<id>&month=YYYY-MM`，返回 `employmentStartDate` 和逐日 `SUBMITTED/MISSING/FUTURE/UNKNOWN`。首次提交后的直接正文修改使用 `PUT /logs/{id}/content`，请求 `{work,version}`，只能由本人在 `submitted_at + 24h` 前执行，必须保留首次提交时间并递增版本。
+
 ## 审核 `/reviews`
 
 `GET /reviews`、`GET /reviews/{id}` 返回申请人或当前审核步骤可见内容。`POST /reviews/{id}/decision` 请求 `{approve,reason}`，驳回时 reason 必填，申请人不能自审；`POST /reviews/{id}/reroute` 仅申请人在未决策前重建审核链。最终通过时再次校验目标版本。
 
 ## 仪表盘、通知、分析和附件
 
-仪表盘提供 `/dashboard`、`/dashboard/company`、`/dashboard/personal`、`/profiles/{id}` 和 `/private-notes`；私人备注始终仅本人可见。通知提供 `GET /notifications`、`POST /notifications/read-all`、`POST /notifications/{id}/read` 和支持 `Last-Event-ID` 的 `/notifications/stream`。分析提供 `/analytics`、`/timeline` 和 `/analytics/export`，导出与详情使用相同数据范围。附件 `POST /attachments` 使用 multipart，单文件最大 10MB；`GET /attachments/{id}` 每次重新鉴权，不提供公开 URL。
+仪表盘提供 `/dashboard`、`/dashboard/company`、`/dashboard/personal`、`/profiles/{id}` 和 `/private-notes`；私人备注始终仅本人可见。`PUT /profiles/me` 的移动端协议字段为 `introduction/phone/email/gender/age/avatarAttachmentId/version`，姓名、部门、职位、角色和状态只读。通知提供 `GET /notifications`、`POST /notifications/read-all`、`POST /notifications/{id}/read` 和支持 `Last-Event-ID` 的 `/notifications/stream`。分析提供 `/analytics`、`/analytics/details`、`/timeline` 和 `/analytics/export`；汇总、钻取与 CSV 必须共用 `groupBy/departmentId/teamId/ownerId`、日期窗口和权限范围。附件 `POST /attachments` 使用 multipart，单文件最大 10MB；`GET /attachments/{id}` 每次重新鉴权，不提供公开 URL。
 
 ## AI `/ai`
 
