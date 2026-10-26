@@ -102,6 +102,24 @@ class ReadAdapter implements HttpClientAdapter {
           'created_at': '2026-10-12T12:00:00Z',
         },
       ];
+    } else if (options.path == '/reviews/review-1') {
+      body = {
+        'id': 'review-1',
+        'title': '日报正文调整',
+        'kind': 'LOG',
+        'status': 'PENDING',
+        'applicant_id': 'u2',
+        'applicant_name': '申请人',
+        'reviewer_id': 'u1',
+        'reviewer_name': '直属主管',
+        'reviewer_configured': true,
+        'approval_mode': 'DIRECT_MANAGER',
+        'expected_version': 3,
+        'version': 4,
+        'steps': [
+          {'reviewer_id': 'historical-reviewer', 'status': 'APPROVED'},
+        ],
+      };
     } else if (options.path.startsWith('/dashboard/')) {
       status = focusStatus;
       final own = options.queryParameters['ownerId'];
@@ -317,6 +335,20 @@ void main() {
       ]);
     },
   );
+
+  test('review HTTP fields expose the configured direct reviewer only', () async {
+    final review = await repo.detail('reviews', 'review-1');
+    expect(review.fields['reviewState'], '待审');
+    expect(review.fields['applicantId'], 'u2');
+    expect(review.fields['reviewerId'], 'u1');
+    expect(review.fields['reviewerName'], '直属主管');
+    expect(review.fields['reviewerConfigured'], isTrue);
+    expect(review.fields['approvalMode'], 'DIRECT_MANAGER');
+    expect(review.fields['baseVersion'], 3);
+    expect(review.fields['steps'], [
+      {'reviewer_id': 'historical-reviewer', 'status': 'APPROVED'},
+    ]);
+  });
 
   Future<void> settleHttp(WidgetTester t) async {
     await t.pump();

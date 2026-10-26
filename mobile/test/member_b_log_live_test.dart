@@ -20,7 +20,7 @@ import 'support/flutter_sdk_assets.dart';
 /// storage is in memory. Never point this fixture at a shared/production DB.
 void main() {
   testWidgets(
-    '真实日志页面：账号部门搜索、分页、修订审核、评论和撤回重提',
+    '真实日志页面：账号部门搜索、分页、评论和移除旧修订申请入口',
     (t) async {
       HttpOverrides.global = null;
       for (final entry in {
@@ -61,10 +61,8 @@ void main() {
         }
       });
       late HttpRepository admin, employee;
-      final reviewers = <String, HttpRepository>{};
       late Session adminSession, employeeSession;
       late String department, account, logId;
-      late Record submitted;
       await t.runAsync(() async {
         final public = client(null);
         final saved = File('${directory.path}/demo-accounts.json');
@@ -83,20 +81,6 @@ void main() {
           await admin.detail('auth', 'me'),
           token: login.fields['accessToken'] as String,
         );
-        reviewers[adminSession.id] = admin;
-        if (prior['employeeAccount'] != null) {
-          final reviewerLogin = await public.execute(
-            'auth',
-            Command('login', {
-              '账号': prior['employeeAccount'],
-              '密码': prior['employeePassword'],
-            }),
-          );
-          final reviewer = client(
-            reviewerLogin.fields['accessToken'] as String,
-          );
-          reviewers[(await reviewer.detail('auth', 'me')).id] = reviewer;
-        }
         expect(
           adminSession.mustChangePassword,
           false,
@@ -149,7 +133,6 @@ void main() {
           );
           if (i == 0) {
             logId = value.id;
-            submitted = await employee.detail('logs', logId);
           }
         }
         final all = await readCompleteList(
@@ -261,91 +244,16 @@ void main() {
       });
 
       container.read(sessionProvider.notifier).state = employeeSession;
-      container
-          .read(routerProvider)
-          .go('/form/log-revise?id=$logId&version=${submitted.version}');
-      await settle();
-      await t.enterText(find.byType(TextFormField).first, '修订后的真实工作');
-      final reason = find.byWidgetPredicate(
-        (w) => w is TextField && w.decoration?.hintText == '填写修改理由',
-      );
-      await t.scrollUntilVisible(
-        reason,
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await t.enterText(reason, '补充验收情况');
-      await t.tap(find.text('提交修订申请'));
-      await settle();
-      await t.runAsync(() async {
-        expect(
-          (await employee.detail('logs', logId)).fields['今日工作'],
-          '真实日志内容0',
-        );
-        final reviews = await readCompleteList(
-          employee,
-          'reviews',
-          const Query(),
-        );
-        final pending = reviews.items.singleWhere(
-          (r) =>
-              r.fields['targetId'] == logId && r.fields['reviewState'] == '待审',
-        );
-        await expectLater(
-          employee.execute('reviews', Command('approve', {'id': pending.id})),
-          throwsA(isA<ApiFailure>()),
-        );
-        final review = await employee.detail('reviews', pending.id);
-        for (final step in review.fields['steps'] as List) {
-          final reviewer = reviewers['${step['reviewer_id']}'];
-          expect(
-            reviewer,
-            isNotNull,
-            reason: 'Use a fresh isolated fixture database',
-          );
-          await reviewer!.execute(
-            'reviews',
-            Command('approve', {'id': pending.id}),
-          );
-        }
-        expect(
-          (await employee.detail('logs', logId)).fields['今日工作'],
-          '修订后的真实工作',
-        );
-      });
-      container.invalidate(itemProvider);
       container.read(routerProvider).go('/item/logs/$logId');
       await settle();
-      final withdraw = find.text('撤回日志');
-      await t.ensureVisible(withdraw);
-      await t.tap(withdraw);
-      await settle();
-      await t.enterText(
-        find.byWidgetPredicate(
-          (w) =>
-              w is TextField &&
-              (w.decoration?.labelText?.startsWith('撤回原因') ?? false),
-        ),
-        '补充附件',
-      );
-      await t.tap(find.text('撤回日志').last);
-      await settle();
+      expect(find.text('真实日志内容0'), findsOneWidget);
+      expect(find.text('提交修订申请'), findsNothing);
+      expect(find.text('申请修订日志'), findsNothing);
+      expect(find.text('真实评论'), findsOneWidget);
+      expect(find.text('真实回复'), findsOneWidget);
       await t.runAsync(() async {
-        final draft = await employee.detail('logs', logId);
-        expect(draft.fields['submitted'], false);
-        expect(draft.fields['submittedAt'], submitted.fields['submittedAt']);
-        expect(
-          (await admin.list('logs/subordinates', Query(search: account))).total,
-          30,
-        );
-        await employee.execute(
-          'logs',
-          Command('submit', {'id': logId}, version: draft.version),
-        );
-        expect(
-          (await employee.detail('logs', logId)).fields['submittedAt'],
-          submitted.fields['submittedAt'],
-        );
+        final refreshed = await employee.detail('logs', logId);
+        expect(refreshed.fields['今日工作'], '真实日志内容0');
       });
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox.shrink());

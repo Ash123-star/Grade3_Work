@@ -110,6 +110,44 @@ void main() {
     });
   }
 
+  testWidgets('cross-week continuation repeats its task title on Monday', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(360, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+    final c = testContainer(
+      overrides: [
+        repositoryProvider.overrideWithValue(
+          MockRepository(const Session(), store: agendaStore()),
+        ),
+        selectedDateProvider.overrideWith((ref) => DateTime(2026, 10, 13)),
+        periodProvider.overrideWith((ref) => '月'),
+      ],
+    );
+    addTearDown(c.dispose);
+    await t.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: appTheme(),
+          home: const Scaffold(body: CalendarContent()),
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+
+    final mondayContinuation = find.byKey(
+      const ValueKey(
+        'month-span-label:tasks:earlier-span:2026-10-19T00:00:00.000',
+      ),
+    );
+    expect(mondayContinuation, findsOneWidget);
+    expect(t.widget<Text>(mondayContinuation).data, '跨周任务测试');
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('date control opens a cancellable date wheel', (t) async {
     final c = testContainer(
       overrides: [
@@ -274,7 +312,7 @@ void main() {
             home: MediaQuery(
               data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
               child: const Scaffold(
-                body: SingleChildScrollView(child: CalendarContent()),
+                body: SizedBox.expand(child: CalendarContent()),
               ),
             ),
           ),
@@ -282,12 +320,6 @@ void main() {
       );
       await t.pumpAndSettle();
       final cell = find.byKey(const ValueKey('month-day:2026-10-13'));
-      expect(
-        find.byKey(
-          const ValueKey('month-span:tasks:t0:2026-10-12T00:00:00.000'),
-        ),
-        findsOneWidget,
-      );
       expect(
         find.byKey(
           const ValueKey('month-span:tasks:t4:2026-09-28T00:00:00.000'),
@@ -300,8 +332,13 @@ void main() {
           const ValueKey('month-span:tasks:t5:2026-10-12T00:00:00.000'),
         ),
         findsNothing,
-        reason: 'records after the third on the same day are omitted',
+        reason: 'overflow records are represented by the day counter',
       );
+      expect(
+        find.byKey(const ValueKey('month-overflow:2026-10-13')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('+'), findsWidgets);
       final firstWeekSegment = find.byKey(
         const ValueKey('month-span:tasks:t6:2026-10-12T00:00:00.000'),
       );
@@ -323,8 +360,8 @@ void main() {
       );
       expect(
         find.descendant(of: nextWeekSegment, matching: find.text('数据结构实训')),
-        findsNothing,
-        reason: 'continuation weeks show color without repeating the title',
+        findsOneWidget,
+        reason: 'the next week repeats the task name at its continuation start',
       );
       final previewTitles = t.widgetList<Text>(
         find.descendant(
