@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/ai_work.dart';
 import 'package:pandora_mobile/data/repositories/ai_work_repository.dart';
@@ -28,6 +29,14 @@ class _WorkbenchPageState extends ConsumerState<WorkbenchPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ref.listenManual<Session>(sessionProvider, (before, after) {
+      if (before?.id != after.id ||
+          before?.token != after.token ||
+          !after.canReadBusiness) {
+        input.clear();
+        inputFocus.unfocus();
+      }
+    });
     timer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (mounted &&
           foreground &&
@@ -61,14 +70,6 @@ class _WorkbenchPageState extends ConsumerState<WorkbenchPage>
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
-    ref.listen(sessionProvider, (before, after) {
-      if (before?.id != after.id ||
-          before?.token != after.token ||
-          !after.canReadBusiness) {
-        input.clear();
-        inputFocus.unfocus();
-      }
-    });
     final data = ref.watch(workListProvider);
     final caps = ref.watch(workCapabilitiesProvider);
     return WorkMotionScope(

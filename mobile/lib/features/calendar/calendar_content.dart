@@ -60,8 +60,15 @@ bool sameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
 class CalendarContent extends ConsumerStatefulWidget {
-  const CalendarContent({super.key, this.availableHeight = 0});
+  const CalendarContent({
+    super.key,
+    this.availableHeight = 0,
+    this.ownerId,
+    this.monthOnly = false,
+  });
   final double availableHeight;
+  final String? ownerId;
+  final bool monthOnly;
   @override
   ConsumerState<CalendarContent> createState() => _CalendarContentState();
 }
@@ -69,8 +76,34 @@ class CalendarContent extends ConsumerStatefulWidget {
 class _CalendarContentState extends ConsumerState<CalendarContent> {
   @override
   Widget build(BuildContext context) {
-    final date = ref.watch(selectedDateProvider),
-        period = ref.watch(periodProvider);
+    final dateProvider = widget.ownerId == null
+        ? selectedDateProvider
+        : memberCalendarDateProvider(widget.ownerId!);
+    final date = ref.watch(dateProvider),
+        period = widget.monthOnly ? '月' : ref.watch(periodProvider);
+    if (period == '月') {
+      return _StableMonthPager(
+        selectedDate: date,
+        ownerId: widget.ownerId,
+        availableHeight: widget.availableHeight,
+        onMonthChanged: (next) {
+          ref.read(dateProvider.notifier).state = next;
+        },
+        onDayChanged: (next, events) {
+          ref.read(dateProvider.notifier).state = next;
+          showTuantuanFocusSheet<void>(
+            context: context,
+            title: dayHeading(next),
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                _DayAgenda(date: next, events: eventsOnDay(events, next)),
+              ],
+            ),
+          );
+        },
+      );
+    }
     final tasks = ref.watch(datedRecordsProvider('tasks'));
     final events = <CalendarEvent>[];
     for (final record in tasks.valueOrNull?.items ?? <Record>[]) {
@@ -104,7 +137,7 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
     final selectedEvents = eventsOnDay(events, date);
     void selectDay(DateTime day) {
       final session = ref.read(sessionProvider);
-      ref.read(selectedDateProvider.notifier).state = day;
+      ref.read(dateProvider.notifier).state = day;
       showTuantuanBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -195,8 +228,7 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
         else ...[
           _WeekStrip(
             date: date,
-            onChanged: (day) =>
-                ref.read(selectedDateProvider.notifier).state = day,
+            onChanged: (day) => ref.read(dateProvider.notifier).state = day,
           ),
           const SizedBox(height: 16),
           _DayAgenda(date: date, events: selectedEvents),
@@ -209,6 +241,184 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
 const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 String dayHeading(DateTime day) =>
     '${day.month}月${day.day}日 周${_weekdays[day.weekday - 1]}';
+
+int _monthIndex(DateTime date) => date.year * 12 + date.month - 1;
+
+DateTime _monthFromIndex(int index) => DateTime(index ~/ 12, index % 12 + 1);
+
+class _StableMonthPager extends StatefulWidget {
+  const _StableMonthPager({
+    required this.selectedDate,
+    required this.ownerId,
+    required this.availableHeight,
+    required this.onMonthChanged,
+    required this.onDayChanged,
+  });
+  final DateTime selectedDate;
+  final String? ownerId;
+  final double availableHeight;
+  final ValueChanged<DateTime> onMonthChanged;
+  final void Function(DateTime, List<CalendarEvent>) onDayChanged;
+
+  @override
+  State<_StableMonthPager> createState() => _StableMonthPagerState();
+}
+
+class _StableMonthPagerState extends State<_StableMonthPager> {
+  static const _baseMonth = 2000 * 12;
+  late final PageController _controller = PageController(
+    initialPage: _monthIndex(widget.selectedDate) - _baseMonth,
+  );
+  int? _lastPage;
+
+  @override
+  void didUpdateWidget(covariant _StableMonthPager oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedDate.year == widget.selectedDate.year &&
+        oldWidget.selectedDate.month == widget.selectedDate.month) {
+      return;
+    }
+    if (!_controller.hasClients) return;
+    final target = _monthIndex(widget.selectedDate) - _baseMonth;
+    if (_controller.page?.round() == target) return;
+    _controller.jumpToPage(target);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final height = widget.availableHeight > 0
+        ? widget.availableHeight
+        : MediaQuery.sizeOf(context).width * 1.6;
+    return SizedBox(
+      height: height,
+      child: PageView.builder(
+        key: const ValueKey('calendar-month-timeline'),
+        controller: _controller,
+        scrollDirection: Axis.vertical,
+        physics: const PageScrollPhysics(),
+        onPageChanged: (page) {
+          if (_lastPage == page) return;
+          _lastPage = page;
+          final month = _monthFromIndex(_baseMonth + page);
+          if (_monthIndex(widget.selectedDate) == _monthIndex(month)) return;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) widget.onMonthChanged(month);
+          });
+        },
+        itemBuilder: (context, page) => _StableMonthPage(
+          month: _monthFromIndex(_baseMonth + page),
+          ownerId: widget.ownerId,
+          availableHeight: height,
+          onDayChanged: widget.onDayChanged,
+        ),
+      ),
+    );
+  }
+}
+
+class _StableMonthPage extends ConsumerWidget {
+  const _StableMonthPage({
+    required this.month,
+    required this.ownerId,
+    required this.availableHeight,
+    required this.onDayChanged,
+  });
+  final DateTime month;
+  final String? ownerId;
+  final double availableHeight;
+  final void Function(DateTime, List<CalendarEvent>) onDayChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(
+      calendarMonthTasksProvider((ownerId, _monthIndex(month))),
+    );
+    return state.when(
+      loading: () => const Center(child: SunnyLoadingIndicator()),
+      error: (error, _) => Center(
+        child: _MonthRetry(
+          message: '$error',
+          onPressed: () => ref.invalidate(
+            calendarMonthTasksProvider((ownerId, _monthIndex(month))),
+          ),
+        ),
+      ),
+      data: (page) {
+        final events = _calendarEvents(page.items);
+        return _MonthGrid(
+          date: month,
+          events: events,
+          onChanged: (day) => onDayChanged(day, events),
+          availableHeight: availableHeight,
+        );
+      },
+    );
+  }
+}
+
+class _MonthRetry extends StatelessWidget {
+  const _MonthRetry({required this.message, required this.onPressed});
+  final String message;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => InkResponse(
+    onTap: onPressed,
+    radius: 28,
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('该月记录暂不可用', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 6),
+          Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 6),
+          Text('轻触重试', style: TextStyle(color: SunnyPalette.primaryStrong)),
+        ],
+      ),
+    ),
+  );
+}
+
+List<CalendarEvent> _calendarEvents(Iterable<Record> records) {
+  final events = <CalendarEvent>[];
+  for (final record in records) {
+    final day = businessEventTime(record.fields['deadline']);
+    if (day == null) continue;
+    final start = businessEventTime(record.fields['startAt']);
+    final end = businessEventTime(record.fields['endAt']);
+    final timed =
+        start != null &&
+        end != null &&
+        end.isAfter(start) &&
+        sameDay(start, day);
+    events.add(
+      CalendarEvent(
+        record,
+        day,
+        timed ? start.hour * 60 + start.minute : null,
+        timed
+            ? math.min(
+                1440,
+                end
+                    .difference(DateTime(day.year, day.month, day.day))
+                    .inMinutes,
+              )
+            : null,
+        spanStart: start,
+        spanEnd: day,
+      ),
+    );
+  }
+  return events;
+}
 
 List<CalendarEvent> eventsOnDay(List<CalendarEvent> events, DateTime day) =>
     events
@@ -709,6 +919,7 @@ List<Widget> _monthWeekBars(
     final col = from.difference(weekStart).inDays,
         days = to.difference(from).inDays + 1;
     final starts = sameDay(from, event.firstDay),
+        continuesAtWeekStart = col == 0 && !starts,
         ends = sameDay(to, event.lastDay);
     final recordTop = math.max(
       24.0,
@@ -739,12 +950,15 @@ List<Widget> _monthWeekBars(
             ),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: starts
+              child: starts || continuesAtWeekStart
                   ? SizedBox(
                       width: cellWidth - (col == 0 ? 2 : 0),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 1),
                         child: Text(
+                          key: ValueKey(
+                            'month-span-label:tasks:${event.record.id}:${weekStart.toIso8601String()}',
+                          ),
                           event.record.title.characters.take(6).toString(),
                           semanticsLabel: event.record.title,
                           maxLines: 1,

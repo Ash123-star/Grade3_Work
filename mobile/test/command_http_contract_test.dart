@@ -80,6 +80,8 @@ class CommandAdapter implements HttpClientAdapter {
         draftVersion = draftVersion == 0 ? 9 : draftVersion + 1;
         body = {'id': 'saved-log', 'title': '日报', 'version': draftVersion};
       }
+    } else if (options.path == '/logs/log-1/content' && status == 200) {
+      body = {'id': 'log-1', 'title': '日报', 'version': 6};
     } else if (options.path.endsWith('/submit')) {
       status = submitStatus;
       if (draftVersion != 0 &&
@@ -125,6 +127,24 @@ void main() {
     expect(adapter.requests.single.data, {'version': 5, 'reason': '补充说明'});
   });
 
+  test('diary content update uses the 24h direct-write contract', () async {
+    await repo.execute(
+      'logs',
+      const Command(
+        'update-content',
+        {'id': 'log-1', 'work': '补充了工作结果'},
+        version: 5,
+        idempotencyKey: 'log-edit-v5',
+      ),
+    );
+
+    final request = adapter.requests.last;
+    expect(request.method, 'PUT');
+    expect(request.path, '/logs/log-1/content');
+    expect(request.data, {'work': '补充了工作结果', 'version': 5});
+    expect(request.headers['Idempotency-Key'], 'log-edit-v5');
+  });
+
   test('log reply maps frontend parentCommentId to backend parentId', () async {
     await repo.execute(
       'logs/comments',
@@ -157,7 +177,17 @@ void main() {
           'reviews',
           'approve',
           '/reviews/review-1/decision',
-          {'approve': true, 'reason': ''},
+          {'approve': true, 'reason': '', 'expectedVersion': 5},
+        ),
+        (
+          'reviews',
+          'reject',
+          '/reviews/review-1/decision',
+          {
+            'approve': false,
+            'reason': '补充依据',
+            'expectedVersion': 5,
+          },
         ),
         ('notifications', 'read', '/notifications/message-1/read', null),
       ]) {
@@ -172,6 +202,8 @@ void main() {
           Command(action, {
             'id': id,
             if (resource == 'logs/comments') '评语': '已核对',
+            if (resource == 'reviews' && action == 'reject')
+              '驳回原因': '补充依据',
           }, version: 5),
         );
         expect(adapter.requests.last.path, path);
@@ -440,13 +472,7 @@ void main() {
       ]);
       expect(adapter.requests.first.data, {
         'businessDate': '2026-10-13',
-        'body': {
-          'work': '验收接口',
-          'blockers': '',
-          'tomorrow': '',
-          'hours': 0,
-          'taskIds': [],
-        },
+        'body': {'work': '验收接口'},
         'version': 0,
       });
       expect(adapter.requests.last.data, {'version': 9});
@@ -556,9 +582,9 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 80)),
       );
       await t.pumpAndSettle();
-      await t.enterText(find.byType(TextFormField).first, '不能丢失的工作正文');
+      await t.enterText(find.byType(TextField).first, '不能丢失的工作正文');
       adapter.submitStatus = 503;
-      await t.tap(find.widgetWithText(FilledButton, '提交'));
+      await t.tap(find.text('提交'));
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 80)),
       );
@@ -566,7 +592,7 @@ void main() {
       expect(find.text('无法连接企业服务，请确认后端已启动及连接地址正确'), findsOneWidget);
       expect(
         t
-            .widget<TextFormField>(find.byType(TextFormField).first)
+            .widget<TextField>(find.byType(TextField).first)
             .controller!
             .text,
         '不能丢失的工作正文',
@@ -581,13 +607,13 @@ void main() {
       await t.pumpAndSettle();
       expect(
         t
-            .widget<TextFormField>(find.byType(TextFormField).first)
+            .widget<TextField>(find.byType(TextField).first)
             .controller!
             .text,
         '不能丢失的工作正文',
       );
       adapter.submitStatus = 200;
-      await t.tap(find.widgetWithText(FilledButton, '提交'));
+      await t.tap(find.text('提交'));
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 80)),
       );

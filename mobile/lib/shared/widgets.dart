@@ -9,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
-import 'package:pandora_mobile/core/config.dart';
 import 'paper_layout.dart';
 import 'generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
@@ -236,18 +235,7 @@ class PageFrame extends StatelessWidget {
 class DemoLabel extends StatelessWidget {
   const DemoLabel({super.key});
   @override
-  Widget build(BuildContext context) => AppConfig.mock
-      ? const Padding(
-          padding: EdgeInsets.only(top: 8, bottom: 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '演示数据 · 未连接企业服务',
-              style: TextStyle(fontSize: 11, color: CuteTokens.muted),
-            ),
-          ),
-        )
-      : const SizedBox.shrink();
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 class RecordList extends ConsumerWidget {
@@ -319,7 +307,8 @@ Color _resourceAccent(BuildContext context, String resource) =>
     };
 
 class DateControls extends ConsumerWidget {
-  const DateControls({super.key});
+  const DateControls({super.key, this.showTaskManagement = false});
+  final bool showTaskManagement;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final date = ref.watch(selectedDateProvider),
@@ -334,12 +323,20 @@ class DateControls extends ConsumerWidget {
       onChanged: (i) =>
           ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
     );
-    final today = TextButton.icon(
-      onPressed: () =>
-          ref.read(selectedDateProvider.notifier).state = DateTime.now(),
-      icon: const Icon(Icons.today_outlined, size: 18),
-      label: const Text('今天'),
-    );
+    void todayAction() {
+      ref.read(selectedDateProvider.notifier).state = DateTime.now();
+    }
+    final Widget today = showTaskManagement
+        ? _DateControlAction(
+            label: '今天',
+            icon: Icons.today_outlined,
+            onPressed: todayAction,
+          )
+        : TextButton.icon(
+            onPressed: todayAction,
+            icon: const Icon(Icons.today_outlined, size: 18),
+            label: const Text('今天'),
+          );
     return Column(
       children: [
         Row(
@@ -392,9 +389,82 @@ class DateControls extends ConsumerWidget {
           ],
         ),
         tabs,
-        Align(alignment: Alignment.centerRight, child: today),
+        if (showTaskManagement)
+          Row(
+            children: [
+              Expanded(
+                child: _DateControlAction(
+                  label: '任务管理',
+                  icon: Icons.table_rows_rounded,
+                  onPressed: () => context.push('/me/tasks'),
+                  emphasized: false,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: today),
+            ],
+          )
+        else
+          Align(alignment: Alignment.centerRight, child: today),
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+class _DateControlAction extends StatelessWidget {
+  const _DateControlAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.emphasized = true,
+  });
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: emphasized ? colors.primaryContainer : colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: colors.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: colors.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

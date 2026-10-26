@@ -15,7 +15,6 @@ import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/data/repositories/complete_list.dart';
 import 'package:pandora_mobile/shared/diary_task_links.dart';
-import 'package:pandora_mobile/shared/diary_read_receipt.dart';
 
 class AiGraph extends ConsumerStatefulWidget {
   const AiGraph({super.key});
@@ -56,10 +55,6 @@ class _AiGraphState extends ConsumerState<AiGraph> {
                   onChanged: (v) => setState(() => search = v),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  '预设关系样例 · 紫色为建议，蓝色为显式来源；可缩放，列表提供相同入口',
-                  style: TextStyle(color: CuteTokens.muted, fontSize: 12),
-                ),
                 const SizedBox(height: 12),
                 if (items.isEmpty)
                   const EmptyIllustration(title: '暂无匹配关系', subtitle: '可以更换搜索条件')
@@ -468,11 +463,6 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
               ],
             ),
           ),
-          const SectionHeader('统计说明'),
-          const Text(
-            '派发数量按创建日期；逾期与验收按截止日期筛选。日报分母按所选天数 × 人员数计算（演示包含周末）。按期验收率 = 截止日处于所选周期且按期验收的任务 / 该周期到期任务。',
-          ),
-          Text('本地计算时间：${DateTime.now().toString().substring(0, 16)}'),
           const DemoLabel(),
         ],
       ),
@@ -499,11 +489,11 @@ class _HelpPageState extends State<HelpPage> {
     ('员工 · 如何填写日志', '进入日志，选择日期，点击写日志。输入今日工作、问题与下一步计划，草稿自动保存，提交后可查看详情。'),
     (
       '员工 · 如何处理任务',
-      '打开任务详情，按当前权限接收任务、提交成果反馈，派发者阅读成果后验收。正式服务目前不支持退回补充；演示流程不代表真实任务已改变。',
+      '打开任务详情，按当前权限接收任务并提交成果反馈，由派发者查看成果后验收。需要补充信息时，可先在任务评论中沟通。',
     ),
     ('管理者 · 派发任务与查看下属', '在导图右下角派发任务，选择主负责人。进入日志 → 下属日志，选择成员查看已提交内容。'),
-    ('管理者 · 审核规则', '在我的 → 审批中心查看修改前后内容，逐级通过或填写驳回理由。不能审核本人申请。'),
-    ('管理员 · 组织与权限', '在我的 → 组织与权限设置维护部门、人员归属和角色。关键变更提交候选，独立审核通过前原配置继续生效。'),
+    ('管理者 · 审核规则', '在我的 → 审批中心查看修改前后内容，由组织中配置的直属上级单级审核；驳回时须填写理由。不能审核本人申请。'),
+    ('管理员 · 组织与权限', '在我的 → 组织与权限设置维护部门、人员归属和角色。关键变更由配置的直属上级单级审核，审核通过前原配置继续生效。'),
     ('登录失败或权限不足', '检查账号与密码和企业服务连接。注册申请只能创建待确认员工；管理员确认部门前无法读取业务资料。权限由企业服务校验。'),
     ('日志保存失败与审核驳回', '保留本地草稿，恢复网络后重试。申请被驳回时查看审核意见，调整内容后重新提交。'),
     (
@@ -567,7 +557,7 @@ class _HelpPageState extends State<HelpPage> {
                 ? () => openForm(context, 'support')
                 : () => notice(context, '问题反馈服务尚未接入，当前不能发送反馈'),
             icon: const Icon(Icons.chat_bubble_outline),
-            label: Text(AppConfig.mock ? '演示问题反馈' : '查看问题反馈说明'),
+            label: const Text('问题反馈'),
           ),
           if (!AppConfig.mock)
             const Padding(
@@ -578,7 +568,7 @@ class _HelpPageState extends State<HelpPage> {
             onPressed: AppConfig.mock
                 ? () => openList(context, 'feedback')
                 : () => notice(context, '问题反馈服务尚未接入，当前不能查询处理进度'),
-            child: Text(AppConfig.mock ? '我的反馈与处理进度' : '反馈处理进度（待接入）'),
+            child: const Text('我的反馈与处理进度'),
           ),
         ],
       ),
@@ -739,8 +729,6 @@ class LogHistory extends ConsumerWidget {
                     );
                   },
                 ),
-            const SectionHeader('阅读记录'),
-            DiaryReadingHistory(r),
           ],
         ),
       );

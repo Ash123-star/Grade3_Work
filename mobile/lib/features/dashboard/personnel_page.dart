@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -137,11 +138,24 @@ class _PersonnelPageState extends ConsumerState<PersonnelPage> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _PersonnelCard(
                           person: person,
-                          onTap: () => context.push(
-                            current.manager && person.id != current.id
-                                ? '/me/team/${encode(person.id)}'
-                                : '/me/profile',
-                          ),
+                          onTap: () {
+                            if (current.manager && person.id != current.id) {
+                              final month = ref.read(
+                                memberCalendarDateProvider(person.id),
+                              );
+                              unawaited(
+                                ref.read(
+                                  calendarMonthTasksProvider((
+                                    person.id,
+                                    month.year * 12 + month.month - 1,
+                                  )).future,
+                                ),
+                              );
+                              context.push('/me/team/${encode(person.id)}');
+                            } else {
+                              context.push('/me/profile');
+                            }
+                          },
                         ),
                       ),
                   ],

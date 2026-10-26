@@ -8,6 +8,12 @@
   "servers" : [ {
     "url" : "/"
   } ],
+  "x-mobile-contract" : {
+    "status" : "PROPOSED",
+    "overlay" : "docs/mobile-openapi-contract.yaml",
+    "mergeStrategy" : "path-and-component-overlay",
+    "description" : "移动端真实 HTTP 调用的补充协议。覆盖文件对列出的 path、operation 和 schema 具有权威定义，补齐任务区间/接收卡片、日志日期范围/成员月状态/24小时正文编辑、多维统计汇总/钻取/导出过滤、个人资料字段及统一分页字段；服务端实现前不得将 PROPOSED 路径报告为已上线。实现后须合并回运行时 SpringDoc 与本快照。"
+  },
   "security" : [ {
     "bearer" : [ ]
   } ],
@@ -849,6 +855,7 @@
           "name" : "date",
           "in" : "query",
           "required" : false,
+          "description" : "Asia/Shanghai 业务日期，格式 YYYY-MM-DD；与 period 组合筛选任务区间相交记录。月范围覆盖月历可见周。",
           "schema" : {
             "type" : "string"
           }
@@ -856,6 +863,7 @@
           "name" : "period",
           "in" : "query",
           "required" : false,
+          "description" : "day/week/month；任务 start_at < 范围结束且 deadline >= 范围开始时命中。",
           "schema" : {
             "type" : "string",
             "default" : "day"

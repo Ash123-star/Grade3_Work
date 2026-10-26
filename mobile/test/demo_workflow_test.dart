@@ -182,9 +182,10 @@ void main() {
     },
   );
   test(
-    'daily log is unique and revisions only apply after full review',
+    'daily log is unique and in-window edits apply without review',
     () async {
       final store = DemoStore();
+      final now = DateTime.utc(2026, 9, 23, 4);
       final employee = MockRepository(
         const Session(
           id: 'u2',
@@ -193,8 +194,13 @@ void main() {
           dispatch: false,
         ),
         store: store,
+        clock: () => now,
       );
-      final manager = MockRepository(const Session(), store: store);
+      final manager = MockRepository(
+        const Session(),
+        store: store,
+        clock: () => now,
+      );
       const date = '2026-09-23';
       final first = await employee.execute(
         'logs',
@@ -217,23 +223,16 @@ void main() {
           isA<ApiFailure>().having((e) => e.kind, 'kind', FailureKind.conflict),
         ),
       );
-      var request = await employee.execute(
+      final edited = await employee.execute(
         'logs',
-        Command('request-review', {
+        Command('update-content', {
           'id': first.id,
-          '今日工作': '修订内容',
-          '修改理由': '补充记录',
+          'work': '修订内容',
         }, version: first.version),
       );
-      expect((await employee.detail('logs', first.id)).fields['今日工作'], '原始内容');
-      for (var i = 0; i < 3; i++) {
-        request = await manager.execute(
-          'reviews',
-          Command('approve', {'id': request.id}, version: request.version),
-        );
-      }
-      expect(request.fields['reviewState'], '已通过');
       expect((await employee.detail('logs', first.id)).fields['今日工作'], '修订内容');
+      expect(edited.fields['submittedAt'], first.fields['submittedAt']);
+      expect((await manager.list('reviews', const Query())).items, isEmpty);
       final subordinate = (await manager.list(
         'logs/subordinates',
         const Query(ownerId: 'u2'),

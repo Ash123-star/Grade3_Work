@@ -17,8 +17,11 @@ import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
 import 'package:pandora_mobile/features/dashboard/personnel_page.dart';
-import 'package:pandora_mobile/features/dashboard/task_management_page.dart';
+import 'package:pandora_mobile/features/dashboard/task_management_page.dart'
+    show ReceivedTasksPage;
+import 'package:pandora_mobile/features/dashboard/task_management_table.dart';
 import 'package:pandora_mobile/features/dashboard/own_profile_page.dart';
+import 'package:pandora_mobile/features/dashboard/diary_composer_sheet.dart';
 import 'package:pandora_mobile/core/state/session_lifecycle.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/features/dashboard/management_page.dart';
@@ -318,7 +321,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/form/:kind',
-        builder: (_, s) => managementKinds.contains(s.pathParameters['kind'])
+        builder: (_, s) =>
+            ['log-edit', 'log-revise'].contains(s.pathParameters['kind'])
+            ? DiaryComposerRoutePage(
+                key: ValueKey('${s.uri}:${ref.read(sessionProvider).id}'),
+                id: s.uri.queryParameters['id'],
+                version: int.tryParse(s.uri.queryParameters['version'] ?? ''),
+              )
+            : managementKinds.contains(s.pathParameters['kind'])
             ? ManagementPage(
                 s.pathParameters['kind']!,
                 memberId: s.uri.queryParameters['id'],
@@ -350,9 +360,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/guide', builder: (_, _) => const GuidePage()),
       GoRoute(
         path: '/me/statistics',
-        builder: (_, _) => AppConfig.mock
-            ? const AnalyticsPage()
-            : const ServerAnalyticsPage(),
+        builder: (_, _) => const ServerAnalyticsPage(),
       ),
       GoRoute(path: '/export', builder: (_, _) => const AnalyticsExportPage()),
       GoRoute(path: '/me/settings', builder: (_, _) => const SettingsPage()),
