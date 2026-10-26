@@ -72,3 +72,20 @@
 
 - **WHEN** 已批准任务的参与人接收并反馈，派发人验收并归档
 - **THEN** 系统 SHALL 保持既有生命周期状态机、事件时间线和乐观锁语义
+
+### Requirement: Flutter 任务契约映射
+
+移动端任务数据层 SHALL 使用任务参与人和审核创建的公开接口契约，且 MUST NOT 在创建或修改候选中发送、持久化或将 `ownerId`、`collaborators`、`progressNote` 解释为任务角色或进度。旧单人转派输入只可转换为单元素 `participants` 集合。该接入 MUST NOT 修改页面、布局或导航。
+
+#### Scenario: 移动端提交创建或修改候选
+
+- **WHEN** 移动端提交任务创建或修改候选
+- **THEN** 请求 SHALL 使用 `participants`、可选 `labelId`、可选 `startAt` 和带时区的 `deadline`
+- **AND** 创建响应 SHALL 被识别为待审申请，客户端不得将其作为已生效任务操作
+
+#### Scenario: 移动端读取任务
+
+- **WHEN** 移动端读取任务详情或列表
+- **THEN** 数据层 SHALL 映射服务端返回的 `participants`、`label`、`start_at` 和 `deadline`
+- **AND** 标签颜色 SHALL 直接使用服务端返回值
+- **AND** 任务列表数据层 MUST NOT 接收、返回或显示完成情况、阶段或替代状态字段；任务详情仅可根据事件时间线提供既有操作所需的本地展示状态

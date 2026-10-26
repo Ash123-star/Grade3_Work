@@ -107,7 +107,13 @@ class AttachmentAdapter implements HttpClientAdapter {
       }
       data = profile;
     } else if (o.path == '/tasks' && o.method == 'POST') {
-      data = {'id': 'task-created', 'title': '附件任务', 'version': 1};
+      data = {
+        'id': 'review-created',
+        'kind': 'TASK_CREATE',
+        'target_id': 'task-created',
+        'applicant_id': 'u1',
+        'status': 'PENDING',
+      };
     } else if (o.path == '/tasks/task') {
       data = {
         'id': 'task',
@@ -262,20 +268,22 @@ void main() {
     },
   );
   test(
-    'actual attachment/collaborator IDs and feedback blocker text use existing supported contracts',
+    'actual attachment and participant IDs and feedback blocker text use supported contracts',
     () async {
       await repo.execute(
         'tasks',
         const Command('create', {
           'title': '任务',
-          'ownerId': 'first',
+          'participantIds': ['first', 'second'],
           'attachments': ['uploaded'],
-          'collaborators': ['second'],
           'deadline': '2026-10-30T18:00:00+08:00',
         }, idempotencyKey: 'idem'),
       );
       expect((adapter.requests.last.data as Map)['attachments'], ['uploaded']);
-      expect((adapter.requests.last.data as Map)['collaborators'], ['second']);
+      expect((adapter.requests.last.data as Map)['participants'], [
+        'first',
+        'second',
+      ]);
       await repo.execute(
         'tasks',
         const Command('feedback', {
@@ -658,7 +666,6 @@ void main() {
                   .data
               as Map;
       expect(body['participants'], ['first', 'second']);
-      expect(body.containsKey('participantIds'), false);
       expect(body['attachments'], ['uploaded-1']);
       expect(body.keys.contains('status'), isFalse);
       await close(t);
