@@ -92,14 +92,6 @@ class TuantuanAssets {
     'success': 'assets/generated_ui/icons/success.png',
   };
 
-  static const mascots = <String, String>{
-    'welcome': 'assets/generated_ui/mascot/mascot_welcome.png',
-    'empty': 'assets/generated_ui/mascot/mascot_empty.png',
-    'error': 'assets/generated_ui/mascot/mascot_error.png',
-    'success': 'assets/generated_ui/mascot/mascot_success.png',
-    'ai': 'assets/generated_ui/mascot/mascot_ai_processing.png',
-  };
-
   static const decorations = <String, String>{
     'leaf_cluster': 'assets/generated_ui/decorations/leaf_cluster.png',
     'washi_tape': 'assets/generated_ui/decorations/washi_tape.png',
@@ -116,7 +108,6 @@ class TuantuanAssets {
     'confetti_cluster': 'assets/generated_ui/decorations/confetti_cluster.png',
     'sun_arc': 'assets/generated_ui/decorations/sun_arc.png',
     'mint_blob': 'assets/generated_ui/decorations/mint_blob.png',
-    'pig_tail_mark': 'assets/generated_ui/decorations/pig_tail_mark.png',
   };
   static const aiAssets = <String, String>{
     'thinking': '$newPack/ai/thinking_cluster.png',
@@ -143,6 +134,103 @@ class TuantuanAssets {
     'lavender': '$newPack/calendar/record_pills/pill_purple.png',
     'blue': '$newPack/calendar/record_pills/pill_blue.png',
   };
+}
+
+class DogAssets {
+  static const root = 'assets/generated_ui/dog';
+
+  // Stable art direction, zero-based indices; see dog/manifest.json usage.
+  static const calm = 0;
+  static const friendly = 10;
+  static const smiling = 15;
+  static const sitting = 6;
+  static const resting = 9;
+  static const peeking = 15;
+  static const faceWatermark = 2;
+  static const restingWatermark = 3;
+  static const weekdayAvatars = <int>[3, 7, 8, 9, 10, 11, 15];
+  static const todayAvatar = 14;
+
+  static String avatar(int index) =>
+      '$root/avatars/avatar_${_number(index)}.png';
+  static String pose(int index) => '$root/poses/pose_${_number(index)}.png';
+  static String background(int index) =>
+      '$root/backgrounds/background_${_number(index)}.png';
+
+  static String _number(int index) =>
+      (index % 16 + 1).toString().padLeft(2, '0');
+}
+
+class DogAvatar extends StatelessWidget {
+  const DogAvatar({super.key, this.index = 0, this.size = 32});
+  final int index;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: IgnorePointer(child: Image.asset(
+      DogAssets.avatar(index),
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (_, _, _) => _missingDogArt(
+        DogAssets.avatar(index), width: size, height: size,
+      ),
+    )),
+  );
+}
+
+class DogPose extends StatelessWidget {
+  const DogPose({super.key, this.index = 0, this.size = 72});
+  final int index;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: IgnorePointer(child: Image.asset(
+      DogAssets.pose(index),
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (_, _, _) => _missingDogArt(
+        DogAssets.pose(index), width: size, height: size,
+      ),
+    )),
+  );
+}
+
+class DogBackground extends StatelessWidget {
+  const DogBackground({
+    super.key,
+    this.index = 0,
+    this.opacity = .7,
+    this.fit = BoxFit.contain,
+  });
+  final int index;
+  final double opacity;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: IgnorePointer(
+      child: ClipRect(child: Opacity(
+        opacity: opacity,
+        child: Image.asset(
+          DogAssets.background(index),
+          fit: fit,
+          errorBuilder: (_, _, _) => _missingDogArt(DogAssets.background(index)),
+        ),
+      )),
+    ),
+  );
+}
+
+Widget _missingDogArt(String path, {double? width, double? height}) {
+  assert(() {
+    debugPrint('Brand decoration could not load: $path');
+    return true;
+  }());
+  return SizedBox(width: width, height: height);
 }
 
 /// Raster borders keep their original proportions as blank centers stretch.
@@ -268,29 +356,6 @@ class TuantuanIcon extends StatelessWidget {
       image: true,
       label: '$name 图标',
       child: Image.asset(path, width: size, height: size, fit: fit),
-    );
-  }
-}
-
-class TuantuanMascot extends StatelessWidget {
-  const TuantuanMascot(
-    this.pose, {
-    super.key,
-    this.size = 96,
-    this.fit = BoxFit.contain,
-  });
-  final String pose;
-  final double size;
-  final BoxFit fit;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = TuantuanAssets.mascots[pose];
-    if (path == null) return SizedBox(width: size, height: size);
-    return ExcludeSemantics(
-      child: IgnorePointer(
-        child: Image.asset(path, width: size, height: size, fit: fit),
-      ),
     );
   }
 }

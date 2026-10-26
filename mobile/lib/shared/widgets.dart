@@ -4,11 +4,11 @@ export 'page_states.dart';
 export 'sunny_button.dart';
 import 'page_states.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
-import 'package:pandora_mobile/core/config.dart';
 import 'paper_layout.dart';
 import 'generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
@@ -31,68 +31,54 @@ void openForm(
   String form, {
   String? id,
   int? version,
-}) => context.push(
-  '/form/$form${id == null ? '' : '?id=${encode(id)}&version=${version ?? 1}'}',
-);
+  bool restoreDiaryDraft = false,
+}) {
+  final query = [
+    if (id != null) 'id=${encode(id)}',
+    if (id != null) 'version=${version ?? 1}',
+    if (restoreDiaryDraft) 'draftSource=diary',
+  ].join('&');
+  context.push('/form/$form${query.isEmpty ? '' : '?$query'}');
+}
+
 void notice(BuildContext context, String text, {bool success = false}) =>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(
             color: success
-                ? SunnyPalette.primaryStrong.withValues(alpha: .3)
-                : const Color(0xFFE0A3A3),
+                ? const Color(0xFFB9DED0)
+                : Theme.of(context).colorScheme.error.withValues(alpha: .28),
           ),
         ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: success
+            ? const Color(0xFFEAF6F0)
+            : Theme.of(context).colorScheme.errorContainer,
+        elevation: 2,
         closeIconColor: Theme.of(context).colorScheme.onSurface,
         showCloseIcon: true,
-        content: Stack(
+        content: Row(
           children: [
-            Positioned.fill(
-              child: TuantuanSkin(
-                TuantuanAssets.feedbackSkins[success ? 'success' : 'error']!,
-              ),
+            Icon(
+              success ? Icons.check_circle_outline : Icons.error_outline,
+              color: success
+                  ? SunnyPalette.successInk
+                  : Theme.of(context).colorScheme.error,
+              size: 22,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: success
-                  ? Row(
-                      children: [
-                        const TuantuanMascot('success', size: 34),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            text,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onTertiaryContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        const Icon(
-                          Icons.error_rounded,
-                          color: SunnyPalette.brandOrange,
-                          size: 28,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            text,
-                            style: const TextStyle(color: SunnyPalette.ink),
-                          ),
-                        ),
-                      ],
-                    ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: success
+                      ? const Color(0xFF246447)
+                      : Theme.of(context).colorScheme.onErrorContainer,
+                ),
+              ),
             ),
           ],
         ),
@@ -112,19 +98,27 @@ class PageBody extends StatelessWidget {
   final ScrollController? controller;
   final Widget? header;
   @override
-  Widget build(BuildContext context) => TuantuanPaperBackdrop(
-    child: Align(
+  Widget build(BuildContext context) {
+    final content = Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
         child: ListView(
           controller: controller,
-          padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
-          children: [?header, ...children],
+          padding: EdgeInsets.only(top: 8, bottom: bottomPadding),
+          children: [
+            ?header,
+            for (final child in children)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: child,
+              ),
+          ],
         ),
       ),
-    ),
-  );
+    );
+    return TuantuanPaperBackdrop(child: content);
+  }
 }
 
 class PageFrame extends StatelessWidget {
@@ -132,37 +126,80 @@ class PageFrame extends StatelessWidget {
     super.key,
     required this.title,
     required this.child,
+    this.showTitle = true,
     this.actions,
     this.fab,
     this.bottom,
   });
   final String title;
   final Widget child;
+  final bool showTitle;
   final List<Widget>? actions;
   final Widget? fab;
   final Widget? bottom;
   @override
   Widget build(BuildContext context) {
     final canGoBack = Navigator.of(context).canPop();
-    final header = canGoBack || (actions?.isNotEmpty ?? false)
-        ? ConstrainedBox(
-            key: const ValueKey('page-scroll-actions'),
+    final headerContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showTitle || canGoBack)
+          ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (canGoBack) const BackButton(),
-                Expanded(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: actions ?? const [],
-                  ),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: canGoBack ? const BackButton() : null,
                 ),
+                if (showTitle) ...[
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const DogAvatar(index: DogAssets.friendly, size: 30),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleLarge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
               ],
             ),
+          ),
+        if (actions?.isNotEmpty ?? false)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ConstrainedBox(
+              key: const ValueKey('page-scroll-actions'),
+              constraints: const BoxConstraints(minHeight: 40),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: actions!,
+              ),
+            ),
+          ),
+      ],
+    );
+    final header = showTitle || canGoBack || (actions?.isNotEmpty ?? false)
+        ? Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: headerContent,
           )
-        : null;
+        : const SizedBox.shrink();
     final content = child;
     return Scaffold(
       body: SafeArea(
@@ -173,14 +210,12 @@ class PageFrame extends StatelessWidget {
                 header: header,
                 children: content.children,
               )
-            : header == null
-            ? TuantuanPaperBackdrop(child: content)
             : TuantuanPaperBackdrop(
-                child: NestedScrollView(
-                  headerSliverBuilder: (_, _) => [
-                    SliverToBoxAdapter(child: header),
+                child: Column(
+                  children: [
+                    header,
+                    Expanded(child: content),
                   ],
-                  body: content,
                 ),
               ),
       ),
@@ -200,18 +235,7 @@ class PageFrame extends StatelessWidget {
 class DemoLabel extends StatelessWidget {
   const DemoLabel({super.key});
   @override
-  Widget build(BuildContext context) => AppConfig.mock
-      ? const Padding(
-          padding: EdgeInsets.only(top: 8, bottom: 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '演示数据 · 未连接企业服务',
-              style: TextStyle(fontSize: 11, color: CuteTokens.muted),
-            ),
-          ),
-        )
-      : const SizedBox.shrink();
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 class RecordList extends ConsumerWidget {
@@ -278,12 +302,13 @@ Color _resourceAccent(BuildContext context, String resource) =>
       'logs' || 'logs/subordinates' => SunnyPalette.coral,
       'notifications' => SunnyPalette.blue,
       'reviews' => SunnyPalette.purple,
-      'organization' => SunnyPalette.mint,
+      'organization' => SunnyPalette.primaryContainer,
       _ => Theme.of(context).colorScheme.surface,
     };
 
 class DateControls extends ConsumerWidget {
-  const DateControls({super.key});
+  const DateControls({super.key, this.showTaskManagement = false});
+  final bool showTaskManagement;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final date = ref.watch(selectedDateProvider),
@@ -292,6 +317,26 @@ class DateControls extends ConsumerWidget {
         ref.read(selectedDateProvider.notifier).state = period == '月'
         ? DateTime(date.year, date.month + direction, 1)
         : date.add(Duration(days: direction * (period == '周' ? 7 : 1)));
+    final tabs = PillTabs(
+      labels: const ['日', '周', '月'],
+      selected: ['日', '周', '月'].indexOf(period),
+      onChanged: (i) =>
+          ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
+    );
+    void todayAction() {
+      ref.read(selectedDateProvider.notifier).state = DateTime.now();
+    }
+    final Widget today = showTaskManagement
+        ? _DateControlAction(
+            label: '今天',
+            icon: Icons.today_outlined,
+            onPressed: todayAction,
+          )
+        : TextButton.icon(
+            onPressed: todayAction,
+            icon: const Icon(Icons.today_outlined, size: 18),
+            label: const Text('今天'),
+          );
     return Column(
       children: [
         Row(
@@ -304,25 +349,35 @@ class DateControls extends ConsumerWidget {
             Expanded(
               child: TextButton(
                 onPressed: () async {
-                  final next = await showDatePicker(
+                  final next = await showCalendarDateWheel(
                     context: context,
                     initialDate: date,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2040),
                   );
                   if (next != null) {
                     ref.read(selectedDateProvider.notifier).state = next;
                   }
                 },
-                child: Text(
-                  period == '月'
-                      ? '${date.year}年${date.month}月'
-                      : '${date.month}月${date.day}日${period == '周' ? ' · 本周' : ''}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: CuteTokens.ink,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          period == '月'
+                              ? '${date.year}年${date.month}月'
+                              : '${date.month}月${date.day}日${period == '周' ? ' · 本周' : ''}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: CuteTokens.ink,
+                          ),
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down, color: CuteTokens.ink),
+                  ],
                 ),
               ),
             ),
@@ -333,14 +388,142 @@ class DateControls extends ConsumerWidget {
             ),
           ],
         ),
-        PillTabs(
-          labels: const ['日', '周', '月'],
-          selected: ['日', '周', '月'].indexOf(period),
-          onChanged: (i) =>
-              ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
-        ),
+        tabs,
+        if (showTaskManagement)
+          Row(
+            children: [
+              Expanded(
+                child: _DateControlAction(
+                  label: '任务管理',
+                  icon: Icons.table_rows_rounded,
+                  onPressed: () => context.push('/me/tasks'),
+                  emphasized: false,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: today),
+            ],
+          )
+        else
+          Align(alignment: Alignment.centerRight, child: today),
         const SizedBox(height: 8),
       ],
     );
   }
+}
+
+class _DateControlAction extends StatelessWidget {
+  const _DateControlAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.emphasized = true,
+  });
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: emphasized ? colors.primaryContainer : colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: colors.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: colors.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<DateTime?> showCalendarDateWheel({
+  required BuildContext context,
+  required DateTime initialDate,
+}) {
+  var selected = DateTime(initialDate.year, initialDate.month, initialDate.day);
+  return showModalBottomSheet<DateTime>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: SizedBox(
+        height: 340,
+        child: Column(
+          children: [
+            Expanded(
+              child: CupertinoTheme(
+                data: const CupertinoThemeData(
+                  primaryColor: SunnyPalette.primaryStrong,
+                ),
+                child: CupertinoDatePicker(
+                  key: const ValueKey('calendar-date-wheel'),
+                  mode: CupertinoDatePickerMode.date,
+                  dateOrder: DatePickerDateOrder.ymd,
+                  initialDateTime: selected,
+                  minimumYear: 2020,
+                  maximumYear: 2040,
+                  onDateTimeChanged: (value) => selected = value,
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    key: const ValueKey('calendar-date-cancel'),
+                    onPressed: () => Navigator.pop(sheetContext),
+                    child: const Text('取消'),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton(
+                    key: const ValueKey('calendar-date-confirm'),
+                    onPressed: () => Navigator.pop(sheetContext, selected),
+                    child: const Text('确定'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

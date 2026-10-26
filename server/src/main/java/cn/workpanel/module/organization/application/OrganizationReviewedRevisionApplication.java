@@ -35,10 +35,11 @@ public class OrganizationReviewedRevisionApplication implements ReviewedRevision
             case "REVIEWER" -> Db.conflict(db.update("UPDATE users SET company_reviewer=true,version=version+1 WHERE id=? AND company_id=? AND status='ACTIVE' AND version=?",target,approver.company(),v));
             case "USER" -> {
                 applicant.requireAdmin(); OrganizationValidation.validateUser(db,approver.company(),target,c);
+                String previousRole=Db.str(db.one("SELECT role FROM users WHERE id=? AND company_id=? FOR UPDATE",target,approver.company()),"role");
                 Db.conflict(db.update("UPDATE users SET name=?,department_id=?,team_id=?,role=?,status=?,dispatch_enabled=?,company_reviewer=?,version=version+1 WHERE id=? AND company_id=? AND version=?",Db.required(c,"name"),nullable(c,"departmentId"),nullable(c,"teamId"),Db.required(c,"role"),Db.required(c,"status"),c.get("dispatchEnabled"),c.get("companyReviewer"),target,approver.company(),v));
                 db.update("UPDATE user_roles SET role_id=? WHERE user_id=?",c.get("role"),target);
                 db.update("DELETE FROM reporting_relations WHERE employee_id=?",target); if(!Db.str(c,"managerId").isBlank()) db.update("INSERT INTO reporting_relations VALUES (?,?,?)",target,c.get("managerId"),approver.company());
-                if(c.get("status").equals("DISABLED")) db.update("DELETE FROM sessions WHERE user_id=?",target);
+                if(c.get("status").equals("DISABLED")||!previousRole.equals(c.get("role"))) db.update("DELETE FROM sessions WHERE user_id=?",target);
             }
             case "DEPARTMENT","TEAM" -> {
                 applicant.requireAdmin(); String table=kind.equals("TEAM")?"teams":"departments";

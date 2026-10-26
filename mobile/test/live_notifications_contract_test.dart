@@ -288,15 +288,23 @@ void main() {
       }
     },
   );
-  testWidgets('tree scoped search and refresh403 clears all names', (t) async {
+  testWidgets('personnel scoped search and refresh403 clears all names', (
+    t,
+  ) async {
     final a = LiveAdapter();
-    final c = await launchLive(t, a, route: '/me/organization');
+    final c = await launchLive(t, a, route: '/me/people');
     await t.enterText(find.byType(TextField), '最后一页');
     await t.pumpAndSettle();
     expect(find.text('最后一页成员或重点'), findsOneWidget);
     a.laterForbidden = true;
-    c.invalidate(organizationTreeProvider);
+    c.invalidate(recordsProvider('organization'));
+    await settleLocalIo(t);
     await t.pumpAndSettle();
+    await t.scrollUntilVisible(
+      find.text('无权访问'),
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('无权访问'), findsOneWidget);
     expect(find.text('最后一页成员或重点'), findsNothing);
     expect(find.text('产品部'), findsNothing);

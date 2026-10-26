@@ -185,7 +185,7 @@ void main() {
       ('10-transfer', '/form/transfer?id=1&version=1'),
       ('11-profile-document', '/me/profile'),
       ('12-history-document', '/history/1/version/1'),
-      ('13-organization', '/me/organization'),
+      ('13-personnel', '/me/people'),
       ('14-settings', '/me/settings'),
       ('15-help', '/me/help'),
       ('16-log-reader', '/item/logs/1'),

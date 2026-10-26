@@ -10,6 +10,7 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/ai_repository.dart';
 import 'package:pandora_mobile/features/common/form_page.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
@@ -312,7 +313,6 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
   Record? owner;
   final collaborators = <String, Record>{};
   DateTime? deadline;
-  String urgency = 'NORMAL';
   List<UploadedAttachment> files = [];
   String? successfulId;
   String? attemptedPayload, attemptedKey;
@@ -396,16 +396,16 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
   }
 
   Future<void> pickDeadline() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
+    final date = await showPremiumDatePicker(
+      context,
+      initial: DateTime.now().add(const Duration(days: 1)),
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
     );
     if (!mounted || !alive || date == null) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 18, minute: 0),
+    final time = await showPremiumTimePicker(
+      context,
+      initial: const TimeOfDay(hour: 18, minute: 0),
     );
     if (alive && time != null) {
       setState(
@@ -463,9 +463,8 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
       'title': title.text.trim(),
       'content': content.text.trim(),
       'group': group.text.trim(),
-      'progressNote': progress.text.trim(),
-      'urgency': urgency,
       'ownerId': owner!.id,
+      'urgency': 'NORMAL',
       'deadline': deadline!.toUtc().toIso8601String(),
       'collaborators': collaborators.keys.toList(),
       'attachments': files.map((f) => f.id).toList(),
@@ -574,19 +573,6 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
                     controller: group,
                     enabled: !busy && successfulId == null,
                     decoration: const InputDecoration(labelText: '所属分组'),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    initialValue: urgency,
-                    decoration: const InputDecoration(labelText: '紧急程度'),
-                    items: const [
-                      DropdownMenuItem(value: 'URGENT', child: Text('紧急')),
-                      DropdownMenuItem(value: 'NORMAL', child: Text('普通')),
-                      DropdownMenuItem(value: 'LOW', child: Text('不紧急')),
-                    ],
-                    onChanged: busy || successfulId != null
-                        ? null
-                        : (v) => setState(() => urgency = v!),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

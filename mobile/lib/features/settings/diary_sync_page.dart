@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,8 @@ import '../../data/models/diary_task_links.dart';
 import '../../data/repositories/complete_list.dart';
 import '../../shared/paper_layout.dart';
 import '../../shared/widgets.dart';
+import '../../shared/premium_pickers.dart';
+import '../dashboard/diary_composer_sheet.dart';
 
 String diaryDayKey(DateTime day) => DraftLocation.diary('', day).object;
 
@@ -134,11 +137,23 @@ class _DiarySyncPageState extends ConsumerState<DiarySyncPage> {
         ? query.$3
         : snapshot.local?.serverVersion ?? server?.version;
     final carryDiary = submitted && widget.id == null && snapshot.local != null;
-    context.push(
-      '/form/${submitted ? "log-revise" : "log-edit"}'
-      '${server == null ? "" : "?id=${encode(server.id)}&version=${version ?? server.version}"}'
-      '${carryDiary ? "&draftSource=diary" : ""}',
-    );
+    if (server != null && submitted) {
+      context.push(
+        '/form/log-revise'
+        '?id=${encode(server.id)}&version=${version ?? server.version}'
+        '${carryDiary ? "&draftSource=diary" : ""}',
+      );
+    } else {
+      unawaited(
+        showDiaryComposer(
+          context,
+          ref,
+          date: day,
+          recordId: server?.id ?? snapshot.local?.serverId,
+          version: version ?? snapshot.local?.serverVersion ?? server?.version,
+        ),
+      );
+    }
   }
 
   @override
@@ -170,9 +185,9 @@ class _DiarySyncPageState extends ConsumerState<DiarySyncPage> {
               icon: const Icon(Icons.event_outlined),
               label: Text(date),
               onPressed: () async {
-                final selected = await showDatePicker(
-                  context: context,
-                  initialDate: validDiaryDay(date) ?? DateTime.now(),
+                final selected = await showPremiumDatePicker(
+                  context,
+                  initial: validDiaryDay(date) ?? DateTime.now(),
                   firstDate: DateTime(2020),
                   lastDate: DateTime(2100),
                 );

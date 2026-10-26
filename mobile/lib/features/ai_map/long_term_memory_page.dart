@@ -395,7 +395,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         notice(
           context,
           result['status'] == 'PENDING'
-              ? '已提交独立审核，尚未生效'
+              ? '已提交直属上级审核，尚未生效'
               : result['message'] as String? ?? '记忆已更新',
         );
       }
@@ -514,7 +514,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                   : scenario == DemoScenario.offline
                   ? '分析暂时无法加载'
                   : '从真实工作记录开始',
-              subtitle: '当前为页面演示，连接企业服务后积累个人与公司记忆，不展示预设发展结论。',
+              subtitle: '完成工作记录后，可在这里查看已积累的个人与公司记忆。',
             ),
           ] else if (!user.active)
             const EmptyIllustration(
@@ -565,12 +565,12 @@ class _AiPageState extends ConsumerState<AiPage> {
             if (loading)
               const Padding(
                 padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: SunnyLoadingIndicator(size: 26)),
               ),
             if (error != null) ErrorPanel(error!, retry: load),
             if (working)
               const ListTile(
-                leading: CircularProgressIndicator(),
+                leading: SunnyLoadingIndicator(size: 20),
                 title: Text('正在检索证据并生成分析…'),
               ),
             if (['FAILED', 'STALE', 'CANCELLED'].contains(analysis['state']))

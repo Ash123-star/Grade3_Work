@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
+import 'package:pandora_mobile/shared/page_states.dart';
 import 'providers.dart';
 import 'local_state.dart';
 import '../config.dart';
@@ -130,9 +131,14 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Center(
-                            child: TuantuanMascot(
-                              check.hasError ? 'error' : 'ai',
-                              size: 96,
+                            child: SunnyStatusIcon(
+                              icon: check.hasError
+                                  ? Icons.cloud_off_outlined
+                                  : Icons.sync_rounded,
+                              color: check.hasError
+                                  ? Theme.of(context).colorScheme.error
+                                  : const Color(0xFF4C8066),
+                              size: 72,
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -143,7 +149,8 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
                           const SizedBox(height: 16),
                           const Text('确认账号状态后继续。本机草稿仍按原账号保留。'),
                           const SizedBox(height: 24),
-                          if (check.isLoading) const LinearProgressIndicator(),
+                          if (check.isLoading)
+                            const SunnyLoadingIndicator(size: 24),
                           if (check.hasError) ...[
                             Text(
                               '${check.error}',

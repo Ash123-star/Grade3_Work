@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'support/flutter_sdk_assets.dart';
 import 'support/local_test_state.dart';
 import 'dart:async';
@@ -982,12 +983,12 @@ void main() {
       await launch(t, '/ai/graph');
       final source = find.byWidgetPredicate(
         (w) =>
-            w is DropdownButtonFormField<String> &&
+            w is PremiumDropdownField<String> &&
             w.decoration.labelText == '前置节点',
       );
       final target = find.byWidgetPredicate(
         (w) =>
-            w is DropdownButtonFormField<String> &&
+            w is PremiumDropdownField<String> &&
             w.decoration.labelText == '后续节点',
       );
       await tapVisible(t, source);

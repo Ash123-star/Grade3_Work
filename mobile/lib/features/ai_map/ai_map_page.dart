@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -49,6 +50,7 @@ class AiPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
+    if (AppConfig.mock) return const LegacyDirectionPage();
     return WorkbenchPage(key: ValueKey('${session.id}:${session.token}'));
   }
 }
@@ -186,7 +188,7 @@ class _AiPageState extends ConsumerState<LegacyDirectionPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(AppConfig.mock ? '预设建议与显式来源链接，用于流程演示。' : '请核对来源后再作决策。'),
+                const Text('请核对来源后再作决策。'),
                 Text(
                   '生成时间：${_generated(item)}',
                   style: const TextStyle(color: CuteTokens.muted),
@@ -323,7 +325,7 @@ class _AiPageState extends ConsumerState<LegacyDirectionPage> {
                 ref
                     .watch(recordsProvider('tasks'))
                     .when(
-                      loading: () => const LinearProgressIndicator(),
+                      loading: () => const SunnyLoadingIndicator(),
                       error: (e, _) => Text('$e'),
                       data: (p) {
                         final overdue = p.items.where((r) {
@@ -369,16 +371,13 @@ class _AiPageState extends ConsumerState<LegacyDirectionPage> {
         },
       );
     }
-    return PageFrame(
+    final page = PageFrame(
       title: 'AI地图',
       bottom: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: SunnyPrimaryButton.icon(
           onPressed: user.active && scenario != DemoScenario.forbidden
-              ? () {
-                  ref.invalidate(recordsProvider('ai-maps'));
-                  notice(context, '已更新演示分析，未调用真实 AI 服务');
-                }
+              ? () => notice(context, '当前无法生成新的分析结果')
               : null,
           icon: const Icon(Icons.auto_awesome_outlined),
           label: const Text('开始分析'),
@@ -397,6 +396,17 @@ class _AiPageState extends ConsumerState<LegacyDirectionPage> {
           content,
         ],
       ),
+    );
+    return SiblingSwipe(
+      index: tab,
+      itemCount: 3,
+      onStep: (step) {
+        final next = tab + step;
+        if (next < 0 || next > 2) return false;
+        changeTab(next);
+        return true;
+      },
+      child: page,
     );
   }
 

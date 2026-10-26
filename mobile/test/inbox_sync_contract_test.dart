@@ -17,9 +17,8 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/local/draft_store.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
-import 'package:pandora_mobile/features/settings/diary_sync_page.dart';
-import 'package:pandora_mobile/features/common/form_page.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
+import 'package:pandora_mobile/features/settings/diary_sync_page.dart';
 import 'support/local_test_state.dart';
 
 class InboxSyncAdapter implements HttpClientAdapter {
@@ -115,6 +114,10 @@ class InboxSyncAdapter implements HttpClientAdapter {
                   'business_date': wrongDate ? '2026-10-12' : date,
                   'submitted': submitted,
                   'version': serverVersion,
+                  if (submitted)
+                    'submitted_at': DateTime.now()
+                        .subtract(const Duration(hours: 1))
+                        .toIso8601String(),
                   'body': {'work': '服务器工作内容'},
                 },
               ],
@@ -133,6 +136,10 @@ class InboxSyncAdapter implements HttpClientAdapter {
         'business_date': wrongDate ? '2026-10-12' : '2026-10-13',
         'submitted': submitted,
         'version': serverVersion,
+        if (submitted)
+          'submitted_at': DateTime.now()
+              .subtract(const Duration(hours: 1))
+              .toIso8601String(),
         'body': {'work': '服务器工作内容', 'tomorrow': '服务器明日计划'},
       };
     } else if (o.path == '/tasks/task-real') {
@@ -280,8 +287,7 @@ void main() {
     'profile counts include late notifications and pending approvals',
     (t) async {
       await launchInbox(t, InboxSyncAdapter(), '/me');
-      expect(find.text('31 条未读消息'), findsOneWidget);
-      expect(find.text('31 项待审批'), findsOneWidget);
+      expect(find.text('31'), findsNWidgets(2));
     },
   );
 
@@ -485,11 +491,9 @@ void main() {
       expect(readback.serverVersion, 4);
       await t.tap(find.text('继续编辑'));
       await settleLocalIo(t);
-      final editor = t.widget<FormPage>(find.byType(FormPage));
-      expect(editor.kind, 'log-edit');
-      expect(editor.id, 'diary');
-      expect(editor.version, 4);
-      expect(find.textContaining('版本已更新'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.textContaining('草稿读取失败'), findsOneWidget);
+      expect(find.text('提交修订申请'), findsNothing);
       expect(c.read(selectedDateProvider), DateTime(2027, 2, 3));
       expect(c.read(reportDateProvider), DateTime(2025, 3, 4));
       expect(c.read(logFilterDateProvider), DateTime(2024, 4, 5));
@@ -497,7 +501,7 @@ void main() {
   );
 
   testWidgets(
-    'revision sync reads original encrypted version and returns guarded revision editor',
+    'stale submitted revision sync keeps local body and never opens review form',
     (t) async {
       final a = InboxSyncAdapter()..submitted = true;
       await launchInbox(
@@ -512,16 +516,14 @@ void main() {
       expect(a.requests.where((o) => o.path == '/logs'), isEmpty);
       await t.tap(find.text('继续编辑'));
       await settleLocalIo(t);
-      final editor = t.widget<FormPage>(find.byType(FormPage));
-      expect(editor.kind, 'log-revise');
-      expect(editor.id, 'diary');
-      expect(editor.version, 3);
-      expect(find.textContaining('版本已更新'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.textContaining('草稿读取失败'), findsOneWidget);
+      expect(find.text('提交修订申请'), findsNothing);
     },
   );
 
   testWidgets(
-    'submitted server diary preserves original local version and restores matching local draft in revision',
+    'submitted diary sync preserves matching local draft inside its edit window',
     (t) async {
       for (final version in [4, 5]) {
         final a = InboxSyncAdapter()..submitted = true;
@@ -533,17 +535,13 @@ void main() {
         );
         await t.tap(find.text('继续编辑'));
         await settleLocalIo(t);
-        final editor = t.widget<FormPage>(find.byType(FormPage));
-        expect(editor.kind, 'log-revise');
-        expect(editor.version, version);
-        expect(editor.restoreDiaryDraft, isTrue);
         if (version == 4) {
-          expect(find.textContaining('版本已更新'), findsOneWidget);
+          expect(find.byType(TextField), findsOneWidget);
+          expect(find.textContaining('草稿读取失败'), findsOneWidget);
         } else {
-          final input = t.widget<TextFormField>(
-            find.byType(TextFormField).first,
-          );
+          final input = t.widget<TextField>(find.byType(TextField).first);
           expect(input.controller!.text, '本机未提交工作');
+          expect(find.text('提交修改'), findsOneWidget);
         }
         final draft = await t.runAsync(
           () => c
@@ -650,10 +648,7 @@ void main() {
   ) async {
     for (final (family, path) in [
       ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
-      (
-        'MaterialIcons',
-        materialIconsFontPath,
-      ),
+      ('MaterialIcons', materialIconsFontPath),
     ]) {
       await (FontLoader(family)..addFont(
             Future.value(ByteData.sublistView(File(path).readAsBytesSync())),
@@ -683,9 +678,7 @@ void main() {
       await t.runAsync(() async {
         final rendered = await boundary.toImage(pixelRatio: 1);
         final png = await rendered.toByteData(format: ui.ImageByteFormat.png);
-        final output = File(
-          '../output/flutter-evidence/$name.png',
-        );
+        final output = File('../output/flutter-evidence/$name.png');
         output.parent.createSync(recursive: true);
         await output.writeAsBytes(png!.buffer.asUint8List());
         rendered.dispose();

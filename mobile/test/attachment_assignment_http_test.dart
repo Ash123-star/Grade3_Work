@@ -107,7 +107,13 @@ class AttachmentAdapter implements HttpClientAdapter {
       }
       data = profile;
     } else if (o.path == '/tasks' && o.method == 'POST') {
-      data = {'id': 'task-created', 'title': '附件任务', 'version': 1};
+      data = {
+        'id': 'review-created',
+        'kind': 'TASK_CREATE',
+        'target_id': 'task-created',
+        'applicant_id': 'u1',
+        'status': 'PENDING',
+      };
     } else if (o.path == '/tasks/task') {
       data = {
         'id': 'task',
@@ -262,20 +268,22 @@ void main() {
     },
   );
   test(
-    'actual attachment/collaborator IDs and feedback blocker text use existing supported contracts',
+    'actual attachment and participant IDs and feedback blocker text use supported contracts',
     () async {
       await repo.execute(
         'tasks',
         const Command('create', {
           'title': '任务',
-          'ownerId': 'first',
+          'participantIds': ['first', 'second'],
           'attachments': ['uploaded'],
-          'collaborators': ['second'],
           'deadline': '2026-10-30T18:00:00+08:00',
         }, idempotencyKey: 'idem'),
       );
       expect((adapter.requests.last.data as Map)['attachments'], ['uploaded']);
-      expect((adapter.requests.last.data as Map)['collaborators'], ['second']);
+      expect((adapter.requests.last.data as Map)['participants'], [
+        'first',
+        'second',
+      ]);
       await repo.execute(
         'tasks',
         const Command('feedback', {
@@ -570,7 +578,7 @@ void main() {
     },
   );
   testWidgets(
-    'dispatch UI sends uploaded IDs and unique collaborators from actual member choices',
+    'dispatch UI preserves uploaded IDs and unique participants from actual member choices',
     (t) async {
       await launch(
         t,
@@ -580,34 +588,30 @@ void main() {
         ],
       );
       final title = find.byWidgetPredicate(
-        (w) =>
-            w is TextField &&
-            (w.decoration?.labelText ?? '').startsWith('任务名称'),
+        (w) => w is TextField && w.decoration?.hintText == '输入任务名称',
       );
       await t.enterText(title, '带附件的任务');
-      final date = find.byWidgetPredicate(
-        (w) =>
-            w is TextField &&
-            (w.decoration?.labelText ?? '').startsWith('截止时间'),
-      );
+      await t.ensureVisible(find.text('选择日期和时间').first);
+      await t.tap(find.text('选择日期和时间').first);
+      await t.pumpAndSettle();
+      await t.tap(find.text('确定'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('确定'));
+      await t.pumpAndSettle();
+      final date = find.text('选择日期和时间').last;
       await t.ensureVisible(date);
       await t.pumpAndSettle();
       await t.tap(date);
       await t.pumpAndSettle();
-      final tomorrow = DateTime.now().add(const Duration(days: 1));
-      if (tomorrow.month != DateTime.now().month) {
-        await t.tap(
-          find.descendant(
-            of: find.byType(DatePickerDialog),
-            matching: find.byIcon(Icons.chevron_right),
-          ),
-        );
+      final tomorrow = DateTime.now().add(const Duration(days: 2));
+      if (tomorrow.month != DateTime.now().add(const Duration(days: 1)).month) {
+        await t.tap(find.byTooltip('下个月'));
         await t.pumpAndSettle();
       }
       await t.tap(
         find
             .descendant(
-              of: find.byType(DatePickerDialog),
+              of: find.byType(BottomSheet),
               matching: find.text('${tomorrow.day}'),
             )
             .last,
@@ -616,11 +620,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('确定'));
       await t.pumpAndSettle();
-      final primary = find.byWidgetPredicate(
-        (w) =>
-            w is TextField &&
-            (w.decoration?.labelText ?? '').startsWith('主负责人'),
-      );
+      final primary = find.widgetWithText(ActionChip, '添加');
       await t.ensureVisible(primary);
       await t.pumpAndSettle();
       await t.tap(primary);
@@ -628,9 +628,9 @@ void main() {
       await t.tap(find.text('第一页成员'));
       await t.pumpAndSettle();
       for (var i = 0; i < 2; i++) {
-        await t.ensureVisible(find.text('添加协作人'));
+        await t.ensureVisible(primary);
         await t.pumpAndSettle();
-        await t.tap(find.text('添加协作人'));
+        await t.tap(primary);
         await settle(t);
         await t.tap(find.text('加载更多成员'));
         await settle(t);
@@ -643,16 +643,29 @@ void main() {
         await t.pumpAndSettle();
       }
       expect(find.widgetWithText(InputChip, '第二页负责人'), findsOneWidget);
+      await t.ensureVisible(find.text('选择标签'));
+      await t.tap(find.text('选择标签'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('重要'));
+      await t.pumpAndSettle();
       await choose(t);
       await t.tap(find.widgetWithText(FilledButton, '派发任务'));
       await settle(t);
+      expect(
+        adapter.requests.any((o) => o.path == '/tasks' && o.method == 'POST'),
+        isTrue,
+        reason: t
+            .widgetList<Text>(find.byType(Text))
+            .map((w) => w.data)
+            .whereType<String>()
+            .join(' | '),
+      );
       final body =
           adapter.requests
                   .lastWhere((o) => o.path == '/tasks' && o.method == 'POST')
                   .data
               as Map;
-      expect(body['ownerId'], 'first');
-      expect(body['collaborators'], ['second']);
+      expect(body['participants'], ['first', 'second']);
       expect(body['attachments'], ['uploaded-1']);
       expect(body.keys.contains('status'), isFalse);
       await close(t);

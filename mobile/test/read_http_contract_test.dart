@@ -16,6 +16,7 @@ class ReadAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   int focusStatus = 200, versionStatus = 200, commentStatus = 200;
   bool submitted = true;
+  DateTime? editDeadline;
   final task = <String, dynamic>{
     'id': 'task-1',
     'title': '真实任务内容',
@@ -54,6 +55,14 @@ class ReadAdapter implements HttpClientAdapter {
         'business_date': '2026-10-12',
         'owner_id': 'u1',
         'submitted': submitted,
+        if (editDeadline != null) ...{
+          'editableUntil': editDeadline!.toUtc().toIso8601String(),
+          'submittedAt': editDeadline!
+              .subtract(const Duration(hours: 24))
+              .toUtc()
+              .toIso8601String(),
+          'canEdit': true,
+        },
         'version': 3,
         'body': {
           'work': '当前生效正文',
@@ -93,6 +102,24 @@ class ReadAdapter implements HttpClientAdapter {
           'created_at': '2026-10-12T12:00:00Z',
         },
       ];
+    } else if (options.path == '/reviews/review-1') {
+      body = {
+        'id': 'review-1',
+        'title': '日报正文调整',
+        'kind': 'LOG',
+        'status': 'PENDING',
+        'applicant_id': 'u2',
+        'applicant_name': '申请人',
+        'reviewer_id': 'u1',
+        'reviewer_name': '直属主管',
+        'reviewer_configured': true,
+        'approval_mode': 'DIRECT_MANAGER',
+        'expected_version': 3,
+        'version': 4,
+        'steps': [
+          {'reviewer_id': 'historical-reviewer', 'status': 'APPROVED'},
+        ],
+      };
     } else if (options.path.startsWith('/dashboard/')) {
       status = focusStatus;
       final own = options.queryParameters['ownerId'];
@@ -309,6 +336,20 @@ void main() {
     },
   );
 
+  test('review HTTP fields expose the configured direct reviewer only', () async {
+    final review = await repo.detail('reviews', 'review-1');
+    expect(review.fields['reviewState'], '待审');
+    expect(review.fields['applicantId'], 'u2');
+    expect(review.fields['reviewerId'], 'u1');
+    expect(review.fields['reviewerName'], '直属主管');
+    expect(review.fields['reviewerConfigured'], isTrue);
+    expect(review.fields['approvalMode'], 'DIRECT_MANAGER');
+    expect(review.fields['baseVersion'], 3);
+    expect(review.fields['steps'], [
+      {'reviewer_id': 'historical-reviewer', 'status': 'APPROVED'},
+    ]);
+  });
+
   Future<void> settleHttp(WidgetTester t) async {
     await t.pump();
     await t.runAsync(
@@ -348,6 +389,23 @@ void main() {
   }
 
   testWidgets(
+    'diary revision action disappears when its server deadline passes',
+    (t) async {
+      adapter.editDeadline = DateTime.now().add(const Duration(seconds: 3));
+      await launch(t, '/item/logs/log-1');
+      expect(find.text('申请修订日志'), findsOneWidget);
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 3100)),
+      );
+      await t.pump(const Duration(seconds: 4));
+      await t.pumpAndSettle();
+      expect(find.text('申请修订日志'), findsNothing);
+      expect(adapter.requests.any((r) => r.method == 'PUT'), false);
+      await closeUi(t);
+    },
+  );
+
+  testWidgets(
     'historical document displays HTTP version body rather than current content',
     (t) async {
       final c = await launch(t, '/history/log-1/version/2');
@@ -358,10 +416,14 @@ void main() {
       expect(find.byType(TextFormField), findsNothing);
       c.read(routerProvider).go('/item/logs/log-1');
       await settleHttp(t);
-      await t.drag(find.byType(ListView).first, const Offset(0, -500));
+      await t.scrollUntilVisible(
+        find.text('服务端实际评语', findRichText: true),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
       await t.pumpAndSettle();
-      expect(find.text('服务端实际评语'), findsOneWidget);
-      expect(find.text('作者 u2 · 2026-10-12T12:00:00Z'), findsOneWidget);
+      expect(find.text('服务端实际评语', findRichText: true), findsOneWidget);
+      expect(find.textContaining('u2'), findsWidgets);
       await closeUi(t);
     },
   );
@@ -452,8 +514,7 @@ void main() {
       });
       await settleHttp(t);
       expect(find.widgetWithText(FilledButton, '查看成果并验收'), findsNothing);
-      await t.tap(find.byTooltip('更多操作'));
-      await t.pumpAndSettle();
+      expect(find.byTooltip('更多操作'), findsNothing);
       expect(find.text('转派任务'), findsNothing);
       await closeUi(t);
     },

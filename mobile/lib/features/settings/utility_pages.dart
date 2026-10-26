@@ -10,6 +10,7 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
 import 'diary_sync_page.dart';
 
@@ -66,46 +67,41 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ref.watch(sessionProvider).token == null &&
             ref.watch(sessionProvider).canReadBusiness) ...[
           const SectionHeader('演示环境'),
-          DropdownButtonFormField<UserRole>(
+          PremiumDropdownField<UserRole>(
             initialValue: ref.watch(sessionProvider).role,
             decoration: const InputDecoration(labelText: '预览角色'),
             items: UserRole.values
                 .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
                 .toList(),
             onChanged: (r) {
-              if (r != null) {
-                ref.read(sessionProvider.notifier).state = Session(
-                  id: r == UserRole.employee ? 'u2' : 'u1',
-                  name: r == UserRole.employee ? '陈一诺' : '林小满',
-                  role: r,
-                  dispatch: r != UserRole.employee,
-                );
-              }
+              if (r == null) return;
+              final account = demoAccounts.firstWhere((a) => a.role == r);
+              ref.read(sessionProvider.notifier).state = account.session();
             },
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
+          PremiumDropdownField<String>(
             key: ValueKey(ref.watch(sessionProvider).id),
             initialValue: ref.watch(sessionProvider).id,
             decoration: const InputDecoration(labelText: '演示账号'),
-            items: const [
-              DropdownMenuItem(value: 'u1', child: Text('林小满')),
-              DropdownMenuItem(value: 'u2', child: Text('陈一诺')),
-              DropdownMenuItem(value: 'u3', child: Text('许知远')),
-            ],
+            items: demoAccounts
+                .map(
+                  (account) => DropdownMenuItem(
+                    value: account.id,
+                    child: Text(
+                      '${account.name} · ${account.departmentName} · ${account.role.label}',
+                    ),
+                  ),
+                )
+                .toList(),
             onChanged: (id) {
               if (id == null) return;
-              final old = ref.read(sessionProvider);
-              ref.read(sessionProvider.notifier).state = Session(
-                id: id,
-                name: {'u1': '林小满', 'u2': '陈一诺', 'u3': '许知远'}[id]!,
-                role: old.role,
-                dispatch: old.dispatch,
-              );
+              final account = demoAccounts.firstWhere((a) => a.id == id);
+              ref.read(sessionProvider.notifier).state = account.session();
             },
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<DemoScenario>(
+          PremiumDropdownField<DemoScenario>(
             initialValue: ref.watch(scenarioProvider),
             decoration: const InputDecoration(labelText: '数据场景'),
             items: DemoScenario.values
@@ -125,10 +121,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             value: ref.watch(sessionProvider).dispatch,
             onChanged: (v) {
               final u = ref.read(sessionProvider);
-              ref.read(sessionProvider.notifier).state = Session(
-                id: u.id,
-                name: u.name,
-                role: u.role,
+              final account = demoAccounts.firstWhere((a) => a.id == u.id);
+              ref.read(sessionProvider.notifier).state = account.session(
                 dispatch: v,
               );
             },
@@ -318,7 +312,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               color: const Color(0xFFF1E7FF),
               child: Text(
                 AppConfig.mock
-                    ? '本地预设样例不调用模型，也不消耗额度。'
+                    ? '用量查询服务尚未接入，当前不能显示调用次数或预算。'
                     : '用量查询服务待接入，当前不能显示调用次数或预算。',
               ),
             ),
@@ -345,12 +339,12 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               ListTile(
                 title: const Text('浏览组织与成员'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/me/organization'),
+                onTap: () => context.push('/me/people'),
               ),
               for (final entry in {
                 'department': '部门与团队',
                 'membership': '确认员工归属',
-                'role': '角色与权限（含公司复核资格）',
+                'role': '角色与权限',
                 'reporting': '直属汇报关系',
                 'disable': '停用账号',
                 'policy': '审核策略',

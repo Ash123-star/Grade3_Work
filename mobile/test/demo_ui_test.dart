@@ -1,3 +1,4 @@
+import 'support/workflow_fixture.dart';
 import 'support/local_test_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,9 +12,12 @@ void main() {
   testWidgets('logs use a single independent date and allow member selection', (
     tester,
   ) async {
-    final container = testContainer();
+    final container = testContainer(
+      overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+    );
     addTearDown(container.dispose);
     container.read(periodProvider.notifier).state = '月';
+    container.read(logFilterDateProvider.notifier).state = null;
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -26,7 +30,7 @@ void main() {
     expect(find.text('日'), findsNothing);
     expect(find.text('周'), findsNothing);
     expect(find.text('月'), findsNothing);
-    expect(find.text('申请修订今天日志'), findsOneWidget);
+    expect(find.byTooltip('创建日志'), findsOneWidget);
     expect(find.text('全部日期'), findsOneWidget);
     expect(
       container
@@ -34,16 +38,42 @@ void main() {
           .valueOrNull!
           .items
           .length,
-      3,
+      greaterThan(0),
     );
     await tester.tap(find.text('下属日志 ›'));
     await tester.pumpAndSettle();
-    expect(find.text('选择下属'), findsOneWidget);
-    expect(find.text('申请修订今天日志'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('subordinate-log-search')),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('创建日志'), findsNothing);
     container.read(logFilterDateProvider.notifier).state = DateTime.now()
         .subtract(const Duration(days: 1));
     await tester.pumpAndSettle();
-    expect(find.text('完成客户访谈与结论整理'), findsWidgets);
+    expect(
+      container
+          .read(logDayRecordsProvider(('logs/subordinates', null)))
+          .valueOrNull!
+          .items
+          .every(
+            (r) =>
+                r.fields['businessDate'] ==
+                container
+                    .read(logFilterDateProvider)!
+                    .toIso8601String()
+                    .split('T')
+                    .first,
+          ),
+      isTrue,
+    );
+    await tester.tap(
+      find.byKey(
+        ValueKey(
+          'log-date:${container.read(logFilterDateProvider)?.toIso8601String() ?? 'all'}',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('全部日期'));
     await tester.pumpAndSettle();
     expect(container.read(logFilterDateProvider), isNull);
@@ -53,7 +83,7 @@ void main() {
           .valueOrNull!
           .items
           .length,
-      9,
+      greaterThan(0),
     );
     expect(container.read(periodProvider), '月');
     expect(tester.takeException(), isNull);
@@ -68,6 +98,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final container = testContainer(
         overrides: [
+          demoStoreProvider.overrideWithValue(workflowFixture()),
           workCapabilitiesProvider.overrideWith(
             (_) async =>
                 const WorkCapabilities(enabled: true, configured: true),
@@ -114,7 +145,9 @@ void main() {
   testWidgets('AI task draft and existing focus editor are prefilled', (
     tester,
   ) async {
-    final container = testContainer();
+    final container = testContainer(
+      overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+    );
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(

@@ -223,7 +223,7 @@ void main() {
     },
   );
   test(
-    'unit, user and policy submit candidate fields and versions; invalid input sends no request',
+    'unit and user submit candidate fields and versions; invalid input sends no request',
     () async {
       await repo.execute(
         'organization/admin',
@@ -261,19 +261,6 @@ void main() {
         'version',
         'reason',
       });
-      await repo.execute(
-        'organization/admin',
-        const Command('policy', {
-          'taskTeamReview': false,
-          'taskDepartmentReview': true,
-          'reason': '调整',
-        }, version: 9),
-      );
-      expect(
-        adapter.requests.last.path,
-        '/organization/review-policy/revisions',
-      );
-      expect((adapter.requests.last.data as Map)['version'], 9);
       final count = adapter.requests.length;
       for (final c in [
         const Command('user', {
@@ -286,11 +273,6 @@ void main() {
           'name': 'x',
           'reason': 'x',
         }, version: 0),
-        const Command('policy', {
-          'taskTeamReview': true,
-          'taskDepartmentReview': false,
-          'reason': '',
-        }, version: 9),
       ]) {
         await expectLater(
           repo.execute('organization/admin', c),
@@ -502,26 +484,30 @@ void main() {
     },
   );
   testWidgets(
-    'policy loads actual switches and submits only supported routing flags',
+    'policy page shows single-level guidance and cannot write legacy switches',
     (t) async {
-      await launch(t, '/form/policy');
-      expect(
-        t.widget<SwitchListTile>(find.byType(SwitchListTile).at(1)).value,
-        isFalse,
+      final c = await launch(t, '/form/policy');
+      expect(find.byType(SwitchListTile), findsNothing);
+      expect(find.textContaining('直属上级单级审核'), findsOneWidget);
+      final before = adapter.requests.length;
+      await expectLater(
+        c.read(repositoryProvider).execute(
+          'organization/admin',
+          const Command('policy', {
+            'taskTeamReview': true,
+            'taskDepartmentReview': false,
+            'reason': '不应写入旧策略',
+          }, version: 9),
+        ),
+        throwsA(isA<ApiFailure>()),
       );
-      await fillReason(t);
-      await submit(t);
-      expect(adapter.requests.lastWhere((o) => o.method == 'POST').data, {
-        'taskTeamReview': true,
-        'taskDepartmentReview': false,
-        'version': 9,
-        'reason': '保留组织调整理由',
-      });
+      expect(adapter.requests.length, before);
+      expect(adapter.requests.where((o) => o.method == 'POST'), isEmpty);
       await close(t);
     },
   );
   testWidgets(
-    'statistics shows actual four metrics, zero denominator, definition and forbidden recovery',
+    'statistics shows metrics and rate denominator without definition copy',
     (t) async {
       final c = await launch(t, '/export');
       await t.pumpWidget(
@@ -538,10 +524,11 @@ void main() {
       expect(find.text('12'), findsOneWidget);
       expect(find.text('75.0%'), findsOneWidget);
       expect(find.text('暂无'), findsOneWidget);
+      expect(find.textContaining('授权任务按期验收'), findsNothing);
       await t.ensureVisible(find.text('按期验收率'));
       await t.tap(find.text('按期验收率'));
       await t.pumpAndSettle();
-      expect(find.textContaining('分子 3 / 分母 4'), findsOneWidget);
+      expect(find.textContaining('按期 3 / 已验收 4'), findsOneWidget);
       await t.tapAt(const Offset(10, 10));
       await t.pumpAndSettle();
       adapter.summaryStatus = 403;
@@ -590,15 +577,15 @@ void main() {
         'date': '2026-10-12',
         'period': 'month',
         'resource': 'logs',
+        'groupBy': 'department',
       });
       await close(t);
     },
   );
   testWidgets(
-    'organization preserves empty units and rejected management has no company resubmit',
+    'personnel includes later pages and rejected management has no company resubmit',
     (t) async {
-      final c = await launch(t, '/me/organization');
-      expect(find.text('空部门'), findsOneWidget);
+      final c = await launch(t, '/me/people');
       expect(find.text('第二页成员'), findsOneWidget);
       c.read(routerProvider).go('/me/reviews/rejected');
       await settle(t);

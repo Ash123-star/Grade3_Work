@@ -1,3 +1,4 @@
+import 'support/workflow_fixture.dart';
 import 'support/local_test_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,7 +31,7 @@ void main() {
     addTearDown(t.view.resetDevicePixelRatio);
     final c = testContainer(
       overrides: [
-        if (store != null) demoStoreProvider.overrideWithValue(store),
+        demoStoreProvider.overrideWithValue(store ?? workflowFixture()),
         if (failedAction)
           repositoryProvider.overrideWith(
             (ref) => FailedActionRepository(
@@ -63,6 +64,8 @@ void main() {
             '成果说明': '已核对交付文件',
             '遇到的阻碍': '需核实版权',
             '主负责人': '陈一诺',
+            'participantIds': ['u2'],
+            'participantNames': ['陈一诺'],
             'deadline': '2026-10-14T18:00:00',
             'dispatcherId': 'u1',
           },
@@ -85,7 +88,7 @@ void main() {
       expect(find.text('请填写验收意见'), findsOneWidget);
       c.read(routerProvider).go('/form/transfer?id=accept&version=1');
       await t.pumpAndSettle();
-      expect(find.text('当前生效 · v1'), findsOneWidget);
+      expect(find.text('交付验收'), findsWidgets);
       expect(
         find.byWidgetPredicate((w) => w is Text && w.data == '陈一诺'),
         findsOneWidget,
@@ -144,9 +147,11 @@ void main() {
       expect(find.text('当前正式工作'), findsNothing);
       c.read(routerProvider).go('/me/profile');
       await t.pumpAndSettle();
-      expect(find.text('日志时间线'), findsOneWidget);
+      expect(find.text('我的个人主页'), findsOneWidget);
+      expect(find.text('日志时间线'), findsNothing);
+      expect(find.text('个人公开重点'), findsNothing);
       expect(find.text('不应出现在公开时间线'), findsNothing);
-      expect(find.text('验收工作日报'), findsOneWidget);
+      expect(find.text('验收工作日报'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pumpAndSettle();
     },

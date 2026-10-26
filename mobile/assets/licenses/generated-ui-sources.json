@@ -13,6 +13,25 @@
     "asset_count": 126,
     "source_originals_retained": true
   },
+  "dog_asset_pack": {
+    "source_type": "user_provided_generated_transparent_png",
+    "source_directory": "mobile/assets/dog",
+    "processing_script": "mobile/tool/process_dog_assets.py",
+    "method": "4x4 row-major crops with reviewed cross-row bounds for tiles crossing grid lines; alpha values below 16 removed and transparent content bounds trimmed",
+    "output_directory": "mobile/assets/generated_ui/dog",
+    "manifest": "mobile/assets/generated_ui/dog/manifest.json",
+    "asset_count": 48,
+    "usage_manifest": "mobile/assets/generated_ui/dog/manifest.json",
+    "source_originals_retained": true,
+    "license_note": "Generated images supplied by the user. Confirm applicable image model terms before public distribution.",
+    "review": {
+      "transparent_background_checked": true,
+      "text_and_logo_checked": true,
+      "third_party_character_checked": true,
+      "approved_for_product": true,
+      "notes": "User-provided original cartoon Shiba Inu artwork; not used to encode task or account status."
+    }
+  },
   "review": {
     "transparent_background_checked": true,
     "text_and_logo_checked": true,

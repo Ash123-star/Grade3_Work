@@ -59,7 +59,7 @@ public final class AiWorkMigrationUpgrade {
             if (schema.equals("public") && jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()", Long.class) != 0)
                 throw new IllegalStateException("Clone has other connections; no conversion performed");
             var rows = jdbc.queryForList("SELECT version,description,type,script,checksum,success FROM " + history + " ORDER BY installed_rank");
-            if (matches(rows, canonical())) return; // 已协调副本可重复验证，不重排历史。
+            if (matches(rows.stream().filter(row -> row.get("version") instanceof String v && v.matches("[1-9][0-9]?") && Integer.parseInt(v)<=18).toList(), canonical())) return; // 已协调副本可重复验证，不重排历史。
             if (rows.size() < 16 || rows.size() > 18 || !matches(rows, LEGACY.subList(0, rows.size())))
                 throw new IllegalStateException("Unknown, incomplete or failed AI history; no conversion performed");
             // 校验关键结构，避免把只伪造了历史、未真正执行的脚本当成升级成功。

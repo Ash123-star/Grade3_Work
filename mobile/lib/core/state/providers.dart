@@ -182,6 +182,20 @@ final recordsProvider = FutureProvider.autoDispose.family<PageResult, String>((
     isActive: () => active,
   );
 });
+final receivedTaskCardProvider = FutureProvider.autoDispose<PageResult>((ref) {
+  final session = ref.watch(sessionProvider);
+  if (!session.canReadBusiness) {
+    throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
+  }
+  var active = true;
+  ref.onDispose(() => active = false);
+  return readCompleteList(
+    ref.watch(repositoryProvider),
+    'tasks/received-card',
+    const Query(),
+    isActive: () => active,
+  );
+});
 final itemProvider = FutureProvider.autoDispose
     .family<Record, (String, String)>(
       (ref, key) => ref.watch(repositoryProvider).detail(key.$1, key.$2),
@@ -202,37 +216,123 @@ final organizationTreeProvider = FutureProvider.autoDispose<Record>((ref) {
 final auditRecordsProvider = FutureProvider.autoDispose<PageResult>(
   (ref) => ref.watch(recordsProvider('audit').future),
 );
-final analyticsSummaryProvider = FutureProvider.autoDispose<Record>(
-  (ref) => ref
-      .watch(repositoryProvider)
-      .detail(
-        'analytics',
-        ref.watch(selectedDateProvider).toIso8601String().split('T').first,
-        ownerId: switch (ref.watch(periodProvider)) {
-          '日' => 'day',
-          '周' => 'week',
-          _ => 'month',
-        },
-      ),
+final analyticsFiltersProvider = StateProvider.family<AnalyticsFilters, String>(
+  (ref, accountId) => const AnalyticsFilters(),
 );
+final analyticsSummaryProvider = FutureProvider.autoDispose<Record>((ref) {
+  final accountId = ref.watch(sessionProvider).id;
+  final filters = ref.watch(analyticsFiltersProvider(accountId));
+  return ref.watch(repositoryProvider).analytics(
+    AnalyticsQuery(
+      date: ref.watch(selectedDateProvider),
+      period: switch (ref.watch(periodProvider)) {
+        '日' => 'day',
+        '周' => 'week',
+        _ => 'month',
+      },
+      groupBy: filters.groupBy,
+      departmentId: filters.departmentId.isEmpty ? null : filters.departmentId,
+      teamId: filters.teamId.isEmpty ? null : filters.teamId,
+      ownerId: filters.ownerId.isEmpty ? null : filters.ownerId,
+    ),
+  );
+});
 final datedRecordsProvider = FutureProvider.autoDispose
     .family<PageResult, String>((ref, resource) {
       var active = true;
       ref.onDispose(() => active = false);
-      final range = BusinessRange(
-        ref.watch(selectedDateProvider),
-        ref.watch(periodProvider),
-      );
+      final date = ref.watch(selectedDateProvider);
+      final period = ref.watch(periodProvider);
+      final DateTime from, to;
+      if (period == '月' && resource == 'tasks') {
+        final range = _calendarMonthRange(date);
+        from = range.from;
+        to = range.to;
+      } else {
+        final range = BusinessRange(date, period);
+        from = range.from;
+        to = range.to;
+      }
       return readCompleteList(
         ref.watch(repositoryProvider),
         resource,
-        Query(from: range.from, to: range.to),
+        Query(from: from, to: to),
         isActive: () => active,
       );
     });
 
+final calendarMonthTasksProvider = FutureProvider.autoDispose
+    .family<PageResult, (String?, int)>((ref, key) {
+      var active = true;
+      ref.onDispose(() => active = false);
+      final monthIndex = key.$2;
+      final year = monthIndex >= 0
+          ? monthIndex ~/ 12
+          : (monthIndex - 11) ~/ 12;
+      final first = DateTime(year, monthIndex - year * 12 + 1);
+      final range = _calendarMonthRange(first);
+      return readCompleteList(
+        ref.watch(repositoryProvider),
+        'tasks',
+        Query(
+          ownerId: key.$1,
+          from: range.from,
+          to: range.to,
+        ),
+        isActive: () => active,
+      );
+    });
+
+final memberCalendarDateProvider = StateProvider.family<DateTime, String>((
+  ref,
+  ownerId,
+) {
+  ref.watch(sessionProvider.select((session) => (session.id, session.token)));
+  return shanghaiWallTime(DateTime.now());
+});
+
+final memberWorkspaceRevokedProvider = StateProvider.family<bool, String>((
+  ref,
+  ownerId,
+) {
+  ref.watch(sessionProvider.select((session) => (session.id, session.token)));
+  return false;
+});
+
+final memberLogMonthProvider = FutureProvider.autoDispose
+    .family<MemberLogMonth, (String, int)>((ref, key) {
+      final session = ref.watch(sessionProvider);
+      if (!session.manager || !session.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '无权查看成员日志日历');
+      }
+      final month = DateTime(key.$2 ~/ 12, key.$2 % 12 + 1);
+      return ref.watch(repositoryProvider).memberLogMonth(key.$1, month);
+    });
+
+({DateTime from, DateTime to}) _calendarMonthRange(DateTime date) {
+  final first = DateTime(date.year, date.month);
+  final gridStart = first.subtract(Duration(days: first.weekday - 1));
+  final weeks =
+      ((first.weekday - 1 + DateTime(date.year, date.month + 1, 0).day) / 7)
+          .ceil();
+  final gridEnd = gridStart.add(Duration(days: weeks * 7));
+  return (
+    from: DateTime.utc(
+      gridStart.year,
+      gridStart.month,
+      gridStart.day,
+    ).subtract(const Duration(hours: 8)),
+    to: DateTime.utc(
+      gridEnd.year,
+      gridEnd.month,
+      gridEnd.day,
+    ).subtract(const Duration(hours: 8)),
+  );
+}
+
 void refreshBusiness(WidgetRef ref) {
   ref.invalidate(recordsProvider);
+  ref.invalidate(receivedTaskCardProvider);
   ref.invalidate(datedRecordsProvider);
   ref.invalidate(itemProvider);
   ref.invalidate(scopedItemProvider);
@@ -277,12 +377,27 @@ final logDayRecordsProvider = FutureProvider.autoDispose
       return readCompleteList(
         ref.watch(repositoryProvider),
         key.$1,
-        Query(ownerId: key.$2, from: range?.from, to: range?.to),
+        Query(
+          ownerId: key.$2,
+          from: range?.from,
+          to: range?.to,
+          departmentId: key.$1 == 'logs/subordinates'
+              ? ref.watch(subordinateLogFilterProvider).$1
+              : null,
+          search: key.$1 == 'logs/subordinates'
+              ? ref.watch(subordinateLogFilterProvider).$2
+              : '',
+        ),
         isActive: () => active,
       );
     });
 
-final logFilterDateProvider = StateProvider<DateTime?>((ref) => null);
+final subordinateLogFilterProvider = StateProvider<(String?, String)>((ref) {
+  ref.watch(sessionProvider.select((s) => (s.id, s.token)));
+  return (null, '');
+});
+
+final logFilterDateProvider = StateProvider<DateTime?>((ref) => DateTime.now());
 
 /// Public registration choices use server IDs; names never substitute for IDs.
 final registrationDepartmentsProvider = FutureProvider.autoDispose<PageResult>(

@@ -27,7 +27,7 @@ class AiWorkMigrationUpgradeTest {
             flyway(schema,null).validate();
             assertEquals(before,jdbc.queryForMap("SELECT password_hash FROM "+schema+".users WHERE id='keep'"));
             assertEquals("comment",jdbc.queryForObject("SELECT parent_id FROM "+schema+".log_comments WHERE id='reply'",String.class));
-            assertEquals(18,jdbc.queryForObject("SELECT count(*) FROM "+schema+".flyway_schema_history",Integer.class));
+            assertEquals(flyway(schema,null).info().all().length,jdbc.queryForObject("SELECT count(*) FROM "+schema+".flyway_schema_history",Integer.class));
         } finally { drop(schema); }
     }
 
@@ -41,7 +41,7 @@ class AiWorkMigrationUpgradeTest {
                 AiWorkMigrationUpgrade.upgrade(source,schema);
                 assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM "+schema+".ai_work_items WHERE id='retained'",Integer.class));
                 assertEquals(before,jdbc.queryForList("SELECT installed_rank,checksum,installed_by,installed_on,execution_time FROM "+schema+".flyway_schema_history WHERE installed_rank<=? ORDER BY installed_rank",oldLast));
-                assertEquals(18,jdbc.queryForObject("SELECT count(*) FROM "+schema+".flyway_schema_history",Integer.class));
+                assertEquals(flyway(schema,null).info().all().length,jdbc.queryForObject("SELECT count(*) FROM "+schema+".flyway_schema_history",Integer.class));
                 var history = jdbc.queryForList("SELECT * FROM "+schema+".flyway_schema_history ORDER BY installed_rank");
                 AiWorkMigrationUpgrade.upgrade(source,schema);
                 assertEquals(history,jdbc.queryForList("SELECT * FROM "+schema+".flyway_schema_history ORDER BY installed_rank"));
@@ -79,8 +79,18 @@ class AiWorkMigrationUpgradeTest {
         assertThrows(IllegalArgumentException.class,()->AiWorkMigrationUpgrade.main(new String[0]));
     }
 
+    @Test void canonicalHistoryWithLaterMigrationsIsValidatedWithoutRewritingHistory() {
+        String schema=schema();
+        try {
+            flyway(schema,null).migrate();
+            var history=jdbc.queryForList("SELECT * FROM "+schema+".flyway_schema_history ORDER BY installed_rank");
+            AiWorkMigrationUpgrade.upgrade(source,schema);
+            assertEquals(history,jdbc.queryForList("SELECT * FROM "+schema+".flyway_schema_history ORDER BY installed_rank"));
+        } finally { drop(schema); }
+    }
+
     private void legacy(String schema,int last) {
-        flyway(schema,null).migrate();
+        flyway(schema,"18").migrate();
         jdbc.update("INSERT INTO "+schema+".users(id,company_id,account,password_hash,phone,name,role,status) VALUES ('keep','default','keep','unchanged','13800000099','保留用户','EMPLOYEE','ACTIVE')");
         // 创建曾经实际部署的迁移顺序；SQL 与旧脚本完全相同。
         jdbc.update("UPDATE "+schema+".flyway_schema_history SET version=(version::int+1000)::text WHERE version::int>=14");

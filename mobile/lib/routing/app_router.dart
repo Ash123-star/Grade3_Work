@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/routing/branch_pager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,8 +16,12 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
-import 'package:pandora_mobile/features/dashboard/organization_browser.dart';
+import 'package:pandora_mobile/features/dashboard/personnel_page.dart';
+import 'package:pandora_mobile/features/dashboard/task_management_page.dart'
+    show ReceivedTasksPage;
+import 'package:pandora_mobile/features/dashboard/task_management_table.dart';
 import 'package:pandora_mobile/features/dashboard/own_profile_page.dart';
+import 'package:pandora_mobile/features/dashboard/diary_composer_sheet.dart';
 import 'package:pandora_mobile/core/state/session_lifecycle.dart';
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/features/dashboard/management_page.dart';
@@ -96,7 +101,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/logs/subordinates',
         builder: (_, _) => const LogsPage(subordinates: true),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
+        navigatorContainerBuilder: (context, shell, children) =>
+            BranchPager(shell: shell, children: children),
         builder: (context, state, shell) => Scaffold(
           body: shell,
           bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
@@ -149,6 +156,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
         branches: [
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/dashboard',
@@ -157,6 +165,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: '/view',
@@ -179,14 +188,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(path: '/logs', builder: (_, _) => const LogsPage()),
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [GoRoute(path: '/ai', builder: (_, _) => const AiPage())],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(path: '/me', builder: (_, _) => const ProfilePage()),
             ],
@@ -194,6 +206,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/me/profile', builder: (_, _) => const OwnProfilePage()),
+      GoRoute(path: '/me/people', builder: (_, _) => const PersonnelPage()),
+      GoRoute(
+        path: '/tasks/received',
+        builder: (_, _) => const ReceivedTasksPage(),
+      ),
+      GoRoute(path: '/me/tasks', builder: (_, _) => const TaskManagementPage()),
       GoRoute(
         path: '/attachments/:id',
         builder: (_, s) => AttachmentDownloadPage(
@@ -209,28 +227,34 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: '/me/organization',
-        builder: (_, _) => const OrganizationBrowser(),
-      ),
-      GoRoute(
-        path: '/me/team',
-        builder: (_, _) => const ListPage('organization'),
-      ),
-      GoRoute(
         path: '/me/team/:memberId',
-        builder: (_, s) => MemberWorkspace(
-          s.pathParameters['memberId']!,
-          businessDate: s.uri.queryParameters['date'],
-          key: ValueKey(s.uri.toString()),
+        pageBuilder: (_, s) => NoTransitionPage<void>(
+          key: ValueKey(
+            'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+          ),
+          child: MemberWorkspace(
+            s.pathParameters['memberId']!,
+            businessDate: s.uri.queryParameters['date'],
+            key: ValueKey(
+              'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+            ),
+          ),
         ),
       ),
       GoRoute(
         path: '/me/team/:memberId/:category',
-        builder: (_, s) => MemberWorkspace(
-          s.pathParameters['memberId']!,
-          category: s.pathParameters['category']!,
-          businessDate: s.uri.queryParameters['date'],
-          key: ValueKey(s.uri.toString()),
+        pageBuilder: (_, s) => NoTransitionPage<void>(
+          key: ValueKey(
+            'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+          ),
+          child: MemberWorkspace(
+            s.pathParameters['memberId']!,
+            category: s.pathParameters['category']!,
+            businessDate: s.uri.queryParameters['date'],
+            key: ValueKey(
+              'member:${s.pathParameters['memberId']}:${s.uri.queryParameters['date']}',
+            ),
+          ),
         ),
       ),
       GoRoute(
@@ -297,7 +321,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/form/:kind',
-        builder: (_, s) => managementKinds.contains(s.pathParameters['kind'])
+        builder: (_, s) =>
+            ['log-edit', 'log-revise'].contains(s.pathParameters['kind'])
+            ? DiaryComposerRoutePage(
+                key: ValueKey('${s.uri}:${ref.read(sessionProvider).id}'),
+                id: s.uri.queryParameters['id'],
+                version: int.tryParse(s.uri.queryParameters['version'] ?? ''),
+              )
+            : managementKinds.contains(s.pathParameters['kind'])
             ? ManagementPage(
                 s.pathParameters['kind']!,
                 memberId: s.uri.queryParameters['id'],
@@ -329,9 +360,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/guide', builder: (_, _) => const GuidePage()),
       GoRoute(
         path: '/me/statistics',
-        builder: (_, _) => AppConfig.mock
-            ? const AnalyticsPage()
-            : const ServerAnalyticsPage(),
+        builder: (_, _) => const ServerAnalyticsPage(),
       ),
       GoRoute(path: '/export', builder: (_, _) => const AnalyticsExportPage()),
       GoRoute(path: '/me/settings', builder: (_, _) => const SettingsPage()),

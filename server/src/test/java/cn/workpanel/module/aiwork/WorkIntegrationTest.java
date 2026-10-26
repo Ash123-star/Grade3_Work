@@ -238,6 +238,30 @@ class WorkIntegrationTest {
         }
     }
     JsonNode deleteWork(int expected,String id,int version,String key)throws Exception{var response=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/ai/work-items/"+id)).header("Authorization","Bearer "+tokens.get("leader")).header("Idempotency-Key",key).header("If-Match",Integer.toString(version)).DELETE().build(),HttpResponse.BodyHandlers.ofString());assertEquals(expected,response.statusCode(),response.body());return JSON.readTree(response.body());}
+    @Test void failureSettlementWaitsForOwnerBeforeLockingItem()throws Exception{
+        String id=Db.id(),stepId=Db.id();
+        db.update("INSERT INTO ai_work_items(id,company_id,owner_id,state) VALUES (?,?,?,'PREPARING')",id,company,ids.get("leader"));
+        db.update("INSERT INTO ai_work_steps(id,company_id,work_id,plan_version,step_key,action,state,fence,attempts,lease_until) VALUES (?,?,?,0,'prepare-1','PREPARE','RUNNING',1,1,now()+interval '10 minutes')",stepId,company,id);
+        var step=db.one("SELECT * FROM ai_work_steps WHERE id=?",stepId);
+        var pool=Executors.newSingleThreadExecutor();
+        try(var connection=dataSource.getConnection()){
+            connection.setAutoCommit(false);
+            int pid;
+            try(var query=connection.createStatement();var result=query.executeQuery("SELECT pg_backend_pid()")){result.next();pid=result.getInt(1);}
+            try(var query=connection.prepareStatement("SELECT id FROM users WHERE id=? FOR UPDATE")){query.setString(1,ids.get("leader"));query.executeQuery().close();}
+            var settlement=pool.submit(()->org.springframework.test.util.ReflectionTestUtils.invokeMethod(workExecutor,"fail",step,new ApiError(403,"FORBIDDEN","revoked")));
+            try{
+                long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+                while(db.count("SELECT count(*) FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid))",pid)==0&&System.nanoTime()<end)Thread.sleep(20);
+                assertTrue(db.count("SELECT count(*) FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid))",pid)>0);
+                // An old item -> notification(user FK) path holds this row and fails NOWAIT.
+                try(var query=connection.prepareStatement("SELECT id FROM ai_work_items WHERE id=? FOR UPDATE NOWAIT")){query.setString(1,id);assertTrue(query.executeQuery().next());}
+            }finally{connection.rollback();}
+            settlement.get(5,TimeUnit.SECONDS);
+            assertEquals("FAILED",db.one("SELECT state FROM ai_work_items WHERE id=?",id).get("state"));
+            assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));
+        }finally{pool.shutdownNow();}
+    }
     @RepeatedTest(20) void stopOrMembershipRevocationBeforeActionPreventsAnyBusinessWrite()throws Exception{
         for(String change:List.of("cancel","delete","role","disabled","entry")){
             redis.delete("workpanel:memory-model:"+ids.get("leader"));redis.delete(redis.keys("workpanel:api:*"));

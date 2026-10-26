@@ -35,17 +35,7 @@ const screens = <String, ScreenSpec>{
   'dispatch': ScreenSpec(
     '派发任务',
     'tasks',
-    fields: [
-      '任务名称',
-      '所属分组',
-      '任务内容',
-      '截止时间',
-      '紧急程度',
-      '进度备注',
-      '主负责人',
-      '协作人',
-      '附件',
-    ],
+    fields: ['任务名称', '开始时间', '任务内容', '截止时间', '标签', '参与人', '附件'],
     manager: true,
   ),
   'feedback': ScreenSpec(
@@ -103,14 +93,20 @@ const screens = <String, ScreenSpec>{
     manager: true,
   ),
   'note': ScreenSpec('私人备注', 'private-notes', fields: ['备注'], action: 'save'),
+  'log-withdraw': ScreenSpec(
+    '撤回日志',
+    'logs',
+    fields: ['撤回原因'],
+    action: 'withdraw',
+  ),
   'log-edit': ScreenSpec(
     '写工作日志',
     'logs',
-    fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时'],
+    fields: ['今日工作'],
     action: 'submit',
   ),
   'log-revise': ScreenSpec(
-    '修订已提交日志',
+    '申请修订日志',
     'logs',
     fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时', '修改理由'],
     action: 'request-review',
@@ -166,7 +162,7 @@ const screens = <String, ScreenSpec>{
   'policy': ScreenSpec(
     '审核策略',
     'organization/admin',
-    fields: ['指定公司复核人', '任务关键修改需复核'],
+    fields: [],
     action: 'policy',
     admin: true,
   ),

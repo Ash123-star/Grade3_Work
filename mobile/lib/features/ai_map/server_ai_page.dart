@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -61,14 +62,11 @@ abstract class AiProtectedState<T extends ConsumerStatefulWidget>
       ref.read(sessionProvider).id == originalAccount.id &&
       ref.read(sessionProvider).token == originalAccount.token &&
       ref.read(sessionProvider).canReadBusiness;
-  CancelToken nextTransport() {
-    transport?.cancel();
-    return transport = CancelToken();
-  }
 
-  bool guard() {
-    ref.watch(sessionProvider);
-    ref.listen(sessionProvider, (_, next) {
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual<Session>(sessionProvider, (_, next) {
       if (next.id != originalAccount.id ||
           next.token != originalAccount.token ||
           !next.canReadBusiness) {
@@ -81,6 +79,15 @@ abstract class AiProtectedState<T extends ConsumerStatefulWidget>
         }
       }
     });
+  }
+
+  CancelToken nextTransport() {
+    transport?.cancel();
+    return transport = CancelToken();
+  }
+
+  bool guard() {
+    ref.watch(sessionProvider);
     return alive;
   }
 
@@ -323,7 +330,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
       if (id != null && id != current?.id && alive && !busy) refresh(id);
     });
     final job = completed;
-    return PageFrame(
+    final page = PageFrame(
       title: 'AI地图',
       bottom: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -469,6 +476,18 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
           const SizedBox(height: 24),
         ],
       ),
+    );
+    return SiblingSwipe(
+      index: job == null ? 0 : tab,
+      itemCount: job == null ? 1 : 3,
+      onStep: (step) {
+        if (job == null) return false;
+        final next = tab + step;
+        if (next < 0 || next > 2) return false;
+        setState(() => tab = next);
+        return true;
+      },
+      child: page,
     );
   }
 }
