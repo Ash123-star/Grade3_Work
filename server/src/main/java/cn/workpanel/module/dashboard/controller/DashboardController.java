@@ -13,8 +13,8 @@ import java.util.*;
 @RequestMapping("/api")
 /** 导图、个人资料和私人备注接口；所有聚合查询复用当前用户数据范围。 */
 public class DashboardController {
-    final Db db; final Business business; final ReviewApplicationService reviews;
-    public DashboardController(Db db,Business business,ReviewApplicationService reviews) { this.db=db; this.business=business; this.reviews=reviews; }
+    final Db db; final Business business; final cn.workpanel.module.dashboard.application.CompanyItemApplicationService companyItems;
+    public DashboardController(Db db,Business business,cn.workpanel.module.dashboard.application.CompanyItemApplicationService companyItems) { this.db=db; this.business=business; this.companyItems=companyItems; }
     /** 获取导图首页四象限及当前用户派发资格。需要登录；公司重点只读。 */
     @GetMapping("/dashboard") public Map<String,Object> home(HttpServletRequest r) {
         Actor a=Actor.current(r); var t=Business.taskScope(a);
@@ -27,10 +27,7 @@ public class DashboardController {
     /** 提交公司重点候选版本。需要全局管理权限；需 reason/version，审核通过后生效。 */
     @PostMapping("/dashboard/company/revisions") @Transactional
     public Map<String,Object> companyRevision(HttpServletRequest r,@RequestBody Map<String,Object> b) {
-        Actor a=Actor.current(r); if(!a.global()) throw ApiError.forbidden(); Db.fields(b,"id","version","reason","title","text","pinned","archived","position"); String id=Db.str(b,"id"); int version=Db.version(b); Object before=Map.of();
-        if(id.isBlank()) { if(version!=0) throw ApiError.conflict(); id=Db.id(); } else before=db.one("SELECT * FROM dashboard_items WHERE id=? AND company_id=? AND kind='COMPANY'",id,a.company());
-        var candidate=new LinkedHashMap<String,Object>(); for(String k:List.of("title","text","pinned","archived","position")) if(b.containsKey(k)) candidate.put(k,b.get(k)); Db.required(candidate,"title"); validate(candidate);
-        return reviews.create(a,"COMPANY_ITEM",id,version,before,candidate,Db.required(b,"reason"));
+        return companyItems.revise(Actor.current(r),b);
     }
     /** 分页读取个人重点。本人可读本人内容；上级只读授权范围内已发布重点。 */
     @GetMapping("/dashboard/personal") public Map<String,Object> personal(HttpServletRequest r,@RequestParam(required=false) String ownerId,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit) {

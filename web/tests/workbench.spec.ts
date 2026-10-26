@@ -13,7 +13,7 @@ test('AI upload uses capability limits and shows the server file error', async (
     else if(url.pathname==='/api/admin/workspace/attachments'){uploads++;expect(url.searchParams.get('purpose')).toBe('AI_WORK');status=415;body={code:'FILE_TYPE_MISMATCH',message:'文件格式与名称不一致，请重新导出后添加'};}
     await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
   });
-  await page.goto('/');
+  await page.goto('/legacy');
   await page.locator('input[type=file]').setInputFiles({name:'旧.xls',mimeType:'application/octet-stream',buffer:Buffer.from('data')});
   await expect(page.getByRole('alert')).toContainText('请添加图片、PDF、Word或Excel文件');expect(uploads).toBe(0);
   await page.locator('input[type=file]').setInputFiles({name:'伪装.pdf',mimeType:'application/pdf',buffer:Buffer.from('data')});
@@ -53,7 +53,7 @@ test('workbench preserves failed input, confirms a concrete action and clears lo
     } else throw new Error(`Unexpected ${request.method()} ${path}`);
     await route.fulfill({status, contentType: 'application/json', body: JSON.stringify(body)});
   });
-  await page.goto('/');
+  await page.goto('/legacy');
   await page.getByRole('textbox', {name: '要办什么'}).fill('请整理交付任务');
   for (let i = 0; i < 2; i++) {
     await page.getByRole('button', {name: '发送', exact: true}).click();
@@ -90,7 +90,7 @@ test('private deletion uses current version and retains formal result semantics'
     } else if (path === '/api/admin/workspace/ai/work-items/work-2') body = workFixture(item);
     await route.fulfill({contentType: 'application/json', body: JSON.stringify(body)});
   });
-  await page.goto('/');
+  await page.goto('/legacy');
   await page.getByRole('button', {name: /已提交交付/}).click();
   await expect(page.getByText('已提交，等待验收', {exact: true})).toBeVisible();
   page.once('dialog', dialog => dialog.accept());
@@ -113,7 +113,7 @@ test('long work results remain readable above the composer', async ({page}) => {
     else if(url.pathname==='/api/admin/workspace/ai-maps/development')body={scopes:[],analysis:{}};
     await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
   });
-  await page.goto('/');await page.getByRole('button',{name:/核对报价材料/}).click();
+  await page.goto('/legacy');await page.getByRole('button',{name:/核对报价材料/}).click();
   await expect(page.getByText(answer,{exact:true})).toBeVisible();
   const bounds=await page.evaluate(()=>({result:document.querySelector('.work-result')!.getBoundingClientRect().bottom,composer:document.querySelector('.work-composer')!.getBoundingClientRect().top}));
   expect(bounds.composer).toBeGreaterThanOrEqual(bounds.result);
@@ -131,7 +131,7 @@ test('completed check displays missing material rather than handled success', as
     const body=path==='/api/auth/me'?{role:'ADMIN',must_change_password:false}:path==='/api/admin/workspace/ai/work-items'?workPage([item]):path==='/api/admin/workspace/ai/work-items/checked-work'?workFixture(item):{};
     await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
   });
-  await page.goto('/');await page.getByRole('button',{name:/检查交付材料/}).click();
+  await page.goto('/legacy');await page.getByRole('button',{name:/检查交付材料/}).click();
   await expect(page.getByRole('status')).toHaveText('需要补充材料');
   await expect(page.getByText('已办妥',{exact:true})).toHaveCount(0);
   await expect(page.getByText('有几处材料需要补充',{exact:true})).toBeVisible();

@@ -1,6 +1,11 @@
 import { createApp } from 'vue';
-import App from './App.vue';
+import AdminApp from './admin/AdminApp.vue';
+import { createPinia } from 'pinia';
+import { router } from './admin/router';
+import 'element-plus/dist/index.css';
 import '@vue-flow/core/dist/style.css';
 import '@vue-flow/core/dist/theme-default.css';
 import './style.css';
-createApp(App).mount('#app');
+import './admin/admin.css';
+const app = createApp(AdminApp).use(createPinia()).use(router);
+void router.isReady().then(() => app.mount('#app'));

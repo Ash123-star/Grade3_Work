@@ -8,7 +8,7 @@ for (const role of ['EMPLOYEE', 'FOUNDER']) {
       if (new URL(route.request().url()).pathname !== '/api/auth/me') businessRequests++;
       await route.fulfill({ json: { role, must_change_password: false } });
     });
-    await page.goto('/');
+    await page.goto('/legacy');
     await expect(page.getByRole('alert')).toContainText('仅供管理员');
     await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '更新分析' })).toHaveCount(0);
@@ -27,7 +27,7 @@ test('revoked administrator clears workspace on protected API denial', async ({ 
       await route.fulfill({ status: 403, json: { code: 'FORBIDDEN', message: '管理权限已撤销' } });
     }
   });
-  await page.goto('/');
+  await page.goto('/legacy');
   await expect(page.getByRole('alert')).toContainText('管理权限已撤销');
   await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '更新分析' })).toHaveCount(0);
@@ -35,7 +35,7 @@ test('revoked administrator clears workspace on protected API denial', async ({ 
 
 test('real employee rejected and real admin enters without mock requests', async ({ page }, testInfo) => {
   test.skip(!process.env.WEEK6_ADMIN_ACCOUNT || !process.env.WEEK6_ADMIN_PASSWORD || !process.env.WEEK6_EMPLOYEE_ACCOUNT || !process.env.WEEK6_EMPLOYEE_PASSWORD, 'Requires isolated real backend credentials');
-  await page.goto('/');
+  await page.goto('/legacy');
   await page.getByLabel('账号').fill(process.env.WEEK6_EMPLOYEE_ACCOUNT!);
   await page.getByLabel('密码', { exact: true }).fill(process.env.WEEK6_EMPLOYEE_PASSWORD!);
   await page.getByRole('button', { name: '登录', exact: true }).click();
@@ -69,7 +69,7 @@ test('task audit supports pages empty errors and safe content', async ({ page })
     }
     return route.fulfill({json:{scopes:[],analysis:{},memories:0}});
   });
-  await page.goto('/');
+  await page.goto('/legacy');
   await page.getByRole('button',{name:'任务审计',exact:true}).click();
   await expect(page.getByText('共 21 条记录')).toBeVisible();
   await page.getByText('查看变更前后内容').click();
