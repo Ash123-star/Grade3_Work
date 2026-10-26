@@ -63,7 +63,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           children: [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: period == '月' ? 12 : 0),
-              child: const DateControls(),
+              child: const DateControls(showTaskManagement: true),
             ),
             Expanded(
               child: LayoutBuilder(
@@ -154,7 +154,6 @@ class ProfilePage extends ConsumerWidget {
                 child: Center(
                   child: TuantuanIcon(switch (title) {
                     '消息中心' => 'notification',
-                    '任务管理' => 'task',
                     '工作统计' || '审计记录' => 'report',
                     '审批中心' || '我的申请' => 'approval',
                     '组织与权限' || '人员展示' => 'members',
@@ -179,7 +178,6 @@ class ProfilePage extends ConsumerWidget {
                         '消息中心' => '任务、审批与工作提醒',
                         '工作统计' => '查看授权范围内的工作数据',
                         '审批中心' || '我的申请' => '核对审核进度',
-                        '任务管理' => '查看本人及下属全部任务',
                         '人员展示' => '按部门查看授权范围内的成员',
                         '组织与权限' => '组织配置与权限申请',
                         '设置' => '偏好与隐私',
@@ -244,12 +242,6 @@ class ProfilePage extends ConsumerWidget {
     return PageFrame(
       title: '我的',
       showTitle: false,
-      actions: [
-        TextButton(
-          onPressed: () => openForm(context, 'profile-edit'),
-          child: const Text('编辑资料'),
-        ),
-      ],
       child: PageBody(
         children: [
           PaperSurface(
@@ -333,7 +325,6 @@ class ProfilePage extends ConsumerWidget {
               badge:
                   '${unread.valueOrNull?.items.where((r) => r.fields['read'] != true).length ?? '—'}',
             ),
-            link('任务管理', () => context.push('/me/tasks')),
             if (user.manager)
               link('工作统计', () => context.push('/me/statistics')),
             link(

@@ -125,6 +125,49 @@ class PageResult {
   final String? nextCursor;
 }
 
+enum MemberLogDayStatus { submitted, missing, future, unknown }
+
+class MemberLogMonth {
+  const MemberLogMonth({
+    required this.ownerId,
+    required this.month,
+    required this.days,
+    this.employmentStartDate,
+  });
+
+  final String ownerId;
+  final DateTime month;
+  final DateTime? employmentStartDate;
+  final Map<int, MemberLogDayStatus> days;
+
+  factory MemberLogMonth.fromJson(Map<String, dynamic> json) {
+    final rawDays = Map<String, dynamic>.from(json['days'] as Map? ?? {});
+    final days = <int, MemberLogDayStatus>{};
+    for (final entry in rawDays.entries) {
+      final day = int.tryParse(entry.key);
+      if (day == null) continue;
+      days[day] = switch ('${entry.value}'.toUpperCase()) {
+        'SUBMITTED' => MemberLogDayStatus.submitted,
+        'MISSING' => MemberLogDayStatus.missing,
+        'FUTURE' => MemberLogDayStatus.future,
+        _ => MemberLogDayStatus.unknown,
+      };
+    }
+    final rawMonth = '${json['month'] ?? ''}';
+    return MemberLogMonth(
+      ownerId: '${json['ownerId'] ?? ''}',
+      month: DateTime.tryParse(
+            rawMonth.length == 7 ? '$rawMonth-01' : rawMonth,
+          ) ??
+          DateTime.now(),
+      employmentStartDate: DateTime.tryParse(
+        '${json['employmentStartDate'] ?? ''}',
+      ),
+      days: days,
+    );
+  }
+}
+
 class Query {
   const Query({
     this.search = '',
@@ -146,6 +189,88 @@ class Query {
     if (from != null) 'from': from!.toUtc().toIso8601String(),
     if (to != null) 'to': to!.toUtc().toIso8601String(),
   };
+}
+
+class AnalyticsQuery {
+  const AnalyticsQuery({
+    required this.date,
+    required this.period,
+    this.groupBy = 'department',
+    this.departmentId,
+    this.teamId,
+    this.ownerId,
+  });
+  final DateTime date;
+  final String period;
+  final String groupBy;
+  final String? departmentId, teamId, ownerId;
+
+  Map<String, dynamic> toJson() => {
+    'date': date.toIso8601String().split('T').first,
+    'period': period,
+    'groupBy': groupBy,
+    if (departmentId != null) 'departmentId': departmentId,
+    if (teamId != null) 'teamId': teamId,
+    if (ownerId != null) 'ownerId': ownerId,
+  };
+}
+
+class AnalyticsDetailsQuery extends AnalyticsQuery {
+  const AnalyticsDetailsQuery({
+    required super.date,
+    required super.period,
+    super.groupBy,
+    super.departmentId,
+    super.teamId,
+    super.ownerId,
+    required this.metric,
+    this.groupId,
+    this.bucket,
+    this.cursor,
+    this.limit = 30,
+  });
+
+  final String metric;
+  final String? groupId, bucket, cursor;
+  final int limit;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    ...super.toJson(),
+    'metric': metric,
+    if (groupId != null) 'groupId': groupId,
+    if (bucket != null) 'bucket': bucket,
+    if (cursor != null) 'cursor': cursor,
+    'limit': limit,
+  };
+}
+
+class AnalyticsFilters {
+  const AnalyticsFilters({
+    this.departmentId = '',
+    this.teamId = '',
+    this.ownerId = '',
+    this.groupBy = 'department',
+    this.visibleMetrics = const [
+      'dispatched', 'received', 'feedback', 'accepted', 'overdue', 'diarySubmitted',
+    ],
+  });
+  final String departmentId, teamId, ownerId;
+  final String groupBy;
+  final List<String> visibleMetrics;
+  AnalyticsFilters copyWith({
+    String? departmentId,
+    String? teamId,
+    String? ownerId,
+    String? groupBy,
+    List<String>? visibleMetrics,
+  }) => AnalyticsFilters(
+    departmentId: departmentId ?? this.departmentId,
+    teamId: teamId ?? this.teamId,
+    ownerId: ownerId ?? this.ownerId,
+    groupBy: groupBy ?? this.groupBy,
+    visibleMetrics: visibleMetrics ?? this.visibleMetrics,
+  );
 }
 
 class Command {

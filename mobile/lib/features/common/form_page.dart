@@ -1039,7 +1039,6 @@ class _FormPageState extends ConsumerState<FormPage> {
       '参与人',
       '员工',
       '直属上级',
-      '指定公司复核人',
     ].contains(label);
     return TextFormField(
       controller: controller,
@@ -1318,7 +1317,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           widget.kind == 'log-revise'
               ? '修订申请已提交，审核通过后生效'
               : AppConfig.mock
-              ? '已保存到演示数据'
+              ? '已保存'
               : '已提交',
         );
         if (context.canPop()) context.pop();
@@ -1346,12 +1345,15 @@ class _FormPageState extends ConsumerState<FormPage> {
             loadFailed ||
             conflict ||
             !windowOpen ||
+            widget.kind == 'policy' ||
             (!AppConfig.mock && widget.kind == 'return')
         ? null
         : submit,
     child: Text(
       loadingExisting
           ? '正在读取…'
+          : widget.kind == 'policy'
+          ? '当前规则'
           : widget.kind == 'login'
           ? '登录'
           : widget.kind == 'register'
@@ -1546,7 +1548,9 @@ class _FormPageState extends ConsumerState<FormPage> {
     return PageFrame(
       title: document ? (log ? '写日志' : '修改日志') : spec.title,
       showTitle: !auth,
-      bottom: Column(
+      bottom: widget.kind == 'policy'
+          ? null
+          : Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (error != null)
@@ -1559,7 +1563,7 @@ class _FormPageState extends ConsumerState<FormPage> {
             ),
           BottomActions(
             primary: submitButton(),
-            secondary: document
+            secondary: document && !log
                 ? OutlinedButton(
                     onPressed:
                         busy ||
@@ -1800,13 +1804,12 @@ class _FormPageState extends ConsumerState<FormPage> {
             'reschedule',
             'role',
             'membership',
-            'policy',
             'reporting',
           ].contains(widget.kind))
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
               child: Text(
-                '提交候选修改后等待独立审核，原版本继续生效。',
+                '提交候选修改后由配置的直属上级单级审核，原版本继续生效。',
                 style: TextStyle(color: CuteTokens.muted),
               ),
             ),
@@ -1827,7 +1830,7 @@ class _FormPageState extends ConsumerState<FormPage> {
             const SectionHeader('策略范围'),
             const PaperSurface(
               child: Text(
-                '任务关键修改 · 提交候选配置后等待独立审核。当前生效策略与完整组织审核链需要服务端返回，不用下方预览替代。',
+                '普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。',
               ),
             ),
             const SizedBox(height: 16),
@@ -1935,23 +1938,10 @@ class _FormPageState extends ConsumerState<FormPage> {
               ),
             ),
           if (widget.kind == 'policy') ...[
-            const SectionHeader('候选路由预览'),
-            PaperSurface(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('1 · 申请人提交候选修改'),
-                  const SizedBox(height: 12),
-                  const Text('2 · 按服务端组织范围解析独立复核节点'),
-                  const SizedBox(height: 12),
-                  Text(
-                    '3 · 公司复核人：${controllers['指定公司复核人']!.text.isEmpty ? '尚未指定' : controllers['指定公司复核人']!.text}',
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '申请人不能自审；节点缺失时等待配置，不自动通过。此处为候选配置示意，实际人选、顺序与生效结果以服务端为准。',
-                  ),
-                ],
+            const SectionHeader('审核方式'),
+            const PaperSurface(
+              child: Text(
+                '普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。',
               ),
             ),
           ],

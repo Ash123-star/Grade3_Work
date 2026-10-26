@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cute_ui/cute_ui.dart' show CuteTokens;
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/models/log_edit_window.dart';
+import 'package:pandora_mobile/features/dashboard/diary_composer_sheet.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
@@ -33,6 +35,8 @@ class _LogsPageState extends ConsumerState<LogsPage> {
       );
     }
     final date = ref.watch(logFilterDateProvider);
+    final canCreateForDate =
+        date == null || canInitiallySubmitDiaryOn(date);
     final resource = team ? 'logs/subordinates' : 'logs';
     final state = ref.watch(
       logDayRecordsProvider((resource, team ? null : user.id)),
@@ -41,26 +45,44 @@ class _LogsPageState extends ConsumerState<LogsPage> {
     final draft = ref.watch(todayDraftProvider(user.id));
 
     void edit(Record? record) {
-      ref.read(logDateProvider.notifier).state = record == null
+      final editDate = record == null
           ? date ?? DateTime.now()
           : DateTime.tryParse('${record.fields['businessDate']}') ??
                 DateTime.now();
-      openForm(
-        context,
-        record == null || !isSubmittedDiary(record) ? 'log-edit' : 'log-revise',
-        id: record?.id,
-        version: record?.version,
-      );
+      ref.read(logDateProvider.notifier).state = editDate;
+      if (record == null || !isSubmittedDiary(record)) {
+        unawaited(
+          showDiaryComposer(
+            context,
+            ref,
+            date: editDate,
+            recordId: record?.id,
+            version: record?.version,
+          ),
+        );
+      } else {
+        unawaited(
+          showDiaryComposer(
+            context,
+            ref,
+            date: editDate,
+            recordId: record.id,
+            version: record.version,
+          ),
+        );
+      }
     }
 
     void create() {
-      ref.read(logDateProvider.notifier).state = date ?? DateTime.now();
-      openForm(context, 'log-edit');
+      final editDate = date ?? DateTime.now();
+      ref.read(logDateProvider.notifier).state = editDate;
+      unawaited(showDiaryComposer(context, ref, date: editDate));
     }
 
     void restoreDraft() {
-      ref.read(logDateProvider.notifier).state = date ?? DateTime.now();
-      openForm(context, 'log-edit', restoreDiaryDraft: true);
+      final editDate = date ?? DateTime.now();
+      ref.read(logDateProvider.notifier).state = editDate;
+      unawaited(showDiaryComposer(context, ref, date: editDate));
     }
 
     Future<void> chooseDateFilter() async {
@@ -108,7 +130,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
             child: const Text('下属日志 ›'),
           ),
       ],
-      fab: team
+      fab: team || !canCreateForDate
           ? null
           : FloatingActionButton(
               heroTag: 'create-log',
@@ -214,7 +236,11 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                 draft.error!,
                 retry: () => ref.invalidate(todayDraftProvider(user.id)),
               ),
-            if (draft.valueOrNull != null)
+            if (draft.valueOrNull != null &&
+                (date == null ||
+                    date.year == DateTime.now().year &&
+                        date.month == DateTime.now().month &&
+                        date.day == DateTime.now().day))
               TextButton.icon(
                 onPressed: restoreDraft,
                 icon: const Icon(Icons.edit_note),

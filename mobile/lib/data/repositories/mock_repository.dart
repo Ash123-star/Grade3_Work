@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:pandora_mobile/data/models/attachments.dart';
@@ -7,6 +8,17 @@ import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
 
 enum DemoScenario { normal, empty, offline, forbidden }
+
+String _mockTaskPhase(String status) => switch (status) {
+  '待接收' => 'DISPATCHED',
+  '进行中' => 'RECEIVED',
+  '待验收' => 'FEEDBACK',
+  '已验收' => 'ACCEPTED',
+  '已归档' => 'ARCHIVED',
+  '已撤回' => 'WITHDRAWN',
+  '需补充' => 'NEEDS_CHANGES',
+  _ => 'UNKNOWN',
+};
 
 class DemoAccount {
   const DemoAccount({
@@ -19,12 +31,14 @@ class DemoAccount {
     required this.teamName,
     required this.managerId,
     required this.intro,
+    this.employmentStartDate,
     this.dispatch = false,
     this.companyReviewer = false,
   });
 
   final String id, name, departmentId, departmentName, teamId, teamName;
   final String managerId, intro;
+  final DateTime? employmentStartDate;
   final UserRole role;
   final bool dispatch, companyReviewer;
 
@@ -42,6 +56,7 @@ class DemoAccount {
     required String todayLogStatus,
     required String taskStatus,
   }) {
+    final accountIndex = demoAccounts.indexWhere((account) => account.id == id);
     return Record(
       id: id,
       title: name,
@@ -58,6 +73,13 @@ class DemoAccount {
         'teamName': teamName,
         'managerId': managerId,
         'manager_id': managerId,
+        if (employmentStartDate != null)
+          'employmentStartDate': employmentStartDate!
+              .toIso8601String()
+              .split('T')
+              .first,
+        'phone': '+1 202-555-${(100 + accountIndex).toString()}',
+        'email': '${id.replaceAll('-', '.')}@example.invalid',
         'participatingTaskCount': participatingTaskCount,
         'todayLogStatus': todayLogStatus,
         'taskStatus': taskStatus,
@@ -346,6 +368,7 @@ class MockRepository implements Repository {
   final DemoStore store;
   String _resource(String r) => switch (r) {
     'logs/subordinates' => 'logs',
+    'tasks/received-card' => 'tasks',
     'organization/dispatch-people' => 'organization',
     _ => r,
   };
@@ -379,7 +402,7 @@ class MockRepository implements Repository {
     await _check('attachments');
     final file = store.attachments[id];
     if (file == null) {
-      throw const ApiFailure(FailureKind.notFound, '演示附件没有文件内容');
+      throw const ApiFailure(FailureKind.notFound, '附件内容暂不可用');
     }
     return DownloadedAttachment(
       name: safeAttachmentName(file.name),
@@ -390,7 +413,7 @@ class MockRepository implements Repository {
   Future<void> _check(String resource) async {
     await Future<void>.delayed(const Duration(milliseconds: 120));
     if (scenario == DemoScenario.offline) {
-      throw const ApiFailure(FailureKind.timeout, '演示：网络连接超时，请重试');
+      throw const ApiFailure(FailureKind.timeout, '网络连接超时，请重试');
     }
     if (!session.canReadBusiness || scenario == DemoScenario.forbidden) {
       throw const ApiFailure(FailureKind.forbidden, '当前账号无权访问');
@@ -573,46 +596,47 @@ class MockRepository implements Repository {
 
   List<Record> _seedPersonalFocus(DateTime now) {
     const focus = [
-      '完成需求边界与验收口径确认',
-      '整理访谈发现并回访关键用户',
-      '完成接口分页与权限校验联调',
-      '补齐移动端关键页面交互细节',
-      '复核自动化回归和发布阻断项',
-      '整理本周渠道内容与排期',
-      '跟进重点客户部署问题闭环',
-      '梳理服务稳定性告警与容量计划',
-      '更新部门目标和资源风险清单',
-      '复核客户成功交付里程碑',
-      '完成体验评审问题分级',
-      '协调跨部门版本依赖与回滚方案',
-      '分析内容渠道转化并提出实验',
-      '更新组织账号与权限复核记录',
-      '完善质量检查清单和缺陷复现步骤',
-      '准备经营例会数据和重点决策项',
-      '制定用户增长实验的停止条件',
-      '归档交付培训材料和客户反馈',
-      '整理用户研究原始记录与结论',
+      '把复杂问题拆成可确认的小步骤',
+      '记录一次有效协作中的做法',
+      '下次评审先讲清楚决策依据',
+      '留出时间复盘今天的取舍',
+      '想到一个值得继续验证的问题',
+      '记下最近一次工作中的收获',
+      '提醒自己及时同步风险变化',
+      '整理一个以后可以复用的经验',
+      '把未完成的想法留到周末梳理',
+      '记录今天值得感谢的一次帮助',
+      '给明天的自己留一个行动提示',
+      '先确认目标，再决定投入顺序',
+      '把反馈中的共性问题记下来',
+      '每次交付后补充一条经验',
+      '遇到分歧时先对齐事实与目标',
+      '记录一个需要持续观察的信号',
+      '本周想尝试的一个小改进',
+      '为重要决定补上背景和理由',
+      '把好用的方法分享给团队',
+    ];
+    const notes = [
+      '这条记录可以继续补充自己的想法、背景或后续行动。',
+      '回看这件事时，记下哪些做法有效，以及下次会如何调整。',
+      '先保留这个观察，等有更多信息后再决定是否采取行动。',
+      '把这次经验整理成自己以后能直接使用的提醒。',
+      '如果情况有变化，回来更新这条记录，不必拘泥于固定格式。',
     ];
     return [
       for (final (i, account) in demoAccounts.indexed)
         for (var slot = 0; slot < 2; slot++)
           Record(
             id: 'focus-${account.id}-${slot + 1}',
-            title: slot == 0
-                ? focus[i % focus.length]
-                : '${account.teamName} · ${focus[(i + 7) % focus.length]}',
+            title: focus[(i * 2 + slot) % focus.length],
             ownerId: account.id,
-            subtitle: '${account.departmentName} · ${account.teamName}',
             fields: {
-              'body':
-                  '${account.intro} 本阶段同步跟进：${focus[(i + slot + 3) % focus.length]}。',
-              'status': slot == 0 ? '进行中' : '待复核',
+              'body': notes[(i + slot) % notes.length],
               '排序位置': slot,
+              'pinned': false,
               'createdAt': now
                   .subtract(Duration(days: slot + i % 4))
                   .toIso8601String(),
-              'departmentName': account.departmentName,
-              'teamName': account.teamName,
             },
           ),
     ];
@@ -706,6 +730,37 @@ class MockRepository implements Repository {
             16 + i % 3,
           );
           final status = statuses[i % statuses.length];
+          final dispatchTime = instant
+              .subtract(Duration(days: i % 12 + 1))
+              .toUtc()
+              .toIso8601String();
+          final dispatchDay = shanghaiWallTime(DateTime.parse(dispatchTime));
+          final phase = _mockTaskPhase(status);
+          final receivedAt = phase == 'DISPATCHED'
+              ? null
+              : dispatchDay
+                    .add(const Duration(hours: 4))
+                    .toUtc()
+                    .toIso8601String();
+          final feedbackAt =
+              [
+                'FEEDBACK',
+                'NEEDS_CHANGES',
+                'ACCEPTED',
+                'ARCHIVED',
+              ].contains(phase)
+              ? dispatchDay
+                    .add(const Duration(days: 1, hours: 2))
+                    .toUtc()
+                    .toIso8601String()
+              : null;
+          final acceptedAt = ['ACCEPTED', 'ARCHIVED'].contains(phase)
+              ? (i.isEven
+                        ? deadline.subtract(const Duration(hours: 2))
+                        : deadline.add(const Duration(hours: 2)))
+                    .toUtc()
+                    .toIso8601String()
+              : null;
           final dispatcher = _account(
             owner.managerId.isEmpty ? 'u-founder' : owner.managerId,
           );
@@ -720,13 +775,15 @@ class MockRepository implements Repository {
               'body':
                   '${owner.name}负责$title，交付物为可复核的工作记录和相关依据；跨组依赖由${dispatcher.name}协调。',
               'status': status,
+              'phase': phase,
               'startAt': _atDay(start, 9 + i % 3).toIso8601String(),
               'endAt': _atDay(start, 12 + i % 3).toIso8601String(),
               'deadline': deadline.toIso8601String(),
-              'createdAt': instant
-                  .subtract(Duration(days: i % 12 + 1))
-                  .toUtc()
-                  .toIso8601String(),
+              'createdAt': dispatchTime,
+              'dispatchAt': dispatchTime,
+              'receivedAt': ?receivedAt,
+              'feedbackAt': ?feedbackAt,
+              'acceptedAt': ?acceptedAt,
               'dispatcherId': dispatcher.id,
               'participantIds': [owner.id, ...teammates.map((a) => a.id)],
               'participantNames': [owner.name, ...teammates.map((a) => a.name)],
@@ -884,10 +941,16 @@ class MockRepository implements Repository {
       for (final (i, subject) in subjects.indexed)
         (() {
           final applicant = demoAccounts[(i * 5 + 1) % demoAccounts.length];
-          final approver = _account(
-            applicant.managerId.isEmpty ? 'u-founder' : applicant.managerId,
-          );
-          final pending = i % 3 == 0;
+          final founderExempt = applicant.role == UserRole.founder;
+          final approver = founderExempt || applicant.managerId.isEmpty
+              ? null
+              : _account(applicant.managerId);
+          final pending = !founderExempt && (approver == null || i % 3 == 0);
+          final reviewState = pending
+              ? '待审'
+              : founderExempt || i % 2 == 0
+              ? '已通过'
+              : '已驳回';
           return Record(
             id: 'review-demo-${i + 1}',
             title: subject,
@@ -896,25 +959,26 @@ class MockRepository implements Repository {
                 '${applicant.name} · ${applicant.departmentName} · ${stamp(now.subtract(Duration(days: i)))}',
             fields: {
               'applicantName': applicant.name,
-              'reviewerName': approver.name,
-              'reviewState': pending
-                  ? '待审'
-                  : i % 2 == 0
-                  ? '已通过'
-                  : '已驳回',
+              'reviewerName': approver?.name,
+              'reviewerId': approver?.id,
+              'reviewerConfigured': approver != null,
+              'approvalMode': 'DIRECT_MANAGER',
+              'reviewState': reviewState,
+              if (founderExempt) 'decisionSource': 'FOUNDER_EXEMPT',
               'targetResource': i % 2 == 0 ? 'tasks' : 'logs',
               'targetId': i % 2 == 0
                   ? 'task-demo-${i + 1}'
                   : 'log-${applicant.id}-1',
-              'reason':
-                  '${applicant.name}说明了业务背景、影响范围和期望生效时间，等待${approver.name}核对。',
+              'reason': '${applicant.name}说明了业务背景、影响范围和期望生效时间，等待直属上级核对。',
               'before': '当前已生效内容保持不变。',
               'after': '按申请补充交付范围、记录或组织说明。',
               'step': 0,
               'createdAt': now.subtract(Duration(days: i)).toIso8601String(),
               'reviewEvents': [
                 '${applicant.name}提交申请',
-                if (!pending) '${approver.name}${i % 2 == 0 ? '通过' : '要求补充说明'}',
+                if (founderExempt) '系统 · 创始人授权操作免审并自动批准',
+                if (!pending && !founderExempt && approver != null)
+                  '${approver.name}${reviewState == '已通过' ? '通过' : '驳回'}',
               ],
             },
           );
@@ -1024,7 +1088,25 @@ class MockRepository implements Repository {
     if (resource == 'organization') {
       items = items.where((r) => visiblePeople.contains(r.id));
     }
-    if (resource == 'tasks') items = items.where(taskVisible);
+    if (resource == 'organization/profile') {
+      items = items.where((r) => visiblePeople.contains(r.id));
+    }
+    if (resource == 'tasks' || resource == 'tasks/received-card') {
+      items = items.where(taskVisible);
+      if (query.ownerId != null) {
+        items = items.where((record) => record.ownerId == query.ownerId);
+      }
+      if (resource == 'tasks/received-card') {
+        items = items.where((record) {
+          final participants = record.fields['participantIds'] as List?;
+          final received = participants == null
+              ? record.ownerId == session.id
+              : participants.map((id) => '$id').contains(session.id);
+          return received &&
+              '${record.fields['dispatcherId'] ?? ''}' != session.id;
+        });
+      }
+    }
     if (resource == 'logs/subordinates') {
       items = items.where(
         (r) =>
@@ -1057,7 +1139,8 @@ class MockRepository implements Repository {
       }
       items = items.where((p) => p.fields['status'] == 'ACTIVE');
     }
-    if (resource == 'tasks' && !session.manager) {
+    if ((resource == 'tasks' || resource == 'tasks/received-card') &&
+        !session.manager) {
       items = items.where((r) {
         final participants = (r.fields['participantIds'] as List?)
             ?.map((id) => '$id')
@@ -1067,13 +1150,43 @@ class MockRepository implements Repository {
             '${r.fields['dispatcherId'] ?? ''}' == session.id;
       });
     }
-    if (resource == 'reviews' && !session.manager) {
-      items = items.where((r) => r.ownerId == session.id);
+    if (resource == 'reviews') {
+      items = items.where(
+        (record) =>
+            record.ownerId == session.id ||
+            record.fields['reviewerId'] == session.id,
+      );
     }
     if (resource == 'notifications') {
       items = items.where((r) => r.ownerId == session.id);
     }
     if (query.from != null && query.to != null) {
+      var rangeFrom = query.from!;
+      var rangeTo = query.to!;
+      if (resource == 'tasks' && rangeTo.difference(rangeFrom).inDays >= 28) {
+        final monthStart = shanghaiWallTime(rangeFrom);
+        final monthEnd = shanghaiWallTime(rangeTo);
+        final visibleStart = DateTime(
+          monthStart.year,
+          monthStart.month,
+          monthStart.day,
+        ).subtract(Duration(days: monthStart.weekday - 1));
+        final visibleEnd = DateTime(
+          monthEnd.year,
+          monthEnd.month,
+          monthEnd.day,
+        ).add(Duration(days: (8 - monthEnd.weekday) % 7));
+        rangeFrom = DateTime.utc(
+          visibleStart.year,
+          visibleStart.month,
+          visibleStart.day,
+        ).subtract(const Duration(hours: 8));
+        rangeTo = DateTime.utc(
+          visibleEnd.year,
+          visibleEnd.month,
+          visibleEnd.day,
+        ).subtract(const Duration(hours: 8));
+      }
       items = items.where((r) {
         DateTime? parseBusinessInstant(dynamic value) {
           final raw = '$value';
@@ -1093,20 +1206,25 @@ class MockRepository implements Repository {
           );
           return start != null &&
               deadline != null &&
-              start.isBefore(query.to!) &&
-              !deadline.isBefore(query.from!);
+              !deadline.isBefore(start) &&
+              start.isBefore(rangeTo) &&
+              !deadline.isBefore(rangeFrom);
         }
         final raw = resource.startsWith('logs')
             ? '${r.fields['businessDate']}T00:00:00+08:00'
             : '${r.fields['deadline'] ?? r.fields['createdAt']}';
         final date = parseBusinessInstant(raw);
         return date != null &&
-            !date.isBefore(query.from!) &&
-            date.isBefore(query.to!);
+            !date.isBefore(rangeFrom) &&
+            date.isBefore(rangeTo);
       });
     }
     final result = items
-        .map((item) => resource == 'tasks' ? _withTaskDisplay(item) : item)
+        .map(
+          (item) => resource == 'tasks' || resource == 'tasks/received-card'
+              ? _withTaskDisplay(item)
+              : item,
+        )
         .toList();
     if (resource == 'dashboard/personal') {
       result.sort(
@@ -1119,12 +1237,540 @@ class MockRepository implements Repository {
   }
 
   @override
+  Future<MemberLogMonth> memberLogMonth(String ownerId, DateTime month) async {
+    await _check('logs/subordinates');
+    if (!session.manager || !visiblePeople.contains(ownerId)) {
+      throw const ApiFailure(FailureKind.forbidden, '无权查看该成员日志日历');
+    }
+    final start = DateTime(month.year, month.month);
+    final now = shanghaiWallTime(clock());
+    final employmentStart =
+        _account(ownerId).employmentStartDate ?? DateTime(2025, 1, 1);
+    final submitted = rows('logs')
+        .where(
+          (record) => record.ownerId == ownerId && isSubmittedDiary(record),
+        )
+        .where((record) {
+          final date = DateTime.tryParse('${record.fields['businessDate']}');
+          return date != null &&
+              date.year == start.year &&
+              date.month == start.month;
+        })
+        .map((record) => DateTime.tryParse('${record.fields['businessDate']}'))
+        .whereType<DateTime>()
+        .map((date) => date.day)
+        .toSet();
+    return MemberLogMonth(
+      ownerId: ownerId,
+      month: start,
+      employmentStartDate: employmentStart,
+      days: {
+        for (
+          var day = 1;
+          day <= DateTime(start.year, start.month + 1, 0).day;
+          day++
+        )
+          day: (() {
+            final date = DateTime(start.year, start.month, day);
+            if (date.isAfter(DateTime(now.year, now.month, now.day))) {
+              return MemberLogDayStatus.future;
+            }
+            if (date.isBefore(employmentStart)) {
+              return MemberLogDayStatus.unknown;
+            }
+            return submitted.contains(day)
+                ? MemberLogDayStatus.submitted
+                : MemberLogDayStatus.missing;
+          })(),
+      },
+    );
+  }
+
+  @override
+  Future<Record> analytics(AnalyticsQuery query) async {
+    await _check('analytics');
+    if (!['day', 'week', 'month'].contains(query.period) ||
+        !['department', 'team', 'person'].contains(query.groupBy)) {
+      throw const ApiFailure(FailureKind.validation, '统计周期或分组维度无效');
+    }
+    final date = DateTime(query.date.year, query.date.month, query.date.day);
+    var start = date;
+    if (query.period == 'week') {
+      start = date.subtract(Duration(days: date.weekday - 1));
+    } else if (query.period == 'month') {
+      start = DateTime(date.year, date.month);
+    }
+    final end = query.period == 'month'
+        ? DateTime(start.year, start.month + 1)
+        : start.add(Duration(days: query.period == 'week' ? 7 : 1));
+    final organization = rows('organization');
+    final availablePeople = organization
+        .where((person) => visiblePeople.contains(person.id))
+        .toList();
+    final departmentIds = availablePeople
+        .map((person) => '${person.fields['department_id'] ?? ''}')
+        .toSet();
+    final teamIds = availablePeople
+        .map((person) => '${person.fields['team_id'] ?? ''}')
+        .toSet();
+    if (query.departmentId != null &&
+            !departmentIds.contains(query.departmentId) ||
+        query.teamId != null && !teamIds.contains(query.teamId) ||
+        query.ownerId != null && !visiblePeople.contains(query.ownerId)) {
+      throw const ApiFailure(FailureKind.forbidden, '无权查看所选统计范围');
+    }
+    final people = availablePeople.where((person) {
+      return (query.departmentId == null ||
+              '${person.fields['department_id'] ?? ''}' ==
+                  query.departmentId) &&
+          (query.teamId == null ||
+              '${person.fields['team_id'] ?? ''}' == query.teamId) &&
+          (query.ownerId == null || person.id == query.ownerId);
+    }).toList();
+    final personIds = people.map((person) => person.id).toSet();
+    final tasks = rows(
+      'tasks',
+    ).where((task) => personIds.contains(task.ownerId)).toList();
+    final logs = rows('logs')
+        .where(
+          (log) => personIds.contains(log.ownerId) && isSubmittedDiary(log),
+        )
+        .toList();
+
+    DateTime? wallDate(dynamic raw) {
+      final instant = businessEventTime(raw);
+      return instant == null
+          ? null
+          : DateTime(instant.year, instant.month, instant.day);
+    }
+
+    bool inRange(DateTime? value) =>
+        value != null && !value.isBefore(start) && value.isBefore(end);
+    const completedPhases = ['ACCEPTED', 'ARCHIVED', '已验收', '已归档'];
+    final dispatched = tasks
+        .where((task) => inRange(wallDate(task.fields['dispatchAt'])))
+        .toList();
+    final accepted = tasks
+        .where(
+          (task) =>
+              completedPhases.contains(
+                '${task.fields['phase'] ?? task.fields['status']}',
+              ) &&
+              inRange(wallDate(task.fields['acceptedAt'])),
+        )
+        .toList();
+    final onTime = accepted.where((task) {
+      final acceptedAt = wallDate(task.fields['acceptedAt']);
+      final deadline = wallDate(task.fields['deadline']);
+      return acceptedAt != null &&
+          deadline != null &&
+          !acceptedAt.isAfter(deadline);
+    }).length;
+    final now = shanghaiWallTime(clock());
+    final today = DateTime(now.year, now.month, now.day);
+    final overdue = tasks.where((task) {
+      final due = wallDate(task.fields['deadline']);
+      final completed = [
+        'ACCEPTED',
+        'ARCHIVED',
+        '已验收',
+        '已归档',
+      ].contains('${task.fields['phase'] ?? task.fields['status']}');
+      return inRange(due) && due!.isBefore(today) && !completed;
+    }).length;
+    final submittedLogs = logs.where((log) {
+      final day = DateTime.tryParse('${log.fields['businessDate'] ?? ''}');
+      return day != null && !day.isBefore(start) && day.isBefore(end);
+    }).toList();
+    final eligiblePeople = people.length;
+    final elapsedEnd = end.isAfter(today.add(const Duration(days: 1)))
+        ? today.add(const Duration(days: 1))
+        : end;
+    final elapsedDays = elapsedEnd
+        .difference(start)
+        .inDays
+        .clamp(0, 366)
+        .toInt();
+    final diaryDenominator = eligiblePeople * elapsedDays;
+    final diaryRate = diaryDenominator == 0
+        ? null
+        : submittedLogs.length / diaryDenominator;
+
+    final groups = <String, List<Record>>{};
+    for (final person in people) {
+      final groupId = switch (query.groupBy) {
+        'team' => '${person.fields['team_id'] ?? ''}',
+        'person' => person.id,
+        _ => '${person.fields['department_id'] ?? ''}',
+      };
+      if (groupId.isNotEmpty) groups.putIfAbsent(groupId, () => []).add(person);
+    }
+    final groupedComparison = [
+      for (final entry in groups.entries)
+        () {
+          final ids = entry.value.map((person) => person.id).toSet();
+          final groupTasks = tasks.where((task) => ids.contains(task.ownerId));
+          final groupDispatched = groupTasks
+              .where((task) => inRange(wallDate(task.fields['dispatchAt'])))
+              .length;
+          final groupAcceptedTasks = groupTasks
+              .where(
+                (task) =>
+                    completedPhases.contains(
+                      '${task.fields['phase'] ?? task.fields['status']}',
+                    ) &&
+                    inRange(wallDate(task.fields['acceptedAt'])),
+              )
+              .toList();
+          final groupAccepted = groupAcceptedTasks.length;
+          final groupReceived = groupTasks
+              .where((task) => inRange(wallDate(task.fields['receivedAt'])))
+              .length;
+          final groupFeedback = groupTasks
+              .where((task) => inRange(wallDate(task.fields['feedbackAt'])))
+              .length;
+          final groupLogs = submittedLogs
+              .where((log) => ids.contains(log.ownerId))
+              .length;
+          final groupDiaryDenominator = entry.value.length * elapsedDays;
+          final groupOnTime = groupAcceptedTasks.where((task) {
+            final acceptedAt = wallDate(task.fields['acceptedAt']);
+            final deadline = wallDate(task.fields['deadline']);
+            return acceptedAt != null &&
+                deadline != null &&
+                !acceptedAt.isAfter(deadline);
+          }).length;
+          final groupOverdue = groupTasks.where((task) {
+            final due = wallDate(task.fields['deadline']);
+            final complete = completedPhases.contains(
+              '${task.fields['phase'] ?? task.fields['status']}',
+            );
+            return inRange(due) && due!.isBefore(today) && !complete;
+          }).length;
+          final person = entry.value.first;
+          final groupName = switch (query.groupBy) {
+            'team' =>
+              person.fields['teamName'] ??
+                  person.fields['team_name'] ??
+                  entry.key,
+            'person' => person.title,
+            _ =>
+              person.fields['departmentName'] ??
+                  person.fields['部门'] ??
+                  entry.key,
+          };
+          return {
+            'groupId': entry.key,
+            'groupBy': query.groupBy,
+            'groupName': groupName,
+            'departmentId': query.groupBy == 'department' ? entry.key : null,
+            'teamId': query.groupBy == 'team' ? entry.key : null,
+            'ownerId': query.groupBy == 'person' ? entry.key : null,
+            'dispatched': groupDispatched,
+            'received': groupReceived,
+            'feedback': groupFeedback,
+            'accepted': groupAccepted,
+            'onTimeAccepted': groupOnTime,
+            'onTimeDenominator': groupAccepted,
+            'onTimeRate': groupAccepted == 0
+                ? null
+                : groupOnTime / groupAccepted,
+            'overdue': groupOverdue,
+            'diarySubmitted': groupLogs,
+            'diaryDenominator': groupDiaryDenominator,
+            'diaryRate': groupDiaryDenominator == 0
+                ? null
+                : groupLogs / groupDiaryDenominator,
+          };
+        }(),
+    ];
+
+    final phaseCounts = <String, int>{};
+    for (final task in dispatched) {
+      final phase = '${task.fields['phase'] ?? task.fields['status']}';
+      final label = switch (phase) {
+        'DISPATCHED' || '待接收' => '待接收',
+        'RECEIVED' || '进行中' => '进行中',
+        'FEEDBACK' || '待验收' => '待验收',
+        'ACCEPTED' || '已验收' => '已验收',
+        'ARCHIVED' || '已归档' => '已归档',
+        'WITHDRAWN' || '已撤回' => '已撤回',
+        'NEEDS_CHANGES' || '需补充' => '需补充',
+        _ => '其他',
+      };
+      phaseCounts.update(label, (count) => count + 1, ifAbsent: () => 1);
+    }
+
+    final trend = <Map<String, dynamic>>[];
+    for (
+      var day = start;
+      day.isBefore(end);
+      day = day.add(const Duration(days: 1))
+    ) {
+      final dayDispatch = dispatched
+          .where((task) => wallDate(task.fields['dispatchAt']) == day)
+          .length;
+      final dayReceived = tasks
+          .where((task) => wallDate(task.fields['receivedAt']) == day)
+          .length;
+      final dayFeedback = tasks
+          .where((task) => wallDate(task.fields['feedbackAt']) == day)
+          .length;
+      final dayAccepted = tasks
+          .where(
+            (task) =>
+                completedPhases.contains(
+                  '${task.fields['phase'] ?? task.fields['status']}',
+                ) &&
+                wallDate(task.fields['acceptedAt']) == day,
+          )
+          .length;
+      final dayOverdue = tasks.where((task) {
+        final due = wallDate(task.fields['deadline']);
+        final complete = completedPhases.contains(
+          '${task.fields['phase'] ?? task.fields['status']}',
+        );
+        return due == day &&
+            !complete &&
+            day.isBefore(today.add(const Duration(days: 1)));
+      }).length;
+      final dayLogs = submittedLogs
+          .where((log) => log.fields['businessDate'] == stamp(day))
+          .map((log) => log.ownerId)
+          .toSet()
+          .length;
+      trend.add({
+        'date': stamp(day),
+        'dispatched': dayDispatch,
+        'received': dayReceived,
+        'feedback': dayFeedback,
+        'accepted': dayAccepted,
+        'overdue': dayOverdue,
+        'diarySubmitted': dayLogs,
+        'diaryDenominator': eligiblePeople,
+        'diaryRate': eligiblePeople == 0 ? null : dayLogs / eligiblePeople,
+      });
+    }
+    final phaseDistribution = phaseCounts.entries
+        .map((entry) => {'phase': entry.key, 'count': entry.value})
+        .toList();
+    return Record(
+      id: 'analytics',
+      title: '工作统计',
+      fields: {
+        'range': {'first': stamp(start), 'end': stamp(end)},
+        'updatedAt': clock().toUtc().toIso8601String(),
+        'filters': query.toJson(),
+        'dispatched': dispatched.length,
+        'overdue': overdue,
+        'received': trend.fold<int>(
+          0,
+          (sum, point) => sum + ((point['received'] as num?)?.toInt() ?? 0),
+        ),
+        'feedback': trend.fold<int>(
+          0,
+          (sum, point) => sum + ((point['feedback'] as num?)?.toInt() ?? 0),
+        ),
+        'onTimeAcceptance': {
+          'numerator': onTime,
+          'denominator': accepted.length,
+          'rate': accepted.isEmpty ? null : onTime / accepted.length,
+          'definition': '所选周期内已验收且实际验收日期不晚于任务截止日期的比例',
+        },
+        'dailySubmission': {
+          'numerator': submittedLogs.length,
+          'denominator': diaryDenominator,
+          'rate': diaryRate,
+          'definition': '范围内已提交日志人数日 / 授权成员数与范围内已到日期数',
+        },
+        'groupBy': query.groupBy,
+        'groupedComparison': groupedComparison,
+        'departmentComparison': groupedComparison,
+        'taskPhaseDistribution': phaseDistribution,
+        'trend': trend,
+        'dailyTrend': trend,
+      },
+    );
+  }
+
+  @override
+  Future<PageResult> analyticsDetails(AnalyticsDetailsQuery query) async {
+    await _check('analytics');
+    const allowedMetrics = {
+      'dispatched',
+      'received',
+      'feedback',
+      'accepted',
+      'overdue',
+      'diarySubmitted',
+      'onTimeAcceptance',
+      'phase:待接收',
+      'phase:进行中',
+      'phase:待验收',
+      'phase:已验收',
+      'phase:已归档',
+      'phase:已撤回',
+      'phase:需补充',
+      'phase:其他',
+    };
+    if (!['day', 'week', 'month'].contains(query.period) ||
+        !['department', 'team', 'person'].contains(query.groupBy) ||
+        !allowedMetrics.contains(query.metric) ||
+        query.limit < 1 ||
+        query.limit > 100) {
+      throw const ApiFailure(FailureKind.validation, '统计明细条件无效');
+    }
+    final date = DateTime(query.date.year, query.date.month, query.date.day);
+    var start = date;
+    if (query.period == 'week') {
+      start = date.subtract(Duration(days: date.weekday - 1));
+    } else if (query.period == 'month') {
+      start = DateTime(date.year, date.month);
+    }
+    final end = query.period == 'month'
+        ? DateTime(start.year, start.month + 1)
+        : start.add(Duration(days: query.period == 'week' ? 7 : 1));
+    final now = shanghaiWallTime(clock());
+    final today = DateTime(now.year, now.month, now.day);
+    final visible = rows(
+      'organization',
+    ).where((person) => visiblePeople.contains(person.id));
+    if ((query.departmentId != null &&
+            !visible.any(
+              (p) => '${p.fields['department_id'] ?? ''}' == query.departmentId,
+            )) ||
+        (query.teamId != null &&
+            !visible.any(
+              (p) => '${p.fields['team_id'] ?? ''}' == query.teamId,
+            )) ||
+        (query.ownerId != null && !visiblePeople.contains(query.ownerId))) {
+      throw const ApiFailure(FailureKind.forbidden, '无权查看所选统计范围');
+    }
+    final people = visible
+        .where(
+          (person) =>
+              (query.departmentId == null ||
+                  '${person.fields['department_id'] ?? ''}' ==
+                      query.departmentId) &&
+              (query.teamId == null ||
+                  '${person.fields['team_id'] ?? ''}' == query.teamId) &&
+              (query.ownerId == null || person.id == query.ownerId),
+        )
+        .toList();
+    final peopleById = {for (final person in people) person.id: person};
+    bool groupIdIsVisible(Record person) => switch (query.groupBy) {
+      'team' => '${person.fields['team_id'] ?? ''}' == query.groupId,
+      'person' => person.id == query.groupId,
+      _ => '${person.fields['department_id'] ?? ''}' == query.groupId,
+    };
+    if (query.groupId != null && !people.any(groupIdIsVisible)) {
+      throw const ApiFailure(FailureKind.forbidden, '无权查看所选统计分组');
+    }
+    String groupIdOf(Record record) {
+      final person = peopleById[record.ownerId];
+      if (person == null) return '';
+      return switch (query.groupBy) {
+        'team' => '${person.fields['team_id'] ?? ''}',
+        'person' => person.id,
+        _ => '${person.fields['department_id'] ?? ''}',
+      };
+    }
+
+    DateTime? businessDay(dynamic raw) {
+      final instant = businessEventTime(raw);
+      return instant == null
+          ? null
+          : DateTime(instant.year, instant.month, instant.day);
+    }
+
+    bool inRange(DateTime? day) =>
+        day != null && !day.isBefore(start) && day.isBefore(end);
+    bool matchesBucket(dynamic raw) =>
+        query.bucket == null ||
+        (businessDay(raw) != null && stamp(businessDay(raw)!) == query.bucket);
+    bool matchesGroup(Record record) =>
+        peopleById.containsKey(record.ownerId) &&
+        (query.groupId == null || groupIdOf(record) == query.groupId);
+    final candidates = <Record>[];
+    final completePhases = {'ACCEPTED', 'ARCHIVED', '已验收', '已归档'};
+    for (final task in rows('tasks')) {
+      if (!matchesGroup(task)) continue;
+      final phase = '${task.fields['phase'] ?? task.fields['status']}';
+      final dispatchDay = businessDay(task.fields['dispatchAt']);
+      final receivedDay = businessDay(task.fields['receivedAt']);
+      final feedbackDay = businessDay(task.fields['feedbackAt']);
+      final acceptedDay = businessDay(task.fields['acceptedAt']);
+      final deadline = DateTime.tryParse('${task.fields['deadline'] ?? ''}');
+      final complete = completePhases.contains(phase);
+      final matches = switch (query.metric) {
+        'dispatched' =>
+          inRange(dispatchDay) && matchesBucket(task.fields['dispatchAt']),
+        'received' =>
+          inRange(receivedDay) && matchesBucket(task.fields['receivedAt']),
+        'feedback' =>
+          inRange(feedbackDay) && matchesBucket(task.fields['feedbackAt']),
+        'accepted' =>
+          complete &&
+              inRange(acceptedDay) &&
+              matchesBucket(task.fields['acceptedAt']),
+        'onTimeAcceptance' =>
+          complete &&
+              inRange(acceptedDay) &&
+              deadline != null &&
+              task.fields['acceptedAt'] != null &&
+              !DateTime.parse(
+                '${task.fields['acceptedAt']}',
+              ).isAfter(deadline) &&
+              matchesBucket(task.fields['acceptedAt']),
+        'overdue' =>
+          deadline != null &&
+              inRange(businessDay(deadline)) &&
+              businessDay(deadline)!.isBefore(today) &&
+              !complete &&
+              matchesBucket(deadline),
+        _ when query.metric.startsWith('phase:') =>
+          inRange(dispatchDay) &&
+              phase ==
+                  (switch (query.metric.substring(6)) {
+                    '待接收' => 'DISPATCHED',
+                    '进行中' => 'RECEIVED',
+                    '待验收' => 'FEEDBACK',
+                    '已验收' => 'ACCEPTED',
+                    '已归档' => 'ARCHIVED',
+                    '已撤回' => 'WITHDRAWN',
+                    '需补充' => 'NEEDS_CHANGES',
+                    _ => query.metric.substring(6),
+                  }) &&
+              matchesBucket(task.fields['dispatchAt']),
+        _ => false,
+      };
+      if (matches) candidates.add(task);
+    }
+    if (query.metric == 'diarySubmitted') {
+      for (final log in rows('logs')) {
+        if (!matchesGroup(log) || !isSubmittedDiary(log)) continue;
+        final day = DateTime.tryParse('${log.fields['businessDate'] ?? ''}');
+        if (inRange(day) && matchesBucket(day)) candidates.add(log);
+      }
+    }
+    candidates.sort((a, b) => a.title.compareTo(b.title));
+    final offset = int.tryParse(query.cursor ?? '0') ?? 0;
+    final page = candidates.skip(offset).take(query.limit).toList();
+    final nextOffset = offset + page.length;
+    return PageResult(
+      page,
+      total: candidates.length,
+      nextCursor: nextOffset < candidates.length ? '$nextOffset' : null,
+    );
+  }
+
+  @override
   Future<Record> detail(String resource, String id, {String? ownerId}) async {
     await _check(resource);
     if (resource == 'organization/tree') {
       return Record(
         id: 'tree',
-        title: '演示组织',
+        title: '组织架构',
         fields: {
           'departments': [
             for (final department in rows('organization/admin'))
@@ -1147,12 +1793,12 @@ class MockRepository implements Repository {
       }
       return const Record(
         id: 'policy',
-        title: '当前审核策略',
+        title: '直属上级单级审核',
         fields: {
-          'review_policy': {
-            'taskTeamReview': true,
-            'taskDepartmentReview': true,
-          },
+          'approval_mode': 'DIRECT_MANAGER',
+          'reviewer_rule': 'CONFIGURED_DIRECT_MANAGER',
+          'unconfigured_behavior': 'PENDING',
+          'founder_behavior': 'FOUNDER_EXEMPT',
         },
       );
     }
@@ -1178,6 +1824,10 @@ class MockRepository implements Repository {
     if (resource == 'tasks' && !taskVisible(item) ||
         resource == 'organization' && !visiblePeople.contains(item.id)) {
       throw const ApiFailure(FailureKind.forbidden, '无权查看管理范围外的数据');
+    }
+    if (resource == 'organization/profile' &&
+        !visiblePeople.contains(item.id)) {
+      throw const ApiFailure(FailureKind.forbidden, '无权查看该成员资料');
     }
     if (['logs', 'logs/subordinates', 'tasks', 'reviews'].contains(resource) &&
         !session.manager &&
@@ -1258,6 +1908,65 @@ class MockRepository implements Repository {
     version: r.version + 1,
     fields: {...r.fields, ...fields},
   );
+
+  DemoAccount? _directManager(String ownerId) {
+    final owner = demoAccounts
+        .where((account) => account.id == ownerId)
+        .firstOrNull;
+    if (owner == null ||
+        owner.managerId.isEmpty ||
+        owner.managerId == ownerId) {
+      return null;
+    }
+    final manager = demoAccounts
+        .where((account) => account.id == owner.managerId)
+        .firstOrNull;
+    if (manager == null || manager.id == owner.id) return null;
+    return manager;
+  }
+
+  Record _applyReviewCandidate({
+    required String resource,
+    required String? id,
+    required String ownerId,
+    required Map<String, dynamic> candidate,
+    int? baseVersion,
+  }) {
+    final target = rows(resource);
+    final index = target.indexWhere((record) => record.id == id);
+    final existing = index < 0 ? null : target[index];
+    if (baseVersion != null &&
+        (existing == null || existing.version != baseVersion)) {
+      throw const ApiFailure(FailureKind.conflict, '原记录已更新，请重新读取后重试');
+    }
+    final base =
+        existing ??
+        Record(
+          id: id ?? 'p${clock().microsecondsSinceEpoch}',
+          title: '${candidate['title'] ?? '新记录'}',
+          ownerId: ownerId,
+        );
+    final updated = copy(base, {
+      ...candidate,
+      'body': candidate['内容'] ?? candidate['今日工作'] ?? base.fields['body'] ?? '',
+      'status': candidate['status'] ?? base.fields['status'] ?? '已提交',
+      'versions': [
+        ...?base.fields['versions'] as List?,
+        {
+          'version': base.version + 1,
+          'body': candidate['今日工作'] ?? candidate['内容'] ?? '',
+          'time': clock().toIso8601String(),
+        },
+      ],
+    }, title: candidate['title'] as String?);
+    if (index < 0) {
+      target.insert(0, updated);
+    } else {
+      target[index] = updated;
+    }
+    return updated;
+  }
+
   void notify(
     String title,
     String resource,
@@ -1294,7 +2003,55 @@ class MockRepository implements Repository {
       if (v.containsKey('role')) {
         throw const ApiFailure(FailureKind.forbidden, '注册只能申请员工账号');
       }
-      return const Record(id: 'auth', title: '演示登录');
+      return const Record(id: 'auth', title: '登录成功');
+    }
+    if (resource == 'analytics/export') {
+      final date = DateTime.tryParse('${v['date'] ?? ''}');
+      final period = '${v['period'] ?? ''}';
+      final target = '${v['resource'] ?? ''}';
+      final groupBy = '${v['groupBy'] ?? 'department'}';
+      if (date == null ||
+          !['day', 'week', 'month'].contains(period) ||
+          !['tasks', 'logs'].contains(target) ||
+          !['department', 'team', 'person'].contains(groupBy)) {
+        throw const ApiFailure(FailureKind.validation, '统计导出条件无效');
+      }
+      final metric = target == 'tasks' ? 'dispatched' : 'diarySubmitted';
+      var cursor = '0';
+      final output = StringBuffer('id,title,ownerId,metric,date\r\n');
+      do {
+        final page = await analyticsDetails(
+          AnalyticsDetailsQuery(
+            date: date,
+            period: period,
+            groupBy: groupBy,
+            departmentId: v['departmentId'] as String?,
+            teamId: v['teamId'] as String?,
+            ownerId: v['ownerId'] as String?,
+            metric: metric,
+            cursor: cursor,
+            limit: 100,
+          ),
+        );
+        for (final item in page.items) {
+          final value = [
+            item.id,
+            item.title,
+            item.ownerId,
+            metric,
+            item.fields['dispatchAt'] ?? item.fields['businessDate'] ?? '',
+          ];
+          output.writeln(
+            value.map((cell) => '"${'$cell'.replaceAll('"', '""')}"').join(','),
+          );
+        }
+        cursor = page.nextCursor ?? '';
+      } while (cursor.isNotEmpty);
+      return Record(
+        id: 'analytics-export',
+        title: '统计导出',
+        fields: {'bytes': utf8.encode(output.toString())},
+      );
     }
     if (resource == 'tasks' &&
         action == 'create' &&
@@ -1305,15 +2062,29 @@ class MockRepository implements Repository {
       if (!session.administrator) {
         throw const ApiFailure(FailureKind.forbidden, '仅管理员可配置');
       }
+      if (action == 'policy') {
+        throw const ApiFailure(
+          FailureKind.unavailable,
+          '审核方式由组织直属关系确定，不再配置团队或部门多级审核',
+        );
+      }
       if ('${v['reason'] ?? ''}'.trim().isEmpty || command.version == null) {
         throw const ApiFailure(FailureKind.validation, '请读取当前版本并填写理由');
       }
+      final reviewer = _directManager(session.id);
       final request = Record(
         id: 'org${DateTime.now().microsecondsSinceEpoch}',
         title: '组织配置修改申请',
         ownerId: session.id,
+        version: command.version!,
+        subtitle: '${stamp(clock())} · 等待直属上级审核',
         fields: {
           'reviewState': '待审',
+          'step': 0,
+          'approvalMode': 'DIRECT_MANAGER',
+          'reviewerId': reviewer?.id,
+          'reviewerName': reviewer?.name,
+          'reviewerConfigured': reviewer != null,
           'targetResource': 'organization/admin',
           'targetId': v['id'],
           'candidate': {...v},
@@ -1325,6 +2096,10 @@ class MockRepository implements Repository {
         },
       );
       rows('reviews').insert(0, request);
+      if (reviewer != null) {
+        notify('有新的组织修改申请待审核', 'reviews', request.id, reviewer.id, '审批');
+      }
+      if (key != null) store.responses[key] = request;
       return request;
     }
     if (resource == 'dashboard/company' && !session.manager) {
@@ -1452,23 +2227,7 @@ class MockRepository implements Repository {
       throw const ApiFailure(FailureKind.notFound, '记录不存在或无权访问');
     }
     if (resource == 'logs' && action == 'read') {
-      final diary = await detail('logs', id ?? '');
-      if (!isSubmittedDiary(diary)) {
-        throw const ApiFailure(FailureKind.forbidden, '草稿不能记录已读');
-      }
-      records[index] = Record(
-        id: diary.id,
-        title: diary.title,
-        subtitle: diary.subtitle,
-        ownerId: diary.ownerId,
-        version: diary.version,
-        fields: {
-          ...diary.fields,
-          'readBy':
-              '${session.name} · ${DateTime.now().toString().substring(0, 16)}',
-        },
-      );
-      return Record(id: diary.id, title: '演示阅读已登记', fields: const {'ok': true});
+      throw const ApiFailure(FailureKind.unavailable, '移动端已停用日志阅读登记');
     }
     if (resource == 'logs') {
       if (previous != null && previous.ownerId != session.id) {
@@ -1478,10 +2237,20 @@ class MockRepository implements Repository {
         throw const ApiFailure(FailureKind.forbidden, '日志提交已满24小时，已锁定');
       }
 
-      if (action == 'update') {
-        throw const ApiFailure(FailureKind.validation, '已提交日志请申请修订');
+      if (action == 'request-review') {
+        throw const ApiFailure(
+          FailureKind.validation,
+          '日志正文修改不再提交审核；仅首次提交后24小时内可直接修改',
+        );
       }
-      if (action == 'withdraw' || action == 'request-review') {
+      if (action == 'update-content' &&
+          (previous == null ||
+              !isSubmittedDiary(previous) ||
+              command.version == null ||
+              '${v['work'] ?? v['今日工作'] ?? ''}'.trim().isEmpty)) {
+        throw const ApiFailure(FailureKind.validation, '请填写今日工作并读取当前已提交日志版本');
+      }
+      if (action == 'withdraw') {
         if (previous == null || !isSubmittedDiary(previous)) {
           throw const ApiFailure(FailureKind.validation, '请先提交日志');
         }
@@ -1493,7 +2262,7 @@ class MockRepository implements Repository {
       if (action == 'save-draft' &&
           previous != null &&
           isSubmittedDiary(previous)) {
-        throw const ApiFailure(FailureKind.validation, '已提交日志请申请修订');
+        throw const ApiFailure(FailureKind.validation, '已提交日志请在首次提交后24小时内直接修改');
       }
       if (action == 'submit' &&
           previous != null &&
@@ -1517,20 +2286,96 @@ class MockRepository implements Repository {
           )) {
         throw const ApiFailure(FailureKind.conflict, '该日期已有日志，请打开已有记录');
       }
+      if (action == 'submit' &&
+          !canInitiallySubmitDiaryOn(
+            DateTime.parse(businessDate),
+            now: clock(),
+          )) {
+        throw const ApiFailure(FailureKind.validation, '仅可首次提交今天、昨天或前天的日志');
+      }
+    }
+    if (resource == 'organization/profile') {
+      if (previous == null || previous.id != session.id || action != 'update') {
+        throw const ApiFailure(FailureKind.forbidden, '仅本人可修改个人资料');
+      }
+      const protectedFields = {
+        'name',
+        '姓名',
+        'departmentId',
+        'department_id',
+        '部门',
+        'position',
+        '职位',
+        'role',
+        '角色',
+        'managerId',
+        'manager_id',
+      };
+      if (v.keys.any(protectedFields.contains)) {
+        throw const ApiFailure(FailureKind.forbidden, '姓名、组织归属和职位不可自行修改');
+      }
+      final phone = '${v['手机号'] ?? ''}'.trim();
+      final email = '${v['邮箱'] ?? ''}'.trim();
+      final age = v['年龄'];
+      if (phone.isNotEmpty &&
+          !RegExp(r'^\+?[0-9][0-9 ()-]{4,18}[0-9]$').hasMatch(phone)) {
+        throw const ApiFailure(FailureKind.validation, '请输入有效电话号码');
+      }
+      if (email.isNotEmpty &&
+          !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+        throw const ApiFailure(FailureKind.validation, '请输入有效邮箱地址');
+      }
+      if (age != null && (int.tryParse('$age') ?? -1) < 0) {
+        throw const ApiFailure(FailureKind.validation, '年龄必须为非负整数');
+      }
+      if (phone.isNotEmpty &&
+          rows(resource).any(
+            (record) =>
+                record.id != session.id &&
+                '${record.fields['手机号'] ?? record.fields['phone'] ?? ''}'
+                        .replaceAll(RegExp(r'\D'), '') ==
+                    phone.replaceAll(RegExp(r'\D'), ''),
+          )) {
+        throw const ApiFailure(FailureKind.conflict, '该电话号码已被其他账号使用');
+      }
     }
     if (previous != null &&
         ['dashboard/personal', 'private-notes'].contains(resource) &&
         previous.ownerId != session.id) {
       throw const ApiFailure(FailureKind.forbidden, '仅本人可以修改');
     }
+    if (resource == 'dashboard/personal' &&
+        action != 'archive' &&
+        v['pinned'] == true &&
+        previous?.fields['pinned'] != true) {
+      final pinnedCount = records
+          .where((record) => record.ownerId == session.id)
+          .where((record) => record.fields['pinned'] == true)
+          .length;
+      if (pinnedCount >= 10) {
+        throw const ApiFailure(FailureKind.validation, '最多置顶10条个人重点');
+      }
+    }
     if (previous != null &&
         command.version != null &&
         command.version != previous.version) {
       throw const ApiFailure(FailureKind.conflict, '版本已更新，请返回刷新后重试');
     }
-    if (resource == 'reviews' &&
-        (previous?.ownerId == session.id || !session.manager)) {
-      throw const ApiFailure(FailureKind.forbidden, '不能审核自己的申请或无审核资格');
+    if (resource == 'reviews' && action != 'request-review') {
+      if (previous?.fields['reviewState'] != '待审') {
+        throw const ApiFailure(FailureKind.conflict, '该申请已处理或已失效');
+      }
+      final assignedReviewer = '${previous?.fields['reviewerId'] ?? ''}';
+      final currentManager = _directManager(previous!.ownerId);
+      if (previous.ownerId == session.id ||
+          assignedReviewer.isEmpty ||
+          assignedReviewer != session.id ||
+          currentManager?.id != session.id) {
+        throw const ApiFailure(FailureKind.forbidden, '仅当前配置的直属上级可审核');
+      }
+      if (command.version == null || command.version != previous.version) {
+        throw const ApiFailure(FailureKind.conflict, '申请版本已变化，请重新读取');
+      }
     }
     if (action == 'reject' && '${v['reason'] ?? ''}'.trim().isEmpty) {
       throw const ApiFailure(FailureKind.validation, '请填写驳回原因');
@@ -1566,6 +2411,47 @@ class MockRepository implements Repository {
       }
     }
     if (action == 'request-review') {
+      final applicant = previous?.ownerId ?? session.id;
+      if (session.role == UserRole.founder) {
+        if (applicant != session.id) {
+          throw const ApiFailure(FailureKind.forbidden, '创始人免审仅适用于本人有权发起的操作');
+        }
+        final applied = _applyReviewCandidate(
+          resource: resource,
+          id: id,
+          ownerId: applicant,
+          candidate: {...v},
+          baseVersion: previous?.version,
+        );
+        final approved = Record(
+          id: 'r${clock().microsecondsSinceEpoch}',
+          title: '${applied.title} · 修改申请',
+          ownerId: session.id,
+          version: 1,
+          subtitle: '${stamp(clock())} · 系统自动批准',
+          fields: {
+            'applicantName': session.name,
+            'reviewState': '已通过',
+            'approvalMode': 'DIRECT_MANAGER',
+            'reviewerConfigured': false,
+            'decisionSource': 'FOUNDER_EXEMPT',
+            'targetResource': resource,
+            'targetId': applied.id,
+            'baseVersion': previous?.version,
+            'effectiveVersion': applied.version,
+            'before':
+                previous?.fields['body'] ?? previous?.fields['今日工作'] ?? '尚未发布',
+            'after': v['内容'] ?? v['今日工作'] ?? '',
+            'reason': v['修改理由'] ?? '',
+            'reviewEvents': ['系统 · 创始人已获授权操作自动批准并生效'],
+          },
+        );
+        rows('reviews').insert(0, approved);
+        notify('创始人授权操作已自动批准', 'reviews', approved.id, session.id, '审核结果');
+        if (key != null) store.responses[key] = approved;
+        return approved;
+      }
+      final reviewer = _directManager(applicant);
       final request = Record(
         id: 'r${DateTime.now().microsecondsSinceEpoch}',
         title: '${v['title'] ?? previous?.title ?? '内容'} · 修改申请',
@@ -1574,6 +2460,10 @@ class MockRepository implements Repository {
         fields: {
           'reviewState': '待审',
           'step': 0,
+          'approvalMode': 'DIRECT_MANAGER',
+          'reviewerId': reviewer?.id,
+          'reviewerName': reviewer?.name,
+          'reviewerConfigured': reviewer != null,
           'before':
               previous?.fields['body'] ?? previous?.fields['今日工作'] ?? '尚未发布',
           'after': v['内容'] ?? v['今日工作'] ?? '',
@@ -1586,7 +2476,9 @@ class MockRepository implements Repository {
         },
       );
       rows('reviews').insert(0, request);
-      notify('有新的修改申请待审核', 'reviews', request.id, 'u1', '审批');
+      if (reviewer != null) {
+        notify('有新的修改申请待审核', 'reviews', request.id, reviewer.id, '审批');
+      }
       if (key != null) store.responses[key] = request;
       return request;
     }
@@ -1637,15 +2529,42 @@ class MockRepository implements Repository {
         'archive' => '已归档',
         _ => previous?.fields['status'] ?? '待接收',
       };
+      fields['phase'] = _mockTaskPhase('${fields['status']}');
       fields['dispatcherId'] = previous?.fields['dispatcherId'] ?? session.id;
-      if (v.containsKey('tagId') &&
-          v['tagId'] != previous?.fields['tagId']) {
+      if (v.containsKey('tagId') && v['tagId'] != previous?.fields['tagId']) {
         fields.remove('tagName');
       }
       if (v.containsKey('participantIds')) fields.remove('participantNames');
       fields.addAll(_taskDisplayFields(fields));
     }
     if (resource == 'logs') {
+      if (action == 'update-content') {
+        final work = v['work'] ?? v['今日工作'];
+        fields['今日工作'] = work;
+        fields['body'] = work;
+        fields['versions'] = [
+          ...?previous?.fields['versions'] as List?,
+          {
+            'version': (previous?.version ?? 0) + 1,
+            'body': work,
+            'time': clock().toUtc().toIso8601String(),
+          },
+        ];
+        for (var i = 0; i < rows('reviews').length; i++) {
+          final review = rows('reviews')[i];
+          if (review.fields['targetResource'] == 'logs' &&
+              review.fields['targetId'] == previous?.id &&
+              review.fields['reviewState'] == '待审') {
+            rows('reviews')[i] = copy(review, {
+              'reviewState': '已失效',
+              'reviewEvents': [
+                ...?review.fields['reviewEvents'] as List?,
+                '日志正文已直接更新，旧修订候选失效',
+              ],
+            });
+          }
+        }
+      }
       fields['status'] = ['save-draft', 'withdraw'].contains(action)
           ? '草稿'
           : '已提交';
@@ -1656,60 +2575,42 @@ class MockRepository implements Repository {
             previous?.fields['submittedAt'] ??
             clock().toUtc().toIso8601String();
       }
-      fields.remove('versions');
+      if (action != 'update-content') fields.remove('versions');
       fields.remove('canEdit');
       fields.remove('canWithdraw');
       fields.remove('editableUntil');
     }
     if (resource == 'feedback') fields['status'] = '待处理';
+    if (resource == 'organization/profile') {
+      fields['body'] = v['个人介绍'] ?? previous?.fields['body'] ?? '';
+      fields['个人介绍'] = fields['body'];
+      if (v.containsKey('手机号')) fields['phone'] = v['手机号'];
+      if (v.containsKey('邮箱')) fields['email'] = v['邮箱'];
+      if (v.containsKey('性别')) fields['gender'] = v['性别'];
+      if (v.containsKey('年龄')) fields['age'] = v['年龄'];
+    }
     if (resource == 'notifications') fields['read'] = true;
     if (resource == 'reviews') {
-      final step =
-          (previous?.fields['step'] as int? ?? 0) +
-          (action == 'approve' ? 1 : 0);
-      fields['step'] = step;
-      fields['reviewState'] = action == 'reject'
-          ? '已驳回'
-          : step >= 3
-          ? '已通过'
-          : '待审';
+      if (previous?.fields['reviewState'] != '待审') {
+        throw const ApiFailure(FailureKind.conflict, '该申请已处理或已失效');
+      }
+      fields['reviewState'] = action == 'reject' ? '已驳回' : '已通过';
+      fields['step'] = action == 'approve' ? 1 : 0;
       fields['reviewEvents'] = [
         ...?previous?.fields['reviewEvents'] as List?,
-        '${['团队复核', '部门复核', '公司复核'][(step - 1).clamp(0, 2)]} · ${session.name} · ${action == 'reject' ? '驳回：${v['reason']}' : '通过'} · ${DateTime.now().toString().substring(0, 16)}',
+        '直属上级 · ${session.name} · ${action == 'reject' ? '驳回：${v['reason']}' : '通过'} · ${clock().toString().substring(0, 16)}',
       ];
       if (fields['reviewState'] == '已通过' && fields['candidate'] is Map) {
-        final target = rows('${fields['targetResource']}');
-        final pos = target.indexWhere((r) => r.id == fields['targetId']);
-        if (fields['baseVersion'] != null &&
-            (pos < 0 || target[pos].version != fields['baseVersion'])) {
-          throw const ApiFailure(FailureKind.conflict, '原记录已更新，请重新申请');
-        }
-        final candidate = Map<String, dynamic>.from(fields['candidate'] as Map);
-        final base = pos < 0
-            ? Record(
-                id: 'p${DateTime.now().microsecondsSinceEpoch}',
-                title: '${candidate['title']}',
-                ownerId: previous!.ownerId,
-              )
-            : target[pos];
-        final updated = copy(base, {
-          ...candidate,
-          'body': candidate['内容'] ?? candidate['今日工作'] ?? '',
-          'status': '已提交',
-          'versions': [
-            ...?base.fields['versions'] as List?,
-            {
-              'version': base.version + 1,
-              'body': candidate['今日工作'] ?? candidate['内容'],
-              'time': DateTime.now().toString().substring(0, 16),
-            },
-          ],
-        }, title: candidate['title'] as String?);
-        if (pos < 0) {
-          target.insert(0, updated);
-        } else {
-          target[pos] = updated;
-        }
+        final applied = _applyReviewCandidate(
+          resource: '${fields['targetResource']}',
+          id: '${fields['targetId'] ?? ''}'.isEmpty
+              ? null
+              : '${fields['targetId']}',
+          ownerId: previous!.ownerId,
+          candidate: Map<String, dynamic>.from(fields['candidate'] as Map),
+          baseVersion: fields['baseVersion'] as int?,
+        );
+        fields['effectiveVersion'] = applied.version;
       }
       notify(
         '审核结果：${fields['reviewState']}',
@@ -1721,7 +2622,7 @@ class MockRepository implements Repository {
     }
     final result = Record(
       id: id ?? DateTime.now().microsecondsSinceEpoch.toString(),
-      title: v['title'] as String? ?? previous?.title ?? '演示记录',
+      title: v['title'] as String? ?? previous?.title ?? '记录',
       subtitle:
           previous?.subtitle ?? '${stamp(DateTime.now())} · ${session.name}',
       ownerId: v['ownerId'] as String? ?? previous?.ownerId ?? session.id,
@@ -1734,6 +2635,16 @@ class MockRepository implements Repository {
       records[index] = result;
     } else {
       records.insert(0, result);
+    }
+    if (resource == 'organization/profile') {
+      final people = rows('organization');
+      final personIndex = people.indexWhere((person) => person.id == result.id);
+      if (personIndex >= 0) {
+        people[personIndex] = copy(people[personIndex], {
+          'phone': result.fields['phone'],
+          'email': result.fields['email'],
+        });
+      }
     }
     if (resource == 'tasks') {
       notify(

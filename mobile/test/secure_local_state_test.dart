@@ -342,9 +342,8 @@ void main() {
       await t.pumpAndSettle();
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      await t.enterText(find.byType(TextFormField).first, '真实加密编辑链路');
-      await t.tap(find.text('保存草稿'));
-      await waitForLocalState(t, find.text('草稿已加密保存到此设备'));
+      await t.enterText(find.byType(TextField).first, '真实加密编辑链路');
+      await waitForLocalState(t, find.text('自动保存到此设备'));
       await t.pumpAndSettle();
       final saved = await t.runAsync(
         () => store.read(DraftLocation.diary('u1', day)),
@@ -358,7 +357,7 @@ void main() {
       await t.pumpAndSettle();
       expect(
         t
-            .widget<TextFormField>(find.byType(TextFormField).first)
+            .widget<TextField>(find.byType(TextField).first)
             .controller!
             .text,
         '真实加密编辑链路',
@@ -448,7 +447,7 @@ void main() {
   );
 
   testWidgets(
-    'failed encryption keeps editor input and recovers with explicit save',
+    'failed draft restore blocks editing until retry; recovered editor auto-saves',
     (t) async {
       final c = testContainer(
         overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
@@ -465,22 +464,12 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.textContaining('草稿读取失败'), findsOneWidget);
-      await t.enterText(find.byType(TextFormField).first, '本机失败仍保留');
-      await t.tap(find.text('保存草稿'));
-      await waitForLocalState(t, find.textContaining('草稿保存失败'));
+      secure.failRead = false;
+      await t.tap(find.text('重试读取'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.textContaining('草稿保存失败'), findsOneWidget);
-      expect(
-        t
-            .widget<TextFormField>(find.byType(TextFormField).first)
-            .controller!
-            .text,
-        '本机失败仍保留',
-      );
-      secure.failRead = false;
-      await t.tap(find.text('保存草稿'));
-      await waitForLocalState(t, find.text('草稿已加密保存到此设备'));
+      await t.enterText(find.byType(TextField).first, '本机失败仍保留');
+      await waitForLocalState(t, find.text('自动保存到此设备'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final draft = await t.runAsync(
@@ -489,7 +478,7 @@ void main() {
             .read(DraftLocation.diary('u1', DateTime(2026, 10, 13))),
       );
       expect(draft!.fields['今日工作'], '本机失败仍保留');
-      expect(find.textContaining('草稿保存失败'), findsNothing);
+      expect(find.textContaining('草稿读取失败'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pump(const Duration(milliseconds: 300));
     },

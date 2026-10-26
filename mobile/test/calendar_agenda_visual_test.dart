@@ -11,12 +11,57 @@ import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
-import 'package:pandora_mobile/features/dashboard/dashboard_pages.dart';
+import 'package:pandora_mobile/features/calendar/calendar_content.dart';
+import 'package:pandora_mobile/theme/app_theme.dart';
 import 'calendar_agenda_test.dart' show agendaStore;
 import 'support/local_test_state.dart';
 
 void main() {
-  testWidgets('six-week task month fits the viewport without scrolling', (
+  testWidgets('month timeline follows vertical swipes and reverse scrolling', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(390, 844);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+    final c = testContainer(
+      overrides: [
+        selectedDateProvider.overrideWith((ref) => DateTime(2026, 10, 13)),
+        periodProvider.overrideWith((ref) => '月'),
+        repositoryProvider.overrideWithValue(
+          MockRepository(const Session(), store: agendaStore()),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    await t.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: appTheme(),
+          home: const Scaffold(body: CalendarContent()),
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    final timeline = find.byKey(const ValueKey('calendar-month-timeline'));
+    expect(timeline, findsOneWidget);
+    expect(c.read(selectedDateProvider).year, 2026);
+    expect(c.read(selectedDateProvider).month, 10);
+
+    await t.drag(timeline, const Offset(0, -680));
+    await t.pumpAndSettle();
+    expect(c.read(selectedDateProvider).month, greaterThan(10));
+    expect(find.byKey(const ValueKey('calendar-month-grid')), findsWidgets);
+
+    await t.drag(timeline, const Offset(0, 680));
+    await t.pumpAndSettle();
+    expect(c.read(selectedDateProvider).month, lessThan(13));
+    expect(find.byKey(const ValueKey('calendar-month-grid')), findsWidgets);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('six-week task month fits inside the continuous month timeline', (
     t,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -104,13 +149,10 @@ void main() {
       await t.pumpAndSettle();
       final month = find.byKey(const ValueKey('calendar-month-grid'));
       final lastDay = find.byKey(const ValueKey('month-day:2026-11-30'));
-      expect(
-        find.descendant(
-          of: find.byType(CalendarPage),
-          matching: find.byType(Scrollable),
-        ),
-        findsNothing,
+      final timeline = find.byKey(
+        const ValueKey('calendar-month-timeline'),
       );
+      expect(timeline, findsOneWidget);
       expect(find.text('月底汇总验收'), findsOneWidget);
       final previews = t.widgetList<Text>(
         find.descendant(
@@ -134,14 +176,14 @@ void main() {
       final navTop = t.getTopLeft(find.byType(NavigationBar)).dy;
       expect(t.getBottomRight(month).dy, lessThanOrEqualTo(navTop));
       expect(t.getBottomRight(lastDay).dy, lessThanOrEqualTo(navTop));
-      final before = t.getRect(lastDay);
-      await t.drag(month, const Offset(0, -100));
+      await t.drag(timeline, Offset(0, -t.getSize(timeline).height * 1.2));
       await t.pumpAndSettle();
       expect(
-        t.getRect(lastDay),
-        before,
-        reason: 'the complete month remains fixed',
+        c.read(selectedDateProvider).month,
+        isNot(11),
+        reason: 'vertical scrolling selects a neighboring month',
       );
+      expect(month, findsWidgets);
       expect(t.takeException(), isNull, reason: '$size scale=$scale');
       await t.runAsync(() async {
         final render =

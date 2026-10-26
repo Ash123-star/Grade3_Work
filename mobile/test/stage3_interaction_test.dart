@@ -14,7 +14,11 @@ import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_page.dart';
 
 void main() {
-  Future<ProviderContainer> launch(WidgetTester t, String route) async {
+  Future<ProviderContainer> launch(
+    WidgetTester t,
+    String route, {
+    DateTime? logDate,
+  }) async {
     SharedPreferences.setMockInitialValues({});
     t.view.physicalSize = const Size(390, 844);
     t.view.devicePixelRatio = 1;
@@ -24,7 +28,7 @@ void main() {
       overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
     );
     addTearDown(c.dispose);
-    c.read(logDateProvider.notifier).state = DateTime(2025, 2, 3);
+    c.read(logDateProvider.notifier).state = logDate ?? DateTime(2025, 2, 3);
     await t.pumpWidget(
       UncontrolledProviderScope(container: c, child: const PandoraApp()),
     );
@@ -34,53 +38,34 @@ void main() {
   }
 
   testWidgets(
-    'diary save, invalid hours, offline retry and keyboard preserve dated content',
+    'diary composer autosaves one field and preserves it when submission fails',
     (t) async {
-      final c = await launch(t, '/form/log-edit');
+      final now = DateTime.now();
+      final day = DateTime(now.year, now.month, now.day);
+      final c = await launch(t, '/form/log-edit', logDate: day);
       expect(find.byType(BottomActions), findsOneWidget);
-      expect(t.getTopLeft(find.text('保存草稿')).dy, greaterThan(700));
-      await t.enterText(find.byType(TextFormField).first, '核对移动端验收范围');
-      await t.pump(const Duration(milliseconds: 700));
-      await t.tap(find.text('保存草稿'));
+      expect(find.byType(TextFormField), findsNothing);
+      expect(find.text('工时'), findsNothing);
+      await t.enterText(find.byType(TextField).first, '核对移动端验收范围');
+      await t.pump(const Duration(milliseconds: 500));
+      await settleLocalIo(t);
       await t.pumpAndSettle();
-      final prefs = await SharedPreferences.getInstance();
-      final location = DraftLocation.diary('u1', DateTime(2025, 2, 3));
+      final location = DraftLocation.diary('u1', day);
       final store = c.read(draftStoreProvider);
       expect(
         (await t.runAsync(() => store.read(location)))?.fields['今日工作'],
         '核对移动端验收范围',
       );
-      expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
-      expect(prefs.getString('draft:u1:2025-02-03:今日工作'), isNull);
-      c.read(selectedDateProvider.notifier).state = DateTime(2027, 1, 1);
-      c.read(logFilterDateProvider.notifier).state = DateTime(2024, 1, 1);
-      await t.scrollUntilVisible(
-        find.text('工时（选填）'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      final hours = find.byType(TextFormField).last;
-      await t.enterText(hours, 'NaN');
-      await t.tap(find.text('提交'));
-      await t.pumpAndSettle();
-      expect(find.text('工时应在0到24之间'), findsOneWidget);
-      await t.enterText(hours, '7.5');
       c.read(scenarioProvider.notifier).state = DemoScenario.offline;
       await t.tap(find.text('提交'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.text('提交失败，内容已保留'), findsOneWidget);
       expect(
         (await t.runAsync(() => store.read(location)))?.fields['今日工作'],
         '核对移动端验收范围',
       );
-      t.view.viewInsets = const FakeViewPadding(bottom: 300);
-      await t.pumpAndSettle();
-      expect(t.getBottomRight(find.text('重试提交')).dy, lessThan(544));
-      t.view.resetViewInsets();
       c.read(scenarioProvider.notifier).state = DemoScenario.normal;
-      await t.pumpAndSettle();
-      await t.tap(find.text('重试提交'));
+      await t.tap(find.text('提交'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final records = (await t.runAsync(
@@ -88,12 +73,11 @@ void main() {
       ))!;
       expect(
         records.items
-            .where((r) => r.fields['businessDate'] == '2025-02-03')
+            .where((r) => r.fields['businessDate'] == day.toIso8601String().split('T').first)
             .single
             .fields['今日工作'],
         '核对移动端验收范围',
       );
-      expect(prefs.getString('draft:u1:2025-02-03:今日工作'), isNull);
       expect(await t.runAsync(() => store.read(location)), isNull);
     },
   );
@@ -103,8 +87,8 @@ void main() {
     (t) async {
       final c = await launch(t, '/me/reviews/1');
       expect(find.text('当前生效 · v1'), findsOneWidget);
-      expect(find.text('候选版本 · v2 · 待审核'), findsOneWidget);
-      expect(find.text('通过本级审核'), findsOneWidget);
+      expect(find.text('候选版本 · v2'), findsOneWidget);
+      expect(find.text('通过申请'), findsOneWidget);
       await t.tap(find.text('驳回'));
       await t.pumpAndSettle();
       await t.tap(find.widgetWithText(FilledButton, '驳回申请'));
@@ -117,55 +101,51 @@ void main() {
       );
       c.read(routerProvider).go('/me/reviews/1');
       await t.pumpAndSettle();
-      expect(find.text('通过本级审核'), findsNothing);
+      expect(find.text('通过申请'), findsNothing);
       expect(find.text('驳回'), findsNothing);
       expect(find.text('这是你发起的申请，不能审核自己的修改'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'stale diary editor requires explicit reload without losing its draft',
+    'legacy revision link edits the submitted body directly without creating review',
     (t) async {
       final c = await launch(t, '/dashboard');
+      final now = DateTime.now();
+      final day = DateTime(now.year, now.month, now.day);
       c.read(demoStoreProvider).records['logs'] = [
-        const Record(
+        Record(
           id: 'stale',
-          title: '最新日报',
+          title: '今日工作日志',
           ownerId: 'u1',
           version: 2,
           fields: {
-            'businessDate': '2025-02-03',
+            'businessDate': day.toIso8601String().split('T').first,
             '今日工作': '服务器最新内容',
             'status': '已提交',
+            'submittedAt': now.subtract(const Duration(hours: 1)).toIso8601String(),
           },
         ),
       ];
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('revision:u1:stale:1:今日工作', '旧版本的本机输入');
-      c.read(routerProvider).go('/form/log-revise?id=stale&version=1');
+      c.read(logDateProvider.notifier).state = day;
+      c.read(routerProvider).go('/form/log-revise?id=stale&version=2');
       await t.pumpAndSettle();
-      expect(find.textContaining('版本已更新'), findsOneWidget);
-      expect(
-        t
-            .widget<FilledButton>(find.widgetWithText(FilledButton, '重试提交'))
-            .onPressed,
-        isNull,
+      await settleLocalIo(t);
+      await t.enterText(find.byType(TextField).first, '直接修改后的工作');
+      await t.tap(find.text('提交修改'));
+      await settleLocalIo(t);
+      await t.pumpAndSettle();
+      final updated = await t.runAsync(
+        () => c.read(repositoryProvider).detail('logs', 'stale'),
       );
-      await t.ensureVisible(find.text('重新读取最新内容'));
-      await t.pumpAndSettle();
-      await t.tap(find.text('重新读取最新内容'));
-      await t.pumpAndSettle();
-      await t.tap(find.widgetWithText(FilledButton, '重新读取'));
-      await t.pumpAndSettle();
+      expect(updated!.fields['今日工作'], '直接修改后的工作');
+      expect(updated.version, 3);
       expect(
-        t
-            .widget<TextFormField>(find.byType(TextFormField).first)
-            .controller!
-            .text,
-        '服务器最新内容',
+        c.read(demoStoreProvider).records['reviews']!.any(
+          (review) => review.fields['targetId'] == 'stale',
+        ),
+        isFalse,
       );
-      expect(prefs.getString('revision:u1:stale:1:今日工作'), '旧版本的本机输入');
-      expect(find.textContaining('版本已更新'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pumpAndSettle();
     },

@@ -62,14 +62,11 @@ abstract class AiProtectedState<T extends ConsumerStatefulWidget>
       ref.read(sessionProvider).id == originalAccount.id &&
       ref.read(sessionProvider).token == originalAccount.token &&
       ref.read(sessionProvider).canReadBusiness;
-  CancelToken nextTransport() {
-    transport?.cancel();
-    return transport = CancelToken();
-  }
 
-  bool guard() {
-    ref.watch(sessionProvider);
-    ref.listen(sessionProvider, (_, next) {
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual<Session>(sessionProvider, (_, next) {
       if (next.id != originalAccount.id ||
           next.token != originalAccount.token ||
           !next.canReadBusiness) {
@@ -82,6 +79,15 @@ abstract class AiProtectedState<T extends ConsumerStatefulWidget>
         }
       }
     });
+  }
+
+  CancelToken nextTransport() {
+    transport?.cancel();
+    return transport = CancelToken();
+  }
+
+  bool guard() {
+    ref.watch(sessionProvider);
     return alive;
   }
 

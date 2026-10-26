@@ -182,6 +182,20 @@ final recordsProvider = FutureProvider.autoDispose.family<PageResult, String>((
     isActive: () => active,
   );
 });
+final receivedTaskCardProvider = FutureProvider.autoDispose<PageResult>((ref) {
+  final session = ref.watch(sessionProvider);
+  if (!session.canReadBusiness) {
+    throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
+  }
+  var active = true;
+  ref.onDispose(() => active = false);
+  return readCompleteList(
+    ref.watch(repositoryProvider),
+    'tasks/received-card',
+    const Query(),
+    isActive: () => active,
+  );
+});
 final itemProvider = FutureProvider.autoDispose
     .family<Record, (String, String)>(
       (ref, key) => ref.watch(repositoryProvider).detail(key.$1, key.$2),
@@ -202,19 +216,27 @@ final organizationTreeProvider = FutureProvider.autoDispose<Record>((ref) {
 final auditRecordsProvider = FutureProvider.autoDispose<PageResult>(
   (ref) => ref.watch(recordsProvider('audit').future),
 );
-final analyticsSummaryProvider = FutureProvider.autoDispose<Record>(
-  (ref) => ref
-      .watch(repositoryProvider)
-      .detail(
-        'analytics',
-        ref.watch(selectedDateProvider).toIso8601String().split('T').first,
-        ownerId: switch (ref.watch(periodProvider)) {
-          '日' => 'day',
-          '周' => 'week',
-          _ => 'month',
-        },
-      ),
+final analyticsFiltersProvider = StateProvider.family<AnalyticsFilters, String>(
+  (ref, accountId) => const AnalyticsFilters(),
 );
+final analyticsSummaryProvider = FutureProvider.autoDispose<Record>((ref) {
+  final accountId = ref.watch(sessionProvider).id;
+  final filters = ref.watch(analyticsFiltersProvider(accountId));
+  return ref.watch(repositoryProvider).analytics(
+    AnalyticsQuery(
+      date: ref.watch(selectedDateProvider),
+      period: switch (ref.watch(periodProvider)) {
+        '日' => 'day',
+        '周' => 'week',
+        _ => 'month',
+      },
+      groupBy: filters.groupBy,
+      departmentId: filters.departmentId.isEmpty ? null : filters.departmentId,
+      teamId: filters.teamId.isEmpty ? null : filters.teamId,
+      ownerId: filters.ownerId.isEmpty ? null : filters.ownerId,
+    ),
+  );
+});
 final datedRecordsProvider = FutureProvider.autoDispose
     .family<PageResult, String>((ref, resource) {
       var active = true;
@@ -237,6 +259,54 @@ final datedRecordsProvider = FutureProvider.autoDispose
         Query(from: from, to: to),
         isActive: () => active,
       );
+    });
+
+final calendarMonthTasksProvider = FutureProvider.autoDispose
+    .family<PageResult, (String?, int)>((ref, key) {
+      var active = true;
+      ref.onDispose(() => active = false);
+      final monthIndex = key.$2;
+      final year = monthIndex >= 0
+          ? monthIndex ~/ 12
+          : (monthIndex - 11) ~/ 12;
+      final first = DateTime(year, monthIndex - year * 12 + 1);
+      final range = _calendarMonthRange(first);
+      return readCompleteList(
+        ref.watch(repositoryProvider),
+        'tasks',
+        Query(
+          ownerId: key.$1,
+          from: range.from,
+          to: range.to,
+        ),
+        isActive: () => active,
+      );
+    });
+
+final memberCalendarDateProvider = StateProvider.family<DateTime, String>((
+  ref,
+  ownerId,
+) {
+  ref.watch(sessionProvider.select((session) => (session.id, session.token)));
+  return shanghaiWallTime(DateTime.now());
+});
+
+final memberWorkspaceRevokedProvider = StateProvider.family<bool, String>((
+  ref,
+  ownerId,
+) {
+  ref.watch(sessionProvider.select((session) => (session.id, session.token)));
+  return false;
+});
+
+final memberLogMonthProvider = FutureProvider.autoDispose
+    .family<MemberLogMonth, (String, int)>((ref, key) {
+      final session = ref.watch(sessionProvider);
+      if (!session.manager || !session.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '无权查看成员日志日历');
+      }
+      final month = DateTime(key.$2 ~/ 12, key.$2 % 12 + 1);
+      return ref.watch(repositoryProvider).memberLogMonth(key.$1, month);
     });
 
 ({DateTime from, DateTime to}) _calendarMonthRange(DateTime date) {
@@ -262,6 +332,7 @@ final datedRecordsProvider = FutureProvider.autoDispose
 
 void refreshBusiness(WidgetRef ref) {
   ref.invalidate(recordsProvider);
+  ref.invalidate(receivedTaskCardProvider);
   ref.invalidate(datedRecordsProvider);
   ref.invalidate(itemProvider);
   ref.invalidate(scopedItemProvider);

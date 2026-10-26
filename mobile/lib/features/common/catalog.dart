@@ -102,7 +102,7 @@ const screens = <String, ScreenSpec>{
   'log-edit': ScreenSpec(
     '写工作日志',
     'logs',
-    fields: ['今日工作', '关联任务', '遇到的阻碍', '明日计划', '工时'],
+    fields: ['今日工作'],
     action: 'submit',
   ),
   'log-revise': ScreenSpec(
@@ -162,7 +162,7 @@ const screens = <String, ScreenSpec>{
   'policy': ScreenSpec(
     '审核策略',
     'organization/admin',
-    fields: ['指定公司复核人', '任务关键修改需复核'],
+    fields: [],
     action: 'policy',
     admin: true,
   ),

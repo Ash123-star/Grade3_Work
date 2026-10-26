@@ -59,10 +59,7 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
       teamId = '',
       managerId = '';
   String role = 'EMPLOYEE';
-  bool dispatch = false,
-      reviewer = false,
-      teamReview = true,
-      departmentReview = true;
+  bool dispatch = false;
   bool loading = true,
       busy = false,
       denied = false,
@@ -103,11 +100,10 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
     });
     try {
       final repository = ref.read(repositoryProvider);
-      final organization = await repository.detail('organization/tree', 'tree');
+      final organization = policy
+          ? null
+          : await repository.detail('organization/tree', 'tree');
       Record? value;
-      if (policy) {
-        value = await repository.detail('organization/policy', 'policy');
-      }
       if (!policy && !unit && memberId.isNotEmpty) {
         value = await repository.detail('organization/profile', memberId);
       }
@@ -115,8 +111,7 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
           (value.version < 1 ||
               !policy &&
                   widget.kind == 'role' &&
-                  (value.fields['dispatch_enabled'] is! bool ||
-                      value.fields['company_reviewer'] is! bool))) {
+                  value.fields['dispatch_enabled'] is! bool)) {
         throw const ApiFailure(FailureKind.unavailable, '当前版本或权限未完整返回，请重新读取');
       }
       if (!mounted ||
@@ -132,18 +127,7 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
         conflict = false;
         submitted = false;
         reason.clear();
-        if (policy) {
-          final flags = value?.fields['review_policy'];
-          if (flags is! Map ||
-              flags['taskTeamReview'] is! bool ||
-              flags['taskDepartmentReview'] is! bool) {
-            current = null;
-            error = const ApiFailure(FailureKind.unavailable, '当前策略未完整返回，请重试');
-          } else {
-            teamReview = flags['taskTeamReview'];
-            departmentReview = flags['taskDepartmentReview'];
-          }
-        } else if (unit) {
+        if (unit) {
           final selected = organizationUnits(
             tree,
             unitKind,
@@ -156,7 +140,6 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
           teamId = '${f['team_id'] ?? ''}';
           role = '${f['role'] ?? 'UNKNOWN'}';
           dispatch = f['dispatch_enabled'] == true;
-          reviewer = f['company_reviewer'] == true;
           managerId = '${f['manager_id'] ?? ''}';
         }
       });
@@ -230,15 +213,10 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
     } else {
       if (current == null) return;
       version = current!.version;
-      action = policy ? 'policy' : 'user';
-      if (policy) {
-        values.addAll({
-          'taskTeamReview': teamReview,
-          'taskDepartmentReview': departmentReview,
-        });
-      } else {
-        values['id'] = memberId;
-        switch (widget.kind) {
+      if (policy) return;
+      action = 'user';
+      values['id'] = memberId;
+      switch (widget.kind) {
           case 'membership':
             values.addAll({
               'departmentId': departmentId,
@@ -249,13 +227,11 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
             values.addAll({
               'role': role,
               'dispatchEnabled': dispatch,
-              'companyReviewer': reviewer,
             });
           case 'reporting':
             values['managerId'] = managerId.isEmpty ? null : managerId;
           case 'disable':
             values['status'] = 'DISABLED';
-        }
       }
     }
     setState(() {
@@ -329,6 +305,7 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
     ).where((t) => t['department_id'] == departmentId).toList();
     final units = organizationUnits(tree, unitKind);
     final canSubmit =
+        !policy &&
         !loading &&
         tree != null &&
         (unit || current != null) &&
@@ -336,13 +313,15 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
         !conflict;
     return PageFrame(
       title: managementTitles[widget.kind]!,
-      bottom: BottomActions(
+      bottom: policy
+          ? null
+          : BottomActions(
         primary: SunnyPrimaryButton(
           loading: busy,
           onPressed: busy || !canSubmit ? null : submit,
           child: Text(submitted ? '候选已提交' : '提交候选修改'),
         ),
-        note: '独立复核通过后生效；当前配置继续使用。',
+        note: '直属上级单级审核通过后生效；当前配置继续使用。',
       ),
       child: PageBody(
         children: [
@@ -356,11 +335,12 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  PaperSurface(
-                    color: const Color(0xFFFFF0DA),
-                    child: const Text('修改申请与当前配置分开展示。提交不会立即更改组织或成员权限。'),
-                  ),
-                  const SectionHeader('选择修改对象'),
+                  if (!policy)
+                    PaperSurface(
+                      color: const Color(0xFFFFF0DA),
+                      child: const Text('修改申请与当前配置分开展示。提交不会立即更改组织或成员权限。'),
+                    ),
+                  if (!policy) const SectionHeader('选择修改对象'),
                   if (unit) ...[
                     select(
                       '组织类型',
@@ -419,32 +399,21 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                         required: true,
                       ),
                   ] else if (policy) ...[
-                    if (current != null)
-                      Text(
-                        '当前生效：团队复核${current!.fields['review_policy']['taskTeamReview'] ? '开启' : '关闭'}，部门复核${current!.fields['review_policy']['taskDepartmentReview'] ? '开启' : '关闭'} · v${current!.version}',
+                    const SectionHeader('关键修改审核规则'),
+                    const PaperSurface(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '非创始人的关键修改由组织中配置的直属上级单级审核，通过后生效，不再逐级转审。直属上级未配置或关系失效时，申请保持待审，不自动批准。',
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            '创始人已获授权的操作自动批准；管理员身份本身不构成免审。',
+                          ),
+                        ],
                       ),
-                    const SectionHeader('任务关键修改 · 候选路线'),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('团队级复核'),
-                      value: teamReview,
-                      onChanged: busy || submitted
-                          ? null
-                          : (v) => setState(() => teamReview = v),
                     ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('部门级复核'),
-                      value: departmentReview,
-                      onChanged: busy || submitted
-                          ? null
-                          : (v) => setState(() => departmentReview = v),
-                    ),
-                    Text(
-                      '路线预览：申请 → ${teamReview ? '团队复核 → ' : ''}${departmentReview ? '部门复核 → ' : ''}公司复核 → 生效',
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('独立复核人由服务端按组织和资格选取，申请人不能自审。公司复核资格请到“角色与权限”配置。'),
                   ] else ...[
                     select(
                       '员工',
@@ -480,14 +449,10 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                             Text(
                               '团队：${organizationName(tree, 'teams', current!.fields['team_id'])}',
                             ),
-                            if (widget.kind == 'role') ...[
+                            if (widget.kind == 'role')
                               Text(
                                 '派发资格：${current!.fields['dispatch_enabled'] == true ? '允许' : '不允许'}',
                               ),
-                              Text(
-                                '公司复核资格：${current!.fields['company_reviewer'] == true ? '允许' : '不允许'}',
-                              ),
-                            ],
                             if (widget.kind == 'reporting')
                               Text(
                                 current!.fields.containsKey('manager_id')
@@ -538,14 +503,6 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                               ? null
                               : (v) => setState(() => dispatch = v),
                         ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('公司复核资格'),
-                          value: reviewer,
-                          onChanged: busy || submitted
-                              ? null
-                              : (v) => setState(() => reviewer = v),
-                        ),
                       ],
                       if (widget.kind == 'reporting')
                         select('候选直属上级', managerId, [
@@ -558,16 +515,18 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                     ] else
                       const Text('选择员工后读取当前资料与版本，再填写候选修改。'),
                   ],
-                  const SectionHeader('变更理由'),
-                  TextFormField(
-                    controller: reason,
-                    enabled: !busy && !submitted,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(labelText: '说明原因与影响'),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? '请填写变更理由' : null,
-                  ),
+                  if (!policy) ...[
+                    const SectionHeader('变更理由'),
+                    TextFormField(
+                      controller: reason,
+                      enabled: !busy && !submitted,
+                      minLines: 3,
+                      maxLines: 6,
+                      decoration: const InputDecoration(labelText: '说明原因与影响'),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? '请填写变更理由' : null,
+                    ),
+                  ],
                   if (error != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 16),
