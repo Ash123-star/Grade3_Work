@@ -31,7 +31,7 @@ test('history follows server pagination and keeps the newest duplicate when page
     }
     await route.fulfill(json(body));
   });
-  await page.goto('/');await expect(page.getByRole('button',{name:'查看更多事项'})).toBeVisible();
+  await page.goto('/legacy');await expect(page.getByRole('button',{name:'查看更多事项'})).toBeVisible();
   badCursor=true;await page.getByRole('button',{name:'查看更多事项'}).click();
   await expect(page.getByRole('alert')).toContainText('暂时无法确认');
   await expect(page.locator('.work-entry')).toHaveCount(1);
@@ -61,7 +61,7 @@ test('conflicting continuation immediately restores the current version and keep
     }else if(path==='/api/admin/workspace/ai/work-items/shared-work')body=item;
     await route.fulfill(json(body,status));
   });
-  await page.goto('/');await page.getByRole('button',{name:/整理成本表/}).click();
+  await page.goto('/legacy');await page.getByRole('button',{name:/整理成本表/}).click();
   await page.getByRole('textbox',{name:'要办什么'}).fill('请使用新成本表');
   await page.locator('input[type=file]').setInputFiles({name:'成本.pdf',mimeType:'application/pdf',buffer:Buffer.from('data')});
   await expect(page.getByRole('button',{name:'移除成本.pdf'})).toBeVisible();
@@ -90,7 +90,7 @@ test('malformed write or delete responses retain private input and cannot appear
     else if(path==='/api/admin/workspace/ai/work-items/shared-work')body=item;
     await route.fulfill(json(body));
   });
-  await page.goto('/');await page.getByRole('textbox',{name:'要办什么'}).fill('保留这条交代');
+  await page.goto('/legacy');await page.getByRole('textbox',{name:'要办什么'}).fill('保留这条交代');
   await page.getByRole('button',{name:'发送',exact:true}).click();await expect(page.getByRole('alert')).toContainText('暂时无法确认');
   await expect(page.getByRole('textbox',{name:'要办什么'})).toHaveValue('保留这条交代');
   badCreate=false;await page.getByRole('button',{name:'发送',exact:true}).click();await expect(page.getByText('私人材料',{exact:true})).toBeVisible();
@@ -109,7 +109,7 @@ test('non JSON access denial clears private content while a capability failure p
     if(route.request().method()==='POST')posts++;
     await route.fulfill(json(body));
   });
-  await page.goto('/');await page.getByRole('button',{name:/整理成本表/}).click();
+  await page.goto('/legacy');await page.getByRole('button',{name:/整理成本表/}).click();
   await page.getByRole('textbox',{name:'要办什么'}).fill('尚未发送');await page.getByRole('button',{name:'发送',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('内容已保留');await expect(page.getByRole('textbox',{name:'要办什么'})).toHaveValue('尚未发送');expect(posts).toBe(0);
   capabilityDown=false;deny=true;await page.getByRole('button',{name:'刷新',exact:true}).click();
@@ -133,7 +133,7 @@ test('two open clients reconcile a concurrent confirmation without resubmitting 
     await route.fulfill(json(body,status));
   });
   const second=await context.newPage();await session(second);
-  for(const client of [page,second]){await client.goto('/');await client.getByRole('button',{name:/整理成本表/}).click();await expect(client.getByRole('button',{name:'创建任务',exact:true})).toBeVisible();}
+  for(const client of [page,second]){await client.goto('/legacy');await client.getByRole('button',{name:/整理成本表/}).click();await expect(client.getByRole('button',{name:'创建任务',exact:true})).toBeVisible();}
   await page.getByRole('button',{name:'创建任务',exact:true}).click();await expect(page.getByText('唯一的任务已创建',{exact:true})).toBeVisible();
   await second.getByRole('button',{name:'创建任务',exact:true}).focus();await second.getByRole('button',{name:'创建任务',exact:true}).press('Enter');await expect(second.getByText('唯一的任务已创建',{exact:true})).toBeVisible();
   await expect(second.getByRole('button',{name:'创建任务',exact:true})).toHaveCount(0);await expect(second.locator('.work-result [role=status]')).toBeFocused();expect(confirmations).toBe(2);expect(versions).toEqual([3,3]);await second.close();

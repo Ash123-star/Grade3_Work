@@ -480,7 +480,8 @@ class TaskDispatchIntegrationTest {
         event(staleTask,"alice","RECEIVED",1,null);
         var pending=db.rows("SELECT reviewer_id FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position",stale.get("id").asText());
         for(int i=0;i<pending.size()-1;i++) {
-            String who=id.entrySet().stream().filter(e->e.getValue().equals(pending.get(i).get("reviewer_id"))).map(Map.Entry::getKey).findFirst().orElseThrow();
+            Object reviewerId=pending.get(i).get("reviewer_id");
+            String who=id.entrySet().stream().filter(e->e.getValue().equals(reviewerId)).map(Map.Entry::getKey).findFirst().orElseThrow();
             call(200,"POST","/reviews/"+stale.get("id").asText()+"/decision",who,Map.of("approve",true,"reason","同意"),null);
         }
         String finalReviewer=id.entrySet().stream().filter(e->e.getValue().equals(pending.getLast().get("reviewer_id"))).map(Map.Entry::getKey).findFirst().orElseThrow();

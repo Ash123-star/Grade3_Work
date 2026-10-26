@@ -38,7 +38,7 @@ public class Security {
                         if(path.startsWith("/api/admin/workspace/")) {
                             a.requireAdmin();
                             String target=path.substring("/api/admin/workspace".length());
-                            if(!adminWorkspaceAllowed(target)) throw ApiError.notFound();
+                            if(!adminWorkspaceAllowed(target)&&!managementAllowed(target)) throw ApiError.notFound();
                             // 管理入口复用已鉴权业务 Controller，身份仍是本次请求从数据库读取的 Actor。
                             // 不根据 User-Agent 或可伪造客户端头改变 Android 的公共业务权限。
                             r.getRequestDispatcher("/api"+target).forward(r,s);
@@ -53,6 +53,9 @@ public class Security {
         var registration=new FilterRegistrationBean<OncePerRequestFilter>(filter); registration.setOrder(-90); return registration;
     }
     public static boolean adminWorkspaceAllowed(String target){return target.startsWith("/ai-maps/")||target.startsWith("/ai-memories")||target.equals("/organization/audit")||target.equals("/organization/task-audit")||target.equals("/auth/me")||target.matches("/ai/work-(?:items|authorizations)(?:/[^/]+(?:/(?:messages|confirm|retry|cancel|stream|revoke))?)?")||Set.of("/ai/work-capabilities","/ai/work-authorization-options","/ai/work-authorization-policy").contains(target)||target.matches("/(?:procedures|tasks)/[^/]+")||target.matches("/attachments(?:/[^/]+)?");}
+    public static boolean managementAllowed(String target) {
+        return target.matches("/management/(?:accounts(?:/[^/]+(?:/revisions)?)?|items(?:/[^/]+)?|options|reviews(?:/[^/]+(?:/(?:decision|reroute))?)?)");
+    }
     public static Actor authenticate(Db db,String authorization) {
         if(authorization==null||!authorization.startsWith("Bearer ")) throw new ApiError(401,"UNAUTHENTICATED","请登录");
         var users=db.rows("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>now() AND u.status<>'DISABLED'",Db.hash(authorization.substring(7)));

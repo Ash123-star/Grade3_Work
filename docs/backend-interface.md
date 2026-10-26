@@ -131,3 +131,23 @@ Content-Type: application/json
 - `GET /api/admin/workspace/organization/task-audit`（公共同权限入口`/api/organization/task-audit`）：仅ADMIN，taskId可选（最多100字）、cursor>=0、limit为1至100。返回items/total/nextCursor；条目包含审计原字段及actor_name/task_id。过滤任务直接事件、任务审核申请/决定及最终生效；数据库按公司过滤后计数分页。无权/未知taskId均空，非法分页400、非ADMIN403。无版本及幂等键，只读；Web任务审计入口支持翻页与前后值展示。
 - 新增V15 `log_comment_replies`，旧评论parent_id为null，通过复合外键禁止跨日志回复。不修改旧迁移，不回删历史评论。
 - 用户确认：标签模型与权限实际接入、C的新任务增删改审核联调等待C提供分支或契约。现有任务审计展示不代表新任务增删改闭环已经完成。
+
+## Web 两页管理端（2026-10-23）
+
+主页面为 `/admin/accounts` 与 `/admin/company-items`，旧工作区仅在 `/legacy`。管理请求前缀为 `/api/admin/workspace/management`，转发到 `/api/management`；二者均由服务端验证当前 ACTIVE ADMIN、本公司范围和首次改密状态，FOUNDER 不自动获得管理权限。认证沿用 `/api/auth/*`。
+
+| 方法 / 管理前缀后路径 | 参数与返回 | 权限、版本及异常 |
+| --- | --- | --- |
+| GET `/accounts` | search≤100字，status为空/ACTIVE/PENDING/DISABLED，departmentId，cursor≥0，limit=1–100；items/total/nextCursor | 默认含全部状态；只返回编辑所需字段，不返回密码、哈希或私人信息 |
+| GET `/accounts/{id}` | 当前姓名、账号、手机号、组织、直属上级、角色、状态、派发资格、复核资格、version与pendingReviews | 账号、手机号、复核资格只读；跨公司/不存在404 |
+| GET `/options` | departments/teams/managers | 仅当前公司已有部门、团队、有效管理者 |
+| POST `/accounts/{id}/revisions` | version、reason及name/departmentId/teamId/managerId/role/status/dispatchEnabled；返回待审申请 | 不直接修改正式值；非法字段400，版本冲突409；待确认员工需有效部门、ACTIVE、EMPLOYEE；已有待审申请409 |
+| GET `/items` | search≤100字，archived=false/true/all，cursor/limit；items/total/nextCursor及preview/pinnedCount | preview为正式生效前十项，按pinned降序、position、id排序 |
+| GET `/items/{id}` | id/title/text/pinned/archived/position/version | text规范化自body.text；跨公司/不存在404 |
+| POST `/items/revisions` | id可省略，version（新增0）、title、text、pinned、archived、position、reason | 标题1–200字、正文≤20000字、理由1–2000字、位置0–10000整数、布尔类型严格校验；最终审核在公司锁下检查最多10项置顶，失败整笔回滚 |
+| GET `/reviews` | category=accounts/items，cursor/limit；items/total/nextCursor | 仅本人申请或分配给本人的USER/MEMBERSHIP/COMPANY_ITEM记录 |
+| GET `/reviews/{id}` | 正式前值、候选内容、申请理由、expected_version、步骤及状态 | 无权403、不存在404；ADMIN身份不扩大分配范围 |
+| POST `/reviews/{id}/decision` | approve:boolean，reason≤2000字 | 当前独立复核人才能决定；自审403、空驳回400、终态/业务版本冲突409 |
+| POST `/reviews/{id}/reroute` | 空请求体 | 仅申请人、待审、无已处理步骤；越权403/状态冲突409 |
+
+读取幂等，无额外版本要求。写入没有幂等键，不自动重试；网络结果不明时先核对修改记录。统一错误形状为`{code,message,traceId}`，401会话无效、403权限不足，跨公司对象隐藏为404。事项不提供硬删除或恢复接口。此批复用现有users/dashboard_items/review_requests/review_steps/audit/outbox表及已有公司索引，不新增或修改Flyway迁移；管理专用审计过滤及状态/目标筛选仍未完成，不能把审核申请列表当作完整审计检索。
