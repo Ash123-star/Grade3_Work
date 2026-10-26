@@ -117,6 +117,17 @@ Content-Type: application/json
 - 该管理入口不改变Android/Flutter Web原公共业务接口的范围。FOUNDER不能仅凭创始人角色进入独立Web。不能用User-Agent、Origin或客户端自报角色替代服务端授权。
 - V14 `log_first_submission_window` 允许撤回保留首次时间，已提交日志仍要求非空时间。不改V1–V13。C的新迁移需合并前确认编号；回滚不能直接恢复旧约束（撤回记录可能已有时间），不得清空首次时间来强行回滚。
 - 日志评论 `POST /api/logs/{id}/comments`：text为1至2000字，可选parentId回复同一日志评论；返回id/actor_id/author_name/text/parent_id/created_at。所有已有日志可见权限的人可评论，24小时后仍可追加，禁止编辑删除。重复POST产生新评论（无幂等键），客户端避免自动重试。草稿403、不可见404、非法文本或回复目标400。GET返回同样字段，旧字段保留；不扩大同级或跨公司日志可见范围。通知日志作者及仍有权限的被回复人，同人去重，事务outbox不带正文。
+
+## week6 Flutter 联调边界（2026-10-22）
+
+本节为dc00e2b旧基线记录。2026-10-23 PR #33整合main 808d9d6后，新任务后端已提供participants、labelId、startAt与任务评论；客户端将HCJ别名映射为实际请求字段，任务评论需要幂等键，日志评论不需要。当前整合证据和未完成页面链路见docs/zhw-week6-main-integration.md。
+
+- Flutter 下属日志查询可将 `departmentId`、`search`、`date`、`period` 与分页参数交给 `GET /logs/subordinates`；服务端仍负责部门和人员范围授权。`date` 是上海业务日期，客户端筛选控件不代表服务端权限。
+- Flutter 将 `LOG_EDIT_WINDOW_EXPIRED` 映射为明确的不可修改/不可撤回提示。`submittedAt`、`editableUntil`、`canEdit`、`canWithdraw` 是展示提示；写操作仍以服务端响应为准。客户端当前修订使用审核申请流程，不宣称为 HCJ 所需的直接编辑。
+- 当前后端任务契约仍接受 `ownerId`、`deadline`、`group`、`content`、`urgency`、`progressNote`、`collaborators`、`attachments`；详情以 `fields` 保存扩展内容。它没有 `startAt`、`participantIds`、`tagId`、标签分类/颜色权限和任务说明追加版本契约。因此移动端不能将这些 HCJ 字段伪装成已接入，也不能把静态标签映射视为服务端标签。真实任务新字段联调待后端提供契约后完成。
+- 日志评论回复使用 `parentId`，客户端接受 HCJ 的 `parentCommentId` 并转换；读取保留 `id`、`authorName`、`parentCommentId`、`time` 和原始响应字段。日志评论发布没有幂等键，网络超时后客户端不得自动重放 POST；跨日志回复由服务端拒绝。任务评论接口仍未提供。
+- `docs/openapi.json` 保持与当前 Spring 后端一致，不能用 HCJ 预期覆盖现有运行时契约。API 改变后应从后端 OpenAPI 重新生成并核对。
+- 当前验证结果见 `docs/zhw-week6-validation.md`。新增 `withdraw` 操作使用 version/reason 调用独立撤回接口；未知直接编辑语义不转换成审核成功。任务新字段和任务评论调用在 HTTP 写入前明确失败。
 - `GET /api/admin/workspace/organization/task-audit`（公共同权限入口`/api/organization/task-audit`）：仅ADMIN，taskId可选（最多100字）、cursor>=0、limit为1至100。返回items/total/nextCursor；条目包含审计原字段及actor_name/task_id。过滤任务直接事件、任务审核申请/决定及最终生效；数据库按公司过滤后计数分页。无权/未知taskId均空，非法分页400、非ADMIN403。无版本及幂等键，只读；Web任务审计入口支持翻页与前后值展示。
 - 新增V15 `log_comment_replies`，旧评论parent_id为null，通过复合外键禁止跨日志回复。不修改旧迁移，不回删历史评论。
 - 用户确认：标签模型与权限实际接入、C的新任务增删改审核联调等待C提供分支或契约。现有任务审计展示不代表新任务增删改闭环已经完成。

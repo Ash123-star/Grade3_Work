@@ -1,5 +1,19 @@
 # 前端接口草案
 
+## 2026-10-23 PR #33 主线整合
+
+基线更新到 main 808d9d6。下方dc00e2b的后端缺口仅是历史记录。新任务将界面participantIds/tagId转换为请求participants/labelId，保留startAt、deadline和审核申请响应；任务详情的服务端label映射为tagId/tagName/tagColor/tagCategory，参与人姓名映射沿用主线规则。
+
+任务评论POST /tasks/{id}/comments支持parentId并要求Command.idempotencyKey；GET tasks/{id}/comments及GET task-labels已登记Repository列表入口。日志评论仍没有幂等键、不自动重试，读取同时提供actorName与authorName。标签选择器的静态数据替换、任务评论页面完整读取及最新任务真实链路仍待后续验收，不以Repository契约测试替代。
+
+## 2026-10-22 week6 旧基线记录（dc00e2b）
+
+以 main dc00e2b 后端为准：下属日志 Query 增加 departmentId，分页保留 search/ownerId/date/period；日志 department 对象映射 departmentId/departmentName、author 映射 authorName。服务端能力字段完整保留，LogEditWindow 用于窗口展示，撤回不重置首次提交时间。
+
+日志评论回复将 HCJ parentCommentId 转换为请求 parentId，读取保留评论 id/作者/父评论/时间；POST 不自动重试。日志撤回 action=withdraw 发送 version/reason；已提交日志继续使用 request-review。过期和限流有明确提示。
+
+startAt/participantIds/tagId 与 tasks/comments 尚无后端契约，正式客户端明确拒绝，旧任务字段迁移未完成。SSE 沿用现有实现。HCJ 页面未合并，数据层通过不代表页面接通。详细证据和未完成项见 ../../docs/zhw-week6-validation.md。
+
 ## 2026-10-23 任务显示元数据
 
 派发和修改沿用 `tagId`、`participantIds` 标识；任务读响应应同时返回 `tagName` 和与ID顺序一致的 `participantNames`，或包含真实姓名的participants对象列表。适配层接受camelCase与snake_case。显示名不参与权限判断；内置标签ID统一映射中文，未知标签且无名称显示“标签名称未提供”，缺失成员姓名显示“成员姓名未提供”，不得把ID当姓名或查询越权人员补名。Mock按已有演示组织的真实姓名补全新建和历史任务，只是本地显示契约，不证明真实服务联调通过。
