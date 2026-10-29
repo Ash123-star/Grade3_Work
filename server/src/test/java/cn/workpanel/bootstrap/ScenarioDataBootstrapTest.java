@@ -20,6 +20,7 @@ class ScenarioDataBootstrapTest {
     }
 
     @Test void validUnicodePasswordFitsBcryptAndExplicitOptInIsRequired() {
+        assertDoesNotThrow(() -> ScenarioDataBootstrap.requirePassword("123456"));
         assertDoesNotThrow(() -> ScenarioDataBootstrap.requirePassword("场景密码安全校验十二字符以上"));
         var condition = ScenarioDataBootstrap.class.getAnnotation(ConditionalOnProperty.class);
         assertEquals("true", condition.havingValue());

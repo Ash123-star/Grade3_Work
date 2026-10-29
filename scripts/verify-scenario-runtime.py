@@ -65,7 +65,12 @@ def main():
         return value
 
     def login(who, expected=(200,)):
-        response = request('POST', '/auth/login', body=dict(account='scenario.' + who,
+        accounts = {'founder': 'boss', 'admin': 'admin', 'product-director': 'pd',
+                    'engineering-director': 'rd', 'delivery-director': 'dd',
+                    'product-lead': 'pl', 'design-lead': 'dl', 'backend-lead': 'bl',
+                    'delivery-lead': 'tl', 'pending': 'new1', 'pending-delivery': 'new2',
+                    'disabled': 'off', 'outsider': 'other'}
+        response = request('POST', '/auth/login', body=dict(account=accounts.get(who, who),
                            password=config['password']), expected=expected)
         if 'token' in response:
             tokens[who] = response['token']

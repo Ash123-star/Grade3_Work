@@ -22,3 +22,5 @@
 ## Impact
 
 新增 scripts 工具、演示数据说明与验证报告；数据/凭据/截图/日志仅在 Git 忽略的 output 下。依赖现有 WSL PostgreSQL/Redis 和 Android SDK。
+
+2026-10-29后续调整：用户授权简化测试凭据，见#42与simple-scenario-cloud-login，追加V3，公开测试密码仅供虚构场景使用。
