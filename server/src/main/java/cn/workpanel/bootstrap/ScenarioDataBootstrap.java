@@ -32,9 +32,9 @@ public class ScenarioDataBootstrap implements ApplicationRunner {
     }
 
     static void requirePassword(String password) {
-        if (password == null || password.isBlank() || password.length() < 12
+        if (password == null || password.isBlank() || password.length() < 6
                 || password.getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new IllegalArgumentException("启用场景初始化必须提供12字符以上且UTF-8不超过72字节的SCENARIO_PASSWORD");
+            throw new IllegalArgumentException("启用场景初始化必须提供至少6字符且UTF-8不超过72字节的SCENARIO_PASSWORD（仅测试账号）");
         }
     }
 

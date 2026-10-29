@@ -24,13 +24,15 @@ D:\flutter\bin\flutter.bat build apk --release --dart-define=USE_MOCK=true
 
 产物位于 `build/app/outputs/flutter-apk/app-release.apk`。当前交付副本为 `build/app/outputs/flutter-apk/pandora-mock-release.apk`。安装后不需要连接真实后端，数据来自本地 Mock Repository；Hot Reload 不会改变已编译 APK 的模式。
 
-真实联调选择 **Android Backend**，先启动后端（8080）。默认真实模式未登录时进入登录页是正常行为；Android 模拟器的 `localhost` 指向模拟器自身，访问电脑使用 `http://10.0.2.2:8080/api`。Android 默认开发地址已改为该地址；Web/桌面仍是 localhost。真机需通过 `API_BASE_URL` 指定电脑局域网地址或 HTTPS 服务。
+真实联调默认访问云端 `http://39.96.84.51/api`（80端口），使用真实后端。Android发布包仅为该IP允许HTTP；debug包保留本地联调支持。可用 `API_BASE_URL` 覆盖地址，修改后须重新运行或构建。
 
 ```powershell
+D:\flutter\bin\flutter.bat run --dart-define=USE_MOCK=false
+# 本地模拟器联调
 D:\flutter\bin\flutter.bat run --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://10.0.2.2:8080/api
 ```
 
-真实注册加载 `/auth/departments`，提交部门 ID；密码至少 12 字符，注册后为待确认员工，不会直接进入业务页面。Mock 不等于创建真实账号。开发 HTTP 仅 debug manifest 允许；生产环境使用 HTTPS。
+真实注册加载 `/auth/departments`，提交部门 ID；密码至少 12 字符，注册后为待确认员工，不会直接进入业务页面。Mock 不等于创建真实账号。云端IP测试地址按指定HTTP白名单访问；HTTPS部署可用API_BASE_URL覆盖。
 
 需要 Flutter 3.38.7 / Dart 3.10.7 或兼容版本、Android SDK、JDK 17。依赖已通过 pubspec.lock 固定。
 
