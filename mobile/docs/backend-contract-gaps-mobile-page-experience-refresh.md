@@ -1,5 +1,9 @@
 # 后端接口补充契约：移动端页面体验阶段
 
+> 2026-10-29补充：剩余接口代码接入状态以 docs/mobile-remaining-api-implementation-status.md 为准。用户已取消意见反馈，移动端入口/表单/Mock资源已删除，旧深链转帮助页；不新增feedback服务。任务评论/日志回复沿用现有真实接口，RETURNED、成果附件、团队目录、AI scope和确认version/幂等回执已接入源码，尚未统一验收。日志阅读登记已停用，不新增人员清单。下文保留的旧缺口或历史验证不能代表本批已通过。
+
+> 2026-10-29状态更新：六组P0接口与#17已有服务端源码及V22迁移，尚未执行测试、编译、迁移或HTTP联调。最新契约/源码矩阵和统一验收待办见 [mobile-p0-implementation-status.md](../../docs/mobile-p0-implementation-status.md)。下文保留2026-10-25审计背景，不能把旧“缺失”直接当作当前结论，也不能把代码接入视为验收通过；P1评论、退回和反馈不在本批接口范围。
+
 更新日期：2026-10-25
 关联 OpenSpec：[`mobile-page-experience-refresh`](../../openspec/changes/mobile-page-experience-refresh/)
 用途：交给后端后续实现与更新正式 API 文档；本文只记录移动端依赖和当前缺口，不表示服务端已经支持。

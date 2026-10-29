@@ -66,6 +66,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             ? null
             : '/auth/pending';
       }
+      if (path == '/form/support' ||
+          path == '/list/feedback' ||
+          path.startsWith('/item/feedback/')) {
+        return '/me/help';
+      }
       return null;
     },
     routes: [

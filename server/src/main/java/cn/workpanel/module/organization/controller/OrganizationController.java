@@ -18,18 +18,20 @@ public class OrganizationController {
     @GetMapping public Map<String, Object> tree(HttpServletRequest request) { return service.tree(Actor.current(request)); }
     /** 同公司部门 id/name 目录，不包含人员数据；已激活账号，无版本/幂等键要求。 */
     @GetMapping("/departments") public List<Map<String, Object>> departments(HttpServletRequest request) { return service.departments(Actor.current(request)); }
+    /** 当前有效账号组织范围内团队目录，返回id/name/department_id/version；沿用组织树范围，越权不返回。只读，无分页、幂等键或版本要求。 */
+    @GetMapping("/teams") public List<Map<String, Object>> teams(HttpServletRequest request) { return service.teams(Actor.current(request)); }
     /** PENDING 员工提交 departmentId/version/reason 归属申请；存在待审409、无效部门404；审核后生效。 */
     @PostMapping("/membership-application") public Map<String, Object> membership(HttpServletRequest request, @RequestBody Map<String, Object> body) { return service.membership(Actor.current(request), body); }
     /** 管理员读取生效审核策略与 version；非管理员403；只读幂等。 */
     @GetMapping("/review-policy") public Map<String, Object> policy(HttpServletRequest request) { return service.policy(Actor.current(request)); }
-    /** 管理员提交 taskTeamReview/taskDepartmentReview/version/reason；非法字段400，独立审核后生效，公司复核不能关闭。 */
+    /** 管理员提交 AI 长期授权开关、期限与数量限制及 version/reason；直属单级审核后生效。退役的 taskTeamReview/taskDepartmentReview 字段返回400。 */
     @PostMapping("/review-policy/revisions") public Map<String, Object> policyRevision(HttpServletRequest request, @RequestBody Map<String, Object> body) { return service.policyRevision(Actor.current(request), body); }
     /** 已激活账号读取人员：search/dispatch/cursor/limit；dispatch要求派发资格；分页无效400、越权403；无版本要求。 */
     @GetMapping("/people") public Map<String, Object> people(HttpServletRequest request, @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "false") boolean dispatch, @RequestParam(defaultValue = "0") int cursor, @RequestParam(defaultValue = "30") int limit) {
         return service.people(Actor.current(request), search, dispatch, cursor, limit);
     }
-    /** ACTIVE 非复核人申请公司复核职责：version/reason；已具备409、无效400；独立管理员批准，员工角色不改变。 */
+    /** ACTIVE 非复核人申请公司复核职责：version/reason；已具备409、无效400；当前直属上级批准，员工角色不改变；此职责不授予多级审核权限。 */
     @PostMapping("/reviewer-application") public Map<String, Object> reviewer(HttpServletRequest request, @RequestBody Map<String, Object> body) { return service.reviewer(Actor.current(request), body); }
     /** 管理员申请人员变更：version/reason及组织/角色/状态字段；非法400、范围外404；审核通过前旧值有效，最终版本冲突409。
      * 创建候选不采用幂等键；重复候选仍在最终版本校验时解决冲突。 */

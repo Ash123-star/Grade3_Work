@@ -14,6 +14,8 @@ The current runtime OpenAPI snapshot and server controllers are authoritative fo
 
 ## Decisions
 
+2026-10-29后续实施覆盖说明：本change以下内容保留当时前端接口盘点背景；当前正式实现与产品取消决定以 `mobile-page-experience-refresh` 和 `docs/mobile-remaining-api-implementation-status.md` 为准。意见反馈已取消，阅读登记不新增清单；任务DTO/标签、评论回复已有真实资源，RETURNED映射、成果附件、团队目录、AI scope/确认version与V23回执已补入源码但未统一验收。下文历史“无服务端/无scope/无version”不能视为当前事实。
+
 - Use option 2. No new dependency, endpoint, database table, permission rule, or server implementation is introduced here.
 - The frontend coverage matrix names UI operations and current/proposed request shapes. Existing paths are marked implemented only when present in runtime OpenAPI/controller and the Flutter adapter. Mock-only or local-only actions are never presented as remote APIs.
 - Unknown list/detail resources fail with `FailureKind.unavailable` before network I/O. Resource mapping is an explicit allowlist.

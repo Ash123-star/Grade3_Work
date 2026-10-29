@@ -42,7 +42,9 @@ public class MessageApplicationService {
                 if(rows.isEmpty()) emitter.send(SseEmitter.event().comment("keepalive"));
             } catch(Exception e) { emitter.complete(); }
         },0,2,TimeUnit.SECONDS);
-        Runnable stop=()->future[0].cancel(false); emitter.onCompletion(stop); emitter.onTimeout(stop); emitter.onError(e->stop.run()); return emitter;
+        Runnable stop=()->future[0].cancel(false); emitter.onCompletion(stop);
+        emitter.onTimeout(()->{ stop.run(); emitter.complete(); });
+        emitter.onError(e->stop.run()); return emitter;
     }
     @jakarta.annotation.PreDestroy void stop() { streams.shutdownNow(); }
 }

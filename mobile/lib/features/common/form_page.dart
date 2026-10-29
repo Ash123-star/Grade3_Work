@@ -903,12 +903,12 @@ class _FormPageState extends ConsumerState<FormPage> {
       );
     }
     if (['附件', '头像'].contains(label)) {
-      if (label == '附件' && !['dispatch'].contains(widget.kind)) {
+      if (label == '附件' && !['dispatch', 'feedback'].contains(widget.kind)) {
         return const ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.info_outline),
           title: Text('附件关联暂不可用'),
-          subtitle: Text('当前成果反馈/意见反馈接口不支持附件关联，请在说明中补充材料信息。'),
+          subtitle: Text('当前操作不支持附件关联。'),
         );
       }
       return Column(
@@ -1129,6 +1129,10 @@ class _FormPageState extends ConsumerState<FormPage> {
   }
 
   Future<void> submit() async {
+    if (widget.kind == 'feedback' && uploadedAttachments.length > 5) {
+      setState(() => error = '成果反馈最多添加5个附件');
+      return;
+    }
     if (loadingExisting ||
         loadFailed ||
         conflict ||
@@ -1189,7 +1193,7 @@ class _FormPageState extends ConsumerState<FormPage> {
             uploadedAttachments.firstOrNull?.id ??
             original?.fields['avatarAttachmentId'] ??
             '',
-      if (widget.kind == 'dispatch')
+      if (['dispatch', 'feedback'].contains(widget.kind))
         'attachments': uploadedAttachments.map((f) => f.id).toList(),
       if (widget.kind == 'dispatch')
         'participantIds': participants.keys.toList(),
@@ -1202,7 +1206,6 @@ class _FormPageState extends ConsumerState<FormPage> {
         'title':
             controllers['任务名称']?.text ??
             controllers['标题']?.text ??
-            controllers['问题描述']?.text ??
             (log
                 ? '${businessDate.toIso8601String().split('T').first} 工作日报'
                 : spec.title),
@@ -1345,8 +1348,7 @@ class _FormPageState extends ConsumerState<FormPage> {
             loadFailed ||
             conflict ||
             !windowOpen ||
-            widget.kind == 'policy' ||
-            (!AppConfig.mock && widget.kind == 'return')
+            widget.kind == 'policy'
         ? null
         : submit,
     child: Text(
@@ -1788,11 +1790,6 @@ class _FormPageState extends ConsumerState<FormPage> {
               padding: EdgeInsets.only(bottom: 16),
               child: Text('私人备注仅本人可见，不进入下属面板或 AI。'),
             ),
-          if (!AppConfig.mock && widget.kind == 'return')
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16),
-              child: Text('退回补充服务尚未接入；可以阅读成果，当前任务不会改变。'),
-            ),
           if (widget.kind == 'profile-edit')
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
@@ -1995,7 +1992,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                   Expanded(
                     child: Text(
                       widget.kind == 'login'
-                          ? '企业账号用于进入对应组织空间，业务数据范围按账号权限控制。'
+                          ? '本机自动记住登录，有效期一周；下次打开无需重复输入账号密码。退出登录或会话失效后需重新登录。'
                           : '账号归属由管理员确认；确认前不会开放公司业务资料。',
                       style: const TextStyle(
                         fontSize: 12,

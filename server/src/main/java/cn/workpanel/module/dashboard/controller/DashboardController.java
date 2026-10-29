@@ -2,19 +2,19 @@ package cn.workpanel.module.dashboard.controller;
 
 import cn.workpanel.*;
 import cn.workpanel.module.review.application.ReviewApplicationService;
-import cn.workpanel.module.auth.controller.AuthController;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import cn.workpanel.module.dashboard.application.ProfileService;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api")
 /** 导图、个人资料和私人备注接口；所有聚合查询复用当前用户数据范围。 */
 public class DashboardController {
-    final Db db; final Business business; final ReviewApplicationService reviews;
-    public DashboardController(Db db,Business business,ReviewApplicationService reviews) { this.db=db; this.business=business; this.reviews=reviews; }
+    final Db db; final Business business; final ReviewApplicationService reviews; final ProfileService profiles;
+    public DashboardController(Db db,Business business,ReviewApplicationService reviews,ProfileService profiles) { this.db=db; this.business=business; this.reviews=reviews; this.profiles=profiles; }
     /** 获取导图首页四象限及当前用户派发资格。需要登录；公司重点只读。 */
     @GetMapping("/dashboard") public Map<String,Object> home(HttpServletRequest r) {
         Actor a=Actor.current(r); var t=Business.taskScope(a);
@@ -48,10 +48,10 @@ public class DashboardController {
         return db.one("SELECT * FROM dashboard_items WHERE id=?",id);
     }
     static void validate(Map<String,Object> b) { for(String k:List.of("pinned","archived")) if(b.containsKey(k)&&!(b.get(k) instanceof Boolean)) throw ApiError.bad("INVALID_BOOLEAN",k+" 必须是布尔值"); if(b.containsKey("position")&&(!(b.get("position") instanceof Number n)||n.intValue()<0||n.intValue()>10000)) throw ApiError.bad("INVALID_POSITION","排序位置无效"); }
-    /** 获取范围内用户公开资料。私人备注不返回；越权返回 403。 */
-    @GetMapping("/profiles/{id}") public Map<String,Object> profile(HttpServletRequest r,@PathVariable String id) { Actor a=Actor.current(r); var u=db.one("SELECT * FROM users WHERE id=? AND company_id=?",id,a.company()); if(!a.canSeeUser(u)) throw ApiError.forbidden(); var result=new LinkedHashMap<>(AuthController.publicUser(u)); result.put("profile",db.read(u.get("profile"))); result.put("viewingSelf",a.id().equals(id)); return result; }
-    /** 修改本人头像和介绍。需要 version；头像必须由本人上传；并发冲突返回 409。 */
-    @PutMapping("/profiles/me") @Transactional public Map<String,Object> profile(HttpServletRequest r,@RequestBody Map<String,Object> b) { Db.fields(b,"avatarAttachmentId","introduction","version"); Actor a=Actor.current(r); if(!Db.str(b,"avatarAttachmentId").isBlank()) db.one("SELECT id FROM attachments WHERE id=? AND owner_id=? AND company_id=?",b.get("avatarAttachmentId"),a.id(),a.company()); var c=new LinkedHashMap<>(b); c.remove("version"); Db.conflict(db.update("UPDATE users SET profile=?::jsonb,version=version+1 WHERE id=? AND version=?",db.write(c),a.id(),Db.version(b))); return profile(r,a.id()); }
+    /** 读取本人、当前真实组织上级或既有全局范围内资料；越权403/404。只读，无分页、幂等或版本要求。 */
+    @GetMapping("/profiles/{id}") public Map<String,Object> profile(HttpServletRequest r,@PathVariable String id) { return profiles.get(Actor.current(r),id); }
+    /** 本人按version更新phone/email/gender/age及简介头像，选填字段支持清空；未知字段400、重复手机号409、旧版本409。数据库原子更新，不要求幂等键。 */
+    @PutMapping("/profiles/me") public Map<String,Object> profile(HttpServletRequest r,@RequestBody Map<String,Object> body) { return profiles.update(Actor.current(r),body); }
     /** 获取本人私人备注。仅本人可见；不接受 ownerId 代查。 */
     @GetMapping("/private-notes") public List<Map<String,Object>> notes(HttpServletRequest r) { Actor a=Actor.current(r); return db.rows("SELECT * FROM private_notes WHERE company_id=? AND owner_id=?",a.company(),a.id()); }
     /** 保存本人私人备注。请求含 resource、objectId、text、version；备注不进入导出和 AI 输入。 */

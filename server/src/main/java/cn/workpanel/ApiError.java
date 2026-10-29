@@ -21,8 +21,17 @@ public class ApiError extends RuntimeException {
 
 @RestControllerAdvice
 class Errors {
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,org.springframework.web.servlet.NoHandlerFoundException.class})
+    ResponseEntity<?> missing(Exception e,HttpServletRequest r) { return ResponseEntity.status(404).body(body("NOT_FOUND","接口不存在",r)); }
     @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestNotUsableException.class)
     void disconnected() { /* 客户端断开 SSE 后响应已不可写，不尝试再写 JSON 错误。 */ }
+    @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestTimeoutException.class)
+    ResponseEntity<?> timeout(HttpServletRequest request,jakarta.servlet.http.HttpServletResponse response) {
+        // SSE按约定定时结束后由客户端重连；已提交的流不能再用JSON转换器写错误响应。
+        if(response.isCommitted()||org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE.equals(response.getContentType())
+                ||response.getContentType()!=null&&response.getContentType().startsWith("text/event-stream;")) return null;
+        return ResponseEntity.status(503).body(body("REQUEST_TIMEOUT","请求处理超时，请稍后重试",request));
+    }
     @ExceptionHandler(ApiError.class)
     ResponseEntity<?> business(ApiError e,HttpServletRequest r) { return ResponseEntity.status(e.status).body(body(e.code,e.getMessage(),r)); }
     @ExceptionHandler(DataIntegrityViolationException.class)

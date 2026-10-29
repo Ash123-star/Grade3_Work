@@ -3,6 +3,7 @@ package cn.workpanel.module.task;
 import cn.workpanel.Actor;
 import cn.workpanel.ApiError;
 import cn.workpanel.Db;
+import cn.workpanel.Business;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
@@ -16,19 +17,22 @@ public class TaskLifecycleService {
 
     /**
      * 生效接收、反馈、验收、退回、归档或撤回动作。
-     * 请求仅接受 type、version、text；反馈、退回和撤回的说明为 1–2000 字。
+     * 请求接受 type、version、text；FEEDBACK可额外带最多5个attachments，其他动作禁止。
      */
     @Transactional
     public Map<String, Object> apply(Actor actor, String taskId, Map<String, Object> request) {
         // 先按范围锁定目标，避免范围外调用者从格式或状态错误中获知任务信息。
         var task = TaskAccess.readable(db, actor, taskId, true);
-        Db.fields(request, "type", "version", "text");
+        Db.fields(request, "type", "version", "text", "attachments");
         var action = TaskStateMachine.Action.parse(Db.required(request, "type"));
         if (action == TaskStateMachine.Action.REASSIGN || action == TaskStateMachine.Action.RESCHEDULE) {
             throw ApiError.bad("INVALID_EVENT", "转派和改期必须提交复核申请");
         }
         int requestedVersion = Db.version(request);
         String text = validateText(action, request);
+        if(request.containsKey("attachments")&&action!=TaskStateMachine.Action.FEEDBACK) throw ApiError.bad("INVALID_FIELD","仅成果反馈支持附件");
+        var attachments=Business.strings(request,"attachments");
+        if(attachments.size()>5) throw ApiError.bad("FILE_LIMIT","成果反馈最多关联5个附件");
 
         var phase = TaskStateMachine.Phase.parse(Db.str(task, "phase"));
         var roles = TaskRoles.resolve(db, actor, task);
@@ -46,6 +50,10 @@ public class TaskLifecycleService {
         int nextVersion = currentVersion + 1;
         var nextBody=new LinkedHashMap<>(db.read(task.get("body")));
         if(action==TaskStateMachine.Action.FEEDBACK) {
+            TaskAttachments.bind(db,actor,taskId,attachments,true);
+            var allAttachments=new LinkedHashSet<>(Business.strings(nextBody,"attachments")); allAttachments.addAll(attachments);
+            if(allAttachments.size()>100) throw ApiError.bad("FILE_LIMIT","任务累计附件超过100个");
+            nextBody.put("attachments",new ArrayList<>(allAttachments));
             String prior=Db.str(nextBody,"content");
             String block="["+actor.id()+" 反馈] "+text;
             nextBody.put("content",prior.isBlank()?block:prior+"\n\n"+block);
@@ -54,6 +62,7 @@ public class TaskLifecycleService {
                 decision.next().name(), db.write(nextBody), nextVersion, taskId, currentVersion));
         var eventBody = new LinkedHashMap<String, Object>();
         if (text != null) eventBody.put("text", text);
+        if(!attachments.isEmpty()) eventBody.put("attachments",attachments);
         TaskTimeline.append(db, actor, taskId, action.name(), eventBody,
                 phase.name(), decision.next().name(), nextVersion);
         db.audit(actor, "TASK_EVENT", taskId, Map.of("phase", phase.name(), "version", currentVersion),

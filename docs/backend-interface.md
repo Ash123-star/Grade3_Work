@@ -4,9 +4,11 @@
 
 实现事实以 SpringDoc 运行时文档 `GET /api/openapi` 为准；提交到仓库的 `docs/openapi.json` 是同一份契约快照，本文件只解释调用规则。三者必须同步更新，客户端不得根据旧版本猜测字段。
 
+2026-10-29 本批状态：六组 P0 及 #17 的代码/运行时 schema 正在接入，尚未测试、编译、启动服务或执行迁移。`docs/openapi.json` 仍为旧运行时快照，须在最终统一验收时重新生成；以下新增契约不是运行成功证明。
+
 根路径为 `/api`。除公开登录、注册和健康检查外均需 `Authorization: Bearer <session-token>`。每个响应带 `X-Trace-Id`；错误体为 `{code,message,traceId}`。列表使用 `{items,total,nextCursor}`，`cursor` 为偏移量，`limit` 范围 1–100。时间使用 UTC ISO-8601，业务日期按 `Asia/Shanghai` 且周一为周首。
 
-移动端补充协议见 [`mobile-openapi-contract.yaml`](mobile-openapi-contract.yaml)，并由 `docs/openapi.json` 的 `x-mobile-contract` 标记引用。对该覆盖文件列出的 path、operation 和 schema，以覆盖文件为权威定义；它是待服务端实现的正式协议草案，优先定义移动端真实调用所需的路径、参数、字段、权限和错误语义，但不代表当前运行代码已经提供这些路由。服务端实现后必须同步 SpringDoc、`docs/openapi.json` 和移动端 HTTP contract tests。
+移动端补充协议见 [`mobile-openapi-contract.yaml`](mobile-openapi-contract.yaml)，并由 `docs/openapi.json` 的 `x-mobile-contract` 标记引用。对该覆盖文件列出的 path、operation 和 schema，以覆盖文件为目标契约；当前状态为 `IMPLEMENTED_UNVERIFIED`，对应源码已接入但尚未通过编译、数据库升级和 HTTP 验收。最终统一验收时必须同步 SpringDoc、`docs/openapi.json` 和移动端 HTTP contract tests。逐项源码接入与验收待办见 [`mobile-p0-implementation-status.md`](mobile-p0-implementation-status.md)。
 
 移动端与服务端的逐项缺口、当前实现状态和后端接手验收要求见 [`mobile/docs/backend-contract-gaps-mobile-page-experience-refresh.md`](../mobile/docs/backend-contract-gaps-mobile-page-experience-refresh.md)。其中“缺失/不匹配”只表示协议或运行端点尚未兑现，不表示移动端 Mock 已替代服务端业务。
 
@@ -31,7 +33,7 @@
 
 `GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
 
-`GET /tasks?date=YYYY-MM-DD&period=day|week|month` 使用上海业务日期按任务区间相交筛选：`start_at < 范围结束 && deadline >= 范围开始`，并排除开始时间晚于截止时间的无效区间。月范围扩展到该月月历首个可见周一至末个可见周一的右侧边界，以便月初/月末灰色日期格和跨月续段读取到同一任务；组织数据范围与分页权限不变。
+`GET /tasks?date=YYYY-MM-DD&period=day|week|month` 使用上海自然日/周/月按任务区间相交筛选：`COALESCE(start_at,deadline) < 范围结束 && deadline >= 范围开始`，排除反向区间。移动端自行计算月历可见网格并发送成对带时区的 `from/to`；不得与 `date/period` 混用。`participantId` 为正式参与人参数，`ownerId` 是兼容别名，同时出现且不同返回400。
 
 移动端新月历调用的正式目标形状为 `GET /tasks?from=<inclusive-ISO8601>&to=<exclusive-ISO8601>&ownerId=<optional-id>`；导图接收卡片使用 `GET /tasks/received-card?cursor&limit&search`，返回 `id/title/version/dispatchAt/phase` 和卡片所需的参与人、标签字段。`phase` 必须区分 `DISPATCHED/RECEIVED/FEEDBACK/ACCEPTED/ARCHIVED/WITHDRAWN`，服务端不得让客户端从缺失字段推导完成状态。
 
@@ -57,13 +59,13 @@
 
 ## 日志 `/logs`
 
-`GET /logs` 只返回本人或授权范围内已提交日志；`GET /logs/subordinates` 是下属日志入口，上级不能读取草稿。`PUT /logs/draft` 按用户和上海业务日期保存唯一草稿；`POST /logs/{id}/submit` 提交；`POST /logs/{id}/revisions` 修改已提交版本并进入审核；`GET /logs/{id}/versions`、`POST /logs/{id}/read`、`GET/POST /logs/{id}/comments` 分别用于历史、已读和评语。
+`GET /logs` 只返回本人草稿或授权范围内已提交日志；下属列表、月状态与详情共享组织范围和真实祖先关系。`PUT /logs/draft` 保存每日唯一草稿，首次提交仅允许上海今天和此前两日。已提交正文由本人在原始24小时内 `PUT /logs/{id}/content` 直改。已删除日志修订、撤回和阅读登记三条旧 HTTP 路由（请求返回404 `NOT_FOUND`），历史待审LOG候选迁移为 `SUPERSEDED`，不能延迟覆盖正文；旧历史字段和版本保留。阅读登记不再提供写入口，统计不再使用待阅指标。
 
 移动端日期范围列表同时支持 `from/to`；成员月状态使用 `GET /logs/subordinates/calendar?ownerId=<id>&month=YYYY-MM`，返回 `employmentStartDate` 和逐日 `SUBMITTED/MISSING/FUTURE/UNKNOWN`。首次提交后的直接正文修改使用 `PUT /logs/{id}/content`，请求 `{work,version}`，只能由本人在 `submitted_at + 24h` 前执行，必须保留首次提交时间并递增版本。
 
 ## 审核 `/reviews`
 
-`GET /reviews`、`GET /reviews/{id}` 返回申请人或当前审核步骤可见内容。`POST /reviews/{id}/decision` 请求 `{approve,reason}`，驳回时 reason 必填，申请人不能自审；`POST /reviews/{id}/reroute` 仅申请人在未决策前重建审核链。最终通过时再次校验目标版本。
+`GET /reviews`、`GET /reviews/{id}` 返回申请人或当前仍有权的分配审核人可见内容，包含尚有当前权限的已决历史，SUPERSEDED步骤不提供读取权限。`POST /reviews/{id}/decision` 请求 `{approve,reason,expectedVersion}`，驳回须理由，禁止自审并复核目标版本及当前直属关系。除 `MEMBERSHIP` 管理员确认外，使用 `DIRECT_MANAGER` 单级审核；有效创始人权限内新操作自动批准并记录 `FOUNDER_EXEMPT`，管理员不免审。无审核人保持待审。`POST /reviews/{id}/reroute` 仅申请人继续PENDING申请，保留已决历史、替代待审步骤；有效创始人明确继续本人非MEMBERSHIP申请时，才按当前业务权限和目标版本免审应用，重复已免审请求返回原结果。迁移不会自动应用任何历史候选。
 
 ## 仪表盘、通知、分析和附件
 
@@ -75,9 +77,9 @@
 
 ## Flutter 接口缺口（待完成）
 
-当前 Flutter 与后端路径的逐项核对见 [backend-interface-gaps.md](backend-interface-gaps.md)。当前没有反馈 Controller；通用反馈资源可能请求 `GET /feedback` 或 `GET /feedback/{id}`，正式提交会明确提示未接入。任务退回补充、日志阅读人员清单、AI 显式范围筛选和 AI 确认时的 job/output 原子版本条件也尚未形成完整服务端契约。
+2026-10-29剩余接口实现状态见 [mobile-remaining-api-implementation-status.md](mobile-remaining-api-implementation-status.md)。任务评论/日志回复和RETURNED后端已存在，本批接通客户端退回及通知映射；成果反馈增加最多5个attachments（仅本人上传同公司可用材料，复用任务读取授权）。`GET /organization/teams`返回当前组织树范围内团队目录。意见反馈已由用户取消，移动端入口/表单/Mock资源移除，旧深链返回帮助页；不新增feedback接口。阅读登记已停用，不新增阅读人员清单。
 
-这些内容只是后续工作登记，不是已发布接口。具体 URL、请求/响应字段、权限、状态、幂等和迁移必须先通过独立 OpenSpec 设计，再同步运行时 SpringDoc、`docs/openapi.json` 和 Flutter/Web 客户端。
+AI作业创建增加 `scope=SELF|AUTHORIZED`（默认AUTHORIZED），服务端权限仍是上限，SELF仅本人日志、参与/派发任务和本人重点，后台执行/重试保留范围。确认请求为 `{version,actionIndex,task}`，必须携带1–128位Idempotency-Key；作业行锁、当前来源及派发权限、版本检查、任务/审核创建和V23确认回执同事务。首次旧版本返回409 VERSION_CONFLICT，同键同规范化命令重放原结果，同键异内容409 IDEMPOTENCY_CONFLICT；重放仍重验当前及原行动来源。返回TASK_CREATE审核对象，客户端跳转审核结果，不能将申请ID当任务ID。上述源码均未编译、测试、启动或迁移；最终统一验收时重新生成运行时快照。
 
 ## 长期记忆与发展分析（2026-10-15 整合）
 

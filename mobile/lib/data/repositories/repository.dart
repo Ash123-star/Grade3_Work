@@ -209,6 +209,7 @@ class HttpRepository implements Repository {
     'REVISED': '待接收',
     'RECEIVED': '进行中',
     'FEEDBACK': '待验收',
+    'RETURNED': '需补充',
     'ACCEPTED': '已验收',
     'ARCHIVED': '已归档',
     'WITHDRAWN': '已撤回',
@@ -218,10 +219,12 @@ class HttpRepository implements Repository {
     'REVISED': '审核生效，重新接收',
     'RECEIVED': '接收任务',
     'FEEDBACK': '提交成果反馈',
+    'RETURNED': '退回补充',
     'ACCEPTED': '验收任务',
     'ARCHIVED': '归档任务',
     'WITHDRAWN': '撤回任务',
     'TRANSFERRED': '转派任务',
+    'REASSIGNED': '转派任务',
     'RESCHEDULED': '调整截止时间',
   };
 
@@ -280,6 +283,7 @@ class HttpRepository implements Repository {
     'analytics' => '/analytics',
     'ai-maps' => '/ai-maps',
     'organization/departments' => '/organization/departments',
+    'organization/teams' => '/organization/teams',
     'reviews' => '/reviews',
     'notifications' => '/notifications',
     _ => throw ApiFailure(FailureKind.unavailable, '列表接口尚未登记：$resource'),
@@ -312,7 +316,9 @@ class HttpRepository implements Repository {
         fields['avatarAttachmentId'] = profile['avatarAttachmentId'];
       }
       for (final key in ['phone', 'email', 'gender', 'age']) {
-        if (profile.containsKey(key)) fields[key] = profile[key];
+        if (!raw.containsKey(key) && profile.containsKey(key)) {
+          fields[key] = profile[key];
+        }
       }
       fields['姓名'] = raw['name'];
     }
@@ -532,6 +538,7 @@ class HttpRepository implements Repository {
         'PENDING' => '待审',
         'APPROVED' => '已通过',
         'REJECTED' => '已驳回',
+        'SUPERSEDED' => '已失效',
         _ => '${raw['status']}',
       };
       fields['before'] = raw['before_value'];
@@ -558,8 +565,8 @@ class HttpRepository implements Repository {
       fields['type'] = switch (raw['type']) {
         'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' => '任务',
         'DEADLINE' => '截止提醒',
-        'LOG_SUBMITTED' => '日志',
-        'LOG_COMMENT' => '评论',
+        'LOG_SUBMITTED' || 'LOG_UPDATED' => '日志',
+        'LOG_COMMENT' || 'TASK_COMMENT' => '评论',
         'REVIEW_PENDING' => '审批',
         'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
         _ => '${raw['type'] ?? '消息'}',
@@ -568,8 +575,9 @@ class HttpRepository implements Repository {
         'TASK_ASSIGNED' ||
         'TASK_EVENT' ||
         'TASK_REVISED' ||
+        'TASK_COMMENT' ||
         'DEADLINE' => 'tasks',
-        'LOG_SUBMITTED' || 'LOG_COMMENT' => 'logs',
+        'LOG_SUBMITTED' || 'LOG_UPDATED' || 'LOG_COMMENT' => 'logs',
         'REVIEW_PENDING' || 'REVIEW_APPROVED' || 'REVIEW_REJECTED' => 'reviews',
         _ => null,
       };
@@ -641,8 +649,7 @@ class HttpRepository implements Repository {
       final parameters = _query(query, resource: resource);
       if (resource == 'tasks' &&
           query.from != null &&
-          query.to != null &&
-          query.to!.difference(query.from!).inDays >= 28) {
+          query.to != null) {
         parameters
           ..remove('date')
           ..remove('period')
@@ -726,7 +733,9 @@ class HttpRepository implements Repository {
             .map((item) => _record(Map<String, dynamic>.from(item)))
             .toList(),
         total: (data['total'] as num?)?.toInt() ?? 0,
-        nextCursor: data['nextCursor'] as String?,
+        nextCursor: '${data['nextCursor'] ?? ''}'.isEmpty
+            ? null
+            : '${data['nextCursor']}',
       );
     } on DioException catch (error) {
       throw ApiFailure.fromDio(error);
@@ -1045,9 +1054,6 @@ class HttpRepository implements Repository {
           );
         }
         final id = Uri.encodeComponent(_commandId(command));
-        if (command.action == 'return') {
-          throw const ApiFailure(FailureKind.unavailable, '退回补充服务尚未接入，原任务未改变');
-        }
         if (command.action == 'transfer' || command.action == 'reschedule') {
           final reason = '${v['变更理由'] ?? v['reason'] ?? ''}'.trim();
           if (reason.isEmpty || command.version == null) {
@@ -1103,14 +1109,19 @@ class HttpRepository implements Repository {
         final event = switch (command.action) {
           'receive' => 'RECEIVED',
           'feedback' => 'FEEDBACK',
+          'return' => 'RETURNED',
           'accept' => 'ACCEPTED',
           'withdraw' => 'WITHDRAWN',
           'archive' => 'ARCHIVED',
           _ => throw const ApiFailure(FailureKind.unavailable, '后端未提供该任务操作'),
         };
+        if (command.version == null) {
+          throw const ApiFailure(FailureKind.validation, '请重新读取任务当前版本');
+        }
         return await _postRecord('/tasks/$id/events', {
           'type': event,
-          'version': command.version ?? 1,
+          'version': command.version,
+          if (command.action == 'feedback') 'attachments': v['attachments'] ?? [],
           if (v['成果说明'] != null)
             'text':
                 '${v['成果说明']}${'${v['遇到的阻碍'] ?? ''}'.trim().isEmpty ? '' : '\n\n遇到的阻碍：${v['遇到的阻碍']}'}',
@@ -1119,6 +1130,9 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'tasks/comments') {
+        if (command.idempotencyKey == null || command.idempotencyKey!.trim().isEmpty) {
+          throw const ApiFailure(FailureKind.validation, '评论需要幂等键', code: 'IDEMPOTENCY_REQUIRED');
+        }
         final text = '${v['text'] ?? v['评语'] ?? ''}'.trim();
         if (text.isEmpty) {
           throw const ApiFailure(FailureKind.validation, '评论不能为空');
@@ -1146,7 +1160,10 @@ class HttpRepository implements Repository {
         throw const ApiFailure(FailureKind.unavailable, '后端未提供该标签操作');
       }
       if (resource == 'logs') {
-        if (command.action == 'update-content') {
+        if (!const {'update-content', 'update', 'submit', 'save-draft'}.contains(command.action)) {
+          throw const ApiFailure(FailureKind.unavailable, '不支持该日志操作，请使用当前日志编辑入口');
+        }
+        if (command.action == 'update-content' || command.action == 'update') {
           final work = '${v['work'] ?? v['今日工作'] ?? ''}'.trim();
           if (work.isEmpty || command.version == null) {
             throw const ApiFailure(
@@ -1163,33 +1180,12 @@ class HttpRepository implements Repository {
           );
           return _record(response.data!);
         }
-        if (command.action == 'withdraw') {
-          return await _postRecord(
-            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
-            {
-              'version': command.version,
-              'reason': v['reason'] ?? v['撤回原因'] ?? '',
-            },
-          );
-        }
-        if (command.action == 'read') {
-          throw const ApiFailure(FailureKind.unavailable, '移动端已停用日志阅读登记');
-        }
-        if (command.action == 'withdraw') {
-          return await _postRecord(
-            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
-            {'version': command.version, 'reason': v['撤回原因']},
-          );
-        }
-        if (command.action == 'request-review') {
-          throw const ApiFailure(
-            FailureKind.validation,
-            '日志正文修改不再提交审核；仅首次提交后24小时内可直接修改',
-          );
-        }
         if (command.action == 'submit') {
           var id = v['id']?.toString();
           var submitVersion = command.version;
+          if (id != null && id.isNotEmpty && submitVersion == null) {
+            throw const ApiFailure(FailureKind.validation, '请读取日志当前版本后提交');
+          }
           if (id == null || id.isEmpty || v.containsKey('今日工作')) {
             if ('${v['businessDate'] ?? ''}'.isEmpty) {
               throw const ApiFailure(FailureKind.validation, '请选择日报业务日期');
@@ -1216,12 +1212,6 @@ class HttpRepository implements Repository {
             );
           }
         }
-        if (command.action == 'update') {
-          throw const ApiFailure(
-            FailureKind.unavailable,
-            '已提交日志修改接口尚未定案；当前不会误写入草稿',
-          );
-        }
         return await _putRecord('/logs/draft', {
           'businessDate': v['businessDate'],
           'body': _diaryBody(v),
@@ -1239,6 +1229,15 @@ class HttpRepository implements Repository {
         );
       }
       if (resource == 'reviews') {
+        if (command.action == 'reroute') {
+          return await _postRecord(
+            '/reviews/${Uri.encodeComponent(_commandId(command))}/reroute',
+            const <String, dynamic>{},
+          );
+        }
+        if (!['approve', 'reject'].contains(command.action)) {
+          throw const ApiFailure(FailureKind.validation, '不支持的审核操作');
+        }
         return await _postRecord(
           '/reviews/${Uri.encodeComponent(_commandId(command))}/decision',
           {
@@ -1288,13 +1287,13 @@ class HttpRepository implements Repository {
       }
       if (resource == 'organization/profile') {
         return await _putRecord('/profiles/me', {
-          'introduction': v['个人介绍'] ?? '',
+          if (v.containsKey('个人介绍')) 'introduction': v['个人介绍'],
           if (v.containsKey('手机号'))
-            'phone': '${v['手机号']}'.trim().isEmpty ? null : v['手机号'],
+            'phone': v['手机号'] == null || '${v['手机号']}'.trim().isEmpty ? null : v['手机号'],
           if (v.containsKey('邮箱'))
-            'email': '${v['邮箱']}'.trim().isEmpty ? null : v['邮箱'],
+            'email': v['邮箱'] == null || '${v['邮箱']}'.trim().isEmpty ? null : v['邮箱'],
           if (v.containsKey('性别'))
-            'gender': '${v['性别']}'.trim().isEmpty ? null : v['性别'],
+            'gender': v['性别'] == null || '${v['性别']}'.trim().isEmpty ? null : v['性别'],
           if (v.containsKey('年龄')) 'age': v['年龄'],
           if (v.containsKey('avatarAttachmentId'))
             'avatarAttachmentId': v['avatarAttachmentId'],

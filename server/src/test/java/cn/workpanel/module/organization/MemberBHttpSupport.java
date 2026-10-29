@@ -41,6 +41,7 @@ abstract class MemberBHttpSupport {
         db.update("INSERT INTO companies(id,name) VALUES (?,?)", foreignCompany, "范围外公司");
         db.update("INSERT INTO departments(id,company_id,name) VALUES (?,?,?)", foreignDepartment, foreignCompany, "范围外部门");
         foreign = user(foreignCompany, foreignDepartment, "", "EMPLOYEE", false);
+        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",admin,reviewer,company);
     }
     String user(String company, String department, String team, String role, boolean reviewer) {
         String id = Db.id(), token = Db.id();
@@ -65,7 +66,7 @@ abstract class MemberBHttpSupport {
     public JsonNode approve(String id, String applicant) throws Exception {
         var detail = call(200, "GET", "/reviews/" + id, applicant, null); JsonNode result = detail;
         for (var step : detail.get("steps")) if (step.get("state").asText().equals("PENDING"))
-            result = call(200, "POST", "/reviews/" + id + "/decision", step.get("reviewer_id").asText(), Map.of("approve", true, "reason", "独立复核"));
+            result = call(200, "POST", "/reviews/" + id + "/decision", step.get("reviewer_id").asText(), Map.of("approve", true, "reason", "独立复核", "expectedVersion", detail.get("expected_version").asInt()));
         assertEquals("APPROVED", result.get("status").asText()); return result;
     }
     Set<String> visible(String who) throws Exception {

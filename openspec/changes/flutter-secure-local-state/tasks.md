@@ -21,3 +21,11 @@
 - [x] 4.2 Update report, audit, API contract, README, local Issue and originalstage3 task3.6 reference; distinguish payload encryption/SQL and injected platform tests from device proof.
 - [ ] 4.3 Verify native AndroidKeystore/SQLite hooks, restart/lockscreen/backup exclusions and TalkBack on an available device without an APK build in this environment; current Windows Flutter tests do not prove native plugin deployment.
 - [x] 4.4 User explicitly authorized all current changes on HCJ; associate Issue #7, push ba7369a and create draft PR #9 via official GitHub API. Delivery: mobile/docs/hcj-delivery.md. Native device4.3 remains unverified.
+
+## 5. 认证记录与启动复核（2026-10-29）
+
+- [ ] 5.1 安全写入回读确认、默认记住登录说明和 Android 网络权限
+- [ ] 5.2 验证登录后重建应用状态免输密码、写入失败、失效及隔离，记录明确退出码
+- [ ] 5.3 统一分析和 APK 编译，更新文档并说明设备和有效期边界
+
+- [ ] 5.4 默认会话168小时，同步部署配置并验证签发到期时间、撤销和过期拒绝

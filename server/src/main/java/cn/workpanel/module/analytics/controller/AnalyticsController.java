@@ -1,62 +1,37 @@
 package cn.workpanel.module.analytics.controller;
 
 import cn.workpanel.*;
-import cn.workpanel.module.task.controller.TaskController;
-import cn.workpanel.module.log.controller.LogController;
-
+import cn.workpanel.module.analytics.application.*;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import java.time.*;
 import java.util.*;
 
+/** 分析 HTTP 边界；日期、组织筛选与授权由同一应用服务处理。 */
 @RestController
 @RequestMapping("/api")
-/** 健康检查、时间线、统计和导出接口；统计与详情使用相同数据范围。 */
 public class AnalyticsController {
-    final Db db; final TaskController tasks; final LogController logs;
-    public AnalyticsController(Db db,TaskController tasks,LogController logs) { this.db=db; this.tasks=tasks; this.logs=logs; }
-    /** 返回服务和数据库健康状态。公开接口；数据库不可用返回错误。 */
-    @GetMapping("/health") public Map<String,Object> health() { db.count("SELECT count(*) FROM companies"); return Map.of("status","UP","time",Instant.now().toString()); }
-    /** 获取范围内工作统计。需要登录；date/period 定义业务区间，返回分子、分母和口径。 */
-    @GetMapping("/analytics") public Map<String,Object> stats(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="week") String period) {
-        Actor a=Actor.current(r); var range=Business.range(date,period); var scope=Business.taskScope(a); var args=new ArrayList<>(scope.args()); args.add(range.from().toString()); args.add(range.to().toString());
-        String interval=" AND t.created_at>=?::timestamptz AND t.created_at<?::timestamptz";
-        long dispatched=db.count("SELECT count(*) FROM tasks t WHERE "+scope.sql()+interval,args.toArray());
-        var deadlineArgs=new ArrayList<>(scope.args()); deadlineArgs.add(range.from().toString()); deadlineArgs.add(range.to().toString());
-        String due=" AND t.deadline>=?::timestamptz AND t.deadline<?::timestamptz AND t.phase<>'WITHDRAWN'";
-        long dueCount=db.count("SELECT count(*) FROM tasks t WHERE "+scope.sql()+due,deadlineArgs.toArray());
-        String accepted="SELECT 1 FROM task_events e WHERE e.task_id=t.id AND e.type='ACCEPTED' AND e.created_at<=t.deadline AND e.sequence>coalesce((SELECT max(re.sequence) FROM task_events re WHERE re.task_id=t.id AND re.type='REVISED'),0)";
-        long ontime=db.count("SELECT count(*) FROM tasks t WHERE "+scope.sql()+due+" AND EXISTS ("+accepted+")",deadlineArgs.toArray());
-        long overdue=db.count("SELECT count(*) FROM tasks t WHERE "+scope.sql()+due+" AND t.deadline<now() AND NOT EXISTS ("+accepted+")",deadlineArgs.toArray());
-        var ls=Business.ownerScope(a,"l"); var la=new ArrayList<>(ls.args()); la.add(range.first().toString()); la.add(range.end().toString());
-        String logWhere=ls.sql()+" AND l.submitted AND l.business_date>=?::date AND l.business_date<?::date";
-        long submitted=db.count("SELECT count(*) FROM daily_logs l WHERE "+logWhere,la.toArray());
-        var unreadArgs=new ArrayList<>(la); unreadArgs.add(a.id());
-        long unread=db.count("SELECT count(*) FROM daily_logs l WHERE "+logWhere+" AND NOT EXISTS (SELECT 1 FROM log_reads lr WHERE lr.log_id=l.id AND lr.reader_id=?)",unreadArgs.toArray());
-        var ua=new ArrayList<Object>(List.of(a.company())); ua.addAll(Arrays.asList(a.scopeArgs()));
-        long people=db.count("SELECT count(*) FROM users u WHERE u.company_id=? AND u.status='ACTIVE' AND ("+a.userScope("u")+")",ua.toArray());
-        LocalDate last=range.end().minusDays(1),today=LocalDate.now(ZoneId.of("Asia/Shanghai")); if(last.isAfter(today)) last=today;
-        long days=Math.max(0,java.time.temporal.ChronoUnit.DAYS.between(range.first(),last.plusDays(1))); long expected=people*days;
-        var distribution=db.rows("SELECT COALESCE(u.department_id,'未分配') AS department_id,count(*) AS dispatched FROM tasks t JOIN users u ON u.id=t.owner_id WHERE "+scope.sql()+interval+" GROUP BY u.department_id",args.toArray());
-        return Map.of("range",range,"updatedAt",Instant.now().toString(),"dispatched",dispatched,"overdue",overdue,"onTimeAcceptance",metric(ontime,dueCount,"区间内截止且未撤回任务；按首次验收事件时间判断"),"dailySubmission",metric(submitted,expected,"当前在职范围人数 × 区间内截至今天的自然日（未配置节假日）"),"unreadLogs",unread,"departmentDistribution",distribution);
+    private final AnalyticsService service;
+    public AnalyticsController(AnalyticsService service) { this.service=service; }
+    /** 公开服务及数据库连通状态；无版本、分页或幂等键。 */
+    @GetMapping("/health") public Map<String,Object> health() { return service.health(); }
+    /** 当前有效账号的授权统计；date/period/groupBy/departmentId/teamId/ownerId 与明细和导出相同。无效400，越权403/404；只读、无幂等键/版本要求。 */
+    @GetMapping("/analytics")
+    public Map<String,Object> stats(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="week") String period,@RequestParam(defaultValue="department") String groupBy,@RequestParam(required=false) String departmentId,@RequestParam(required=false) String teamId,@RequestParam(required=false) String ownerId) {
+        return service.statistics(Actor.current(r),new AnalyticsQuery(date,period,groupBy,departmentId,teamId,ownerId));
     }
-    static Map<String,Object> metric(long numerator,long denominator,String definition) { return Map.of("numerator",numerator,"denominator",denominator,"rate",denominator==0?0:(double)numerator/denominator,"definition",definition); }
-    /** 导出范围内日志或任务 CSV。需要登录；resource 受白名单限制并进行公式注入转义。 */
-    @GetMapping(value="/analytics/export",produces="text/csv") public ResponseEntity<String> export(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="week") String period,@RequestParam(defaultValue="logs") String resource) {
-        if(!Set.of("logs","tasks").contains(resource)) throw ApiError.bad("INVALID_RESOURCE","resource: logs/tasks");
-        var lines=new StringBuilder("\ufeffid,type,title_or_date,owner_id,version\r\n"); int offset=0;
-        while(true) {
-            Map<String,Object> page=resource.equals("logs")?logs.list(Actor.current(r),offset,100,null,date,period,false):tasks.list(r,offset,100,"",null,date,period);
-            @SuppressWarnings("unchecked") var items=(List<Map<String,Object>>)page.get("items"); if(items.isEmpty()) break;
-            for(var item:items) lines.append(csv(item.get("id"))).append(',').append(resource).append(',').append(csv(item.get(resource.equals("logs")?"business_date":"title"))).append(',').append(csv(item.get("owner_id"))).append(',').append(csv(item.get("version"))).append("\r\n");
-            offset+=items.size(); if(offset>=((Number)page.get("total")).longValue()) break;
-            if(offset>=10000) throw ApiError.bad("EXPORT_TOO_LARGE","导出超过 10000 条，请缩小区间");
-        }
-        return ResponseEntity.ok().contentType(new MediaType("text","csv",java.nio.charset.StandardCharsets.UTF_8)).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+resource+".csv\"").body(lines.toString());
+    /** 指标明细；metric白名单，可选groupId和区间内bucket=YYYY-MM-DD；offset cursor>=0、limit 1–100。无效400、越权403/404；只读，无版本和幂等键。 */
+    @GetMapping("/analytics/details")
+    public Map<String,Object> details(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="week") String period,@RequestParam(defaultValue="department") String groupBy,@RequestParam(required=false) String departmentId,@RequestParam(required=false) String teamId,@RequestParam(required=false) String ownerId,@RequestParam String metric,@RequestParam(required=false) String groupId,@RequestParam(required=false) String bucket,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit) {
+        return service.details(Actor.current(r),new AnalyticsQuery(date,period,groupBy,departmentId,teamId,ownerId),metric,groupId,bucket,cursor,limit);
     }
-    public static String csv(Object o) { String s=o==null?"":o.toString(); if(s.matches("^[=+@\\-\\t\\r].*")) s="'"+s; return "\""+s.replace("\"","\"\"")+"\""; }
-    /** 返回同一区间的日志和任务时间线。需要登录；ownerId 必须在当前范围内。 */
-    @GetMapping("/timeline") public Map<String,Object> timeline(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="day") String period,@RequestParam(required=false) String ownerId) { var range=Business.range(date,period); return Map.of("range",range,"logs",logs.list(Actor.current(r),0,100,ownerId,date,period,false),"tasks",tasks.list(r,0,100,"",ownerId,date,period)); }
+    /** 同范围CSV：resource=logs/tasks，最多10000条，超限400不截断，公式转义、UTF-8。授权及错误同汇总；无版本和幂等键。 */
+    @GetMapping(value="/analytics/export",produces="text/csv")
+    public ResponseEntity<String> export(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="week") String period,@RequestParam(defaultValue="logs") String resource,@RequestParam(defaultValue="department") String groupBy,@RequestParam(required=false) String departmentId,@RequestParam(required=false) String teamId,@RequestParam(required=false) String ownerId) {
+        String body=service.export(Actor.current(r),new AnalyticsQuery(date,period,groupBy,departmentId,teamId,ownerId),resource);
+        return ResponseEntity.ok().contentType(new MediaType("text","csv",java.nio.charset.StandardCharsets.UTF_8)).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+resource+".csv\"").body(body);
+    }
+    public static String csv(Object value) { return AnalyticsService.csv(value); }
+    /** 当前授权范围时间线；ownerId须可见，date/period同列表；只读、无版本或幂等键。 */
+    @GetMapping("/timeline") public Map<String,Object> timeline(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="day") String period,@RequestParam(required=false) String ownerId) { return service.timeline(Actor.current(r),date,period,ownerId); }
 }
-

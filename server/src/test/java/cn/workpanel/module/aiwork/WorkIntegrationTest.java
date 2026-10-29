@@ -51,16 +51,62 @@ class WorkIntegrationTest {
             else if(Set.of("CHECK","SUBMIT","OVERRIDE").contains(mode.get()))result=Map.of("summary","检查交付材料","answer","","questions",List.of(),"sourceIds",List.of(),"actions",List.of(Map.of("type",mode.get().equals("SUBMIT")?"SUBMIT_DELIVERY":"CHECK_DELIVERY","taskId",mode.get().equals("OVERRIDE")?sourceId.get():data.at("/task/id").asText(),"taskVersion",data.at("/task/version").asInt())));
             else {var action=new LinkedHashMap<String,Object>(Map.of("type","CREATE_TASK","title","交付成本表","requirements","提交成本明细","ownerId",owner,"ownerEvidence","小李","deadline","2099-10-23T17:00:00+08:00","deadlineEvidence","2099年10月23日17:00"));var actions=new ArrayList<Map<String,Object>>();actions.add(action);if(mode.get().equals("BATCH")){var second=new LinkedHashMap<>(action);second.put("title","交付第二份成本材料");second.put("dependsOn",List.of(1));actions.add(second);}result=Map.of("summary","准备成本表任务","answer","已整理任务要求","questions",List.of(),"sourceIds",sourceId.get().isBlank()?List.of():List.of(sourceId.get()),"actions",actions);}
             byte[] out=JSON.writeValueAsBytes(Map.of("choices",List.of(Map.of("message",Map.of("content",JSON.writeValueAsString(result)))),"usage",Map.of("total_tokens",100)));e.getResponseHeaders().set("Content-Type","application/json");e.sendResponseHeaders(200,out.length);e.getResponseBody().write(out);}finally{e.close();}});server.start();return server;}catch(IOException e){throw new RuntimeException(e);}}
-    @BeforeAll void seed(){db.update("INSERT INTO companies(id,name,review_policy) VALUES (?,?,'{\"taskTeamReview\":false,\"taskDepartmentReview\":false}')",company,"办事测试");db.update("INSERT INTO departments(id,company_id,name) VALUES (?,?,?)",company+"-d",company,"测试部");db.update("INSERT INTO teams(id,company_id,department_id,name) VALUES (?,?,?,?)",company+"-t",company,company+"-d","测试组");user("leader","LEADER","组长",true,false);user("alice","EMPLOYEE","小李",false,false);user("admin","ADMIN","管理员",true,false);user("reviewer","ADMIN","独立复核人",true,true);}
+    @BeforeAll void seed(){db.update("INSERT INTO companies(id,name,review_policy) VALUES (?,?,'{\"taskTeamReview\":false,\"taskDepartmentReview\":false}')",company,"办事测试");db.update("INSERT INTO departments(id,company_id,name) VALUES (?,?,?)",company+"-d",company,"测试部");db.update("INSERT INTO teams(id,company_id,department_id,name) VALUES (?,?,?,?)",company+"-t",company,company+"-d","测试组");user("leader","LEADER","组长",true,false);user("alice","EMPLOYEE","小李",false,false);user("admin","ADMIN","管理员",true,false);user("reviewer","ADMIN","独立复核人",true,true);for(String who:List.of("leader","admin"))db.update("INSERT INTO reporting_relations VALUES (?,?,?)",ids.get(who),ids.get("reviewer"),company);}
     void user(String key,String role,String name,boolean dispatch,boolean reviewer){String id=Db.id(),token=Db.id();ids.put(key,id);tokens.put(key,token);db.update("INSERT INTO users(id,company_id,account,password_hash,phone,name,department_id,team_id,role,status,dispatch_enabled,company_reviewer) VALUES (?,?,?,?,?,?,?, ?,?,'ACTIVE',?,?)",id,company,id,"x",id,name,company+"-d",company+"-t",role,dispatch,reviewer);db.update("INSERT INTO sessions VALUES (?,?,now()+interval '1 hour')",Db.hash(token),id);}
     @BeforeEach void reset(){ocrStatus.set(200);providerStatus.set(200);ocrConfidence.set(.99);mode.set("TASK");sourceId.set("");scriptedPlan.set(null);db.update("UPDATE ai_work_authorizations SET revoked_at=now() WHERE company_id=?",company);db.update("UPDATE procedure_documents SET state='WITHDRAWN' WHERE company_id=? AND state='PUBLISHED'",company);db.update("UPDATE tasks SET title='历史夹具-'||id WHERE company_id=?",company);for(String id:ids.values())redis.delete("workpanel:memory-model:"+id);redis.delete(redis.keys("workpanel:api:*"));}
     JsonNode call(int expected,String method,String path,String who,Object body,String key)throws Exception{var b=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api"+path)).timeout(Duration.ofSeconds(30)).header("Authorization","Bearer "+tokens.get(who));if(key!=null)b.header("Idempotency-Key",key);if(body!=null)b.header("Content-Type","application/json");var r=http.send(b.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString());assertEquals(expected,r.statusCode(),path+" "+r.body());return r.headers().firstValue("content-type").orElse("").contains("application/octet-stream")?JSON.createObjectNode():JSON.readTree(r.body());}
     JsonNode await(String id,String state)throws Exception{return awaitAs(id,state,"leader");}
     JsonNode awaitAs(String id,String state,String who)throws Exception{long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(20);JsonNode r;do{r=call(200,"GET","/ai/work-items/"+id,who,null,null);if(state.equals(r.get("state").asText()))return r;if(r.get("state").asText().equals("FAILED")&&!state.equals("FAILED"))fail(r.toString());Thread.sleep(250);}while(System.nanoTime()<end);fail(r.toString());return r;}
+    int reviewVersion(String path) {return ((Number)db.one("SELECT expected_version FROM review_requests WHERE id=?",path.substring("/reviews/".length(),path.length()-"/decision".length())).get("expected_version")).intValue();}
+    /** Fixture preparation uses the real current create -> manager decision -> readable task flow. */
+    JsonNode dispatchReviewed(String who,Object body,String key)throws Exception{
+        var review=call(200,"POST","/tasks",who,body,key);
+        assertEquals("TASK_CREATE",review.get("kind").asText());
+        call(200,"POST","/reviews/"+review.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"expectedVersion",review.get("expected_version").asInt()),null);
+        return call(200,"GET","/tasks/"+review.get("target_id").asText(),who,null,null);
+    }
+    /** Creation scenarios explicitly approve actual manager reviews; execution never bypasses review. */
+    JsonNode approveTaskReviewsAndAwaitSuccess(String id)throws Exception{
+        long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(25);JsonNode item;
+        do{
+            item=call(200,"GET","/ai/work-items/"+id,"leader",null,null);
+            if("SUCCEEDED".equals(item.path("state").asText()))return item;
+            assertNotEquals("FAILED",item.path("state").asText(),item.toString());
+            if("WAITING_REVIEW".equals(item.path("state").asText())){
+                for(var receipt:item.path("receipts")){
+                    String reviewId=receipt.path("result").path("reviewId").asText();if(reviewId.isBlank())continue;
+                    var review=call(200,"GET","/reviews/"+reviewId,"leader",null,null);
+                    if(!"PENDING".equals(review.path("status").asText()))continue;
+                    assertEquals(1,review.path("steps").size());assertEquals(ids.get("reviewer"),review.at("/steps/0/reviewer_id").asText());
+                    call(200,"POST","/reviews/"+reviewId+"/decision","reviewer",Map.of("approve",true,"expectedVersion",review.get("expected_version").asInt()),null);
+                }
+                workExecutor.reconcileReviews();
+            }
+            Thread.sleep(100);
+        }while(System.nanoTime()<end);fail(item.toString());return item;
+    }
     String upload(String who,byte[] data,String name)throws Exception{return uploadResult(who,data,name,"",200).get("id").asText();}
     JsonNode uploadResult(String who,byte[] data,String name,String purpose,int expected)throws Exception{String boundary=Db.id();var bytes=new ByteArrayOutputStream();bytes.write(("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file\"; filename=\""+name+"\"\r\nContent-Type: application/octet-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8));bytes.write(data);bytes.write(("\r\n--"+boundary+"--\r\n").getBytes(StandardCharsets.UTF_8));var response=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/attachments?purpose="+purpose)).header("Authorization","Bearer "+tokens.get(who)).header("Content-Type","multipart/form-data; boundary="+boundary).POST(HttpRequest.BodyPublishers.ofByteArray(bytes.toByteArray())).build(),HttpResponse.BodyHandlers.ofString());assertEquals(expected,response.statusCode(),response.body());return JSON.readTree(response.body());}
 
     String published(String title,String content,String scope,String scopeId){String id=Db.id();var body=new LinkedHashMap<String,Object>(Map.of("title",title,"type","POLICY","content",content,"scopeKind",scope));if(scopeId!=null)body.put("scopeId",scopeId);db.update("INSERT INTO procedure_documents(id,company_id,owner_id,type,title,scope_kind,scope_id,state,active_version) VALUES (?,?,?,'POLICY',?,?,?,'PUBLISHED',1)",id,company,ids.get("admin"),title,scope,scopeId);db.update("INSERT INTO procedure_versions(company_id,document_id,version,body) VALUES (?,?,1,?::jsonb)",company,id,db.write(body));return id;}
+    @Test void taskCreationReceiptUsesReviewIdUntilManagerApproval()throws Exception{
+        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?) ON CONFLICT(employee_id) DO UPDATE SET manager_id=excluded.manager_id",ids.get("leader"),ids.get("reviewer"),company);
+        String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();
+        // 明确创建指令允许自动提交审核，无需第二次确认。
+        var waiting=await(id,"WAITING_REVIEW"); var receipt=waiting.at("/receipts/0/result");
+        assertEquals("WAITING_REVIEW",receipt.get("kind").asText()); assertFalse(receipt.has("taskId"));
+        String review=receipt.get("reviewId").asText();
+        var request=call(200,"GET","/reviews/"+review,"leader",null,null);
+        String target=request.get("target_id").asText();
+        assertEquals(0,db.count("SELECT count(*) FROM tasks WHERE id=?",target));
+        call(200,"POST","/reviews/"+review+"/decision","reviewer",Map.of("approve",true,"expectedVersion",request.get("expected_version").asInt()),null);
+        workExecutor.reconcileReviews(); var completed=await(id,"SUCCEEDED");
+        assertEquals(target,completed.at("/receipts/0/result/taskId").asText());
+        assertEquals("TASK_CREATED",completed.at("/receipts/0/result/kind").asText());
+        assertEquals(1,db.count("SELECT count(*) FROM tasks WHERE id=?",target));
+        assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));
+    }
+
     @Test void knownMaterialCitationIsNeverPromotedToFormalRuleAndUnknownCitationFails()throws Exception{
         String file=word("leader","请小李在2099年10月23日17:00交付成本表");sourceId.set(file);
         String id=call(202,"POST","/ai/work-items","leader",Map.of("text","整理材料任务","attachmentIds",List.of(file)),Db.id()).get("id").asText();
@@ -121,7 +167,7 @@ class WorkIntegrationTest {
         String privateSource=published("保密差旅规定","差旅报销秘密材料","DEPARTMENT",company+"-other");
         var first=call(200,"GET","/procedures?search="+URLEncoder.encode("分页验收",StandardCharsets.UTF_8)+"&limit=30","leader",null,null);assertEquals(55,first.get("total").asInt());assertEquals(30,first.get("nextCursor").asInt());
         var second=call(200,"GET","/procedures?search="+URLEncoder.encode("分页验收",StandardCharsets.UTF_8)+"&cursor=30&limit=30","leader",null,null);assertEquals(25,second.get("items").size());assertEquals(-1,second.get("nextCursor").asInt());
-        mode.set("KNOWLEDGE");sourceId.set(target);String id=call(202,"POST","/ai/work-items","leader",Map.of("text","异地差旅报销制度需要哪些材料"),Db.id()).get("id").asText();var done=await(id,"SUCCEEDED");assertEquals(target,done.at("/plan/sources/0/id").asText());assertTrue(done.at("/plan/sources/0/excerpts/0/locator").asText().contains("81"));assertTrue(input.get().contains("行程单"));assertFalse(input.get().contains(privateSource));assertFalse(input.get().contains("秘密材料"));
+        mode.set("KNOWLEDGE");sourceId.set(target);String id=call(202,"POST","/ai/work-items","leader",Map.of("text","异地差旅报销制度需要哪些材料"),Db.id()).get("id").asText();var done=approveTaskReviewsAndAwaitSuccess(id);assertEquals(target,done.at("/plan/sources/0/id").asText());assertTrue(done.at("/plan/sources/0/excerpts/0/locator").asText().contains("81"));assertTrue(input.get().contains("行程单"));assertFalse(input.get().contains(privateSource));assertFalse(input.get().contains("秘密材料"));
         db.update("UPDATE procedure_documents SET state='WITHDRAWN' WHERE id=?",target);var stale=call(200,"GET","/ai/work-items/"+id,"leader",null,null);assertFalse(stale.get("planValid").asBoolean());assertFalse(stale.has("plan"));var list=call(200,"GET","/ai/work-items","leader",null,null);for(var item:list.get("items"))if(id.equals(item.get("id").asText()))assertFalse(item.at("/result/summary").asText().contains("行程单"));
         call(404,"GET","/procedures/"+privateSource,"leader",null,null);call(400,"GET","/procedures?limit=101","leader",null,null);
     }
@@ -151,7 +197,7 @@ class WorkIntegrationTest {
             assertTrue(missing.at("/plan/questions").toString().contains("多位小李"));assertTrue(missing.at("/plan/questions").toString().contains("日期和时间"));assertEquals(0,missing.at("/plan/actions").size());
             plan(List.of(createAction("集中补充验收","alice","2099-10-23T17:00:00+08:00","2099年10月23日17:00")));
             call(200,"POST","/ai/work-items/"+id+"/messages","leader",Map.of("version",missing.get("version").asInt(),"text","小李在2099年10月23日17:00交付成本表","answers",Map.of("ownerId",ids.get("alice"))),Db.id());
-            var ready=await(id,"WAITING_CONFIRMATION");assertEquals("小李",ready.at("/plan/actions/0/evidence/owner").asText());call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirmation(ready),Db.id());assertEquals(1,await(id,"SUCCEEDED").get("receipts").size());
+            var ready=await(id,"WAITING_CONFIRMATION");assertEquals("小李",ready.at("/plan/actions/0/evidence/owner").asText());call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirmation(ready),Db.id());assertEquals(1,approveTaskReviewsAndAwaitSuccess(id).get("receipts").size());
         }finally{db.update("UPDATE users SET status='DISABLED' WHERE id=?",ids.get("same-name"));}
     }
     @Test void personnelBeyondFirstHundredCannotHideDuplicateNamesOrSelectedPeople()throws Exception{
@@ -168,13 +214,13 @@ class WorkIntegrationTest {
     @Test void independentAssigneesAndOversizedBatchesNeverSilentlyDropWork()throws Exception{
         user("bob","EMPLOYEE","小王",false,false);
         var actions=List.of(createAction("独立报价材料","alice","2099-10-23T17:00:00+08:00","2099年10月23日17:00"),createAction("独立成本材料","bob","2099-10-23T17:00:00+08:00","2099年10月23日17:00"));plan(actions);
-        String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务，小李和小王分别在2099年10月23日17:00交付各自材料"),Db.id()).get("id").asText();var done=await(id,"SUCCEEDED");assertEquals(2,done.get("receipts").size());
+        String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务，小李和小王分别在2099年10月23日17:00交付各自材料"),Db.id()).get("id").asText();var done=approveTaskReviewsAndAwaitSuccess(id);assertEquals(2,done.get("receipts").size());
         assertEquals(1,db.count("SELECT count(*) FROM tasks WHERE id IN (SELECT result->>'taskId' FROM ai_action_receipts WHERE work_id=?) AND owner_id=?",id,ids.get("alice")));assertEquals(1,db.count("SELECT count(*) FROM tasks WHERE id IN (SELECT result->>'taskId' FROM ai_action_receipts WHERE work_id=?) AND owner_id=?",id,ids.get("bob")));
         var six=new ArrayList<Map<String,Object>>();for(int i=0;i<6;i++)six.add(createAction("分批工作"+i,"alice","2099-10-23T17:00:00+08:00","2099年10月23日17:00"));plan(six);
         String grouped=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务，小李在2099年10月23日17:00完成六项工作"),Db.id()).get("id").asText();var waiting=await(grouped,"WAITING_INPUT");assertTrue(waiting.at("/plan/questions").toString().contains("最多 5 项"));assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",grouped));assertEquals(1,waiting.get("messages").size());
     }
     @Test void batchExistingTasksUseEachGroundedClauseAndIgnoreModelSwappedIds()throws Exception{
-        var tasks=new ArrayList<JsonNode>();for(String title:List.of("报价逐项核对","成本逐项核对")){var t=call(200,"POST","/tasks","leader",Map.of("title",title,"ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00","acceptanceChecklist",costChecklist()),Db.id());call(200,"POST","/tasks/"+t.get("id").asText()+"/events","alice",Map.of("version",t.get("version").asInt(),"type","RECEIVED","text","接收"),Db.id());tasks.add(t);}
+        var tasks=new ArrayList<JsonNode>();for(String title:List.of("报价逐项核对","成本逐项核对")){var t=dispatchReviewed("leader",Map.of("title",title,"ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00","acceptanceChecklist",costChecklist()),Db.id());call(200,"POST","/tasks/"+t.get("id").asText()+"/events","alice",Map.of("version",t.get("version").asInt(),"type","RECEIVED","text","接收"),Db.id());tasks.add(t);}
         String file=word("alice","成本：10元");var actions=new ArrayList<Map<String,Object>>();for(int i=0;i<2;i++)actions.add(Map.of("type","CHECK_DELIVERY","taskId",tasks.get(1-i).get("id").asText(),"taskVersion",1,"taskEvidence","检查"+tasks.get(i).get("title").asText()));plan(actions);
         String id=call(202,"POST","/ai/work-items","alice",Map.of("text","检查报价逐项核对，检查成本逐项核对","attachmentIds",List.of(file)),Db.id()).get("id").asText();var done=awaitAs(id,"SUCCEEDED","alice");assertEquals(2,done.get("receipts").size());
         for(int i=0;i<2;i++)assertEquals(tasks.get(i).get("id").asText(),db.read(db.one("SELECT result FROM ai_action_receipts WHERE work_id=? AND step_key=?",id,"action-"+(i+1)).get("result")).get("taskId"));
@@ -182,9 +228,9 @@ class WorkIntegrationTest {
         String ambiguous=call(202,"POST","/ai/work-items","alice",Map.of("text","检查报价逐项核对，检查成本逐项核对","attachmentIds",List.of(file)),Db.id()).get("id").asText();awaitAs(ambiguous,"WAITING_INPUT","alice");assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",ambiguous));
     }
     @Test void similarTaskNeedsConcreteChoiceAndNeverOverwritesExisting()throws Exception{
-        var task=call(200,"POST","/tasks","leader",Map.of("title","交付成本表","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00"),Db.id());String existing=task.get("id").asText();
+        var task=dispatchReviewed("leader",Map.of("title","交付成本表","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00"),Db.id());String existing=task.get("id").asText();
         String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();var ready=await(id,"WAITING_CONFIRMATION");assertEquals(existing,ready.at("/plan/actions/0/similarTasks/0/id").asText());assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));
-        call(200,"POST","/ai/work-items/"+id+"/confirm","leader",Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1")),Db.id());var done=await(id,"SUCCEEDED");assertNotEquals(existing,done.at("/receipts/0/result/taskId").asText());assertEquals(1,db.one("SELECT version FROM tasks WHERE id=?",existing).get("version"));
+        call(200,"POST","/ai/work-items/"+id+"/confirm","leader",Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1")),Db.id());var done=approveTaskReviewsAndAwaitSuccess(id);assertNotEquals(existing,done.at("/receipts/0/result/taskId").asText());assertEquals(1,db.one("SELECT version FROM tasks WHERE id=?",existing).get("version"));
     }
     @Test void companyPolicyReviewInvalidatesGrantsAndCannotBeBypassed()throws Exception{
         var policy=call(200,"GET","/ai/work-authorization-policy","leader",null,null);var grantBody=Map.of("action","CREATE_TASK","scope",Map.of("ownerIds",List.of(ids.get("alice")),"maxActions",2),"expiresAt",Instant.now().plusSeconds(3600).toString());
@@ -193,9 +239,9 @@ class WorkIntegrationTest {
         call(400,"POST","/organization/review-policy/revisions","admin",Map.of("version",policy.get("version").asInt(),"reason","测试","aiWorkAuthorizationMaxDays",31),null);
         db.update("UPDATE users SET team_id=NULL,department_id=NULL WHERE id=?",ids.get("admin"));
         String review=call(200,"POST","/organization/review-policy/revisions","admin",Map.of("version",policy.get("version").asInt(),"reason","暂停长期授权","aiWorkCreateAuthorization",false,"aiWorkAuthorizationMaxDays",1,"aiWorkAuthorizationMaxObjects",1,"aiWorkAuthorizationMaxActions",1),null).get("id").asText();
-        assertTrue(call(200,"GET","/ai/work-authorization-policy","leader",null,null).get("canCreate").asBoolean());call(403,"POST","/reviews/"+review+"/decision","admin",Map.of("approve",true),null);call(200,"POST","/reviews/"+review+"/decision","reviewer",Map.of("approve",true),null);
+        assertTrue(call(200,"GET","/ai/work-authorization-policy","leader",null,null).get("canCreate").asBoolean());call(403,"POST","/reviews/"+review+"/decision","admin",Map.of("approve",true,"expectedVersion",reviewVersion("/reviews/"+review+"/decision")),null);call(200,"POST","/reviews/"+review+"/decision","reviewer",Map.of("approve",true,"expectedVersion",reviewVersion("/reviews/"+review+"/decision")),null);
         assertFalse(call(200,"GET","/ai/work-authorization-policy","leader",null,null).get("canCreate").asBoolean());var grants=call(200,"GET","/ai/work-authorizations","leader",null,null);for(var g:grants)if(gid.equals(g.get("id").asText()))assertFalse(g.get("effective").asBoolean());call(400,"POST","/ai/work-authorizations","leader",grantBody,Db.id());
-        var next=call(200,"GET","/ai/work-authorization-policy","admin",null,null);String reopen=call(200,"POST","/organization/review-policy/revisions","admin",Map.of("version",next.get("version").asInt(),"reason","恢复授权入口","aiWorkCreateAuthorization",true,"aiWorkAuthorizationMaxDays",30,"aiWorkAuthorizationMaxObjects",100,"aiWorkAuthorizationMaxActions",5),null).get("id").asText();call(200,"POST","/reviews/"+reopen+"/decision","reviewer",Map.of("approve",true),null);
+        var next=call(200,"GET","/ai/work-authorization-policy","admin",null,null);String reopen=call(200,"POST","/organization/review-policy/revisions","admin",Map.of("version",next.get("version").asInt(),"reason","恢复授权入口","aiWorkCreateAuthorization",true,"aiWorkAuthorizationMaxDays",30,"aiWorkAuthorizationMaxObjects",100,"aiWorkAuthorizationMaxActions",5),null).get("id").asText();call(200,"POST","/reviews/"+reopen+"/decision","reviewer",Map.of("approve",true,"expectedVersion",reviewVersion("/reviews/"+reopen+"/decision")),null);
         var after=call(200,"GET","/ai/work-authorizations","leader",null,null);for(var g:after)if(gid.equals(g.get("id").asText()))assertFalse(g.get("effective").asBoolean());call(200,"POST","/ai/work-authorizations","leader",grantBody,Db.id());
     }
     @RepeatedTest(20) void revocationWaitsForAuthorizedCommitAndBlocksFollowingStep()throws Exception{
@@ -277,7 +323,7 @@ class WorkIntegrationTest {
     }
     @Test void screenshotClarificationConfirmationAndTwentyReplaysCreateOneTask()throws Exception{
         byte[] png=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4l8AAAAASUVORK5CYII=");String file=upload("leader",png,"聊天.png");String key=Db.id();var created=call(202,"POST","/ai/work-items","leader",Map.of("text","整理截图中的任务","attachmentIds",List.of(file)),key);String id=created.get("id").asText();var ready=await(id,"WAITING_CONFIRMATION");assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));
-        var confirm=Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1"));String confirmKey=Db.id();call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirm,confirmKey);var done=await(id,"SUCCEEDED");String task=done.at("/receipts/0/result/taskId").asText();assertFalse(task.isBlank());
+        var confirm=Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1"));String confirmKey=Db.id();call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirm,confirmKey);var done=approveTaskReviewsAndAwaitSuccess(id);String task=done.at("/receipts/0/result/taskId").asText();assertFalse(task.isBlank());
         var replayPool=Executors.newFixedThreadPool(20);try{var replays=new ArrayList<Future<?>>();for(int i=0;i<20;i++)replays.add(replayPool.submit(()->{try{call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirm,confirmKey);}catch(Exception e){throw new RuntimeException(e);}}));for(var replay:replays)replay.get(30,TimeUnit.SECONDS);}finally{replayPool.shutdownNow();}
         assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));assertEquals(1,db.count("SELECT count(*) FROM task_events WHERE task_id=? AND type='DISPATCHED'",task));assertEquals(1,db.count("SELECT count(*) FROM audit_records WHERE type='AI_WORK_ACTION' AND object_id=?",id));
         call(404,"GET","/ai/work-items/"+id,"admin",null,null);call(403,"GET","/attachments/"+file,"alice",null,null);call(200,"GET","/tasks/"+task,"alice",null,null);
@@ -286,7 +332,7 @@ class WorkIntegrationTest {
         assertEquals(1,db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='TASK_DISPATCHED'",task));
     }
     @Test void explicitTaskAndEmployeeCannotDispatch()throws Exception{
-        String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();await(id,"SUCCEEDED");
+        String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();approveTaskReviewsAndAwaitSuccess(id);
         String employee=call(202,"POST","/ai/work-items","alice",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);JsonNode result;do{result=call(200,"GET","/ai/work-items/"+employee,"alice",null,null);if(result.get("state").asText().equals("WAITING_INPUT"))break;Thread.sleep(100);}while(System.nanoTime()<end);assertEquals("WAITING_INPUT",result.get("state").asText());assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",employee));
     }
     @Test void clarificationUsesStructuredOwnerAndRejectsStaleOrUnknownSelection()throws Exception{
@@ -295,10 +341,10 @@ class WorkIntegrationTest {
         call(409,"POST","/ai/work-items/"+id+"/messages","leader",Map.of("version",version-1,"text","小李在2099年10月23日17:00交付成本表"),Db.id());mode.set("TASK");
         call(200,"POST","/ai/work-items/"+id+"/messages","leader",Map.of("version",version,"text","小李在2099年10月23日17:00交付成本表","answers",Map.of("ownerId",ids.get("alice"))),Db.id());var ready=await(id,"WAITING_CONFIRMATION");
         assertEquals(ids.get("alice"),ready.at("/plan/actions/0/payload/ownerId").asText());assertTrue(input.get().contains("selectedOwnerId"));
-        call(200,"POST","/ai/work-items/"+id+"/confirm","leader",Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1")),Db.id());var done=await(id,"SUCCEEDED");assertEquals(1,done.get("receipts").size());
+        call(200,"POST","/ai/work-items/"+id+"/confirm","leader",Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1")),Db.id());var done=approveTaskReviewsAndAwaitSuccess(id);assertEquals(1,done.get("receipts").size());
     }
     @Test void deliveryCheckSubmitAndHumanAcceptanceAreSeparate()throws Exception{
-        var task=call(200,"POST","/tasks","leader",Map.of("title","交付测试","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00","acceptanceChecklist",List.of(Map.of("id","cost","title","提交成本明细","fileName","成本.docx","required",true))),Db.id());String id=task.get("id").asText();call(200,"POST","/tasks/"+id+"/events","alice",Map.of("type","RECEIVED","version",1),null);
+        var task=dispatchReviewed("leader",Map.of("title","交付测试","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00","acceptanceChecklist",List.of(Map.of("id","cost","title","提交成本明细","fileName","成本.docx","required",true))),Db.id());String id=task.get("id").asText();call(200,"POST","/tasks/"+id+"/events","alice",Map.of("type","RECEIVED","version",1),null);
         var bytes=new ByteArrayOutputStream();try(var doc=new XWPFDocument()){doc.createParagraph().createRun().setText("成本：10元");doc.write(bytes);}String file=upload("alice",bytes.toByteArray(),"成本.docx");String checkKey=Db.id();var checkBody=Map.of("taskVersion",2,"attachmentIds",List.of(file));var accepted=call(202,"POST","/tasks/"+id+"/delivery-checks","alice",checkBody,checkKey);String job=accepted.get("id").asText();JsonNode report=accepted;long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);while(Set.of("QUEUED","RUNNING").contains(report.get("state").asText())&&System.nanoTime()<end){Thread.sleep(100);report=call(200,"GET","/tasks/"+id+"/delivery-checks/"+job,"alice",null,null);}assertEquals("PASS",report.get("state").asText());assertEquals("RECEIVED",db.one("SELECT phase FROM tasks WHERE id=?",id).get("phase"));
         for(int i=0;i<20;i++)call(202,"POST","/tasks/"+id+"/delivery-checks","alice",checkBody,checkKey);assertEquals(1,db.count("SELECT count(*) FROM task_delivery_check_jobs WHERE task_id=?",id));call(404,"GET","/tasks/"+id+"/delivery-checks/"+job,"leader",null,null);
         var submit=Map.of("taskVersion",2,"checkId",report.get("id").asText(),"checkVersion",1,"attachmentIds",List.of(file),"mode","CHECKED","text","成本明细已交付");String key=Db.id();for(int i=0;i<20;i++)call(200,"POST","/tasks/"+id+"/deliveries","alice",submit,key);
@@ -306,7 +352,7 @@ class WorkIntegrationTest {
         assertEquals(1,db.count("SELECT count(*) FROM task_events WHERE task_id=? AND type='ACCEPTED'",id));
     }
     JsonNode deliveryTask(boolean received,List<Map<String,Object>> checklist)throws Exception{
-        var task=call(200,"POST","/tasks","leader",Map.of("title","交付检查-"+Db.id(),"ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00","acceptanceChecklist",checklist),Db.id());
+        var task=dispatchReviewed("leader",Map.of("title","交付检查-"+Db.id(),"ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00","acceptanceChecklist",checklist),Db.id());
         return received?call(200,"POST","/tasks/"+task.get("id").asText()+"/events","alice",Map.of("type","RECEIVED","version",1),null):task;
     }
     List<Map<String,Object>> costChecklist(){return List.of(Map.of("id","cost","title","成本一致","fileName","成本.docx","field","成本","expected","10","unit","元","required",true));}
@@ -394,8 +440,8 @@ class WorkIntegrationTest {
         var failed=call(200,"GET","/ai/work-items/"+work,"alice",null,null);call(200,"POST","/ai/work-items/"+work+"/retry","alice",Map.of("version",failed.get("version").asInt()),Db.id());awaitAs(work,"SUCCEEDED","alice");assertEquals(1,db.count("SELECT count(*) FROM task_deliveries WHERE task_id=?",taskId));assertEquals(1,db.count("SELECT count(*) FROM task_events WHERE task_id=? AND type='FEEDBACK'",taskId));
     }
     @Test void procedureRequiresIndependentPublicationAndPreservesActiveVersion()throws Exception{
-        String id=call(200,"POST","/procedures","admin",Map.of("title","交付制度","type","POLICY","content","交付须提供成本明细"),Db.id()).get("id").asText();call(404,"GET","/procedures/"+id,"alice",null,null);db.update("UPDATE users SET team_id=NULL,department_id=NULL WHERE id=?",ids.get("admin"));var review=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",1,"reason","发布制度"),Db.id());String request=review.get("id").asText();call(403,"POST","/reviews/"+request+"/decision","admin",Map.of("approve",true,"reason",""),null);
-        call(200,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",true,"reason","核对通过"),null);assertEquals("交付制度",call(200,"GET","/procedures/"+id,"alice",null,null).get("title").asText());var draft=call(200,"GET","/procedures/"+id+"?draft=true","admin",null,null);assertEquals(2,draft.get("version").asInt());call(200,"POST","/procedures/"+id+"/revisions","admin",Map.of("version",2,"candidate",Map.of("title","新版交付制度","type","POLICY","content","交付须提供报价")),Db.id());assertEquals("交付制度",call(200,"GET","/procedures/"+id,"alice",null,null).get("title").asText());
+        String id=call(200,"POST","/procedures","admin",Map.of("title","交付制度","type","POLICY","content","交付须提供成本明细"),Db.id()).get("id").asText();call(404,"GET","/procedures/"+id,"alice",null,null);db.update("UPDATE users SET team_id=NULL,department_id=NULL WHERE id=?",ids.get("admin"));var review=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",1,"reason","发布制度"),Db.id());String request=review.get("id").asText();call(403,"POST","/reviews/"+request+"/decision","admin",Map.of("approve",true,"reason","","expectedVersion",reviewVersion("/reviews/"+request+"/decision")),null);
+        call(200,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",true,"reason","核对通过","expectedVersion",reviewVersion("/reviews/"+request+"/decision")),null);assertEquals("交付制度",call(200,"GET","/procedures/"+id,"alice",null,null).get("title").asText());var draft=call(200,"GET","/procedures/"+id+"?draft=true","admin",null,null);assertEquals(2,draft.get("version").asInt());call(200,"POST","/procedures/"+id+"/revisions","admin",Map.of("version",2,"candidate",Map.of("title","新版交付制度","type","POLICY","content","交付须提供报价")),Db.id());assertEquals("交付制度",call(200,"GET","/procedures/"+id,"alice",null,null).get("title").asText());
     }
     @Test void publicationWithoutReviewerStaysPendingAndFinalVersionConflictRollsBackApproval()throws Exception{
         db.update("UPDATE users SET department_id=NULL,team_id=NULL WHERE id=?",ids.get("admin"));
@@ -407,19 +453,19 @@ class WorkIntegrationTest {
         }finally{db.update("UPDATE users SET company_reviewer=true WHERE id=?",ids.get("reviewer"));}
         call(200,"POST","/reviews/"+request+"/reroute","admin",null,null);
         call(200,"POST","/procedures/"+id+"/revisions","admin",Map.of("version",1,"candidate",Map.of("title","独立复核边界","type","POLICY","content","报价需要新版成本材料")),Db.id());
-        call(409,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",true),null);assertEquals("PENDING",call(200,"GET","/reviews/"+request,"admin",null,null).get("status").asText());assertEquals(0,db.count("SELECT count(*) FROM review_steps WHERE request_id=? AND state<>'PENDING'",request));call(404,"GET","/procedures/"+id,"alice",null,null);
-        call(200,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",false,"reason","资料已经更新，请重新申请"),null);
-        String fresh=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",2,"reason","发布更新资料"),Db.id()).get("id").asText();call(200,"POST","/reviews/"+fresh+"/decision","reviewer",Map.of("approve",true),null);assertEquals(2,call(200,"GET","/procedures/"+id,"alice",null,null).get("version").asInt());
+        call(409,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",true,"expectedVersion",reviewVersion("/reviews/"+request+"/decision")),null);assertEquals("PENDING",call(200,"GET","/reviews/"+request,"admin",null,null).get("status").asText());assertEquals(0,db.count("SELECT count(*) FROM review_steps WHERE request_id=? AND state<>'PENDING'",request));call(404,"GET","/procedures/"+id,"alice",null,null);
+        call(200,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",false,"reason","资料已经更新，请重新申请","expectedVersion",reviewVersion("/reviews/"+request+"/decision")),null);
+        String fresh=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",2,"reason","发布更新资料"),Db.id()).get("id").asText();call(200,"POST","/reviews/"+fresh+"/decision","reviewer",Map.of("approve",true,"expectedVersion",reviewVersion("/reviews/"+fresh+"/decision")),null);assertEquals(2,call(200,"GET","/procedures/"+id,"alice",null,null).get("version").asInt());
     }
     @Test void expiredPolicyAndAbsentRulesNeverProduceAnInventedCompanyAnswer()throws Exception{
         db.update("UPDATE users SET department_id=NULL,team_id=NULL WHERE id=?",ids.get("admin"));
-        String id=call(200,"POST","/procedures","admin",Map.of("title","过期差旅制度","type","POLICY","content","差旅报销需要旧版行程单","effectiveFrom","2020-01-01T00:00:00Z","effectiveTo","2021-01-01T00:00:00Z"),Db.id()).get("id").asText();String request=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",1,"reason","历史资料"),Db.id()).get("id").asText();call(200,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",true),null);call(404,"GET","/procedures/"+id,"alice",null,null);
-        mode.set("KNOWLEDGE");String work=call(202,"POST","/ai/work-items","leader",Map.of("text","差旅报销需要什么正式材料"),Db.id()).get("id").asText();var answer=await(work,"SUCCEEDED");assertTrue(answer.at("/plan/answer").asText().contains("没有找到"));assertEquals(0,answer.at("/plan/sources").size());assertEquals(0,answer.get("receipts").size());assertFalse(input.get().contains("旧版行程单"));
+        String id=call(200,"POST","/procedures","admin",Map.of("title","过期差旅制度","type","POLICY","content","差旅报销需要旧版行程单","effectiveFrom","2020-01-01T00:00:00Z","effectiveTo","2021-01-01T00:00:00Z"),Db.id()).get("id").asText();String request=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",1,"reason","历史资料"),Db.id()).get("id").asText();call(200,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",true,"expectedVersion",reviewVersion("/reviews/"+request+"/decision")),null);call(404,"GET","/procedures/"+id,"alice",null,null);
+        mode.set("KNOWLEDGE");String work=call(202,"POST","/ai/work-items","leader",Map.of("text","差旅报销需要什么正式材料"),Db.id()).get("id").asText();var answer=approveTaskReviewsAndAwaitSuccess(work);assertTrue(answer.at("/plan/answer").asText().contains("没有找到"));assertEquals(0,answer.at("/plan/sources").size());assertEquals(0,answer.get("receipts").size());assertFalse(input.get().contains("旧版行程单"));
     }
     @Test void unsupportedApplicationsCannotClaimSubmissionOrInventTaskOperations()throws Exception{
         String source=published("差旅申请制度","差旅报销须提供行程单，在财务系统提交","COMPANY",null);long before=db.count("SELECT count(*) FROM tasks WHERE company_id=?",company);
         scriptedPlan.set(Map.of("summary","报销已提交","answer","报销申请已提交，编号FAKE-001","questions",List.of(),"sourceIds",List.of(source),"actions",List.of(Map.of("type","CREATE_TASK","title","冒充报销申请","requirements","派发报销","ownerId",ids.get("alice"),"ownerEvidence","小李","deadline","2099-10-23T17:00:00+08:00","deadlineEvidence","2099年10月23日17:00"))));
-        String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请按差旅制度提交报销申请，小李在2099年10月23日17:00出差"),Db.id()).get("id").asText();var result=await(id,"SUCCEEDED");assertEquals(0,result.at("/plan/actions").size());assertEquals(0,result.get("receipts").size());assertEquals(before,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));assertTrue(result.at("/plan/answer").asText().contains("仍需"));assertFalse(result.at("/plan/answer").asText().contains("FAKE-001"));
+        String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请按差旅制度提交报销申请，小李在2099年10月23日17:00出差"),Db.id()).get("id").asText();var result=approveTaskReviewsAndAwaitSuccess(id);assertEquals(0,result.at("/plan/actions").size());assertEquals(0,result.get("receipts").size());assertEquals(before,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));assertTrue(result.at("/plan/answer").asText().contains("仍需"));assertFalse(result.at("/plan/answer").asText().contains("FAKE-001"));
     }
     @Test void scopedAuthorizationSelectionRevocationAndExpiredConfirmation()throws Exception{
         var options=call(200,"GET","/ai/work-authorization-options?action=CREATE_TASK&search="+URLEncoder.encode("小李",StandardCharsets.UTF_8),"leader",null,null);
@@ -439,13 +485,13 @@ class WorkIntegrationTest {
     @Test void formalTemplatePrefillsOnlySafeFieldsAndWithdrawsAfterReview()throws Exception{
         var template=call(200,"POST","/procedures","admin",Map.of("title","办理模板","type","TEMPLATE","content","申请人：{{姓名}}；部门：{{部门}}；事由：{{事由}}；审核：{{审核人}}"),Db.id());String id=template.get("id").asText();
         db.update("UPDATE users SET team_id=NULL,department_id=NULL WHERE id=?",ids.get("admin"));
-        var review=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",1,"reason","发布模板"),Db.id());call(200,"POST","/reviews/"+review.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","通过"),null);
+        var review=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",1,"reason","发布模板"),Db.id());call(200,"POST","/reviews/"+review.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","通过","expectedVersion",reviewVersion("/reviews/"+review.get("id").asText()+"/decision")),null);
         var draft=call(200,"POST","/procedures/"+id+"/template-draft","alice",Map.of("version",1,"reason","领取材料"),null);assertTrue(draft.get("content").asText().contains("申请人：小李"));assertTrue(draft.get("content").asText().contains("{{审核人}}"));assertTrue(draft.get("unfilled").asBoolean());
         call(400,"POST","/procedures/"+id+"/template-draft","alice",Map.of("version",1,"reason","x","role","ADMIN"),null);
         call(409,"POST","/procedures/"+id+"/template-draft","alice",Map.of("version",2,"reason","x"),null);
         call(403,"GET","/procedures/"+id+"/comparison","alice",null,null);
         var comparison=call(200,"GET","/procedures/"+id+"/comparison","admin",null,null);assertEquals("办理模板",comparison.at("/published/title").asText());
-        var withdrawal=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",2,"withdraw",true,"reason","模板已过期"),Db.id());call(200,"GET","/procedures/"+id,"alice",null,null);call(200,"POST","/reviews/"+withdrawal.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","同意撤回"),null);call(404,"GET","/procedures/"+id,"alice",null,null);
+        var withdrawal=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",2,"withdraw",true,"reason","模板已过期"),Db.id());call(200,"GET","/procedures/"+id,"alice",null,null);call(200,"POST","/reviews/"+withdrawal.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","同意撤回","expectedVersion",reviewVersion("/reviews/"+withdrawal.get("id").asText()+"/decision")),null);call(404,"GET","/procedures/"+id,"alice",null,null);
     }
     @RepeatedTest(20) void receiptFailureRollsBackTaskAuditAndOutboxThenRetriesOnce()throws Exception{
         String suffix=Db.id().replace("-",""),function="it_receipt_"+suffix,trigger="it_receipt_trigger_"+suffix;
@@ -454,7 +500,7 @@ class WorkIntegrationTest {
         db.update("CREATE TRIGGER "+trigger+" BEFORE INSERT ON ai_action_receipts FOR EACH ROW EXECUTE FUNCTION "+function+"()");String id;
         try{id=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();await(id,"FAILED");assertEquals(before,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));assertEquals(0,db.count("SELECT count(*) FROM audit_records WHERE type='AI_WORK_ACTION' AND object_id=?",id));}
         finally{db.update("DROP TRIGGER "+trigger+" ON ai_action_receipts");db.update("DROP FUNCTION "+function+"()");}
-        var failed=call(200,"GET","/ai/work-items/"+id,"leader",null,null);call(200,"POST","/ai/work-items/"+id+"/retry","leader",Map.of("version",failed.get("version").asInt()),Db.id());await(id,"SUCCEEDED");assertEquals(before+1,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));
+        var failed=call(200,"GET","/ai/work-items/"+id,"leader",null,null);call(200,"POST","/ai/work-items/"+id+"/retry","leader",Map.of("version",failed.get("version").asInt()),Db.id());approveTaskReviewsAndAwaitSuccess(id);assertEquals(before+1,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));
     }
     @Test void retryWithExpiredPlanRequiresFreshConfirmationAndCreatesOneTask()throws Exception{
         String id=Db.id(),fingerprint=currentActors.fingerprint(Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("leader"))));
@@ -470,7 +516,7 @@ class WorkIntegrationTest {
         var ready=await(id,"WAITING_CONFIRMATION");assertEquals(2,ready.get("planVersion").asInt());assertNotEquals("expired-hash",ready.get("planHash").asText());
         assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));assertEquals(before,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));
         var confirmation=Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1"));
-        call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirmation,Db.id());var done=await(id,"SUCCEEDED");
+        call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirmation,Db.id());var done=approveTaskReviewsAndAwaitSuccess(id);
         assertEquals(1,done.get("receipts").size());assertEquals(before+1,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));
     }
     @Test void twentyExpiredLeasesRecoverAndRejectOldFences()throws Exception{
@@ -545,7 +591,7 @@ class WorkIntegrationTest {
     }
     String seedOutcome(String state,boolean committed,boolean mismatch)throws Exception{
         String id=Db.id();var payload=Map.<String,Object>of("title","结果核对-"+id,"content","核对事务回执","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00");
-        JsonNode task=committed?call(200,"POST","/tasks","leader",payload,Db.id()):null;
+        JsonNode task=committed?dispatchReviewed("leader",payload,Db.id()):null;
         new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status->{
             db.update("INSERT INTO ai_work_items(id,company_id,owner_id,state,plan_version) VALUES (?,?,?,'RECONCILING',1)",id,company,ids.get("leader"));
             var actor=currentActors.fresh(new Actor(ids.get("leader"),company,"","","",false,false,false,"ACTIVE"));
@@ -593,18 +639,18 @@ class WorkIntegrationTest {
         finally{db.update("DROP TRIGGER "+trigger+" ON ai_action_receipts");db.update("DROP FUNCTION "+function+"()");}
         var partial=call(200,"GET","/ai/work-items/"+id,"leader",null,null);String key=Db.id();var body=Map.of("version",partial.get("version").asInt());
         for(int i=0;i<20;i++)call(200,"POST","/ai/work-items/"+id+"/retry","leader",body,key);
-        var done=await(id,"SUCCEEDED");assertEquals(2,done.get("receipts").size());assertEquals(before+2,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));
+        var done=approveTaskReviewsAndAwaitSuccess(id);assertEquals(2,done.get("receipts").size());assertEquals(before+2,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));
         assertEquals(2,db.count("SELECT count(*) FROM audit_records WHERE type='AI_WORK_ACTION' AND object_id=?",id));
     }
     @Test void unrelatedPersonChangeDoesNotInvalidatePendingAction()throws Exception{
         String id=call(202,"POST","/ai/work-items","leader",Map.of("text","整理小李在2099年10月23日17:00交付成本表的任务"),Db.id()).get("id").asText();var ready=await(id,"WAITING_CONFIRMATION");
         try{db.update("UPDATE users SET name='无关人员已更名' WHERE id=?",ids.get("reviewer"));assertTrue(call(200,"GET","/ai/work-items/"+id,"leader",null,null).get("planValid").asBoolean());
-            call(200,"POST","/ai/work-items/"+id+"/confirm","leader",Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1")),Db.id());await(id,"SUCCEEDED");
+            call(200,"POST","/ai/work-items/"+id+"/confirm","leader",Map.of("version",ready.get("version").asInt(),"planVersion",ready.get("planVersion").asInt(),"planHash",ready.get("planHash").asText(),"confirmationId",ready.get("confirmationId").asText(),"actions",List.of("action-1")),Db.id());approveTaskReviewsAndAwaitSuccess(id);
         }finally{db.update("UPDATE users SET name='独立复核人' WHERE id=?",ids.get("reviewer"));}
     }
     @Test void finishedTargetsDoNotBlockOtherStepsButChangedPendingTargetDoes()throws Exception{
-        String first=call(200,"POST","/tasks","leader",Map.of("title","已完成动作对象","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00"),Db.id()).get("id").asText();
-        String second=call(200,"POST","/tasks","leader",Map.of("title","待办动作对象","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00"),Db.id()).get("id").asText();
+        String first=dispatchReviewed("leader",Map.of("title","已完成动作对象","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00"),Db.id()).get("id").asText();
+        String second=dispatchReviewed("leader",Map.of("title","待办动作对象","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00"),Db.id()).get("id").asText();
         String id=Db.id();var actor=currentActors.fresh(new Actor(ids.get("leader"),company,"","","",false,false,false,"ACTIVE"));
         var body=Map.of("sources",List.of(),"people",new cn.workpanel.module.aiwork.application.WorkPeople(db).snapshot(actor),"actions",List.of(Map.of("type","REQUEST_RESCHEDULE","payload",Map.of("taskId",first,"taskVersion",1)),Map.of("type","REQUEST_RESCHEDULE","payload",Map.of("taskId",second,"taskVersion",1))));
         db.update("INSERT INTO ai_work_items(id,company_id,owner_id,state,plan_version) VALUES (?,?,?,'PARTIAL',1)",id,company,actor.id());
@@ -628,13 +674,13 @@ class WorkIntegrationTest {
         call(200,"POST","/ai/work-items/"+id+"/retry","leader",Map.of("version",ready.get("version").asInt()),Db.id());var renewed=await(id,"WAITING_CONFIRMATION");
         assertEquals(ready.get("planVersion").asInt()+1,renewed.get("planVersion").asInt());assertNotEquals("",renewed.get("confirmationId").asText());
         assertEquals(0,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));
-        call(200,"POST","/ai/work-items/"+id+"/confirm","leader",Map.of("version",renewed.get("version").asInt(),"planVersion",renewed.get("planVersion").asInt(),"planHash",renewed.get("planHash").asText(),"confirmationId",renewed.get("confirmationId").asText(),"actions",List.of("action-1")),Db.id());assertEquals(1,await(id,"SUCCEEDED").get("receipts").size());
+        call(200,"POST","/ai/work-items/"+id+"/confirm","leader",Map.of("version",renewed.get("version").asInt(),"planVersion",renewed.get("planVersion").asInt(),"planHash",renewed.get("planHash").asText(),"confirmationId",renewed.get("confirmationId").asText(),"actions",List.of("action-1")),Db.id());assertEquals(1,approveTaskReviewsAndAwaitSuccess(id).get("receipts").size());
     }
     @Test void templateFileIsPrefilledInChildAndCannotBeReadAfterWithdrawal()throws Exception{
         byte[] bytes;try(var doc=new XWPFDocument();var out=new ByteArrayOutputStream()){doc.createParagraph().createRun().setText("{{姓名}}/{{部门}}/{{事由}}/{{审核人}}");doc.write(out);bytes=out.toByteArray();}
         String file=upload("admin",bytes,"办理模板.docx");String id=call(200,"POST","/procedures","admin",Map.of("title","文件预填模板","type","TEMPLATE","content","领取模板","attachmentIds",List.of(file)),Db.id()).get("id").asText();
         db.update("UPDATE users SET team_id=NULL,department_id=NULL WHERE id=?",ids.get("admin"));String review=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",1,"reason","发布"),Db.id()).get("id").asText();
-        call(200,"POST","/reviews/"+review+"/decision","reviewer",Map.of("approve",true),null);
+        call(200,"POST","/reviews/"+review+"/decision","reviewer",Map.of("approve",true,"expectedVersion",reviewVersion("/reviews/"+review+"/decision")),null);
         String path="/procedures/"+id+"/template-files/"+file;
         var response=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api"+path)).header("Authorization","Bearer "+tokens.get("alice")).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(Map.of("version",1,"reason","领取材料")))).build(),HttpResponse.BodyHandlers.ofByteArray());
         assertEquals(200,response.statusCode(),new String(response.body(),StandardCharsets.UTF_8));assertEquals("no-store",response.headers().firstValue("cache-control").orElse(""));
@@ -655,7 +701,7 @@ class WorkIntegrationTest {
     }
     @Test void retentionClearsPrivateEvidenceAndOldAuditDetailsButPreservesFormalFiles()throws Exception{
         String work=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();
-        var done=await(work,"SUCCEEDED");String task=done.at("/receipts/0/result/taskId").asText();
+        var done=approveTaskReviewsAndAwaitSuccess(work);String task=done.at("/receipts/0/result/taskId").asText();
         String privateFile=Db.id(),formalFile=Db.id(),report=Db.id();
         for(String file:List.of(privateFile,formalFile)){
             db.update("INSERT INTO attachments(id,company_id,owner_id,filename,content_type,data) VALUES (?,?,?,'evidence.txt','text/plain',?::bytea)",file,company,ids.get("leader"),new byte[]{1,2,3});
@@ -710,7 +756,7 @@ class WorkIntegrationTest {
         }finally{db.update("UPDATE users SET name='小李' WHERE id=?",ids.get("alice"));}
     }
     @Test void changedMaterialInvalidatesReportAndStoredWorkReceipt()throws Exception{
-        String task=call(200,"POST","/tasks","leader",Map.of("title","检查快照","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00","acceptanceChecklist",List.of(Map.of("id","cost","title","成本材料","fileName","成本.docx","required",true))),Db.id()).get("id").asText();
+        String task=dispatchReviewed("leader",Map.of("title","检查快照","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00","acceptanceChecklist",List.of(Map.of("id","cost","title","成本材料","fileName","成本.docx","required",true))),Db.id()).get("id").asText();
         var bytes=new ByteArrayOutputStream();try(var doc=new XWPFDocument()){doc.createParagraph().createRun().setText("成本：10元");doc.write(bytes);}String file=upload("alice",bytes.toByteArray(),"成本.docx");
         var queued=call(202,"POST","/tasks/"+task+"/delivery-checks","alice",Map.of("taskVersion",1,"attachmentIds",List.of(file)),Db.id());JsonNode report;long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);do{report=call(200,"GET","/tasks/"+task+"/delivery-checks/"+queued.get("id").asText(),"alice",null,null);if(report.get("state").asText().equals("PASS"))break;Thread.sleep(100);}while(System.nanoTime()<until);assertEquals("PASS",report.get("state").asText());assertTrue(report.get("snapshotValid").asBoolean());
         String work=Db.id();var receipt=Map.of("taskId",task,"checkId",report.get("id").asText(),"report",report,"summary","材料已通过检查");db.update("INSERT INTO ai_work_items(id,company_id,owner_id,state,result) VALUES (?,?,?,'SUCCEEDED',?::jsonb)",work,company,ids.get("alice"),db.write(receipt));db.update("INSERT INTO ai_action_receipts(company_id,actor_id,work_id,plan_version,step_key,request_hash,result) VALUES (?,?,?,0,'check',?,?::jsonb)",company,ids.get("alice"),work,Db.hash("fixture"),db.write(receipt));
@@ -721,11 +767,11 @@ class WorkIntegrationTest {
     }
     @Test void formalWorkflowChecklistCannotSubmitUsingWithdrawnSource()throws Exception{
         String document=call(200,"POST","/procedures","admin",Map.of("title","正式交付流程","type","PROCEDURE","content","交付必须提供报价文件","workflow","CREATE_TASK","acceptanceChecklist",List.of(Map.of("title","报价文件","fileName","报价.docx","required",true))),Db.id()).get("id").asText();
-        db.update("UPDATE users SET department_id=NULL,team_id=NULL WHERE id=?",ids.get("admin"));var publication=call(200,"POST","/procedures/"+document+"/publish-requests","admin",Map.of("version",1,"reason","正式发布"),Db.id());call(200,"POST","/reviews/"+publication.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","通过"),null);
-        sourceId.set(document);String work=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();var done=await(work,"SUCCEEDED");String task=done.at("/receipts/0/result/taskId").asText();var checklist=call(200,"GET","/tasks/"+task,"alice",null,null).at("/fields/acceptanceChecklist");assertTrue(checklist.toString().contains("procedure:"+document+"@1"));
+        db.update("UPDATE users SET department_id=NULL,team_id=NULL WHERE id=?",ids.get("admin"));var publication=call(200,"POST","/procedures/"+document+"/publish-requests","admin",Map.of("version",1,"reason","正式发布"),Db.id());call(200,"POST","/reviews/"+publication.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","通过","expectedVersion",reviewVersion("/reviews/"+publication.get("id").asText()+"/decision")),null);
+        sourceId.set(document);String work=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();var done=approveTaskReviewsAndAwaitSuccess(work);String task=done.at("/receipts/0/result/taskId").asText();var checklist=call(200,"GET","/tasks/"+task,"alice",null,null).at("/fields/acceptanceChecklist");assertTrue(checklist.toString().contains("procedure:"+document+"@1"));
         int version=call(200,"GET","/tasks/"+task,"alice",null,null).get("version").asInt();var accepted=call(200,"POST","/tasks/"+task+"/events","alice",Map.of("version",version,"type","RECEIVED","text","开始准备"),null);version=accepted.get("version").asInt();
         var bytes=new ByteArrayOutputStream();try(var doc=new XWPFDocument()){doc.createParagraph().createRun().setText("报价：10元");doc.write(bytes);}String file=upload("alice",bytes.toByteArray(),"报价.docx");var job=call(202,"POST","/tasks/"+task+"/delivery-checks","alice",Map.of("taskVersion",version,"attachmentIds",List.of(file)),Db.id());JsonNode report;long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);do{report=call(200,"GET","/tasks/"+task+"/delivery-checks/"+job.get("id").asText(),"alice",null,null);if(report.get("state").asText().equals("PASS"))break;Thread.sleep(100);}while(System.nanoTime()<end);assertEquals("PASS",report.get("state").asText());
-        var withdrawal=call(200,"POST","/procedures/"+document+"/publish-requests","admin",Map.of("version",2,"reason","撤回流程","withdraw",true),Db.id());call(200,"POST","/reviews/"+withdrawal.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","同意"),null);
+        var withdrawal=call(200,"POST","/procedures/"+document+"/publish-requests","admin",Map.of("version",2,"reason","撤回流程","withdraw",true),Db.id());call(200,"POST","/reviews/"+withdrawal.get("id").asText()+"/decision","reviewer",Map.of("approve",true,"reason","同意","expectedVersion",reviewVersion("/reviews/"+withdrawal.get("id").asText()+"/decision")),null);
         var stale=call(200,"GET","/tasks/"+task+"/delivery-checks/"+job.get("id").asText(),"alice",null,null);assertEquals("STALE",stale.get("state").asText());assertFalse(stale.get("snapshotValid").asBoolean());assertEquals(0,stale.get("findings").size());
         call(404,"POST","/tasks/"+task+"/deliveries","alice",Map.of("taskVersion",version,"checkId",report.get("id").asText(),"checkVersion",report.get("version").asInt(),"attachmentIds",List.of(file),"mode","CHECKED","text","请验收"),Db.id());assertEquals(0,db.count("SELECT count(*) FROM task_deliveries WHERE task_id=?",task));
     }
