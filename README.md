@@ -32,6 +32,7 @@
 | --- | --- |
 | 产品需求和导航基线 | [方案.md](方案.md) |
 | 后端运行、部署和配置 | [docs/backend.md](docs/backend.md) |
+| 云端现有 systemd 部署、更新与回滚 | [docs/cloud-systemd-deployment.md](docs/cloud-systemd-deployment.md) |
 | 后端分层、模块职责和依赖 | [docs/backend-architecture.md](docs/backend-architecture.md) |
 | REST、SSE、附件和 AI 接口 | [docs/backend-interface.md](docs/backend-interface.md) |
 | 数据库表和迁移说明 | [docs/database-schema.md](docs/database-schema.md) |

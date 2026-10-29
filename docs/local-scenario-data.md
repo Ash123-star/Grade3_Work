@@ -64,6 +64,8 @@ Android本地调试使用 `USE_MOCK=false` 的debug APK，默认访问云端 `ht
 
 ## 本次简化账号的云端部署
 
+**现有云端实际由systemd管理。** 请优先使用 [systemd部署、迁移和回滚步骤](cloud-systemd-deployment.md)，配置 `/etc/collaboration-scenario.env`，保留原服务的数据库连接。以下Compose步骤仅适用于原本就以该Compose项目运行API的环境；不能将其直接用于现有systemd服务，否则会产生8080冲突，并可能连接另一套数据库。
+
 V3只处理固定21个场景用户，统一密码由执行V3时的SCENARIO_PASSWORD决定。本次测试密码为 `123456`。V1/V2保持原样；人员ID、权限、状态、任务、日志与组织关系保持不变，V3撤销原会话。短账号已被占用或场景成员被改名时整批回滚，不覆盖其他账号。
 
 在云端拉取main后，在原部署的 `deploy/backend/.env` 设置 `SCENARIO_DATA_ENABLED=true` 和 `SCENARIO_PASSWORD=123456`，然后重新构建并启动：
