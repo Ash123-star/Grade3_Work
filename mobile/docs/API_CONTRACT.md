@@ -1,5 +1,7 @@
 # 前端接口草案
 
+> 2026-10-29补充：剩余接口代码接入状态以 docs/mobile-remaining-api-implementation-status.md 为准。用户已取消意见反馈，移动端入口/表单/Mock资源已删除，旧深链转帮助页；不新增feedback服务。任务评论/日志回复沿用现有真实接口，RETURNED、成果附件、团队目录、AI scope和确认version/幂等回执已接入源码，尚未统一验收。日志阅读登记已停用，不新增人员清单。下文保留的旧缺口或历史验证不能代表本批已通过。
+
 ## 2026-10-23 PR #33 主线整合
 
 基线更新到 main 808d9d6。下方dc00e2b的后端缺口仅是历史记录。新任务将界面participantIds/tagId转换为请求participants/labelId，保留startAt、deadline和审核申请响应；任务详情的服务端label映射为tagId/tagName/tagColor/tagCategory，参与人姓名映射沿用主线规则。
@@ -94,12 +96,12 @@ GET /analytics必须date(YYYY-MM-DD)/period(day|week|month)，返回单个对象
 
 ## 阶段3既有AI契约对齐（2026-10-13）
 
-正式页面使用专用AiRepository/模型，通过当前HttpRepository的认证Dio调用企业服务，客户端不调用DeepSeek或保存供应商密钥。POST `/ai/jobs`只含date、period(day/week/month)、purpose(SUMMARY/EXPLAIN_RISK/SPLIT_STEPS/DRAFT_TASK)、可选focusSourceId；非SUMMARY必须有有效来源。接口没有ownerId或scope筛选参数，范围来自服务端Actor；正式页展示真实授权范围，不提供无效个人/公司切换。服务器来源可包含50日志+50任务+10个人重点。
+正式页面使用专用AiRepository/模型，通过当前HttpRepository的认证Dio调用企业服务，客户端不调用DeepSeek或保存供应商密钥。POST `/ai/jobs`接收date、period(day/week/month)、purpose(SUMMARY/EXPLAIN_RISK/SPLIT_STEPS/DRAFT_TASK)、可选focusSourceId及scope=SELF/AUTHORIZED（默认AUTHORIZED）；非SUMMARY必须有有效来源。两个scope都受实时Actor权限限制；SELF只本人日志、本人参与/派发任务及本人重点。后台、重试与来源后续分析保留范围；正式页提供本人/当前授权范围选择并标记实际结果范围。服务器来源可包含50日志+50任务+10个人重点。
 
 GET job返回id/owner_id/state/input/output/version/error/created_at等嵌套数据，状态QUEUED/RUNNING/SUCCEEDED/FAILED/CANCELLED。output有summary/sourceIds、最多10 nodes和3 actions、generatedAt/draft；建议引用必须能与input.sources匹配。服务端验证当前来源权限。客户端将匹配的task/log/item来源映射到内部详情，只允许无外部host/scheme的准确路径；个人重点保持本人ownerId上下文，不跳任意URL。来源不足禁确认。
 
 GET `/ai/jobs/{id}/stream`为受认证SSE，delta.text是累计的未完成JSON，不作为可操作建议；result事件后或流断开后GET核实最终作业。支持UTF8跨块、CRLF、多行data、keepalive、边界大小；回页可“继续接收”同作业而不再次生成。取消只有显式DELETE，离页/换账号仅取消传输，不假称远程取消；POST retry沿用原输入并返回新job ID。503 AI_NOT_CONFIGURED、429 AI_BUDGET及网络失败保留输入/上次结果；403/401或账户变化清除页面、弹窗受保护来源。
 
-PUT `/ai/jobs/{id}/draft`只发送version/summary/sourceIds/nodes/actions，保留来源、node和ownerId，编辑正文及建议标题；409保留输入并禁过期提交，确认重新读取后替换。保存草稿不创建任务。POST `/ai/jobs/{id}/confirm-task`必须派发资格与Idempotency-Key，body为actionIndex/task。专用确认页人工编辑title/content/group/progressNote/urgency、实际单负责人、协作人、附件ID与未来deadline，确认前GET核对job版本/来源；相同载荷重试保持幂等键，修改载荷重新确认并换键。服务端确认没有version字段，GET与POST之间仍有远程编辑竞态，不能声称原子版本保护。
+PUT `/ai/jobs/{id}/draft`只发送version/summary/sourceIds/nodes/actions，保留来源、node和ownerId，编辑正文及建议标题；409保留输入并禁过期提交，确认重新读取后替换。保存草稿不创建任务。POST `/ai/jobs/{id}/confirm-task`必须派发资格与Idempotency-Key，body为version/actionIndex/task。专用确认页人工编辑title/content/group/progressNote/urgency、实际单负责人、协作人、附件ID与未来deadline，由服务端确认事务锁定job并核对版本/来源；相同载荷重试保持幂等键，修改载荷重新确认并换键。服务端以行锁、原TASK_CREATE审核及V23确认回执提供原子版本保护；旧版本409，同键同规范化载荷重放原结果，异载荷409。结果为审核申请时跳转审核页，不能将申请ID当作任务ID。该批源码尚未经过编译/迁移/HTTP验收。
 
 GET `/ai-maps`返回实际nodes(id/job_id/owner_id/body)/edges(source_id/target_id/body)，客户端读取关联job恢复来源，带过滤/缩放/列表替代；POST `/ai-maps/edges`提交sourceId/targetId/label，禁止自身依赖。GET `/ai/usage`只有dailyLimit及UTC日期tokens/jobs记录，客户端不猜用量。未新增后端、数据库或依赖，真实供应商/数据库/设备链路仍待验收。

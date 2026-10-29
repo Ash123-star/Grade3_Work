@@ -4,7 +4,7 @@ import 'package:pandora_mobile/core/errors/api_failure.dart';
 
 void main() {
   test('日志修改窗口过期保留明确错误码并映射为不可编辑提示', () {
-    final request = RequestOptions(path: '/logs/log-1/revisions');
+    final request = RequestOptions(path: '/logs/log-1/content');
     final failure = ApiFailure.fromDio(
       DioException(
         requestOptions: request,

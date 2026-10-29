@@ -5,17 +5,15 @@ import 'package:pandora_mobile/data/models/models.dart';
 
 void main() {
   test(
-    'withdrawal preserves first submission window and invalidates pending review',
+    'direct edits preserve first submission and retired actions cannot mutate logs',
     () async {
       var now = DateTime.utc(2026, 10, 21, 8);
-      final store = DemoStore();
+      final store = DemoStore()
+        ..records['logs'] = []
+        ..records['reviews'] = [];
+      final reviewCount = (store.records['reviews'] ?? []).length;
       final author = MockRepository(
         const Session(id: 'u2', role: UserRole.employee),
-        store: store,
-        clock: () => now,
-      );
-      final reviewer = MockRepository(
-        const Session(),
         store: store,
         clock: () => now,
       );
@@ -27,73 +25,47 @@ void main() {
           '今日工作': '原文',
         }),
       );
-      await expectLater(
-        author.execute(
-          'logs',
-          Command('update', {
-            'id': log.id,
-            '今日工作': '直接覆盖',
-          }, version: log.version),
-        ),
-        throwsA(isA<ApiFailure>()),
-      );
-      var review = await author.execute(
+      final edited = await author.execute(
         'logs',
-        Command('request-review', {
+        Command('update-content', {
           'id': log.id,
-          '今日工作': '修订',
-          '修改理由': '补充',
+          'work': '补充正文',
         }, version: log.version),
       );
-      final draft = await author.execute(
-        'logs',
-        Command('withdraw', {
-          'id': log.id,
-          'reason': '补充后重提',
-        }, version: log.version),
-      );
-      expect(isSubmittedDiary(draft), isFalse);
-      expect(draft.fields['submittedAt'], log.fields['submittedAt']);
-      final resubmitted = await author.execute(
-        'logs',
-        Command('submit', {'id': log.id}, version: draft.version),
-      );
-      expect(resubmitted.fields['submittedAt'], log.fields['submittedAt']);
-      for (var i = 0; i < 2; i++) {
-        review = await reviewer.execute(
-          'reviews',
-          Command('approve', {'id': review.id}, version: review.version),
+      expect(edited.fields['submittedAt'], log.fields['submittedAt']);
+      expect(isSubmittedDiary(edited), isTrue);
+      for (final action in ['withdraw', 'request-review', 'unknown']) {
+        await expectLater(
+          author.execute(
+            'logs',
+            Command(action, {
+              'id': log.id,
+              '今日工作': '不得写入',
+            }, version: edited.version),
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (e) => e.kind,
+              'kind',
+              FailureKind.unavailable,
+            ),
+          ),
         );
       }
-      await expectLater(
-        reviewer.execute(
-          'reviews',
-          Command('approve', {'id': review.id}, version: review.version),
-        ),
-        throwsA(
-          isA<ApiFailure>().having((e) => e.kind, 'kind', FailureKind.conflict),
-        ),
-      );
-      final withdrawn = await author.execute(
-        'logs',
-        Command('withdraw', {
-          'id': log.id,
-          'reason': '补充',
-        }, version: resubmitted.version),
-      );
+      expect((store.records['reviews'] ?? []).length, reviewCount);
       now = now.add(const Duration(hours: 24));
       expect((await author.detail('logs', log.id)).fields['canEdit'], isFalse);
       await expectLater(
         author.execute(
           'logs',
-          Command('save-draft', {
+          Command('update-content', {
             'id': log.id,
-            '今日工作': '超时',
-          }, version: withdrawn.version),
+            'work': '超时覆盖',
+          }, version: edited.version),
         ),
         throwsA(isA<ApiFailure>()),
       );
-      expect((await author.detail('logs', log.id)).fields['今日工作'], '原文');
+      expect((await author.detail('logs', log.id)).fields['今日工作'], '补充正文');
     },
   );
   test(
@@ -184,7 +156,7 @@ void main() {
   test(
     'daily log is unique and in-window edits apply without review',
     () async {
-      final store = DemoStore();
+      final store = DemoStore()..records['reviews'] = [];
       final now = DateTime.utc(2026, 9, 23, 4);
       final employee = MockRepository(
         const Session(

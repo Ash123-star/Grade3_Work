@@ -389,17 +389,18 @@ void main() {
   }
 
   testWidgets(
-    'diary revision action disappears when its server deadline passes',
+    'diary direct edit locks when its server deadline passes',
     (t) async {
       adapter.editDeadline = DateTime.now().add(const Duration(seconds: 3));
       await launch(t, '/item/logs/log-1');
-      expect(find.text('申请修订日志'), findsOneWidget);
+      expect(find.text('编辑日志'), findsOneWidget);
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 3100)),
       );
       await t.pump(const Duration(seconds: 4));
       await t.pumpAndSettle();
-      expect(find.text('申请修订日志'), findsNothing);
+      expect(find.text('编辑日志'), findsNothing);
+      expect(find.text('已满24小时 · 日志已锁定'),findsOneWidget);
       expect(adapter.requests.any((r) => r.method == 'PUT'), false);
       await closeUi(t);
     },

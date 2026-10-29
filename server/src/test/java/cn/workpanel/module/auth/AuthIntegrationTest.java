@@ -58,6 +58,19 @@ class AuthIntegrationTest {
     JsonNode login(String password, int status) throws Exception { return call(status, "POST", "/auth/login", null, Map.of("account", account, "password", password)); }
     String token() throws Exception { return login(PASSWORD, 200).get("token").asText(); }
 
+    @Test void defaultSessionLastsOneWeekAndExpiredTokenIsRejected() throws Exception {
+        Instant before=Instant.now();
+        var login=login(PASSWORD,200);Instant after=Instant.now();
+        Instant expires=Instant.parse(login.get("expiresAt").asText());
+        assertFalse(expires.isBefore(before.plus(Duration.ofDays(7))));
+        assertFalse(expires.isAfter(after.plus(Duration.ofDays(7))));
+        String token=login.get("token").asText();
+        assertTrue(Duration.between(expires,((java.sql.Timestamp)db.one("SELECT expires_at FROM sessions WHERE token_hash=?",Db.hash(token)).get("expires_at")).toInstant()).abs().compareTo(Duration.ofMillis(1))<0);
+        call(200,"GET","/auth/me",token,null);
+        db.update("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE token_hash=?",Db.hash(token));
+        assertEquals("SESSION_EXPIRED",call(401,"GET","/auth/me",token,null).get("code").asText());
+    }
+
     @Test void failedLoginPersistsLocksExpiresAndSuccessClears() throws Exception {
         for (int i = 1; i <= 5; i++) {
             assertEquals("INVALID_CREDENTIALS", login("wrong-password", 401).get("code").asText());

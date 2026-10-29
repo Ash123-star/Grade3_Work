@@ -32,24 +32,32 @@ public class AiApplicationService {
         this.db=db; this.business=business; this.redis=redis; this.limiter=limiter; this.tx=new TransactionTemplate(manager); this.key=key; this.url=url.replaceAll("/+$",""); this.model=model; this.daily=daily; this.maxTokens=maxTokens; this.timeout=timeout; this.enabled=enabled;
     }
     Map<String,Object> context(Actor a,String date,String period) {
+        return context(a,date,period,"AUTHORIZED");
+    }
+    Map<String,Object> context(Actor a,String date,String period,String selection) {
+        if(!Set.of("SELF","AUTHORIZED").contains(selection)) throw ApiError.bad("INVALID_SCOPE","scope: SELF/AUTHORIZED");
+        boolean self=selection.equals("SELF");
         var range=Business.range(date,period); var scope=Business.ownerScope(a,"l"); var args=new ArrayList<>(scope.args()); args.add(range.first().toString()); args.add(range.end().toString());
-        var logs=db.rows("SELECT l.id,l.owner_id,l.business_date,l.body FROM daily_logs l WHERE "+scope.sql()+" AND l.submitted AND l.business_date>=?::date AND l.business_date<?::date ORDER BY business_date DESC LIMIT 50",args.toArray());
+        if(self) args.add(a.id());
+        var logs=db.rows("SELECT l.id,l.owner_id,l.business_date,l.body FROM daily_logs l WHERE "+scope.sql()+" AND l.submitted AND l.business_date>=?::date AND l.business_date<?::date"+(self?" AND l.owner_id=?":"")+" ORDER BY business_date DESC,l.id LIMIT 50",args.toArray());
         var ts=Business.taskScope(a); var taskArgs=new ArrayList<>(ts.args()); taskArgs.add(range.from().toString()); taskArgs.add(range.to().toString());
-        var tasks=db.rows("SELECT t.id,t.owner_id,t.title,t.deadline,t.body,t.phase FROM tasks t WHERE "+ts.sql()+" AND t.deadline>=?::timestamptz AND t.deadline<?::timestamptz ORDER BY deadline LIMIT 50",taskArgs.toArray());
+        if(self) { taskArgs.add(a.id()); taskArgs.add(a.id()); }
+        var tasks=db.rows("SELECT t.id,t.owner_id,t.title,t.deadline,t.body,t.phase FROM tasks t WHERE "+ts.sql()+" AND t.deadline>=?::timestamptz AND t.deadline<?::timestamptz"+(self?" AND (t.issuer_id=? OR EXISTS (SELECT 1 FROM task_participants p WHERE p.task_id=t.id AND p.user_id=?))":"")+" ORDER BY deadline,t.id LIMIT 50",taskArgs.toArray());
         var sources=new ArrayList<Map<String,Object>>();
         for(var l:logs) { var body=db.read(l.get("body")); var text=new LinkedHashMap<String,Object>(); for(String k:List.of("work","blockers","tomorrow")) text.put(k,sanitize(Db.str(body,k))); sources.add(Map.of("id","log:"+l.get("id"),"url","/api/logs/"+l.get("id"),"ownerId",l.get("owner_id"),"date",l.get("business_date").toString(),"text",text)); }
         for(var t:tasks) { var body=db.read(t.get("body")); sources.add(Map.of("id","task:"+t.get("id"),"url","/api/tasks/"+t.get("id"),"ownerId",t.get("owner_id"),"title",sanitize(Db.str(t,"title")),"content",sanitize(Db.str(body,"content")),"deadline",t.get("deadline").toString(),"overdue",!Set.of("ACCEPTED","ARCHIVED","WITHDRAWN").contains(t.get("phase"))&&((java.sql.Timestamp)t.get("deadline")).toInstant().isBefore(Instant.now()))); }
         var items=db.rows("SELECT id,title,body FROM dashboard_items WHERE company_id=? AND owner_id=? AND kind='PERSONAL' AND NOT archived LIMIT 10",a.company(),a.id());
         for(var item:items) sources.add(Map.of("id","item:"+item.get("id"),"url","/api/dashboard/personal?ownerId="+a.id(),"title",sanitize(Db.str(item,"title")),"text",sanitize(Db.str(db.read(item.get("body")),"text"))));
-        var people=new ArrayList<Map<String,Object>>(); if(a.manager()&&a.dispatch()) { var pa=new ArrayList<Object>(List.of(a.company())); pa.addAll(Arrays.asList(a.scopeArgs())); people.addAll(db.rows("SELECT u.id,u.name FROM users u WHERE u.company_id=? AND u.status='ACTIVE' AND ("+a.userScope("u")+") ORDER BY u.id LIMIT 100",pa.toArray())); }
+        var people=new ArrayList<Map<String,Object>>(); if(a.manager()&&a.dispatch()) { var pa=new ArrayList<Object>(List.of(a.company())); pa.addAll(Arrays.asList(a.scopeArgs())); if(self) pa.add(a.id()); people.addAll(db.rows("SELECT u.id,u.name FROM users u WHERE u.company_id=? AND u.status='ACTIVE' AND ("+a.userScope("u")+")"+(self?" AND u.id=?":"")+" ORDER BY u.id LIMIT 100",pa.toArray())); }
         people.forEach(person->person.put("name",sanitize(Db.str(person,"name"))));
-        return Map.of("sources",sources,"candidates",people,"date",date,"period",period,"generatedAt",Instant.now().toString());
+        if(self) people.removeIf(person->!a.id().equals(person.get("id")));
+        return Map.of("sources",sources,"candidates",people,"date",date,"period",period,"scope",selection,"generatedAt",Instant.now().toString());
     }
     public static String sanitize(String s) { return s.replaceAll("(?i)(password|密码|api[_-]?key|密钥|token)\\s*[:：=]\\s*\\S+","[已隐藏敏感信息]").replaceAll("(?<![0-9])1[3-9][0-9]{9}(?![0-9])","[已隐藏手机号]"); }
     public Map<String,Object> create(Actor a,Map<String,Object> b) {
-        Db.fields(b,"date","period","purpose","focusSourceId"); limiter.check("ai:"+a.id(),5,60);
+        Db.fields(b,"date","period","purpose","focusSourceId","scope"); limiter.check("ai:"+a.id(),5,60);
         if(key.isBlank()) throw new ApiError(503,"AI_NOT_CONFIGURED","AI 尚未配置，基础业务可继续使用");
-        var input=new LinkedHashMap<>(context(a,Db.required(b,"date"),Db.required(b,"period"))); options(input,b); if(db.write(input).length()>60000) throw ApiError.bad("AI_INPUT_TOO_LARGE","请缩小 AI 总结范围");
+        var input=new LinkedHashMap<>(context(a,Db.required(b,"date"),Db.required(b,"period"),b.containsKey("scope")?Db.required(b,"scope"):"AUTHORIZED")); options(input,b); if(db.write(input).length()>60000) throw ApiError.bad("AI_INPUT_TOO_LARGE","请缩小 AI 总结范围");
         String id=Db.id(); db.update("INSERT INTO ai_jobs(id,company_id,owner_id,input) VALUES (?,?,?,?::jsonb)",id,a.company(),a.id(),db.write(input)); return job(a,id);
     }
     static void options(Map<String,Object> input,Map<String,Object> b) {
@@ -79,7 +87,7 @@ public class AiApplicationService {
         String budgetKey=null; long reserve=0; int usage=0;
         try {
             var j=db.one("SELECT * FROM ai_jobs WHERE id=?",id); Actor a=currentOwner(j);
-            var old=db.read(j.get("input")); var input=new LinkedHashMap<>(context(a,Db.required(old,"date"),Db.required(old,"period"))); options(input,old); db.update("UPDATE ai_jobs SET input=?::jsonb WHERE id=?",db.write(input),id);
+            var old=db.read(j.get("input")); var input=new LinkedHashMap<>(context(a,Db.required(old,"date"),Db.required(old,"period"),old.containsKey("scope")?Db.required(old,"scope"):"AUTHORIZED")); options(input,old); db.update("UPDATE ai_jobs SET input=?::jsonb WHERE id=?",db.write(input),id);
             reserve=db.write(input).length()+maxTokens+1000L; budgetKey="workpanel:ai-budget:"+a.id()+":"+LocalDate.now(ZoneOffset.UTC);
             long persisted=db.count("SELECT coalesce(sum(tokens),0) FROM ai_jobs WHERE owner_id=? AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",a.id())+db.count("SELECT coalesce(sum(tokens),0) FROM memory_model_calls WHERE company_id=? AND owner_id=? AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",a.company(),a.id());
             if(persisted+reserve>daily) { reserve=0; throw new ApiError(429,"AI_BUDGET","每日 AI 预算不足"); }
@@ -88,7 +96,7 @@ public class AiApplicationService {
             db.update("UPDATE ai_jobs SET tokens=? WHERE id=?",reserve,id);
             Map<String,Object> output=null; Exception failure=null;
             for(int attempt=0;attempt<2;attempt++) {
-                try { var completion=complete(id,input); usage=completion.tokens(); output=validate(completion.text(),input); failure=null; break; }
+                try { Actor current=currentOwner(db.one("SELECT * FROM ai_jobs WHERE id=?",id)); var refs=new ArrayList<String>(); for(Object source:(List<?>)input.get("sources")) refs.add(((Map<?,?>)source).get("id").toString()); validateSources(current,Map.of("sourceIds",refs,"nodes",List.of(),"actions",List.of())); var completion=complete(id,input); usage=completion.tokens(); output=validate(completion.text(),input); failure=null; break; }
                 catch(Exception e) { failure=e; if(Thread.currentThread().isInterrupted()||!Db.str(db.one("SELECT state FROM ai_jobs WHERE id=?",id),"state").equals("RUNNING")||!Db.str(db.one("SELECT partial FROM ai_jobs WHERE id=?",id),"partial").isBlank()) break; }
             }
             if(failure!=null) throw failure;
@@ -149,7 +157,7 @@ public class AiApplicationService {
         job(a,id); int n=db.update("UPDATE ai_jobs SET state='CANCELLED',version=version+1,finished_at=now() WHERE id=? AND state IN ('QUEUED','RUNNING')",id); if(n==0) throw ApiError.conflict();
         Future<?> f=running.remove(id); if(f!=null) f.cancel(true); InputStream body=bodies.remove(id); if(body!=null) try { body.close(); } catch(IOException ignored) {}
     }
-    public Map<String,Object> retry(Actor a,String id) { var old=job(a,id); if(!Set.of("FAILED","CANCELLED").contains(old.get("state"))) throw ApiError.conflict(); var input=db.read(old.get("input")); return create(a,Map.of("date",input.get("date"),"period",input.get("period"),"purpose",input.getOrDefault("purpose","SUMMARY"),"focusSourceId",input.getOrDefault("focusSourceId",""))); }
+    public Map<String,Object> retry(Actor a,String id) { var old=job(a,id); if(!Set.of("FAILED","CANCELLED").contains(old.get("state"))) throw ApiError.conflict(); var input=db.read(old.get("input")); return create(a,Map.of("date",input.get("date"),"period",input.get("period"),"scope",input.getOrDefault("scope","AUTHORIZED"),"purpose",input.getOrDefault("purpose","SUMMARY"),"focusSourceId",input.getOrDefault("focusSourceId",""))); }
     public SseEmitter stream(String token,String id) {
         Actor a=Security.authenticate(db,token); job(a,id); SseEmitter emitter=new SseEmitter(55000L); String[] previous={""}; ScheduledFuture<?>[] future=new ScheduledFuture<?>[1];
         future[0]=streams.scheduleAtFixedRate(()->{ try { Actor fresh=Security.authenticate(db,token); if(!fresh.status().equals("ACTIVE")||fresh.mustChange()) throw ApiError.forbidden(); var job=job(fresh,id); String text=Db.str(db.one("SELECT partial FROM ai_jobs WHERE id=?",id),"partial");
@@ -165,9 +173,9 @@ public class AiApplicationService {
 @RequestMapping("/api")
 /** AI 与 AI 地图 HTTP 适配器。模型只生成带来源草稿，确认后才调用普通任务流程。 */
 class AiHttpController {
-    final AiApplicationService ai; final Db db; final TaskDispatchService tasks;
-    AiHttpController(AiApplicationService ai,Db db,TaskDispatchService tasks) { this.ai=ai; this.db=db; this.tasks=tasks; }
-    /** 创建 AI 异步草稿。请求为 date、period、action 等业务筛选；服务端先按范围脱敏；未配置供应商返回 503。 */
+    final AiApplicationService ai; final Db db; final AiConfirmationService confirmations;
+    AiHttpController(AiApplicationService ai,Db db,AiConfirmationService confirmations) { this.ai=ai; this.db=db; this.confirmations=confirmations; }
+    /** 创建本人AI异步草稿：date/period/purpose/focusSourceId及scope=SELF/AUTHORIZED（默认后者）；实时授权过滤并脱敏。无版本/幂等键；无效400、失权403、限流429、未配置503。后台和重试保留范围。 */
     @PostMapping("/ai/jobs") public Map<String,Object> create(HttpServletRequest r,@RequestBody Map<String,Object> b) { return ai.create(Actor.current(r),b); }
     /** 查询本人 AI job。来源失权时重新校验并拒绝返回；跨用户读取返回 404/403。 */
     @GetMapping("/ai/jobs/{id}") public Map<String,Object> get(HttpServletRequest r,@PathVariable String id) { Actor a=Actor.current(r); var job=ai.job(a,id); if(job.get("output") instanceof Map<?,?> o) ai.validateSources(a,db.read(db.write(o))); return job; }
@@ -204,10 +212,8 @@ class AiHttpController {
         for(String node:List.of(source,target)) { var n=db.one("SELECT body FROM ai_map_nodes WHERE id=? AND company_id=? AND owner_id=?",node,a.company(),a.id()); var body=db.read(n.get("body")); ai.validateSources(a,Map.of("sourceIds",Business.strings(body,"sourceIds"),"nodes",List.of(),"actions",List.of())); }
         String id=Db.id(); db.update("INSERT INTO ai_map_edges VALUES (?,?,?,?,?,?::jsonb)",id,a.company(),a.id(),source,target,db.write(Map.of("label",Db.str(b,"label")))); return Map.of("id",id);
     }
-    /** 确认 AI 草稿并创建普通任务。需派发权限和 Idempotency-Key；再次执行任务校验与范围过滤。 */
+    /** 原子确认本人SUCCEEDED草稿：version/actionIndex/task及1–128位Idempotency-Key必填；重验来源/派发权限。旧版本409、无效400、失权403/404；同键同内容重放、异内容409。返回TASK_CREATE审核结果，按正常单级/创始人规则生效。 */
     @PostMapping("/ai/jobs/{id}/confirm-task") public Map<String,Object> confirm(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b,@RequestHeader("Idempotency-Key") String key) {
-        Db.fields(b,"actionIndex","task"); Actor a=Actor.current(r); a.requireDispatch(); var job=get(r,id); if(!job.get("state").equals("SUCCEEDED")) throw ApiError.conflict();
-        var output=db.read(db.write(job.get("output"))); var actions=AiApplicationService.maps(output,"actions",3); if(!(b.get("actionIndex") instanceof Number n)||n.intValue()<0||n.intValue()>=actions.size()) throw ApiError.bad("INVALID_ACTION","行动索引无效");
-        if(!(b.get("task") instanceof Map<?,?>)) throw ApiError.bad("INVALID_TASK","需要人工确认的完整任务"); return tasks.dispatch(a,db.read(db.write(b.get("task"))),key);
+        return confirmations.confirm(Actor.current(r),id,b,key);
     }
 }

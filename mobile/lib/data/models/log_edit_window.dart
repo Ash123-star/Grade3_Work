@@ -1,13 +1,17 @@
 import 'models.dart';
 
 /// Presentation only: every mutation must still be authorized by the server.
-/// A withdrawn diary retains its original submission deadline.
+/// The first submission deadline is immutable.
 
 bool canInitiallySubmitDiaryOn(DateTime businessDate, {DateTime? now}) {
   final shanghaiNow = (now ?? DateTime.now()).toUtc().add(
     const Duration(hours: 8),
   );
-  final today = DateTime.utc(shanghaiNow.year, shanghaiNow.month, shanghaiNow.day);
+  final today = DateTime.utc(
+    shanghaiNow.year,
+    shanghaiNow.month,
+    shanghaiNow.day,
+  );
   final selected = DateTime.utc(
     businessDate.year,
     businessDate.month,
@@ -40,9 +44,4 @@ class LogEditWindow {
 
   bool canEditAt(DateTime now) =>
       record.fields['canEdit'] != false && _open(now);
-
-  bool canWithdrawAt(DateTime now) =>
-      isSubmittedDiary(record) &&
-      record.fields['canWithdraw'] == true &&
-      _open(now);
 }

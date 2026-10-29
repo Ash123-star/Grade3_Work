@@ -1,7 +1,6 @@
 package cn.workpanel.module.log.application;
 
 import cn.workpanel.*;
-import cn.workpanel.module.review.application.ReviewApplicationService;
 import org.junit.jupiter.api.*;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -11,10 +10,10 @@ import static org.mockito.Mockito.*;
 /** 日报工作流的无容器分支测试：版本、历史和草稿私密性。 */
 class LogWorkflowServiceTest {
     static final Actor ALICE=new Actor("alice","c1","EMPLOYEE","d1","t1",false,false,false,"ACTIVE");
-    Db db; Business business; ReviewApplicationService reviews; LogWorkflowService service;
+    Db db; Business business; LogWorkflowService service;
 
     @BeforeEach void setUp() {
-        db=mock(Db.class); business=mock(Business.class); reviews=mock(ReviewApplicationService.class); service=new LogWorkflowService(db,business,reviews);
+        db=mock(Db.class); business=mock(Business.class); service=new LogWorkflowService(db,business);
         when(db.write(any())).thenReturn("{}"); when(db.read(any())).thenReturn(Map.of("work","完成日报"));
     }
 
@@ -39,7 +38,9 @@ class LogWorkflowServiceTest {
     }
 
     @Test void submitWritesHistoryInSameWorkflow() {
-        when(business.log(ALICE,"log-1",true)).thenReturn(log(false,1));
+        var draft=log(false,1);
+        draft.put("business_date",java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).toString());
+        when(business.log(ALICE,"log-1",true)).thenReturn(draft);
         when(business.log(ALICE,"log-1",false)).thenReturn(log(true,2));
         when(db.update(startsWith("UPDATE daily_logs SET submitted"),any(Object[].class))).thenReturn(1);
         when(db.rows(startsWith("SELECT * FROM users WHERE company_id"),eq("c1"))).thenReturn(List.of());
@@ -48,9 +49,8 @@ class LogWorkflowServiceTest {
         assertEquals("log-1",result.get("id"));
     }
 
-    @Test void ownDraftCannotBeMarkedReadOrExposeComments() {
+    @Test void ownDraftCannotExposeComments() {
         when(business.log(ALICE,"log-1",false)).thenReturn(log(false,1));
-        assertThrows(ApiError.class,()->service.markRead(ALICE,"log-1"));
         assertThrows(ApiError.class,()->service.comments(ALICE,"log-1"));
         verify(db,never()).update(startsWith("INSERT INTO log_reads"),any(Object[].class));
         verify(db,never()).rows(startsWith("SELECT id,actor_id,text"),any(Object[].class));

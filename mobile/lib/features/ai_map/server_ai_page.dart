@@ -177,6 +177,7 @@ class ServerAiPage extends ConsumerStatefulWidget {
 class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
   DateTime date = DateTime.now();
   String period = 'day';
+  String selectedScope = 'AUTHORIZED';
   AiJob? current, completed;
   bool busy = false, connected = false;
   int tab = 0;
@@ -242,6 +243,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
               source == null ? aiDate(date) : '${completed!.input['date']}',
               source == null ? period : '${completed!.input['period']}',
               purpose: purpose,
+              scope: source == null ? selectedScope : '${completed!.input['scope'] ?? 'AUTHORIZED'}',
               focus: source,
               token: token,
             );
@@ -350,6 +352,16 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
             onChanged: (v) => setState(() => tab = v),
           ),
           const SizedBox(height: 12),
+          PillTabs(
+            labels: const ['本人', '当前授权范围'],
+            selected: selectedScope == 'SELF' ? 0 : 1,
+            onChanged: (value) {
+              if (!busy && current?.running != true) {
+                setState(() => selectedScope = value == 0 ? 'SELF' : 'AUTHORIZED');
+              }
+            },
+          ),
+          const SizedBox(height: 12),
           if (error != null)
             ErrorPanel(
               error!,
@@ -419,6 +431,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
             ),
           if (job != null) ...[
             const SizedBox(height: 20),
+            Text('本次结果范围：${job.input['scope'] == 'SELF' ? '本人' : '当前授权范围'}'),
             if (job.id != current?.id) const Text('以下为上一次完成的结果，当前生成尚未替换它。'),
             if (tab == 0) ...[
               Text(job.summary, style: const TextStyle(height: 1.7)),

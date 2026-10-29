@@ -66,3 +66,14 @@ P0／#5，同时覆盖#4入口迁移：任务管理入口 SHALL 从“我的”�
 #### Scenario: 受限账号直接访问
 - **WHEN** 待确认或失效账号访问新入口或旧深链
 - **THEN** 仍执行认证/业务权限守卫，不因入口移动而获得任何任务数据
+
+### Requirement: 正式任务区间与接收卡片契约
+服务端 SHALL 接受任务日历的 `from/to` 左闭右开范围与可选 `ownerId/participantId`，按任务时间跨度与查询区间相交筛选，并提供 `GET /tasks/received-card` 的授权历史分页投影。`dispatchAt` SHALL 来自真实派发事件，记录按 `dispatchAt DESC, id ASC` 稳定排序；卡片接口不得让普通列表受保护字段泄漏。
+
+#### Scenario: Cross-month task and received history
+- **WHEN** 任务开始于上月但跨入当前可见月份，且当前用户有权查看该任务
+- **THEN** 区间查询返回该任务，接收卡片按真实派发事件时间返回全部授权历史和当前 `phase`，即使所有任务均已验收/归档也不返回假空
+
+#### Scenario: Invalid range or out-of-scope owner
+- **WHEN** `from`/`to` 缺失一端、顺序无效，或指定用户超出当前可见范围
+- **THEN** 返回统一无效参数/权限错误，不退化为未筛选的全范围结果，也不把截止日用作派发时间

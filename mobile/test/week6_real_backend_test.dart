@@ -8,7 +8,7 @@ import 'package:pandora_mobile/data/repositories/repository.dart';
 /// Reuses explicitly supplied isolated-stage accounts; does not bypass rate limits.
 void main() {
   test(
-    '真实Repository日志提交、筛选、回复、撤回重提及权限拒绝',
+    '真实Repository日志提交、筛选、回复、直接编辑及权限拒绝',
     () async {
       HttpOverrides.global = null;
       final dir = Platform.environment['STAGE_DEMO_DIRECTORY']!;
@@ -49,7 +49,7 @@ void main() {
         );
         final me = await employee.detail('auth', 'me');
         expect(me.fields['status'], 'ACTIVE');
-        final instant = DateTime.now().add(const Duration(days: 1));
+        final instant = DateTime.now();
         final day = shanghaiWallTime(
           instant,
         ).toIso8601String().split('T').first;
@@ -62,7 +62,7 @@ void main() {
         );
         final first = diary.fields['submittedAt'];
         expect(diary.fields['canEdit'], true);
-        expect(diary.fields['canWithdraw'], true);
+        expect(diary.fields['canWithdraw'], false);
         expect(
           DateTime.parse(
             '${diary.fields['editableUntil']}',
@@ -120,20 +120,16 @@ void main() {
             ),
           ),
         );
-        final withdrawn = await employee.execute(
+        final edited = await employee.execute(
           'logs',
-          Command('withdraw', {
+          Command('update-content', {
             'id': diary.id,
-            'reason': 'integration withdraw',
+            'work': 'integration direct edit',
           }, version: diary.version),
         );
-        expect(withdrawn.fields['submittedAt'], first);
-        expect(withdrawn.fields['canWithdraw'], false);
-        final again = await employee.execute(
-          'logs',
-          Command('submit', {'id': diary.id}, version: withdrawn.version),
-        );
-        expect(again.fields['submittedAt'], first);
+        expect(edited.fields['submittedAt'], first);
+        expect(edited.fields['canWithdraw'], false);
+        expect(edited.fields['今日工作'], 'integration direct edit');
       } finally {
         for (final r in clients) {
           r.dio.close(force: true);

@@ -18,11 +18,12 @@ public class ReviewController {
     @GetMapping public Map<String, Object> list(HttpServletRequest request, @RequestParam(defaultValue = "0") int cursor, @RequestParam(defaultValue = "30") int limit) { return service.list(Actor.current(request), cursor, limit); }
     /** 本公司申请人或分配的审核人读取候选和步骤；无权限403、不存在404，无版本要求。 */
     @GetMapping("/{id}") public Map<String, Object> get(HttpServletRequest request, @PathVariable String id) { return service.get(Actor.current(request), id); }
-    /** 当前独立审核人决定：approve布尔值/reason文本；驳回须非空原因，自审403、无效400、终态或目标版本冲突409。
+    /** 当前直属上级或管理员成员确认人决定：approve/reason/expectedVersion；驳回须非空原因，自审403、无效400、终态或目标版本冲突409。
      * 最终审核才更新业务版本；重复决定不重放，无幂等键。 */
     @PostMapping("/{id}/decision") public Map<String, Object> decide(HttpServletRequest request, @PathVariable String id, @RequestBody Map<String, Object> body) {
-        return service.decide(Actor.current(request), id, ReviewPolicy.decision(body), Db.str(body, "reason"));
+        boolean approve=ReviewPolicy.decision(body);
+        return service.decide(Actor.current(request), id, approve, Db.str(body, "reason"), ReviewPolicy.expectedVersion(body));
     }
-    /** 仅申请人在无任何已处理步骤时重新路由；非申请人403、已有决定409；不改变生效业务，无版本或幂等键。 */
+    /** 申请人按当前关系重路由PENDING申请；保留已决历史。创始人明确继续非MEMBERSHIP旧申请时按当前权限/版本免审应用；该终态重复请求返回原结果。其他终态409、越权403；无幂等键。 */
     @PostMapping("/{id}/reroute") public Map<String, Object> reroute(HttpServletRequest request, @PathVariable String id) { return service.reroute(Actor.current(request), id); }
 }

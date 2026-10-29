@@ -411,6 +411,9 @@ class MockRepository implements Repository {
   }
 
   Future<void> _check(String resource) async {
+    if (resource == 'feedback') {
+      throw const ApiFailure(FailureKind.notFound, '功能不存在');
+    }
     await Future<void>.delayed(const Duration(milliseconds: 120));
     if (scenario == DemoScenario.offline) {
       throw const ApiFailure(FailureKind.timeout, '网络连接超时，请重试');
@@ -453,7 +456,6 @@ class MockRepository implements Repository {
           ),
       ];
     }
-    if (resource == 'feedback') return [];
     if (resource == 'tasks') return _seedTasks(now, instant);
     if (resource == 'logs') return _seedLogs(now, instant);
     if (resource == 'dashboard/personal') return _seedPersonalFocus(now);
@@ -461,6 +463,25 @@ class MockRepository implements Repository {
     if (resource == 'notifications') return _seedNotifications(now);
     if (resource == 'audit') return _seedAudit(now);
     if (resource == 'organization/admin') return _seedDepartments();
+    if (resource == 'organization/teams') {
+      final teams = <String, Record>{};
+      for (final account in demoAccounts) {
+        teams.putIfAbsent(
+          account.teamId,
+          () => Record(
+            id: account.teamId,
+            title: account.teamName,
+            fields: {
+              'name': account.teamName,
+              'department_id': account.departmentId,
+              'departmentName': account.departmentName,
+              'version': 1,
+            },
+          ),
+        );
+      }
+      return teams.values.toList()..sort((a, b) => a.id.compareTo(b.id));
+    }
     final titles = switch (resource) {
       'dashboard/company' => [
         'Q4 协作工作台体验提升',
@@ -1091,6 +1112,17 @@ class MockRepository implements Repository {
     if (resource == 'organization/profile') {
       items = items.where((r) => visiblePeople.contains(r.id));
     }
+    if (resource == 'organization/teams' &&
+        session.role != UserRole.admin &&
+        session.role != UserRole.founder) {
+      final account = _account(session.id);
+      items = items.where(
+        (r) => session.role == UserRole.director
+            ? r.fields['department_id'] ==
+                  (session.departmentId ?? account.departmentId)
+            : r.id == (session.teamId ?? account.teamId),
+      );
+    }
     if (resource == 'tasks' || resource == 'tasks/received-card') {
       items = items.where(taskVisible);
       if (query.ownerId != null) {
@@ -1119,7 +1151,6 @@ class MockRepository implements Repository {
       'logs',
       'dashboard/personal',
       'private-notes',
-      'feedback',
     ].contains(resource)) {
       items = items.where((r) => r.ownerId == (query.ownerId ?? session.id));
     }
@@ -1838,7 +1869,6 @@ class MockRepository implements Repository {
     if ([
           'dashboard/personal',
           'private-notes',
-          'feedback',
         ].contains(resource) &&
         item.ownerId != session.id &&
         !(resource == 'dashboard/personal' && session.manager)) {
@@ -1865,10 +1895,7 @@ class MockRepository implements Repository {
               item.ownerId == session.id &&
               LogEditWindow(item).canEditAt(clock()),
           'editableUntil': LogEditWindow(item).until?.toUtc().toIso8601String(),
-          'canWithdraw':
-              item.ownerId == session.id &&
-              isSubmittedDiary(item) &&
-              LogEditWindow(item).canEditAt(clock()),
+          'canWithdraw': false,
           'serverNow': clock().toUtc().toIso8601String(),
         },
       );
@@ -1994,7 +2021,8 @@ class MockRepository implements Repository {
   @override
   Future<Record> execute(String resource, Command command) async {
     if (resource != 'auth') await _check(resource);
-    final v = command.values, action = command.action;
+    final v = command.values;
+    final action = resource == 'logs' && command.action == 'update' ? 'update-content' : command.action;
     final key = command.idempotencyKey;
     if (key != null && store.responses.containsKey(key)) {
       return store.responses[key]!;
@@ -2226,8 +2254,8 @@ class MockRepository implements Repository {
         ].contains(action)) {
       throw const ApiFailure(FailureKind.notFound, '记录不存在或无权访问');
     }
-    if (resource == 'logs' && action == 'read') {
-      throw const ApiFailure(FailureKind.unavailable, '移动端已停用日志阅读登记');
+    if (resource == 'logs' && !const {'submit', 'save-draft', 'update-content', 'update'}.contains(action)) {
+      throw const ApiFailure(FailureKind.unavailable, '不支持该日志操作，请使用当前日志编辑入口');
     }
     if (resource == 'logs') {
       if (previous != null && previous.ownerId != session.id) {
@@ -2237,27 +2265,12 @@ class MockRepository implements Repository {
         throw const ApiFailure(FailureKind.forbidden, '日志提交已满24小时，已锁定');
       }
 
-      if (action == 'request-review') {
-        throw const ApiFailure(
-          FailureKind.validation,
-          '日志正文修改不再提交审核；仅首次提交后24小时内可直接修改',
-        );
-      }
       if (action == 'update-content' &&
           (previous == null ||
               !isSubmittedDiary(previous) ||
               command.version == null ||
               '${v['work'] ?? v['今日工作'] ?? ''}'.trim().isEmpty)) {
         throw const ApiFailure(FailureKind.validation, '请填写今日工作并读取当前已提交日志版本');
-      }
-      if (action == 'withdraw') {
-        if (previous == null || !isSubmittedDiary(previous)) {
-          throw const ApiFailure(FailureKind.validation, '请先提交日志');
-        }
-        if (command.version == null ||
-            '${v['reason'] ?? v['修改理由'] ?? ''}'.trim().isEmpty) {
-          throw const ApiFailure(FailureKind.validation, '请填写原因并提供当前版本');
-        }
       }
       if (action == 'save-draft' &&
           previous != null &&
@@ -2267,7 +2280,7 @@ class MockRepository implements Repository {
       if (action == 'submit' &&
           previous != null &&
           isSubmittedDiary(previous)) {
-        throw const ApiFailure(FailureKind.conflict, '日志已经提交，请申请修订');
+        throw const ApiFailure(FailureKind.conflict, '日志已经提交，请直接编辑正文');
       }
       if (action != 'save-draft' &&
           '${v['今日工作'] ?? previous?.fields['今日工作'] ?? ''}'.trim().isEmpty) {
@@ -2565,7 +2578,7 @@ class MockRepository implements Repository {
           }
         }
       }
-      fields['status'] = ['save-draft', 'withdraw'].contains(action)
+      fields['status'] = action == 'save-draft'
           ? '草稿'
           : '已提交';
       fields['submitted'] = fields['status'] == '已提交';
@@ -2580,7 +2593,6 @@ class MockRepository implements Repository {
       fields.remove('canWithdraw');
       fields.remove('editableUntil');
     }
-    if (resource == 'feedback') fields['status'] = '待处理';
     if (resource == 'organization/profile') {
       fields['body'] = v['个人介绍'] ?? previous?.fields['body'] ?? '';
       fields['个人介绍'] = fields['body'];

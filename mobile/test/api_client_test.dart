@@ -85,9 +85,10 @@ void main() {
       final adapter = FakeAdapter([
         (o) => _transient(),
         (o) => _json(200, '{"id":"1","title":"t"}'),
+        (o) => _json(200, '{"items":[]}'),
       ]);
       final record = await _repo(adapter).detail('tasks', '1');
-      expect(adapter.calls, 2);
+      expect(adapter.calls, 3);
       expect(record.id, '1');
     });
 
@@ -126,7 +127,7 @@ void main() {
       await expectLater(
         _repo(
           adapter,
-        ).execute('tasks', const Command('create', {}, idempotencyKey: 'k')),
+        ).execute('tasks', const Command('create', {'title':'重试验证','participants':['member-1'],'deadline':'2099-10-29T12:00:00+08:00'}, idempotencyKey: 'k')),
         throwsA(isA<ApiFailure>()),
       );
       expect(adapter.calls, 1);

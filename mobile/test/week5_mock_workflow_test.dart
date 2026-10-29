@@ -55,7 +55,9 @@ void main() {
     'first submission opens a direct 24h edit window and preserves its start',
     () async {
       var now = DateTime.utc(2026, 10, 17, 4);
-      final store = DemoStore()..records['logs'] = [];
+      final store = DemoStore()
+        ..records['logs'] = []
+        ..records['reviews'] = [];
       final repo = MockRepository(
         const Session(),
         store: store,

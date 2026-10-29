@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/data/models/models.dart';
@@ -66,12 +67,21 @@ void main() {
       final reply = (log.fields['comments'] as List).single as Map;
       expect(reply['parentId'], 'parent');
       expect(reply['authorName'], '周宁');
-      await repository.execute(
-        'logs',
-        Command('withdraw', {'id': 'log-1', 'reason': '补充材料'}, version: 4),
+      final before = adapter.requests.length;
+      await expectLater(
+        repository.execute(
+          'logs',
+          Command('withdraw', {'id': 'log-1'}, version: 4),
+        ),
+        throwsA(
+          isA<ApiFailure>().having(
+            (e) => e.kind,
+            'kind',
+            FailureKind.unavailable,
+          ),
+        ),
       );
-      expect(adapter.requests.last.path, '/logs/log-1/withdraw');
-      expect(adapter.requests.last.data, {'version': 4, 'reason': '补充材料'});
+      expect(adapter.requests.length, before);
       await repository.execute(
         'logs/comments',
         const Command('comment', {

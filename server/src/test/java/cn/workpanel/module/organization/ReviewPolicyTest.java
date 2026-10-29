@@ -13,7 +13,8 @@ class ReviewPolicyTest {
         assertDoesNotThrow(() -> ReviewPolicy.request("r", "u", "PENDING"));
     }
     @Test void validatesDecisionAndRejectionReason() {
-        assertTrue(ReviewPolicy.decision(Map.of("approve", true)));
+        assertTrue(ReviewPolicy.decision(Map.of("approve", true, "expectedVersion", 1)));
+        assertThrows(ApiError.class, () -> ReviewPolicy.decision(Map.of("approve", true)));
         assertThrows(ApiError.class, () -> ReviewPolicy.decision(Map.of("approve", "true")));
         assertThrows(ApiError.class, () -> ReviewPolicy.decision(Map.of("approve", false, "reason", 1)));
         assertThrows(ApiError.class, () -> ReviewPolicy.decision(Map.of("approve", true, "extra", true)));

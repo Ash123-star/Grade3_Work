@@ -31,7 +31,9 @@ app:
   admin-password: ${ADMIN_PASSWORD:}
   admin-phone: ${ADMIN_PHONE:}
   cors-origins: ${CORS_ORIGINS:http://localhost:5173}
-  session-hours: ${SESSION_HOURS:24}
+  session-hours: ${SESSION_HOURS:168}
+  scenario-data-enabled: ${SCENARIO_DATA_ENABLED:false}
+  scenario-password: ${SCENARIO_PASSWORD:}
   jobs-enabled: ${JOBS_ENABLED:true}
   deepseek-key: ${DEEPSEEK_API_KEY:}
   deepseek-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}

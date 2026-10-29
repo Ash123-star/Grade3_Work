@@ -205,12 +205,6 @@ class _ListPageState extends ConsumerState<ListPage> {
             onPressed: () => openForm(context, 'dispatch'),
             icon: const Icon(Icons.add),
           ),
-        if (resource == 'feedback')
-          IconButton(
-            tooltip: '提交反馈',
-            onPressed: () => openForm(context, 'support'),
-            icon: const Icon(Icons.add_comment_outlined),
-          ),
         if (resource == 'notifications')
           TextButton(
             onPressed: messageBusy || deniedMessage || !data.hasValue
@@ -777,6 +771,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
         if (mounted) setState(() {});
       });
     }
+  }
   bool busy = false;
   String? error;
   late final Session initialLogIdentity = ref.read(sessionProvider);
@@ -796,9 +791,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     super.dispose();
   }
 
-  bool busy = false;
-  String? error;
-  late final Session initialLogIdentity = ref.read(sessionProvider);
   ApiFailure? logAccessError;
   Future<void> action(Record item, String action) async {
     if (action == 'archive') {
@@ -856,59 +848,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       if (mounted) setState(() => error = '$e');
     }
     if (mounted) setState(() => busy = false);
-  }
-
-  Future<void> withdrawLog(Record item) async {
-    final controller = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('撤回日志'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 300,
-          decoration: const InputDecoration(labelText: '撤回原因'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialog),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(dialog, controller.text.trim());
-              }
-            },
-            child: const Text('撤回'),
-          ),
-        ],
-      ),
-    );
-    if (reason == null || !mounted) return;
-    setState(() {
-      busy = true;
-      error = null;
-    });
-    try {
-      await ref
-          .read(repositoryProvider)
-          .execute(
-            'logs',
-            Command('withdraw', {
-              'id': item.id,
-              'reason': reason,
-            }, version: item.version),
-          );
-      refreshBusiness(ref);
-      if (mounted) notice(context, '日志已撤回，可以继续编辑');
-    } catch (failure) {
-      refreshBusiness(ref);
-      if (mounted) setState(() => error = '$failure');
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
   }
 
   void edit(Record item, String kind) {
@@ -1336,15 +1275,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             } else if (resource.startsWith('logs')) {
               scheduleLogDeadline(item);
               final window = LogEditWindow(item);
-              if (item.ownerId == user.id &&
-                  window.canWithdrawAt(DateTime.now())) {
-                actions.add(
-                  TextButton(
-                    onPressed: busy ? null : () => edit(item, 'log-withdraw'),
-                    child: const Text('撤回日志'),
-                  ),
-                );
-              }
               if (item.ownerId == user.id) {
                 final canEdit = window.canEditAt(DateTime.now());
                 bottom = !window.submitted
@@ -1384,7 +1314,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                 ),
                 if (f['editableUntil'] != null)
-                  Text('可申请修订至 ${prettyDate(f['editableUntil'])}'),
+                  Text('可编辑至 ${prettyDate(f['editableUntil'])}'),
                 if (isSubmittedDiary(item) &&
                     businessEventTime(f['submittedAt']) != null)
                   Padding(
@@ -1518,7 +1448,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   style: const TextStyle(color: CuteTokens.muted),
                 ),
                 section(
-                  resource == 'feedback' ? '问题描述' : '内容',
+                  '内容',
                   f['内容'] ?? f['body'],
                 ),
               ]);

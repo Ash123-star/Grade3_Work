@@ -65,16 +65,18 @@ class SessionStore {
         await secure.remove(key);
         return;
       }
-      await secure.write(
-        key,
-        jsonEncode({
-          'schema': 1,
-          'server': server,
-          'account': session.id,
-          'token': token,
-          'expiresAt': date.toIso8601String(),
-        }),
-      );
+      final encoded = jsonEncode({
+        'schema': 1,
+        'server': server,
+        'account': session.id,
+        'token': token,
+        'expiresAt': date.toUtc().toIso8601String(),
+      });
+      await secure.write(key, encoded);
+      // Only confirm persistent login after the platform can read it back.
+      if (await secure.read(key) != encoded) {
+        throw const LocalStorageFailure('安全会话回读失败');
+      }
     } catch (_) {
       throw const LocalStorageFailure('安全会话保存失败，本次登录仅在当前运行期间有效');
     }

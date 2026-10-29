@@ -336,8 +336,9 @@ class ServerAnalyticsPage extends ConsumerWidget {
                       _Metric(
                         title: '日报提交率',
                         value: rate(diaryRate),
-                        explain:
-                            '提交 ${diaryRate['numerator'] ?? '未返回'} / 应提交 ${diaryRate['denominator'] ?? '未返回'}',
+                        explain: diaryRate['denominatorKnown'] == false
+                            ? '入职或历史在职资料不完整，暂无法计算提交率'
+                            : '提交 ${diaryRate['numerator'] ?? '未返回'} / 应提交 ${diaryRate['denominator'] ?? '未返回'}',
                       ),
                     ],
                   ),

@@ -43,7 +43,7 @@ public class AttachmentApplicationService implements AttachmentApi {
         boolean visible=a.id().equals(f.get("owner_id"));
         if(!visible){
             var owner=db.one("SELECT * FROM users WHERE id=? AND company_id=?",f.get("owner_id"),a.company());
-            visible=a.canSeeUser(owner)&&id.equals(Db.str(db.read(owner.get("profile")),"avatarAttachmentId"));
+            visible=(a.canSeeUser(owner)||Business.reportingAncestor(db,a,Db.str(owner,"id")))&&id.equals(Db.str(db.read(owner.get("profile")),"avatarAttachmentId"));
             if(!visible&&f.get("task_id")!=null){try{var t=business.task(a,Db.str(f,"task_id"),false);visible=Business.strings(db.read(t.get("body")),"attachments").contains(id);}catch(ApiError ignored){}}
             if(!visible)for(var binding:db.rows("SELECT resource_type,resource_id FROM attachment_bindings WHERE company_id=? AND attachment_id=?",a.company(),id)){
                 try{

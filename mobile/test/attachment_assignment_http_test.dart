@@ -295,6 +295,7 @@ void main() {
       expect(adapter.requests.last.data, {
         'type': 'FEEDBACK',
         'version': 3,
+        'attachments': [],
         'text': '交付内容\n\n遇到的阻碍：等待复核',
       });
       await repo.list(

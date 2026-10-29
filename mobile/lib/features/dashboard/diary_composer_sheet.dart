@@ -92,6 +92,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   late final String _accountId;
+  late final String? _sessionToken;
   late final DateTime _date;
   late final DraftLocation _location;
   late final DraftStore _draftStore;
@@ -120,6 +121,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
     WidgetsBinding.instance.addObserver(this);
     final session = ref.read(sessionProvider);
     _accountId = session.id;
+    _sessionToken = session.token;
     _draftStore = ref.read(draftStoreProvider);
     final selected = widget.date ?? ref.read(logDateProvider);
     final resolved = selected ?? DateTime.now();
@@ -183,7 +185,10 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
     super.dispose();
   }
 
-  bool get _isCurrentAccount => ref.read(sessionProvider).id == _accountId;
+  bool get _isCurrentAccount {
+    final session = ref.read(sessionProvider);
+    return session.id == _accountId && session.token == _sessionToken && session.canReadBusiness;
+  }
 
   Future<void> _restore() async {
     try {
@@ -231,7 +236,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
         _version = record.version;
       }
     } catch (error) {
-      if (mounted) {
+      if (mounted && _isCurrentAccount) {
         setState(() {
           _restoreFailed = true;
           _error = '草稿读取失败：$error';
@@ -357,12 +362,12 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
       setState(() => _error = '仅可首次提交今天、昨天或前天的日志');
       return;
     }
-    if (!await _saveDraft() || !mounted) return;
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
+      if (!await _saveDraft() || !mounted || !_isCurrentAccount) return;
       final text = _controller.text;
       final result = await ref
           .read(repositoryProvider)
@@ -426,7 +431,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
           if (mounted) setState(() => _error = '提交失败且草稿保存失败，正文仍保留：$saveError');
         }
       }
-      if (mounted) setState(() => _error = '$error');
+      if (mounted && _isCurrentAccount) setState(() => _error = '$error');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -443,7 +448,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
     final heightBudget = math.max(0.0, screenHeight * 2 / 3 - keyboardHeight);
     final height = math.min(heightBudget, MediaQuery.sizeOf(context).height);
     final compact = height < 210;
-    final active = session.id == _accountId && session.canReadBusiness;
+    final active = session.id == _accountId && session.token == _sessionToken && session.canReadBusiness;
 
     return PopScope<void>(
       canPop: _allowPop,

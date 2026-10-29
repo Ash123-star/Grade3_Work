@@ -552,24 +552,6 @@ class _HelpPageState extends State<HelpPage> {
             icon: const Icon(Icons.explore_outlined),
             label: const Text('查看新手引导'),
           ),
-          SunnyPrimaryButton.icon(
-            onPressed: AppConfig.mock
-                ? () => openForm(context, 'support')
-                : () => notice(context, '问题反馈服务尚未接入，当前不能发送反馈'),
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('问题反馈'),
-          ),
-          if (!AppConfig.mock)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('问题反馈服务尚未接入，当前不能发送或查询处理进度。'),
-            ),
-          TextButton(
-            onPressed: AppConfig.mock
-                ? () => openList(context, 'feedback')
-                : () => notice(context, '问题反馈服务尚未接入，当前不能查询处理进度'),
-            child: const Text('我的反馈与处理进度'),
-          ),
         ],
       ),
     );

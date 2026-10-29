@@ -19,7 +19,21 @@ void main() {
         onRequest: (r, h) {
           requests.add(r);
           h.resolve(
-            Response(requestOptions: r, statusCode: 200, data: response),
+            Response(
+              requestOptions: r,
+              statusCode: 200,
+              data:
+                  r.path.endsWith('/comments') &&
+                      r.method == 'GET' &&
+                      response is Map &&
+                      !(response as Map).containsKey('items')
+                  ? {'items': []}
+                  : r.path == '/tasks/task' &&
+                        response is Map &&
+                        (response as Map).containsKey('items')
+                  ? {'id': 'task'}
+                  : response,
+            ),
           );
         },
       ),
@@ -76,7 +90,7 @@ void main() {
     expect(result.items.first.fields['authorName'], '员工');
   });
 
-  test('HCJ回复映射parentId，撤回使用独立路径和版本', () async {
+  test('回复映射parentId，正文使用当前接口及版本', () async {
     await repository.execute(
       'logs/comments',
       const Command('comment', {
@@ -88,10 +102,13 @@ void main() {
     expect(requests.single.data, {'text': '回复', 'parentId': 'comment-0'});
     await repository.execute(
       'logs',
-      const Command('withdraw', {'id': 'log-1', 'reason': '补充'}, version: 3),
+      const Command('update-content', {
+        'id': 'log-1',
+        'work': '补充',
+      }, version: 3),
     );
-    expect(requests.last.path, '/logs/log-1/withdraw');
-    expect(requests.last.data, {'version': 3, 'reason': '补充'});
+    expect(requests.last.path, '/logs/log-1/content');
+    expect(requests.last.data, {'version': 3, 'work': '补充'});
   });
 
   test('日志详情评论保留身份、作者及回复关系', () async {
@@ -245,16 +262,14 @@ void main() {
         },
       ],
     };
-    final comments = await repository.list(
-      'tasks/task/comments',
-      const Query(),
-    );
-    expect(comments.items.single.fields['text'], '正文');
-    expect(comments.items.single.fields['actorName'], '员工');
-    expect(comments.items.single.fields['parentCommentId'], 'parent');
+    final taskWithComments = await repository.detail('tasks', 'task');
+    final comment = (taskWithComments.fields['comments'] as List).single as Map;
+    expect(comment['text'], '正文');
+    expect(comment['actorName'], '员工');
+    expect(comment['parentCommentId'], 'parent');
   });
 
-  test('精确24小时、服务端拒绝和撤回后重用原窗口', () {
+  test('精确24小时及服务端拒绝控制编辑窗口', () {
     final until = DateTime.utc(2026, 10, 23);
     Record log({bool submitted = true, bool edit = true}) => Record(
       id: 'log',
@@ -265,7 +280,7 @@ void main() {
         'submittedAt': '2026-10-22T00:00:00Z',
         'editableUntil': until.toIso8601String(),
         'canEdit': edit,
-        'canWithdraw': true,
+        'canWithdraw': false,
       },
     );
     expect(
@@ -275,7 +290,6 @@ void main() {
       true,
     );
     expect(LogEditWindow(log()).canEditAt(until), false);
-    expect(LogEditWindow(log()).canWithdrawAt(until), false);
     expect(LogEditWindow(log(submitted: false)).canEditAt(until), false);
     expect(
       LogEditWindow(

@@ -107,7 +107,15 @@ public class WorkExecutor {
                     if(!receipt.isEmpty())result=db.read(receipt.getFirst().get("result"));else{
                         String key="ai-work:"+step.get("id");var context=ReviewActors.context(current);var b=new LinkedHashMap<>(payload);b.keySet().removeAll(Set.of("explicit","confirmed","preauthorized"));
                         switch(action){
-                            case "CREATE_TASK"->{var t=tasks.create(context,b,key);result=Map.of("taskId",t.get("id"),"version",t.get("version"),"summary","任务已创建","kind","TASK_CREATED");}
+                            case "CREATE_TASK"->{
+                                var created=tasks.create(context,b,key);
+                                if("TASK_CREATE".equals(created.get("kind"))) {
+                                    if("APPROVED".equals(created.get("status"))) {
+                                        var task=tasks.get(context,Db.str(created,"target_id"));
+                                        result=Map.of("taskId",task.get("id"),"version",task.get("version"),"reviewId",created.get("id"),"summary","任务已创建","kind","TASK_CREATED");
+                                    } else result=Map.of("reviewId",created.get("id"),"summary","任务申请已提交，等待复核","kind","WAITING_REVIEW");
+                                } else result=Map.of("taskId",created.get("id"),"version",created.get("version"),"summary","任务已创建","kind","TASK_CREATED");
+                            }
                             case "CHECK_DELIVERY"->result=Map.of("taskId",payload.get("taskId"),"checkId",report.get("id"),"summary",report.get("summary"),"report",report,"kind","DELIVERY_CHECKED");
                             case "SUBMIT_DELIVERY"->{if(!"PASS".equals(report.get("state"))){result=Map.of("taskId",payload.get("taskId"),"checkId",report.get("id"),"summary",report.get("summary"),"report",report,"kind","NEEDS_MATERIAL");}else{
                                 String text=Db.str(payload,"text");if(text.isBlank())text="交付材料已核对，请验收";result=deliveries.submit(current,Db.str(payload,"taskId"),Map.of("taskVersion",payload.get("taskVersion"),"checkId",report.get("id"),"checkVersion",report.get("version"),"attachmentIds",payload.get("attachmentIds"),"mode","CHECKED","text",text),key);}}
@@ -153,13 +161,20 @@ public class WorkExecutor {
         default->"暂时没能处理，内容已保留";
     };}
     @Scheduled(fixedDelay=10000) public void reconcileReviews(){
-        for(var row:db.rows("SELECT id,company_id,owner_id,plan_version FROM ai_work_items WHERE state='WAITING_REVIEW' AND deleted_at IS NULL LIMIT 50"))try{
+        // 尚未决定的申请不占用批次，避免较早的待审记录饿死后续已审批作业。
+        for(var row:db.rows("SELECT w.id,w.company_id,w.owner_id,w.plan_version FROM ai_work_items w WHERE w.state='WAITING_REVIEW' AND w.deleted_at IS NULL AND EXISTS (SELECT 1 FROM ai_action_receipts receipt JOIN review_requests review ON review.company_id=receipt.company_id AND review.id=receipt.result->>'reviewId' WHERE receipt.company_id=w.company_id AND receipt.work_id=w.id AND receipt.plan_version=w.plan_version AND review.status<>'PENDING') AND NOT EXISTS (SELECT 1 FROM ai_action_receipts receipt JOIN review_requests review ON review.company_id=receipt.company_id AND review.id=receipt.result->>'reviewId' WHERE receipt.company_id=w.company_id AND receipt.work_id=w.id AND receipt.plan_version=w.plan_version AND review.status='PENDING') ORDER BY w.updated_at,w.id LIMIT 50"))try{
             var a=actors.fresh(new Actor(Db.str(row,"owner_id"),Db.str(row,"company_id"),"","","",false,false,false,"ACTIVE"));
             var results=new ArrayList<Map<String,Object>>();
             for(var receipt:db.rows("SELECT result FROM ai_action_receipts WHERE company_id=? AND work_id=? AND plan_version=?",a.company(),row.get("id"),row.get("plan_version"))){var result=db.read(receipt.get("result"));if(result.containsKey("reviewId"))results.add(reviews.get(ReviewActors.context(a),Db.str(result,"reviewId")));}
             if(results.isEmpty()||results.stream().anyMatch(r->"PENDING".equals(r.get("status"))))continue;
             boolean approved=results.stream().allMatch(r->"APPROVED".equals(r.get("status")));
-            tx.executeWithoutResult(s->{Actor current=actors.locked(a);var live=repo.owned(current,Db.str(row,"id"),true);if("WAITING_REVIEW".equals(live.get("state"))&&Objects.equals(live.get("plan_version"),row.get("plan_version"))){repo.state(current,Db.str(row,"id"),approved?"SUCCEEDED":"WAITING_INPUT",Map.of("summary",approved?"复核已通过，变更已生效":"申请被退回，请查看原因后调整","reviews",results.stream().map(r->Map.of("id",r.get("id"),"status",r.get("status"),"reason",Db.str(r,"reason"))).toList()));}});
+            tx.executeWithoutResult(s->{Actor current=actors.locked(a);var live=repo.owned(current,Db.str(row,"id"),true);if("WAITING_REVIEW".equals(live.get("state"))&&Objects.equals(live.get("plan_version"),row.get("plan_version"))){
+                if(approved) for(var review:results) if("TASK_CREATE".equals(review.get("kind"))){
+                    var task=tasks.get(ReviewActors.context(current),Db.str(review,"target_id"));
+                    var receipt=Map.of("taskId",task.get("id"),"version",task.get("version"),"reviewId",review.get("id"),"summary","任务已创建","kind","TASK_CREATED");
+                    db.update("UPDATE ai_action_receipts SET result=?::jsonb WHERE company_id=? AND work_id=? AND plan_version=? AND result->>'reviewId'=?",db.write(receipt),current.company(),row.get("id"),row.get("plan_version"),review.get("id"));
+                }
+                repo.state(current,Db.str(row,"id"),approved?"SUCCEEDED":"WAITING_INPUT",Map.of("summary",approved?"复核已通过，变更已生效":"申请被退回，请查看原因后调整","reviews",results.stream().map(r->Map.of("id",r.get("id"),"status",r.get("status"),"reason",Db.str(r,"reason"))).toList()));}});
         }catch(ApiError ignored){}
     }
     @PreDestroy public void stop(){pool.shutdownNow();}

@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
   title: 移动端业务接口补充契约
-  version: '2026-10-25'
+  version: '2026-10-29'
   description: |
-    PROPOSED 协议覆盖文件。只定义移动端与服务端的接口、字段、权限和错误语义，不表示当前服务端已经实现。
-    实现后必须合并到运行时 SpringDoc 与 docs/openapi.json。
+    IMPLEMENTED_UNVERIFIED：P0及剩余接口代码与SpringDoc模式已接入，尚未编译、迁移或HTTP验收。意见反馈已由用户取消，不提供feedback服务；已停用阅读登记不新增人员清单。
+    docs/openapi.json仍为旧快照，统一验收阶段启动服务后重新生成，禁止把本文件当作运行成功证据。
 servers:
   - url: /
 security:
@@ -32,7 +32,7 @@ paths:
     get:
       operationId: mobileReceivedTaskCards
       summary: 查询导图接收任务卡片
-      description: 只返回当前用户实际接收且有权查看的任务历史；phase 必须区分撤回、验收和归档。
+      description: 保留现有公司任务授权范围，返回全部可见任务历史；dispatchAt为最早真实DISPATCHED时间，缺失为null且排末，同时间按ID排序；phase区分撤回、验收和归档。
       parameters:
         - {$ref: '#/components/parameters/Cursor'}
         - {$ref: '#/components/parameters/Limit'}
@@ -104,7 +104,7 @@ paths:
     get:
       operationId: mobileAnalyticsSummary
       summary: 查询多维统计汇总
-      description: 汇总、钻取和导出必须复用同一授权范围、日期窗口、组织过滤器和指标口径；零分母不得伪造比例。
+      description: 共享授权范围、日期窗口及当前负责人组织筛选；阶段指标按任务每种事件首次实际时间计数，阶段分布为区间内派发任务的当前阶段，不回推历史。按期验收率分母为区间内首次验收任务，分子要求最新REVISED后仍有有效验收且不晚于当前deadline。日报分母为当前授权在职成员可信入职日起至今天的自然人数日；未知入职日或缺乏可靠在职区间的历史日志使denominatorKnown=false、rate=null。无事实时数组为空，存在事实时趋势补全自然日；零分母rate为null。
       parameters:
         - {name: date, in: query, required: true, schema: {type: string, format: date}}
         - {name: period, in: query, schema: {type: string, enum: [day, week, month], default: week}}
@@ -161,6 +161,123 @@ paths:
             schema: {$ref: '#/components/schemas/ProfileUpdate'}
       responses:
         '200': {description: Updated profile, content: {application/json: {schema: {$ref: '#/components/schemas/ProfileView'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/profiles/{id}:
+    get:
+      operationId: mobileReadProfile
+      summary: 读取本人、真实组织祖先或既有全局权限内资料
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Authoritative profile columns and merged introduction/avatar, content: {application/json: {schema: {$ref: '#/components/schemas/ProfileView'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/reviews/{id}/decision:
+    post:
+      operationId: mobileReviewDecision
+      summary: 当前有效直属审核人或成员确认管理员决定申请
+      description: 禁止自审；驳回需理由；当前申请版本、目标版本及关系均由服务端复核。MEMBERSHIP不适用创始人免审。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [approve, expectedVersion]
+              properties:
+                approve: {type: boolean}
+                expectedVersion: {type: integer, minimum: 0}
+                reason: {type: string, maxLength: 20000}
+      responses:
+        '200': {description: Review result, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/reviews/{id}/reroute:
+    post:
+      operationId: mobileRerouteReview
+      summary: 申请人按当前规则继续待审申请
+      description: 保留历史步骤并替代待审步骤。有效创始人明确继续本人非MEMBERSHIP申请时按当前权限及目标版本免审应用；重复该已免审请求返回原结果。成员确认仍分配管理员。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Current review, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/tasks/{id}/events:
+    post:
+      operationId: mobileTaskEvent
+      summary: 接收、成果反馈、退回、验收、归档或撤回
+      description: 当前version必填；FEEDBACK/RETURNED/WITHDRAWN必须给1至2000字text。仅FEEDBACK允许最多5个attachments，沿用同公司本人上传或已绑定本任务规则。退回仅派发人/管理员在FEEDBACK阶段执行，转为RECEIVED；绑定、版本、事件、审计与通知同事务。无独立幂等键，重复旧version返回409；越权403/404、参数400、阶段409。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [type, version]
+              properties:
+                type: {type: string, enum: [RECEIVED, FEEDBACK, RETURNED, ACCEPTED, ARCHIVED, WITHDRAWN]}
+                version: {type: integer, minimum: 0}
+                text: {type: string, minLength: 1, maxLength: 2000}
+                attachments: {type: array, maxItems: 5, items: {type: string}}
+      responses:
+        '200': {description: Updated authorized task detail, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/organization/teams:
+    get:
+      operationId: mobileTeamDirectory
+      summary: 当前组织树范围内的团队目录
+      description: ACTIVE账号，只读，无分页、版本和幂等键。沿用组织树范围，不扩大人员权限。
+      responses:
+        '200': {description: Authorized teams, content: {application/json: {schema: {type: array, items: {type: object, required: [id, name, department_id, version], additionalProperties: true, properties: {id: {type: string}, name: {type: string}, department_id: {type: string}, version: {type: integer}}}}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/ai/jobs:
+    post:
+      operationId: mobileCreateScopedAiJob
+      summary: 创建指定范围的AI草稿作业
+      description: scope=SELF/AUTHORIZED，默认AUTHORIZED。SELF只取本人日志、本人参与/派发任务及本人重点，所有来源仍受实时权限限制。后台、重试和基于来源的后续分析保留scope。无version/幂等键，每次调用新建作业；参数400、权限403、限流429、未配置503。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [date, period]
+              properties:
+                date: {type: string, format: date}
+                period: {type: string, enum: [day, week, month]}
+                scope: {type: string, enum: [SELF, AUTHORIZED], default: AUTHORIZED}
+                purpose: {type: string, enum: [SUMMARY, EXPLAIN_RISK, SPLIT_STEPS, DRAFT_TASK], default: SUMMARY}
+                focusSourceId: {type: string, description: 非SUMMARY必须有当前有权且属于所选范围的来源}
+      responses:
+        '200': {description: Queued owner job with input scope, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/ai/jobs/{id}/confirm-task:
+    post:
+      operationId: mobileConfirmAiTask
+      summary: 按作业版本原子确认人工任务草稿
+      description: 必须本人、有效派发资格、SUCCEEDED作业和当前来源权限。行锁与版本检查、原TASK_CREATE审核流程及V23回执同事务；旧version409，同键同规范化载荷重放原回执，异载荷409 IDEMPOTENCY_CONFLICT；重放仍校验来源和当前权限。返回审核申请（kind=TASK_CREATE），不能将id当任务ID；创始人免审沿用原规则。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version, actionIndex, task]
+              properties:
+                version: {type: integer, minimum: 0}
+                actionIndex: {type: integer, minimum: 0, maximum: 2}
+                task: {type: object, description: 完整TaskDraft，与运行时SpringDoc和POST /tasks完全相同的字段白名单及业务校验，推荐participants集合，兼容ownerId/collaborators，支持title/content/startAt/deadline/group/urgency/labelId/attachments/acceptanceChecklist, additionalProperties: true}
+      responses:
+        '200': {description: Original or new TASK_CREATE review result, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
         default: {$ref: '#/components/responses/Error'}
 components:
   securitySchemes:
@@ -277,6 +394,7 @@ components:
         month: {type: string, pattern: '^\\d{4}-\\d{2}$'}
         employmentStartDate: {type: string, format: date, nullable: true}
         days: {type: object, additionalProperties: {type: string, enum: [SUBMITTED, MISSING, FUTURE, UNKNOWN]}}
+        logIds: {type: object, description: 已提交日期日号到日志ID，仅含当前授权已提交记录, additionalProperties: {type: string}}
     LogContentUpdate:
       type: object
       additionalProperties: false
@@ -286,12 +404,13 @@ components:
         version: {type: integer, minimum: 0}
     Metric:
       type: object
-      required: [numerator, denominator, rate]
+      required: [numerator, denominator, rate, denominatorKnown]
       properties:
         numerator: {type: integer, format: int64, minimum: 0}
         denominator: {type: integer, format: int64, minimum: 0}
         rate: {type: number, minimum: 0, maximum: 1, nullable: true}
         definition: {type: string}
+        denominatorKnown: {type: boolean}
     AnalyticsSummary:
       type: object
       required: [range, updatedAt, filters, groupedComparison, taskPhaseDistribution, trend]
@@ -305,6 +424,7 @@ components:
         feedback: {type: integer, format: int64}
         accepted: {type: integer, format: int64}
         overdue: {type: integer, format: int64}
+        diarySubmitted: {type: integer, format: int64}
         onTimeAcceptance: {$ref: '#/components/schemas/Metric'}
         dailySubmission: {$ref: '#/components/schemas/Metric'}
         groupedComparison: {type: array, items: {$ref: '#/components/schemas/AnalyticsGroup'}}
@@ -334,11 +454,19 @@ components:
         accepted: {type: integer, format: int64, minimum: 0}
         overdue: {type: integer, format: int64, minimum: 0}
         diarySubmitted: {type: integer, format: int64, minimum: 0}
+        onTimeAcceptance: {type: integer, format: int64, minimum: 0}
+        onTimeAccepted: {type: integer, format: int64, minimum: 0}
+        onTimeDenominator: {type: integer, format: int64, minimum: 0}
+        onTimeRate: {type: number, nullable: true}
+        diaryDenominator: {type: integer, format: int64, minimum: 0}
+        diaryDenominatorKnown: {type: boolean}
+        diaryRate: {type: number, nullable: true}
     TaskPhaseCount:
       type: object
-      required: [phase, count]
+      required: [phase, phaseCode, count]
       properties:
         phase: {type: string}
+        phaseCode: {type: string}
         count: {type: integer, format: int64, minimum: 0}
     AnalyticsTrendPoint:
       type: object
@@ -351,17 +479,37 @@ components:
         accepted: {type: integer, format: int64, minimum: 0}
         overdue: {type: integer, format: int64, minimum: 0}
         diarySubmitted: {type: integer, format: int64, minimum: 0}
+        onTimeAcceptance: {type: integer, format: int64, minimum: 0}
+        diaryDenominator: {type: integer, format: int64, minimum: 0}
+        diaryDenominatorKnown: {type: boolean}
+        diaryRate: {type: number, nullable: true}
     AnalyticsDetailsPage:
       allOf:
         - {$ref: '#/components/schemas/Page'}
-        - {type: object, required: [metric, groupBy], properties: {metric: {type: string}, groupBy: {type: string, enum: [department, team, person]}, items: {type: array, items: {type: object, additionalProperties: true}}}}
+        - {type: object, required: [metric, groupBy, range, filters], properties: {metric: {type: string}, groupBy: {type: string, enum: [department, team, person]}, range: {type: object, additionalProperties: true}, filters: {$ref: '#/components/schemas/AnalyticsFilters'}, items: {type: array, items: {$ref: '#/components/schemas/AnalyticsDetail'}}}}
+    AnalyticsDetail:
+      type: object
+      required: [id, resource, title, owner_id, owner_name, version, group_id, group_name, occurred_at, bucket]
+      properties:
+        id: {type: string}
+        resource: {type: string, enum: [tasks, logs]}
+        title: {type: string}
+        owner_id: {type: string}
+        owner_name: {type: string}
+        version: {type: integer, minimum: 0}
+        phase: {type: string, nullable: true}
+        deadline: {type: string, format: date-time, nullable: true}
+        group_id: {type: string}
+        group_name: {type: string}
+        occurred_at: {type: string, format: date-time}
+        bucket: {type: string, format: date}
     ProfileUpdate:
       type: object
       additionalProperties: false
       required: [version]
       properties:
         version: {type: integer, minimum: 0}
-        introduction: {type: string, maxLength: 20000}
+        introduction: {type: string, nullable: true, maxLength: 20000}
         phone: {type: string, nullable: true, pattern: '^1[3-9][0-9]{9}$'}
         email: {type: string, nullable: true, format: email, maxLength: 320}
         gender: {type: string, nullable: true, maxLength: 32}
@@ -382,6 +530,9 @@ components:
         gender: {type: string, nullable: true}
         age: {type: integer, nullable: true, minimum: 0}
         department: {type: object, additionalProperties: true}
+        team: {type: object, additionalProperties: true}
+        employmentStartDate: {type: string, format: date, nullable: true}
+        viewingSelf: {type: boolean}
         profile: {$ref: '#/components/schemas/ProfileFields'}
     ProfileFields:
       type: object
