@@ -267,6 +267,7 @@ final datedRecordsProvider = FutureProvider.autoDispose
 
 final calendarMonthTasksProvider = FutureProvider.autoDispose
     .family<PageResult, (String?, int)>((ref, key) {
+      if (!ref.watch(sessionProvider).canReadBusiness) return const PageResult([]);
       var active = true;
       ref.onDispose(() => active = false);
       final monthIndex = key.$2;

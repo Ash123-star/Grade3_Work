@@ -110,3 +110,19 @@ Month task labels SHALL use their weekly segment's full available width rather t
 #### Scenario: Cross-week continuation and overflow
 - WHEN a task continues into another week with a title too long for that week's segment
 - THEN the title repeats at the segment start and is ellipsized before the 10dp trailing margin
+
+
+### Requirement: Regression-safe overlay and local recovery
+The mobile app SHALL preserve human notification titles, release temporary notification timers when their overlay is disposed, and keep recovery actions accessible inside floating feedback.
+
+#### Scenario: Read marker fails on the network
+- **WHEN** marking an authorized notification read fails with a network error
+- **THEN** the app SHALL warn the user and open its valid target while preserving the unread state
+
+#### Scenario: Account changes with an open calendar day
+- **WHEN** the session identity changes or business access is revoked
+- **THEN** the calendar SHALL clear the previously opened day records and SHALL NOT query protected month data without an active account
+
+#### Scenario: Legacy revision draft opens in the current diary editor
+- **WHEN** the same account opens an identified record/version with a stored revision draft and no daily draft
+- **THEN** the editor SHALL restore that local revision and retain its original server version for conflict detection

@@ -402,7 +402,7 @@ void main() {
   );
 
   testWidgets(
-    'individual read failure and old-session response never navigate',
+    'read marker network failure opens target; old-session response never navigates',
     (t) async {
       final a = InboxSyncAdapter()
         ..total = 1
@@ -410,7 +410,10 @@ void main() {
       final c = await launchInbox(t, a, '/list/notifications');
       await t.tap(find.text('工作消息0'));
       await t.pumpAndSettle();
-      expect(find.textContaining('消息操作未完成'), findsOneWidget);
+      expect(find.textContaining('未能标记已读'), findsOneWidget);
+      expect(find.text('真正任务详情'), findsOneWidget);
+      c.read(routerProvider).go('/list/notifications');
+      await t.pumpAndSettle();
       expect(find.textContaining('未读 ·'), findsOneWidget);
       a.failWrite = false;
       a.commandGate = Completer<void>();
@@ -518,6 +521,7 @@ void main() {
       await settleLocalIo(t);
       expect(find.byType(TextField), findsOneWidget);
       expect(find.textContaining('草稿读取失败'), findsOneWidget);
+      expect(t.widget<TextField>(find.byType(TextField)).controller!.text, '本机未提交工作');
       expect(find.text('提交修订申请'), findsNothing);
     },
   );

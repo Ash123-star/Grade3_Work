@@ -1,4 +1,11 @@
 /// Notification protocol codes stay unchanged; only presentation is localized.
+String notificationDisplayTitle(Object? title, Object? type) {
+  final text = title is String ? title.trim() : '';
+  return text.isEmpty || RegExp(r'^[A-Z][A-Z0-9_]*$').hasMatch(text)
+      ? notificationTitle(type)
+      : text;
+}
+
 String notificationTitle(Object? type) => switch (type) {
   'TASK_DISPATCHED' || 'TASK_ASSIGNED' => '收到新任务',
   'TASK_EVENT' => '任务进度更新',
@@ -20,8 +27,14 @@ String notificationTitle(Object? type) => switch (type) {
 };
 
 String? notificationResource(Object? type) => switch (type) {
-  'TASK_DISPATCHED' || 'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' ||
-  'TASK_REASSIGNED' || 'TASK_RESCHEDULED' || 'TASK_COMMENT' || 'DEADLINE' ||
+  'TASK_DISPATCHED' ||
+  'TASK_ASSIGNED' ||
+  'TASK_EVENT' ||
+  'TASK_REVISED' ||
+  'TASK_REASSIGNED' ||
+  'TASK_RESCHEDULED' ||
+  'TASK_COMMENT' ||
+  'DEADLINE' ||
   'DELIVERY_CHECKED' => 'tasks',
   'LOG_SUBMITTED' || 'LOG_UPDATED' || 'LOG_COMMENT' => 'logs',
   'REVIEW_PENDING' || 'REVIEW_APPROVED' || 'REVIEW_REJECTED' => 'reviews',

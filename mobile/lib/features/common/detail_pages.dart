@@ -125,8 +125,10 @@ class _ListPageState extends ConsumerState<ListPage> {
       } catch (error) {
         if (message == null ||
             error is ApiFailure && [FailureKind.forbidden, FailureKind.unauthorized]
-                .contains(error.kind)) rethrow;
-        if (!sameSession(session)) return;
+                .contains(error.kind)) {
+          rethrow;
+        }
+        if (!mounted || !sameSession(session)) return;
         setState(() => messageError = error);
         notice(context, '未能标记已读，正在打开关联详情', tone: NoticeTone.warning);
       }

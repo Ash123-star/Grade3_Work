@@ -90,15 +90,30 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
           ref.read(dateProvider.notifier).state = next;
         },
         onDayChanged: (next, events) {
+          final session = ref.read(sessionProvider);
           ref.read(dateProvider.notifier).state = next;
           showTuantuanFocusSheet<void>(
             context: context,
             title: dayHeading(next),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                _DayAgenda(date: next, events: eventsOnDay(events, next)),
-              ],
+            child: Consumer(
+              builder: (context, sheetRef, _) {
+                final current = sheetRef.watch(sessionProvider);
+                if (!current.canReadBusiness ||
+                    current.id != session.id ||
+                    current.token != session.token) {
+                  return const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('账号权限已变化，请关闭后重新查看'),
+                  );
+                }
+                return ListView(
+                  key: const ValueKey('month-day-agenda'),
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _DayAgenda(date: next, events: eventsOnDay(events, next)),
+                  ],
+                );
+              },
             ),
           );
         },
@@ -713,9 +728,7 @@ class _MonthGrid extends StatelessWidget {
             MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
           );
           final barHeight =
-              MediaQuery.textScalerOf(
-                    context,
-                  ).scale(_monthRecordFontSize) *
+              MediaQuery.textScalerOf(context).scale(_monthRecordFontSize) *
                   1.15 +
               3;
           final capacity = ((cellHeight - recordTop - 2 + 1) / (barHeight + 1))
@@ -855,7 +868,37 @@ class _MonthGrid extends StatelessWidget {
                                                   ),
                                                 ),
                                               ),
-                                              if (today && cellWidth >= 38)
+                                              if (eventsOnDay(events, day).any(
+                                                (event) => !lanes.containsKey(
+                                                  _calendarEventKey(event),
+                                                ),
+                                              ))
+                                                Positioned(
+                                                  right: 1,
+                                                  top: 3,
+                                                  child: Text(
+                                                    '+${eventsOnDay(events, day).where((event) => !lanes.containsKey(_calendarEventKey(event))).length}',
+                                                    key: ValueKey(
+                                                      'month-overflow:${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                    ),
+                                                  ),
+                                                ),
+                                              if (today &&
+                                                  cellWidth >= 38 &&
+                                                  eventsOnDay(
+                                                    events,
+                                                    day,
+                                                  ).every(
+                                                    (event) =>
+                                                        lanes.containsKey(
+                                                          _calendarEventKey(
+                                                            event,
+                                                          ),
+                                                        ),
+                                                  ))
                                                 const Positioned(
                                                   top: 1,
                                                   right: 1,

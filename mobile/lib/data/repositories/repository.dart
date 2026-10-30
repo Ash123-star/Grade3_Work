@@ -593,7 +593,7 @@ class HttpRepository implements Repository {
     }
     final taskReview = '${raw['kind'] ?? ''}'.startsWith('TASK');
     final title = raw.containsKey('recipient_id')
-        ? notificationTitle(raw['type'])
+        ? notificationDisplayTitle(raw['title'], raw['type'])
         : raw.containsKey('business_date') || raw.containsKey('businessDate')
         ? workLogTitle(fields, explicitTitle: raw['title'])
         : '${raw['title'] ?? raw['name'] ?? (taskReview ? '任务审核申请' : null) ?? (raw.containsKey('actor_id') ? raw['type'] : null) ?? (raw.containsKey('recipient_id') ? fields['type'] : null) ?? '记录'}';

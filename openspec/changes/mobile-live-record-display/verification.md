@@ -19,3 +19,26 @@
 2026-10-30后续交互修复，Issue #52：短时提示使用根Overlay并区分成功/信息/警告/错误；表单、详情、通知及组织操作错误通过PageFrame悬浮层显示，不加入底部操作栏或编辑区布局；可关闭并重新展开，保留恢复动作。团队名称追加服务端team_name并归一化客户端映射，统计筛选优先组织树名称，移除ID兜底；公司重点实心圆。月历取消六字符及单日宽度上限，按每周任务段宽度显示并预留右侧10dp，超出省略，每周续接首日重复标题。规划OpenSpec严格校验45项通过；未运行编译、测试、HTTP或设备验收，未部署/打包APK；任务维持未验证。接口无数据库迁移。
 
 回归断言源码已同步：月历移除六字符/单格截断预期，补充完整跨周名称和右侧10dp边界预期；提示用例改为Overlay替换与关闭预期。未执行这些用例。
+
+
+## 2026-10-30 统一编译与回归（Issue #49/#51/#52，替代此前暂不测试约束）
+
+本轮回归修复：通知保留服务端业务标题，仅转换协议代码；短时提示的计时器随组件销毁释放；组织配置恢复动作置于悬浮提示内；月历恢复溢出计数并在账号权限变化时清空已打开的记录、停止无权限查询；新日志编辑器兼容恢复本账号旧修订草稿并保留版本冲突保护。新增审核快照与通知展示断言，更新已读失败导航、中心弹层及修订草稿断言。
+
+已获得明确退出码0的检查：
+- `openspec.cmd validate --all --strict`：45项通过。
+- `flutter analyze --no-pub`：无问题。
+- `flutter test --no-pub --dart-define=USE_MOCK=true --reporter expanded test/calendar_agenda_test.dart test/calendar_agenda_visual_test.dart test/sunny_design_system_test.dart test/record_display_test.dart test/management_analytics_http_test.dart test/inbox_sync_contract_test.dart test/review_notification_display_test.dart`：58项通过。
+- 隔离复制server源码后执行`mvn.cmd -B -f .diagnostics/backend-package/pom.xml -DskipTests package`：生产及测试源码编译、JAR打包成功，退出码0；该命令跳过测试执行，不能代替后端全量测试。
+- `flutter build apk --debug --no-pub --dart-define=API_BASE_URL=http://39.96.84.51/api`：APK打包成功；手机需安装新APK才能获得界面变更。
+
+未通过或未完成的检查：
+- 移动端全量测试（USE_MOCK=true）：最后结果301通过、3跳过、27失败，停在task_label_selector_test的异步请求；中断执行退出码1。失败分布在AI文案/布局、人员工作区、旧页面及截图断言、日志与审核交互等；未逐项证明是旧用例还是功能缺陷，不报告全量通过。
+- 本地规定的后端验证脚本因缺少data镜像失败，镜像拉取又遇Docker Hub网络超时。既有运行JAR被本地进程占用，因此不能原地重打包，改用隔离目录。
+- 云端以b76891d源码、独立临时数据容器执行等效`mvn -B -f server/pom.xml clean verify`，不使用业务数据库。已观察到BackendIntegrationTest的6个断言失败和1个错误（审核版本、任务响应、AI数量/审核、转部门数据范围、首次日志提交日期窗口）；迁移升级及日志等其他已完成测试有通过记录。WorkIntegrationTest仍在执行时SSH会话停止返回，新SSH握手超时；缺少最终退出码，不能报告后端全量验证完成。测试目录记录于云端/root/workpanel-verify-current-path，恢复连接后需核查测试进程、结果与临时容器清理。
+
+权限/隐私验证覆盖：审核投影不显示内部ID、通知401/403和旧账号响应不导航、月历切换账号清除旧记录；可靠性/易用性覆盖：提示替换关闭、已读失败仍打开合法详情、草稿冲突保留本机正文、月历跨周与大字号几何。以上仅为相应用例证据；真机、无障碍设备及全量真实服务链路仍未验收。PR保持草稿，禁止报告可合并。
+
+本批不新增数据库迁移、不重建或重新播种业务数据库；云端原有CI/Dockerfile等改动保留。云端本轮拉取至b76891d，但运行服务最后确认仍为113e30b，新版JAR替换和重启尚待成功证据。
+
+16:23前后复核：两次新SSH连接均在banner exchange阶段超时，已有SSH会话无响应；云端API直接与经本机代理访问均超时（HTTP000）。未执行服务停止或JAR替换，无法判断是网络还是主机资源问题，不能报告已重启。恢复连接后先检查负载和隔离验证进程，再安全清理本批测试容器并完成备份部署。

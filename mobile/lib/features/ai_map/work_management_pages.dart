@@ -10,6 +10,7 @@ import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/repositories/ai_work_repository.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/widgets.dart' show notice;
 import 'package:pandora_mobile/theme/app_theme.dart';
 
 class WorkTargetPicker extends ConsumerStatefulWidget {

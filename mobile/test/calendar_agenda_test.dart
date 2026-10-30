@@ -402,16 +402,16 @@ void main() {
       await t.ensureVisible(cell);
       await t.tapAt(t.getTopLeft(cell) + const Offset(8, 8));
       await t.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byKey(const ValueKey('month-day-agenda')), findsOneWidget);
       expect(find.text('5 条记录'), findsOneWidget);
       expect(find.text('任务标题5'), findsOneWidget);
       expect(find.text('日志标题'), findsNothing);
       c.read(sessionProvider.notifier).state = const Session(active: false);
-      await t.pump();
+      await t.pumpAndSettle();
       expect(find.text('账号权限已变化，请关闭后重新查看'), findsOneWidget);
       expect(
         find.descendant(
-          of: find.byType(BottomSheet),
+          of: find.byKey(const ValueKey('month-day-agenda')),
           matching: find.text('任务标题0'),
         ),
         findsNothing,

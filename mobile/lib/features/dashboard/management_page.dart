@@ -217,21 +217,18 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
       action = 'user';
       values['id'] = memberId;
       switch (widget.kind) {
-          case 'membership':
-            values.addAll({
-              'departmentId': departmentId,
-              'teamId': teamId.isEmpty ? null : teamId,
-              if (current!.fields['status'] == 'PENDING') 'status': 'ACTIVE',
-            });
-          case 'role':
-            values.addAll({
-              'role': role,
-              'dispatchEnabled': dispatch,
-            });
-          case 'reporting':
-            values['managerId'] = managerId.isEmpty ? null : managerId;
-          case 'disable':
-            values['status'] = 'DISABLED';
+        case 'membership':
+          values.addAll({
+            'departmentId': departmentId,
+            'teamId': teamId.isEmpty ? null : teamId,
+            if (current!.fields['status'] == 'PENDING') 'status': 'ACTIVE',
+          });
+        case 'role':
+          values.addAll({'role': role, 'dispatchEnabled': dispatch});
+        case 'reporting':
+          values['managerId'] = managerId.isEmpty ? null : managerId;
+        case 'disable':
+          values['status'] = 'DISABLED';
       }
     }
     setState(() {
@@ -313,19 +310,24 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
         !conflict;
     return PageFrame(
       title: managementTitles[widget.kind]!,
-      feedback: tree != null && error != null ? ErrorPanel(
-        '$error', key: ValueKey(error), retry: conflict ? reload : load,
-      ) : null,
+      feedback: tree != null && error != null
+          ? ErrorPanel(
+              '$error',
+              key: ValueKey(error),
+              retry: conflict ? reload : load,
+              retryLabel: conflict ? '重新读取当前配置' : '重新加载',
+            )
+          : null,
       bottom: policy
           ? null
           : BottomActions(
-        primary: SunnyPrimaryButton(
-          loading: busy,
-          onPressed: busy || !canSubmit ? null : submit,
-          child: Text(submitted ? '候选已提交' : '提交候选修改'),
-        ),
-        note: '直属上级单级审核通过后生效；当前配置继续使用。',
-      ),
+              primary: SunnyPrimaryButton(
+                loading: busy,
+                onPressed: busy || !canSubmit ? null : submit,
+                child: Text(submitted ? '候选已提交' : '提交候选修改'),
+              ),
+              note: '直属上级单级审核通过后生效；当前配置继续使用。',
+            ),
       child: PageBody(
         children: [
           if (loading)
@@ -411,9 +413,7 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                             '非创始人的关键修改由组织中配置的直属上级单级审核，通过后生效，不再逐级转审。直属上级未配置或关系失效时，申请保持待审，不自动批准。',
                           ),
                           SizedBox(height: 12),
-                          Text(
-                            '创始人已获授权的操作自动批准；管理员身份本身不构成免审。',
-                          ),
+                          Text('创始人已获授权的操作自动批准；管理员身份本身不构成免审。'),
                         ],
                       ),
                     ),
@@ -530,11 +530,6 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                           v == null || v.trim().isEmpty ? '请填写变更理由' : null,
                     ),
                   ],
-                  if (conflict)
-                    TextButton(
-                      onPressed: busy ? null : reload,
-                      child: const Text('重新读取当前配置'),
-                    ),
                   if (submitted) ...[
                     const SectionHeader('已提交待审'),
                     const Text('原配置保持生效。到“我的审批”查看申请进展。'),
