@@ -457,6 +457,27 @@ class MockRepository implements Repository {
       ];
     }
     if (resource == 'tasks') return _seedTasks(now, instant);
+    if (resource == 'task-labels') {
+      final labels = <String, Record>{};
+      for (final task in rows('tasks')) {
+        final fields = task.fields;
+        final id = '${fields['tagId'] ?? ''}';
+        if (id.isEmpty) continue;
+        labels.putIfAbsent(
+          id,
+          () => Record(
+            id: id,
+            title: '${fields['tagName'] ?? ''}',
+            fields: {
+              'color': fields['tagColor'],
+              'category': fields['tagCategory'],
+              'status': 'ACTIVE',
+            },
+          ),
+        );
+      }
+      return labels.values.toList();
+    }
     if (resource == 'logs') return _seedLogs(now, instant);
     if (resource == 'dashboard/personal') return _seedPersonalFocus(now);
     if (resource == 'reviews') return _seedReviews(now);
@@ -1147,11 +1168,7 @@ class MockRepository implements Repository {
             isSubmittedDiary(r),
       );
     }
-    if ([
-      'logs',
-      'dashboard/personal',
-      'private-notes',
-    ].contains(resource)) {
+    if (['logs', 'dashboard/personal', 'private-notes'].contains(resource)) {
       items = items.where((r) => r.ownerId == (query.ownerId ?? session.id));
     }
     if (resource == 'logs/subordinates' && query.ownerId != null) {
@@ -1866,10 +1883,7 @@ class MockRepository implements Repository {
         !(resource == 'tasks' && taskVisible(item))) {
       throw const ApiFailure(FailureKind.forbidden, '无权查看其他成员的记录');
     }
-    if ([
-          'dashboard/personal',
-          'private-notes',
-        ].contains(resource) &&
+    if (['dashboard/personal', 'private-notes'].contains(resource) &&
         item.ownerId != session.id &&
         !(resource == 'dashboard/personal' && session.manager)) {
       throw const ApiFailure(FailureKind.forbidden, '仅本人可见');
@@ -1903,15 +1917,21 @@ class MockRepository implements Repository {
     return resource == 'tasks' ? _withTaskDisplay(item) : item;
   }
 
-  Map<String, dynamic> _taskDisplayFields(Map<String, dynamic> fields) => {
-    'tagName': taskTagLabel(fields),
-    'participantNames': taskParticipantNames(
-      fields,
-      namesById: {
-        for (final person in rows('organization')) person.id: person.title,
-      },
-    ),
-  };
+  Map<String, dynamic> _taskDisplayFields(Map<String, dynamic> fields) {
+    final label = rows(
+      'task-labels',
+    ).where((label) => label.id == fields['tagId']).firstOrNull;
+    return {
+      'tagName': label?.title ?? taskTagLabel(fields),
+      if (label != null) 'tagColor': label.fields['color'],
+      'participantNames': taskParticipantNames(
+        fields,
+        namesById: {
+          for (final person in rows('organization')) person.id: person.title,
+        },
+      ),
+    };
+  }
 
   Record _withTaskDisplay(Record item) => Record(
     id: item.id,
@@ -2254,7 +2274,13 @@ class MockRepository implements Repository {
         ].contains(action)) {
       throw const ApiFailure(FailureKind.notFound, '记录不存在或无权访问');
     }
-    if (resource == 'logs' && !const {'submit', 'save-draft', 'update-content', 'update'}.contains(action)) {
+    if (resource == 'logs' &&
+        !const {
+          'submit',
+          'save-draft',
+          'update-content',
+          'update',
+        }.contains(action)) {
       throw const ApiFailure(FailureKind.unavailable, '不支持该日志操作，请使用当前日志编辑入口');
     }
     if (resource == 'logs') {

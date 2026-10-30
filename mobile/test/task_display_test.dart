@@ -8,6 +8,10 @@ void main() {
     expect(taskTagLabel({'tagId': 'department-research'}), '研发');
     expect(taskTagLabel({'tag_id': 'department-design'}), '设计');
     expect(taskTagLabel({'tagId': 'custom', 'tagName': '客户回访'}), '客户回访');
+    expect(
+      taskTagLabel({'tagId': 'custom', 'tagName': 'department-design'}),
+      'department-design',
+    );
     expect(taskTagLabel({'tagId': 'custom'}), '标签名称未提供');
   });
 
@@ -47,7 +51,7 @@ void main() {
           'participantIds': ['u2', 'u1'],
         }),
       );
-      expect(created.fields['tagName'], '研发');
+      expect(created.fields['tagName'], '研发质量');
       expect(created.fields['participantNames'], ['陈一诺', '林小满']);
       final reread = await repo.detail('tasks', created.id);
       expect(reread.fields['participantNames'], ['陈一诺', '林小满']);

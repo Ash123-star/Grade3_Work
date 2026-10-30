@@ -13,9 +13,18 @@ class ScenarioDataBootstrapTest {
     @Test void invalidPasswordNeverAccessesDatabase() {
         var source = mock(DataSource.class);
         for (String invalid : new String[]{"", "short", " ".repeat(20), "界".repeat(25)}) {
-            var runner = new ScenarioDataBootstrap(source, new BCryptPasswordEncoder(), invalid);
+            var runner = new ScenarioDataBootstrap(source, new BCryptPasswordEncoder(), invalid, "legacy");
             assertThrows(IllegalArgumentException.class, () -> runner.run(null));
         }
+        verifyNoInteractions(source);
+    }
+
+    @Test void annualPasswordAndUnknownDatasetFailBeforeDatabaseAccess() {
+        var source = mock(DataSource.class);
+        assertThrows(IllegalArgumentException.class, () ->
+            new ScenarioDataBootstrap(source, new BCryptPasswordEncoder(), "12345678", "annual-2026").run(null));
+        assertThrows(IllegalArgumentException.class, () ->
+            new ScenarioDataBootstrap(source, new BCryptPasswordEncoder(), "test12345678", "unknown").run(null));
         verifyNoInteractions(source);
     }
 

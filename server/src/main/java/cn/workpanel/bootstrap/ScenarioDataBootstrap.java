@@ -23,12 +23,15 @@ public class ScenarioDataBootstrap implements ApplicationRunner {
     private final DataSource dataSource;
     private final BCryptPasswordEncoder passwords;
     private final String password;
+    private final String dataset;
 
     public ScenarioDataBootstrap(DataSource dataSource, BCryptPasswordEncoder passwords,
-            @Value("${app.scenario-password:}") String password) {
+            @Value("${app.scenario-password:}") String password,
+            @Value("${app.scenario-dataset:legacy}") String dataset) {
         this.dataSource = dataSource;
         this.passwords = passwords;
         this.password = password;
+        this.dataset = dataset;
     }
 
     static void requirePassword(String password) {
@@ -41,9 +44,14 @@ public class ScenarioDataBootstrap implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         requirePassword(password);
+        if (!dataset.equals("legacy") && !dataset.equals("annual-2026"))
+            throw new IllegalArgumentException("SCENARIO_DATASET仅支持legacy或annual-2026");
+        boolean annual = dataset.equals("annual-2026");
+        if (annual && password.length() < 12)
+            throw new IllegalArgumentException("annual-2026测试密码至少12字符，满足现有前后端校验");
         Flyway.configure().dataSource(dataSource)
-                .locations("classpath:db/scenario")
-                .table("flyway_scenario_history")
+                .locations(annual ? "classpath:db/scenario-annual2026" : "classpath:db/scenario")
+                .table(annual ? "flyway_annual2026_history" : "flyway_scenario_history")
                 .baselineOnMigrate(true).baselineVersion("0")
                 .placeholders(Map.of("scenarioPasswordHash", passwords.encode(password)))
                 .load().migrate();
