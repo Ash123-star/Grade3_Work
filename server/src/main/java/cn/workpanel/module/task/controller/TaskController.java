@@ -30,7 +30,7 @@ public class TaskController {
     /** 空白参数按未提供处理，避免 `ownerId=` 之类的空值被当成筛选值或区间端点。 */
     private static String text(String value) { return value==null||value.isBlank()?null:value.trim(); }
     /**
-     * 当前 Actor 可访问的接收任务卡片历史；返回 {items,total,nextCursor}，不按完成状态过滤，
+     * 当前 Actor 本人参与的任务卡片历史（含本人派发且参与）；返回 {items,total,nextCursor}，不按完成状态过滤，
      * 撤回、验收、归档记录均保留。每项含 id/title/start_at/deadline/version/phase/dispatchAt/participants/label/createdAt，
      * dispatchAt 为最早真实 DISPATCHED 事件时间，缺失为 null 并排在末尾，同时间按 id 稳定排序。
      * 支持 search（≤200 字）、cursor、limit（1–100）；范围外任务不返回；只读 GET 无版本和幂等键。

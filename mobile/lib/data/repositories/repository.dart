@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:pandora_mobile/data/models/task_display.dart';
+import 'package:pandora_mobile/data/models/record_display.dart';
+import 'package:pandora_mobile/data/models/notification_display.dart';
 import 'package:dio/dio.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
@@ -328,6 +330,13 @@ class HttpRepository implements Repository {
     } else if (raw['department'] != null) {
       fields['departmentName'] = raw['department'];
     }
+    if (raw['department_name'] != null) fields['departmentName'] = raw['department_name'];
+    if (raw['team'] is Map) {
+      fields['teamName'] = raw['team']['name'];
+      fields['teamId'] = raw['team']['id'];
+    } else if (raw['team_name'] != null) {
+      fields['teamName'] = raw['team_name'];
+    }
     if (raw['author'] is Map) fields['authorName'] = raw['author']['name'];
     if (raw['kind'] != null && raw['target_id'] != null) {
       fields['targetId'] = raw['target_id'];
@@ -507,7 +516,7 @@ class HttpRepository implements Repository {
             );
       fields['events'] = [
         for (final e in events)
-          '${e['actor_id'] ?? '操作者未提供'} · ${_eventLabels[e['type']] ?? '未知事件（${e['type']}）'} · ${e['created_at'] ?? '时间未提供'}',
+          '${displayPersonName(e['actor_name'])} · ${_eventLabels[e['type']] ?? '未知事件（${e['type']}）'} · ${e['created_at'] ?? '时间未提供'}',
       ];
       for (final e in events) {
         if (e['type'] == 'DISPATCHED' && e['created_at'] != null) {
@@ -543,8 +552,18 @@ class HttpRepository implements Repository {
       };
       fields['before'] = raw['before_value'];
       fields['after'] = raw['candidate'];
+      fields['displayReferences'] = raw['display_references'];
       fields['baseVersion'] = raw['expected_version'];
       fields['steps'] = raw['steps'];
+      fields['reviewEvents'] = [
+        for (final step in (raw['steps'] as List? ?? const []).whereType<Map>())
+          '${displayPersonName(step['reviewer_name'])} · ${switch (step['state']) {
+            'APPROVED' => '审核通过',
+            'REJECTED' => '驳回',
+            'SUPERSEDED' => '已失效',
+            _ => '待审核',
+          }}${'${step['reason'] ?? ''}'.trim().isEmpty ? '' : ' · ${step['reason']}'}${step['decided_at'] == null ? '' : ' · ${step['decided_at']}'}',
+      ];
       fields['applicantId'] = raw['applicant_id'];
       fields['applicantName'] =
           raw['applicant_name'] ?? (raw['applicant'] is Map ? raw['applicant']['name'] : null);
@@ -562,25 +581,8 @@ class HttpRepository implements Repository {
     }
     if (raw.containsKey('is_read')) fields['read'] = raw['is_read'] == true;
     if (raw.containsKey('recipient_id')) {
-      fields['type'] = switch (raw['type']) {
-        'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' => '任务',
-        'DEADLINE' => '截止提醒',
-        'LOG_SUBMITTED' || 'LOG_UPDATED' => '日志',
-        'LOG_COMMENT' || 'TASK_COMMENT' => '评论',
-        'REVIEW_PENDING' => '审批',
-        'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
-        _ => '${raw['type'] ?? '消息'}',
-      };
-      final target = switch (raw['type']) {
-        'TASK_ASSIGNED' ||
-        'TASK_EVENT' ||
-        'TASK_REVISED' ||
-        'TASK_COMMENT' ||
-        'DEADLINE' => 'tasks',
-        'LOG_SUBMITTED' || 'LOG_UPDATED' || 'LOG_COMMENT' => 'logs',
-        'REVIEW_PENDING' || 'REVIEW_APPROVED' || 'REVIEW_REJECTED' => 'reviews',
-        _ => null,
-      };
+      fields['type'] = notificationTitle(raw['type']);
+      final target = notificationResource(raw['type']);
       if (target != null && raw['object_id'] != null) {
         fields['targetResource'] = target;
         fields['targetId'] = raw['object_id'];
@@ -590,8 +592,11 @@ class HttpRepository implements Repository {
       fields['status'] = raw['submitted'] == true ? '已提交' : '草稿';
     }
     final taskReview = '${raw['kind'] ?? ''}'.startsWith('TASK');
-    final title =
-        '${raw['title'] ?? raw['name'] ?? raw['business_date'] ?? (taskReview ? '任务审核申请' : null) ?? (raw.containsKey('actor_id') ? raw['type'] : null) ?? (raw.containsKey('recipient_id') ? fields['type'] : null) ?? '记录'}';
+    final title = raw.containsKey('recipient_id')
+        ? notificationDisplayTitle(raw['title'], raw['type'])
+        : raw.containsKey('business_date') || raw.containsKey('businessDate')
+        ? workLogTitle(fields, explicitTitle: raw['title'])
+        : '${raw['title'] ?? raw['name'] ?? (taskReview ? '任务审核申请' : null) ?? (raw.containsKey('actor_id') ? raw['type'] : null) ?? (raw.containsKey('recipient_id') ? fields['type'] : null) ?? '记录'}';
     final owner =
         '${raw['ownerId'] ?? raw['owner_id'] ?? raw['user_id'] ?? raw['applicant_id'] ?? raw['recipient_id'] ?? ''}';
     final version = raw['version'] is num ? (raw['version'] as num).toInt() : 1;
@@ -889,7 +894,8 @@ class HttpRepository implements Repository {
       return {
         'id': raw['id'],
         'parentCommentId': raw['parent_id'],
-        'authorName': raw['author_name'],
+        'actorName': displayPersonName(raw['author_name']),
+        'authorName': displayPersonName(raw['author_name']),
         'text': raw['text'] ?? '',
         'actorId': raw['actor_id'],
         'parentId': raw['parent_id'],
@@ -930,7 +936,7 @@ class HttpRepository implements Repository {
     'id': raw['id'],
     'parentCommentId': raw['parent_id'],
     'actorId': raw['author_id'],
-    'actorName': raw['nickname'],
+    'actorName': displayPersonName(raw['nickname']),
     'avatarId': raw['avatar_id'],
     'text': raw['body'] ?? '',
     'createdAt': raw['created_at'],
@@ -1243,7 +1249,7 @@ class HttpRepository implements Repository {
           {
             'approve': command.action == 'approve',
             'reason': v['reason'] ?? v['驳回原因'] ?? '',
-            'expectedVersion': command.version,
+            'expectedVersion': v['expectedVersion'] ?? command.version,
           },
         );
       }

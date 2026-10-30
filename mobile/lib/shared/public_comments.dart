@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pandora_mobile/data/models/record_display.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cute_ui/cute_ui.dart' show SectionHeader;
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -103,8 +104,7 @@ class _PublicCommentsState extends ConsumerState<PublicComments> {
                     builder: (context) {
                       final comment = value is Map ? value : {'text': '$value'};
                       final parent = byId['${comment['parentCommentId']}'];
-                      final name =
-                          '${comment['actorName'] ?? comment['actorId'] ?? '成员'}';
+                      final name = displayPersonName(comment['actorName']);
                       final date = businessEventTime(
                         '${comment['createdAt'] ?? comment['time']}',
                       );
@@ -168,7 +168,7 @@ class _PublicCommentsState extends ConsumerState<PublicComments> {
                                           ),
                                           TextSpan(
                                             text:
-                                                '${parent['actorName'] ?? '成员'}',
+                                                displayPersonName(parent['actorName']),
                                             style: TextStyle(
                                               color: Theme.of(
                                                 context,
@@ -228,7 +228,7 @@ class _PublicCommentsState extends ConsumerState<PublicComments> {
         if (reply != null)
           Row(
             children: [
-              Expanded(child: Text('回复 ${reply!['actorName'] ?? '成员'}')),
+              Expanded(child: Text('回复 ${displayPersonName(reply!['actorName'])}')),
               IconButton(
                 tooltip: '取消回复',
                 onPressed: () => setState(() => reply = null),

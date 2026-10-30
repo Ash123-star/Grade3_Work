@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:pandora_mobile/data/models/task_display.dart';
+import 'package:pandora_mobile/data/models/record_display.dart';
+import 'package:pandora_mobile/data/models/review_display.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,7 +25,7 @@ import '../../shared/generated_assets.dart';
 
 String _reviewMetadata(Record record) => [
   '${record.fields['reviewState'] ?? '审核状态未提供'}',
-  '申请人 ${record.fields['applicantName'] ?? record.ownerId}',
+  '申请人 ${displayPersonName(record.fields['applicantName'])}',
   prettyDate(record.fields['createdAt']),
 ].join(' · ');
 
@@ -34,23 +36,26 @@ class _ReviewListRow extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => PaperSurface(
-    onTap: onTap,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          record.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _reviewMetadata(record),
-          style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
-        ),
-      ],
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: PaperSurface(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            record.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _reviewMetadata(record),
+            style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -110,12 +115,23 @@ class _ListPageState extends ConsumerState<ListPage> {
       messageError = null;
     });
     try {
-      await repository.execute(
-        'notifications',
-        message == null
-            ? const Command('read-all', {})
-            : Command('read', {'id': message.id}),
-      );
+      try {
+        await repository.execute(
+          'notifications',
+          message == null
+              ? const Command('read-all', {})
+              : Command('read', {'id': message.id}),
+        );
+      } catch (error) {
+        if (message == null ||
+            error is ApiFailure && [FailureKind.forbidden, FailureKind.unauthorized]
+                .contains(error.kind)) {
+          rethrow;
+        }
+        if (!mounted || !sameSession(session)) return;
+        setState(() => messageError = error);
+        notice(context, '未能标记已读，正在打开关联详情', tone: NoticeTone.warning);
+      }
       if (!mounted) return;
       if (!sameSession(session)) return;
       ref.invalidate(recordsProvider('notifications'));
@@ -124,12 +140,16 @@ class _ListPageState extends ConsumerState<ListPage> {
       final id = message.fields['targetId'];
       if (id is! String ||
           id.trim().isEmpty ||
-          !['tasks', 'logs', 'reviews'].contains(target)) {
-        notice(context, '消息已读，关联内容暂不可用，请返回工作台查看');
+          !['tasks', 'logs', 'reviews', 'ai-jobs', 'ai-work'].contains(target)) {
+        notice(context, '关联内容暂不可用，请返回工作台查看');
         return;
       }
       if (target == 'reviews') {
         context.push('/me/reviews/${encode(id)}');
+      } else if (target == 'ai-jobs') {
+        context.push('/ai/jobs/${encode(id)}/edit');
+      } else if (target == 'ai-work') {
+        context.push('/ai/work/${encode(id)}');
       } else {
         openItem(context, target as String, id);
       }
@@ -192,6 +212,9 @@ class _ListPageState extends ConsumerState<ListPage> {
 
     return PageFrame(
       title: resourceTitles[resource] ?? '记录',
+      feedback: messageError != null && !deniedMessage
+          ? ErrorPanel('消息操作未完成：$messageError。请再次选择消息或全部已读重试。', key: ValueKey(messageError))
+          : null,
       actions: [
         if (resource == 'dashboard/personal')
           IconButton(
@@ -353,11 +376,6 @@ class _ListPageState extends ConsumerState<ListPage> {
               ],
             ),
           ],
-          if (messageError != null && !deniedMessage)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: ErrorPanel('消息操作未完成：$messageError。请再次选择消息或全部已读重试。'),
-            ),
           if (deniedMessage) ...[
             RecordFailure(messageError!),
             TextButton(
@@ -550,7 +568,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                                         ),
                                       if (resource == 'audit')
                                         Text(
-                                          '${prettyDate(r.fields['createdAt'])} · 操作者 ${r.fields['actor_id'] ?? '未返回'}',
+                                          '${prettyDate(r.fields['createdAt'])} · 操作者 ${displayPersonName(r.fields['actor_name'])}',
                                           style: Theme.of(
                                             context,
                                           ).textTheme.bodySmall,
@@ -833,13 +851,15 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   '排序位置': item.fields['排序位置'] ?? item.fields['position'] ?? 0,
                 },
               },
-              version: item.version,
+              version: widget.resource == 'reviews'
+                  ? (item.fields['baseVersion'] as num?)?.toInt() ?? item.version
+                  : item.version,
               idempotencyKey: '${item.id}:${item.version}:$action',
             ),
           );
       refreshBusiness(ref);
       if (mounted) {
-        notice(context, AppConfig.mock ? '已保存' : '操作已提交');
+        notice(context, AppConfig.mock ? '已保存' : '操作已提交', success: true);
         if (action == 'archive' && widget.resource == 'dashboard/personal') {
           context.pop();
         }
@@ -1149,6 +1169,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             } else if (resource == 'reviews') {
               final self = item.ownerId == user.id;
               final pending = f['reviewState'] == '待审';
+              final creating = f['reviewKind'] == 'TASK_CREATE' ||
+                  f['baseVersion'] == 0;
               final assigned = f['reviewerId'] == user.id;
               if (!self && pending && assigned) {
                 bottom = button('通过申请', () => action(item, 'approve'));
@@ -1191,42 +1213,50 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     ],
                   ),
                 ),
-                const SectionHeader('修改内容'),
-                PaperSurface(
-                  outlined: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '当前生效 · v${f['effectiveVersion'] ?? f['baseVersion'] ?? 1}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: CuteTokens.muted,
+                SectionHeader(creating ? '创建内容' : '修改内容'),
+                if (!creating) ...[
+                  PaperSurface(
+                    outlined: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '申请前内容',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: CuteTokens.muted,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(_value(f['before'])),
-                      const SizedBox(height: 16),
-                      const Text(
-                        '直属上级审核通过前，继续使用此版本',
-                        style: TextStyle(color: CuteTokens.muted, fontSize: 12),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        Text(reviewSnapshotText(f['before'], f['displayReferences'])),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
                 PaperSurface(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '候选版本 · v${f['candidateVersion'] ?? ((f['baseVersion'] as int? ?? 1) + 1)}',
+                        creating ? '申请创建的内容' : '申请修改后的内容',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        _value(f['after']),
+                        reviewSnapshotText(f['after'], f['displayReferences']),
                         style: const TextStyle(height: 1.7),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        switch (f['reviewState']) {
+                          '待审' => creating ? '审核通过后创建记录' : '审核通过后生效，审核前保留原内容',
+                          '已通过' => '申请已通过，以上为本次申请获批时的内容',
+                          '已驳回' => '申请已驳回，以上内容未生效',
+                          '已失效' => '申请已失效，以上内容不再等待审核',
+                          _ => '以上为提交申请时记录的内容',
+                        },
+                        style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                       ),
                     ],
                   ),
@@ -1236,12 +1266,12 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   Text(
                     f['reviewerConfigured'] == false || f['reviewerId'] == null
                         ? '直属上级未配置，申请保持待审'
-                        : '审核人 ${f['reviewerName'] ?? f['reviewerId']}',
+                        : '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
                   )
                 else if (f['reviewerId'] != null)
                   Text(
-                    '审核人 ${f['reviewerName'] ?? f['reviewerId']}',
+                    '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
                   ),
                 if (f['decisionSource'] == 'FOUNDER_EXEMPT')
@@ -1310,7 +1340,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${f['businessDate'] ?? ''} · 作者 ${f['authorName'] ?? item.ownerId} · ${f['status'] ?? (isSubmittedDiary(item) ? '已提交' : '提交状态未确认')}',
+                  '${f['businessDate'] ?? ''} · 作者 ${displayPersonName(f['authorName'])} · ${f['status'] ?? (isSubmittedDiary(item) ? '已提交' : '提交状态未确认')}',
                   style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                 ),
                 if (f['editableUntil'] != null)
@@ -1380,7 +1410,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 section('事件类型', f['type']),
-                section('操作者', f['actor_id']),
+                section('操作者', displayPersonName(f['actor_name'])),
                 section('发生时间', f['created_at']),
                 section('修改对象', f['object_id']),
                 section('变更理由', f['reason']),
@@ -1490,17 +1520,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 OwnPrivateNote(resource: resource, recordId: item.id),
               );
             }
-            if (error != null && bottom == null) {
-              children.add(
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: ErrorPanel(
-                    error!,
-                    retry: () => ref.invalidate(itemProvider(key)),
-                  ),
-                ),
-              );
-            }
             children.add(const DemoLabel());
             final review = resource == 'reviews' && bottom != null;
             return PageFrame(
@@ -1512,27 +1531,19 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ? '工作日志'
                   : '${resourceTitles[resource] ?? '记录'}详情',
               actions: actions,
+              feedback: error == null ? null : ErrorPanel(
+                error!,
+                key: ValueKey(error),
+                retry: () {
+                  setState(() => error = null);
+                  ref.invalidate(provider);
+                },
+              ),
               bottom: bottom == null
                   ? null
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (error != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 128),
-                              child: SingleChildScrollView(
-                                child: ErrorPanel(
-                                  error!,
-                                  retry: () {
-                                    setState(() => error = null);
-                                    ref.invalidate(itemProvider(key));
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
                         BottomActions(
                           primary: bottom,
                           secondary: review

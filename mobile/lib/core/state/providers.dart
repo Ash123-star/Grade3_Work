@@ -256,13 +256,18 @@ final datedRecordsProvider = FutureProvider.autoDispose
       return readCompleteList(
         ref.watch(repositoryProvider),
         resource,
-        Query(from: from, to: to),
+        Query(
+          ownerId: resource == 'tasks' ? ref.watch(sessionProvider).id : null,
+          from: from,
+          to: to,
+        ),
         isActive: () => active,
       );
     });
 
 final calendarMonthTasksProvider = FutureProvider.autoDispose
     .family<PageResult, (String?, int)>((ref, key) {
+      if (!ref.watch(sessionProvider).canReadBusiness) return const PageResult([]);
       var active = true;
       ref.onDispose(() => active = false);
       final monthIndex = key.$2;
@@ -275,7 +280,7 @@ final calendarMonthTasksProvider = FutureProvider.autoDispose
         ref.watch(repositoryProvider),
         'tasks',
         Query(
-          ownerId: key.$1,
+          ownerId: key.$1 ?? ref.watch(sessionProvider).id,
           from: range.from,
           to: range.to,
         ),
@@ -334,6 +339,7 @@ void refreshBusiness(WidgetRef ref) {
   ref.invalidate(recordsProvider);
   ref.invalidate(receivedTaskCardProvider);
   ref.invalidate(datedRecordsProvider);
+  ref.invalidate(calendarMonthTasksProvider);
   ref.invalidate(itemProvider);
   ref.invalidate(scopedItemProvider);
   ref.invalidate(organizationTreeProvider);

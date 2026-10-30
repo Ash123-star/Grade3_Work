@@ -83,7 +83,7 @@ class _AiPageState extends ConsumerState<LegacyDirectionPage> {
       ref.read(provider.notifier).state = [...items, draft];
     }
     changeTab(2);
-    notice(context, '已放入行动草稿，可编辑后再执行');
+    notice(context, '已放入行动草稿，可编辑后再执行', success: true);
   }
 
   Future<void> editAction(AiActionDraft? item) async {
@@ -498,17 +498,12 @@ class _AiPageState extends ConsumerState<LegacyDirectionPage> {
                     ref.read(provider.notifier).state = items
                         .where((e) => e.id != item.id)
                         .toList();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('已移除行动'),
-                        action: SnackBarAction(
-                          label: '撤销',
-                          onPressed: () => ref.read(provider.notifier).state = [
-                            ...ref.read(provider),
-                            item,
-                          ],
-                        ),
-                      ),
+                    notice(context, '已移除行动', success: true,
+                      actionLabel: '撤销',
+                      onAction: () => ref.read(provider.notifier).state = [
+                        ...ref.read(provider),
+                        item,
+                      ],
                     );
                   },
                   child: const Text('移除'),

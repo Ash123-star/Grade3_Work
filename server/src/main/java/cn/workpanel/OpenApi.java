@@ -103,6 +103,16 @@ public class OpenApi {
         var indexRetry=object("id","type","state");indexRetry.addProperty("id",text());indexRetry.addProperty("type",new StringSchema()._enum(List.of("KNOWLEDGE_INDEX")));indexRetry.addProperty("state",new StringSchema()._enum(List.of("QUEUED")));c.addSchemas("KnowledgeIndexRetry",indexRetry);
         var forgetJob=object("id","state");forgetJob.addProperty("id",text());forgetJob.addProperty("state",new StringSchema()._enum(List.of("PENDING","SUCCEEDED","FAILED")));forgetJob.addProperty("error",text());forgetJob.addProperty("message",text());c.addSchemas("MemoryForgetJob",forgetJob);
         var error=object("code","message","traceId"); for(String field:List.of("code","message","traceId")) error.addProperty(field,text()); c.addSchemas("Error",error);
+        var reviewDetail=object("id","kind","status","expected_version","before_value","candidate","display_references");
+        for(String field:List.of("id","kind","status")) reviewDetail.addProperty(field,text());
+        reviewDetail.addProperty("expected_version",new IntegerSchema().minimum(java.math.BigDecimal.ZERO));
+        reviewDetail.addProperty("before_value",new ObjectSchema().additionalProperties(true));
+        reviewDetail.addProperty("candidate",new ObjectSchema().additionalProperties(true));
+        var references=new ObjectSchema();
+        for(String category:List.of("people","labels","departments","teams"))
+            references.addProperty(category,new ObjectSchema().additionalProperties(text()));
+        reviewDetail.addProperty("display_references",references.description("已授权审核快照引用的同公司ID到当前名称映射；名称非历史快照，缺失引用不返回"));
+        reviewDetail.additionalProperties(true); c.addSchemas("ReviewDetail",reviewDetail);
         MobileP0OpenApi.register(c);
         return new OpenAPI().servers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/"))).info(new Info().title("企业协作智能面板 API").version("1.0.0").description("UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表不提供完成情况。分页 cursor 是非负偏移量。" )).components(c).addSecurityItem(new SecurityRequirement().addList("bearer"));
     }
@@ -117,8 +127,9 @@ public class OpenApi {
                 Map.entry("POST /api/ai/jobs","AiJobRequest"),Map.entry("PUT /api/ai/jobs/{id}/draft","AiDraftEdit"),Map.entry("POST /api/ai/jobs/{id}/confirm-task","ConfirmTask"),Map.entry("POST /api/ai-maps/edges","MapEdge"),
                 Map.entry("POST /api/ai-maps/development/jobs","DevelopmentRequest"),Map.entry("POST /api/ai-memories","MemoryCreate"),Map.entry("POST /api/ai-memories/{id}/revisions","MemoryRevision"),Map.entry("POST /api/ai-memories/{id}/confirm","MemoryConfirm"),Map.entry("PUT /api/ai-memories/preferences/me","MemoryPreferences"),Map.entry("POST /api/ai-maps/development/{id}/feedback","DevelopmentFeedback"));
             var responses=Map.ofEntries(
+                Map.entry("GET /api/reviews/{id}","ReviewDetail"),
                 Map.entry("POST /api/ai/jobs/{id}/confirm-task","AiTaskConfirmationResult"),Map.entry("GET /api/organization/teams","TeamDirectory"),
-                Map.entry("GET /api/tasks","TaskPage"),Map.entry("GET /api/tasks/received-card","ReceivedTaskPage"),Map.entry("GET /api/logs/subordinates/calendar","MemberLogCalendar"),
+                Map.entry("GET /api/tasks","TaskPage"),Map.entry("GET /api/tasks/received-card","ReceivedTaskPage"),Map.entry("GET /api/logs/subordinates/calendar","MemberLogCalendar"),Map.entry("GET /api/organization/people","OrganizationPeoplePage"),
                 Map.entry("GET /api/analytics","AnalyticsSummary"),Map.entry("GET /api/analytics/details","AnalyticsDetailsPage"),Map.entry("GET /api/profiles/{id}","ProfileView"),Map.entry("PUT /api/profiles/me","ProfileView"),
                 Map.entry("GET /api/ai-maps/development","DevelopmentLatest"),Map.entry("POST /api/ai-maps/development/jobs","DevelopmentJob"),
                 Map.entry("GET /api/ai-maps/development/jobs/{id}","DevelopmentJob"),Map.entry("POST /api/ai-maps/development/jobs/{id}/retry","DevelopmentJob"),

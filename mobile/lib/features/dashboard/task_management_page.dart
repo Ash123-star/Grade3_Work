@@ -16,8 +16,7 @@ bool isReceivedTask(Record item, String id) {
   final ids = (item.fields['participantIds'] as List?)?.map(
     (value) => '$value',
   );
-  return (ids?.contains(id) ?? (item.ownerId == id)) &&
-      '${item.fields['dispatcherId'] ?? ''}' != id;
+  return ids?.contains(id) ?? (item.ownerId == id);
 }
 
 /// Dashboard company-task records have no management toolbar.
@@ -26,7 +25,7 @@ class ReceivedTasksPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(sessionProvider);
-    final state = ref.watch(recordsProvider('tasks'));
+    final state = ref.watch(receivedTaskCardProvider);
     return PageFrame(
       title: '公司任务',
       child: PageBody(
@@ -35,7 +34,7 @@ class ReceivedTasksPage extends ConsumerWidget {
             loading: () => const LoadingSkeleton(),
             error: (error, _) => RecordFailure(
               error,
-              retry: () => ref.invalidate(recordsProvider('tasks')),
+              retry: () => ref.invalidate(receivedTaskCardProvider),
             ),
             data: (page) {
               final rows = page.items

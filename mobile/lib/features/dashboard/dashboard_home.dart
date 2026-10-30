@@ -181,10 +181,12 @@ class DashboardPage extends ConsumerWidget {
                                     if (i > 0) const SizedBox(height: 8),
                                     SizedBox(
                                       height: 42 * scale,
-                                      child: index == 0 || index == 2
+                                      child: index != 3
                                           ? InkWell(
                                               borderRadius: BorderRadius.circular(12),
-                                              onTap: () => index == 0
+                                              onTap: () => index == 1
+                                                  ? open()
+                                                  : index == 0
                                                   ? _showCompanyItem(context, ref, items[i])
                                                   : _showFocusDetail(context, items[i]),
                                               onLongPress: index == 2
@@ -197,13 +199,13 @@ class DashboardPage extends ConsumerWidget {
                                               child: _FocusPreviewRow(
                                                 title: visibleTitles[i],
                                                 scale: scale,
+                                                completed: index == 1 &&
+                                                    _isCompletedTask(items[i]),
                                               ),
                                             )
                                           : _FocusPreviewRow(
                                               title: visibleTitles[i],
                                               scale: scale,
-                                                  completed: index == 1 &&
-                                                      _isCompletedTask(items[i]),
                                             ),
                                     ),
                                   ],
@@ -550,8 +552,8 @@ Future<void> _showFocusCollection(
                             Padding(
                               padding: const EdgeInsets.only(top: 5),
                               child: Icon(
-                                Icons.radio_button_unchecked_rounded,
-                                size: 18,
+                                resource == 'dashboard/company' ? Icons.circle : Icons.radio_button_unchecked_rounded,
+                                size: resource == 'dashboard/company' ? 10 : 18,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
@@ -705,9 +707,7 @@ Future<void> _showPersonalItemActions(
     ref.invalidate(recordsProvider(collectionResource));
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('删除失败：$error')));
+      notice(context, '删除失败：$error', tone: NoticeTone.error);
     }
   }
 }

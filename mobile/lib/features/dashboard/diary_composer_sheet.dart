@@ -192,7 +192,12 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
 
   Future<void> _restore() async {
     try {
-      final local = await ref.read(draftStoreProvider).read(_location);
+      var local = await ref.read(draftStoreProvider).read(_location);
+      if (local == null && widget.recordId != null && widget.version != null) {
+        local = await ref.read(draftStoreProvider).read(
+          DraftLocation.revision(_accountId, widget.recordId!, widget.version!),
+        );
+      }
       if (!mounted || !_isCurrentAccount) return;
       if (local != null) {
         _controller.text = local.fields['今日工作'] ?? '';

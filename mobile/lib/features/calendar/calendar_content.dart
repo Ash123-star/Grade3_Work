@@ -90,15 +90,30 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
           ref.read(dateProvider.notifier).state = next;
         },
         onDayChanged: (next, events) {
+          final session = ref.read(sessionProvider);
           ref.read(dateProvider.notifier).state = next;
           showTuantuanFocusSheet<void>(
             context: context,
             title: dayHeading(next),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                _DayAgenda(date: next, events: eventsOnDay(events, next)),
-              ],
+            child: Consumer(
+              builder: (context, sheetRef, _) {
+                final current = sheetRef.watch(sessionProvider);
+                if (!current.canReadBusiness ||
+                    current.id != session.id ||
+                    current.token != session.token) {
+                  return const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('账号权限已变化，请关闭后重新查看'),
+                  );
+                }
+                return ListView(
+                  key: const ValueKey('month-day-agenda'),
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _DayAgenda(date: next, events: eventsOnDay(events, next)),
+                  ],
+                );
+              },
             ),
           );
         },
@@ -713,9 +728,7 @@ class _MonthGrid extends StatelessWidget {
             MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
           );
           final barHeight =
-              MediaQuery.textScalerOf(
-                    context,
-                  ).scale(_monthRecordFontSize(cellWidth)) *
+              MediaQuery.textScalerOf(context).scale(_monthRecordFontSize) *
                   1.15 +
               3;
           final capacity = ((cellHeight - recordTop - 2 + 1) / (barHeight + 1))
@@ -855,7 +868,37 @@ class _MonthGrid extends StatelessWidget {
                                                   ),
                                                 ),
                                               ),
-                                              if (today && cellWidth >= 38)
+                                              if (eventsOnDay(events, day).any(
+                                                (event) => !lanes.containsKey(
+                                                  _calendarEventKey(event),
+                                                ),
+                                              ))
+                                                Positioned(
+                                                  right: 1,
+                                                  top: 3,
+                                                  child: Text(
+                                                    '+${eventsOnDay(events, day).where((event) => !lanes.containsKey(_calendarEventKey(event))).length}',
+                                                    key: ValueKey(
+                                                      'month-overflow:${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                    ),
+                                                  ),
+                                                ),
+                                              if (today &&
+                                                  cellWidth >= 38 &&
+                                                  eventsOnDay(
+                                                    events,
+                                                    day,
+                                                  ).every(
+                                                    (event) =>
+                                                        lanes.containsKey(
+                                                          _calendarEventKey(
+                                                            event,
+                                                          ),
+                                                        ),
+                                                  ))
                                                 const Positioned(
                                                   top: 1,
                                                   right: 1,
@@ -925,7 +968,7 @@ List<Widget> _monthWeekBars(
       24.0,
       MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
     );
-    final fontSize = _monthRecordFontSize(cellWidth);
+    final fontSize = _monthRecordFontSize;
     final barHeight =
         MediaQuery.textScalerOf(context).scale(fontSize) * 1.15 + 3;
     final top = recordTop + lane * (barHeight + 1);
@@ -952,18 +995,18 @@ List<Widget> _monthWeekBars(
               alignment: Alignment.centerLeft,
               child: starts || continuesAtWeekStart
                   ? SizedBox(
-                      width: cellWidth - (col == 0 ? 2 : 0),
+                      width: double.infinity,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 1),
+                        padding: const EdgeInsets.only(left: 2, right: 10),
                         child: Text(
                           key: ValueKey(
                             'month-span-label:tasks:${event.record.id}:${weekStart.toIso8601String()}',
                           ),
-                          event.record.title.characters.take(6).toString(),
+                          event.record.title,
                           semanticsLabel: event.record.title,
                           maxLines: 1,
                           softWrap: false,
-                          overflow: TextOverflow.clip,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: fontSize,
                             height: 1.15,
@@ -986,10 +1029,8 @@ List<Widget> _monthWeekBars(
 
 String _calendarEventKey(CalendarEvent event) => event.record.id;
 
-// Six full-width characters fit on one line at the default text scale.
-// Larger accessibility text still clips rather than wrapping or adding dots.
-double _monthRecordFontSize(double cellWidth) =>
-    math.min(10.0, math.max(1.0, (cellWidth - 4) / 6));
+// Text is bounded by the weekly segment, never by a fixed character count.
+const double _monthRecordFontSize = 10.0;
 
 Map<String, int> _monthLanes(
   List<CalendarEvent> events,

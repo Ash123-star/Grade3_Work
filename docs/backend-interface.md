@@ -27,9 +27,15 @@
 
 ## 组织 `/organization`
 
+2026-10-30（Issue #49，源码实现，未运行验收）：`GET /organization/people` 每项新增 `participatingTaskCount`、`activeTaskCount`、`todayLogStatus`、`summaryDate`。任务计数同时限制在当前请求人任务权限和该成员参与关系内，未结束任务排除 ACCEPTED/ARCHIVED/WITHDRAWN；日志状态为 SUBMITTED/MISSING/UNKNOWN，以服务端上海业务日及已提交记录计算，待确认账号 UNKNOWN，不返回他人草稿信息。前端字段缺失显示未知，不伪造0或缺交。
+
+任务事件 `actor_name`、审核步骤 `reviewer_name`、审计 `actor_name` 为同公司 `users.name`。姓名缺失显示未知成员，不回退登录账号/内部ID。日志保留业务日期，但列表/卡片标题从work首个非空行生成最多48字符摘要，无正文显示工作日志，无新增存储字段。运行时OpenAPI模式已同步；`docs/openapi.json`快照留待统一验收时重新导出。
+
 组织树和 `/people` 返回范围内数据。管理员策略、人员和组织单元的关键变更使用 `version`、`reason`，通过审核后生效。主要接口：`GET /organization`、`GET /organization/departments`、`GET /organization/people`、`POST /organization/membership-application`、`GET/POST /organization/review-policy`、`POST /organization/reviewer-application`、`POST /organization/users/{id}/revisions`、`POST /organization/{departments|teams}/revisions`、`GET /organization/audit`。
 
 ## 任务 `/tasks`
+
+2026-10-30（Issue #49）：`GET /tasks/received-card` 仅返回当前用户本人参与的任务（包括本人派发且参与），包含全部生命周期状态，不再返回仅下属参与的授权范围任务。`items/total/nextCursor`使用相同过滤；每项增加`issuer_id`。导图卡片与完整列表共用该资源，管理任务表继续使用`GET /tasks`授权范围查询。
 
 `GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
 
@@ -133,3 +139,12 @@ Content-Type: application/json
 - `GET /api/admin/workspace/organization/task-audit`（公共同权限入口`/api/organization/task-audit`）：仅ADMIN，taskId可选（最多100字）、cursor>=0、limit为1至100。返回items/total/nextCursor；条目包含审计原字段及actor_name/task_id。过滤任务直接事件、任务审核申请/决定及最终生效；数据库按公司过滤后计数分页。无权/未知taskId均空，非法分页400、非ADMIN403。无版本及幂等键，只读；Web任务审计入口支持翻页与前后值展示。
 - 新增V15 `log_comment_replies`，旧评论parent_id为null，通过复合外键禁止跨日志回复。不修改旧迁移，不回删历史评论。
 - 用户确认：标签模型与权限实际接入、C的新任务增删改审核联调等待C提供分支或契约。现有任务审计展示不代表新任务增删改闭环已经完成。
+
+### 审核与通知业务展示（Issue #51）
+
+GET /api/reviews/{id} 在现有审核读取权限校验之后追加 `display_references`：people、labels、departments、teams 分类下的 `{引用ID: 当前名称}`。只解析 before_value/candidate 内已有引用，查询必须限定 review_requests.company_id；缺失、已删除或跨公司引用不返回名称。该字段只供展示，不能提交为审核输入；原始快照、expected_version 及所有写入接口保持不变，无数据库迁移。名称反映读取时的当前名称，不能当作历史名称证据。
+
+移动端将审核快照显示为中文业务字段；时间按 Asia/Shanghai 展示，附件显示数量；缺失引用显示“名称暂不可用”，不回退内部ID。创建申请无“当前生效v0”，通过/驳回/失效记录无待审生效提示。GET /notifications 的 type/object_id 保持现有契约：历史 TASK_DISPATCHED 与 TASK_ASSIGNED 均显示收到新任务并指向 tasks；TASK_EVENT/REVISED/REASSIGNED/RESCHEDULED/COMMENT、DEADLINE、DELIVERY_CHECKED 指向 tasks；LOG_SUBMITTED/UPDATED/COMMENT 指向 logs；REVIEW_PENDING/APPROVED/REJECTED 指向 reviews；AI_READY 指向既有作业结果页，AI_WORK_UPDATED 指向工作详情页。未知类型显示“工作通知”，缺失或不支持目标明确提示；目标详情仍执行既有服务端权限校验，不新增旧接口或绕过鉴权。标记已读的网络失败保留错误提示并允许打开合法详情，401/403仍阻断。
+
+### 组织团队名称与操作反馈（Issue #52）
+GET /organization/people沿用原组织数据范围，追加可空team_name，按teams.id及company_id联合关联；无团队或名称不存在时返回null。客户端将team_name/嵌套team.name归一化为teamName；统计筛选优先取当前授权组织树teams名称，不将team_id当显示名称。无需数据库迁移，旧客户端可忽略新增字段。任务和组织查询权限保持现有规则。

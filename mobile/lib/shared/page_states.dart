@@ -259,8 +259,14 @@ class EmptyIllustration extends StatelessWidget {
 }
 
 class ErrorPanel extends StatelessWidget {
-  const ErrorPanel(this.message, {super.key, this.retry});
+  const ErrorPanel(
+    this.message, {
+    super.key,
+    this.retry,
+    this.retryLabel = '重新加载',
+  });
   final String message;
+  final String retryLabel;
   final VoidCallback? retry;
   @override
   Widget build(BuildContext context) => PaperSurface(
@@ -289,7 +295,7 @@ class ErrorPanel extends StatelessWidget {
           TextButton.icon(
             onPressed: retry,
             icon: const Icon(Icons.refresh),
-            label: const Text('重新加载'),
+            label: Text(retryLabel),
           ),
       ],
     ),

@@ -10,7 +10,7 @@ import java.util.*;
 @Service
 public class TaskQueryService {
     private static final String LIST_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at";
-    private static final String CARD_COLUMNS="t.id,t.title,t.start_at,t.deadline,t.phase,t.version,t.created_at";
+    private static final String CARD_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.phase,t.version,t.created_at";
     /** 最早真实 DISPATCHED 事件时间；缺失时为 NULL，不推测。 */
     private static final String DISPATCH_LATERAL=" LEFT JOIN LATERAL (SELECT min(e.created_at) AS dispatch_at FROM task_events e WHERE e.company_id=t.company_id AND e.task_id=t.id AND e.type='DISPATCHED') dispatched ON true";
     final Db db;
@@ -61,7 +61,7 @@ public class TaskQueryService {
     }
 
     /**
-     * 查询当前 Actor 已授权的所有任务卡片历史，不按完成状态过滤，包含撤回、验收与归档记录。
+     * 查询当前 Actor 本人参与的任务卡片历史，不按完成状态过滤，包含撤回、验收与归档记录。
      * dispatchAt 来自最早真实 DISPATCHED 事件；缺少事件时间的旧数据排在末尾，同时间按 id 稳定排序。
      * cursor 为稳定偏移分页，limit 范围 1–100；本只读 GET 不要求幂等键。
      */
@@ -70,7 +70,8 @@ public class TaskQueryService {
         String keyword=keyword(search);
         var scope=Business.taskScope(actor);
         var args=new ArrayList<Object>(scope.args());
-        String where=scope.sql()+" AND t.title ILIKE ?";
+        String where=scope.sql()+" AND EXISTS (SELECT 1 FROM task_participants personal WHERE personal.task_id=t.id AND personal.company_id=t.company_id AND personal.user_id=?) AND t.title ILIKE ?";
+        args.add(actor.id());
         args.add("%"+keyword+"%");
         long total=db.count("SELECT count(*) FROM tasks t WHERE "+where,args.toArray());
         args.add(limit); args.add(cursor);
@@ -78,7 +79,7 @@ public class TaskQueryService {
                 +" WHERE "+where+" ORDER BY dispatched.dispatch_at DESC NULLS LAST,t.id LIMIT ? OFFSET ?",args.toArray())
             .stream().map(task->{
                 var item=new LinkedHashMap<String,Object>();
-                for(String column:List.of("id","title","start_at","deadline","version","phase","created_at")) item.put(column,task.get(column));
+                for(String column:List.of("id","issuer_id","title","start_at","deadline","version","phase","created_at")) item.put(column,task.get(column));
                 item.put("dispatchAt",task.get("dispatch_at"));
                 item.put("participants",TaskParticipants.list(db,Db.str(task,"id")));
                 item.put("label",TaskLabels.find(db,Db.str(task,"id")));

@@ -26,7 +26,10 @@ public class OrganizationController {
     @GetMapping("/review-policy") public Map<String, Object> policy(HttpServletRequest request) { return service.policy(Actor.current(request)); }
     /** 管理员提交 AI 长期授权开关、期限与数量限制及 version/reason；直属单级审核后生效。退役的 taskTeamReview/taskDepartmentReview 字段返回400。 */
     @PostMapping("/review-policy/revisions") public Map<String, Object> policyRevision(HttpServletRequest request, @RequestBody Map<String, Object> body) { return service.policyRevision(Actor.current(request), body); }
-    /** 已激活账号读取人员：search/dispatch/cursor/limit；dispatch要求派发资格；分页无效400、越权403；无版本要求。 */
+    /** 已激活账号读取人员：search/dispatch/cursor/limit；dispatch要求派发资格；分页无效400、越权403。
+     * 返回人员及participatingTaskCount/activeTaskCount（当前调用人任务权限内，未结束排除ACCEPTED/ARCHIVED/WITHDRAWN）、
+     * todayLogStatus（SUBMITTED/MISSING/UNKNOWN）和上海业务日summaryDate；只统计已提交日志，不披露他人草稿。
+     * 只读分页，无版本和幂等键要求；每次读取实时计算，不保存重复计数字段。 */
     @GetMapping("/people") public Map<String, Object> people(HttpServletRequest request, @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "false") boolean dispatch, @RequestParam(defaultValue = "0") int cursor, @RequestParam(defaultValue = "30") int limit) {
         return service.people(Actor.current(request), search, dispatch, cursor, limit);

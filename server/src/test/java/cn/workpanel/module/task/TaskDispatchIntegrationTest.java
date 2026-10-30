@@ -588,6 +588,11 @@ class TaskDispatchIntegrationTest {
         String second=scheduledTask(prefix+"-second",null,"2026-10-21T00:00:00Z","ARCHIVED");
         String withdrawn=scheduledTask(prefix+"-withdrawn",null,"2026-10-22T00:00:00Z","WITHDRAWN");
         String undated=scheduledTask(prefix+"-undated",null,"2026-10-23T00:00:00Z","DISPATCHED");
+        for(String tid:List.of(first,second,withdrawn,undated)) {
+            jdbc.update("INSERT INTO task_participants(task_id,user_id,company_id) VALUES (?,?,?)",tid,id.get("leader"),company);
+        }
+        // 同属授权范围但本人未参与，不能混入个人公司任务卡片。
+        scheduledTask(prefix+"-subordinate-only",null,"2026-10-24T00:00:00Z","DISPATCHED");
         // 同一任务多次派发取最早时间；同时间的三条按 id 升序；无派发事件排最后。
         dispatchedEvent(first,"2026-10-15T03:00:00Z"); dispatchedEvent(first,"2026-10-12T01:00:00Z");
         dispatchedEvent(second,"2026-10-12T01:00:00Z");
@@ -600,7 +605,7 @@ class TaskDispatchIntegrationTest {
         assertEquals(expected,actual);
         Map<String,JsonNode> byId=new HashMap<>(); page.get("items").forEach(item->byId.put(item.get("id").asText(),item));
         var names=new HashSet<String>(); byId.get(first).fieldNames().forEachRemaining(names::add);
-        assertEquals(Set.of("id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","label"),names);
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","label"),names);
         assertEquals(at("2026-10-12T01:00:00Z"),at(byId.get(first).get("dispatchAt").asText()));
         assertEquals("ACCEPTED",byId.get(first).get("phase").asText());
         assertEquals("WITHDRAWN",byId.get(withdrawn).get("phase").asText());

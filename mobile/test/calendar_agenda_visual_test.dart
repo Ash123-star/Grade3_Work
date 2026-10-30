@@ -158,7 +158,7 @@ void main() {
         find.descendant(
           of: month,
           matching: find.byWidgetPredicate(
-            (w) => w is Text && w.overflow == TextOverflow.clip,
+            (w) => w is Text && w.overflow == TextOverflow.ellipsis,
           ),
         ),
       );
@@ -166,7 +166,6 @@ void main() {
       for (final preview in previews) {
         expect(preview.style?.fontSize, inInclusiveRange(6, 10));
         expect(preview.maxLines, 1);
-        expect(preview.data!.characters.length, lessThanOrEqualTo(6));
       }
       expect(
         find.descendant(of: month, matching: find.byType(FittedBox)),

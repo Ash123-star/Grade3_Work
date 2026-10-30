@@ -81,7 +81,7 @@ BEGIN
         INSERT INTO user_roles VALUES(uid,person.role);
     END LOOP;
     INSERT INTO reporting_relations(employee_id,manager_id,company_id)
-      SELECT 'annual-'||key,'annual-'||manager,c FROM annual_people WHERE manager IS NOT NULL;
+      SELECT 'annual-'||p.key,'annual-'||p.manager,c FROM annual_people p WHERE p.manager IS NOT NULL;
 
     FOR company IN SELECT unnest(ARRAY[c,'annual-peer']) LOOP
         INSERT INTO task_labels(id,company_id,name,category,color,creator_id,created_at)

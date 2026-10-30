@@ -42,7 +42,7 @@ DemoStore agendaStore() {
       ),
     const Record(
       id: 'earlier-span',
-      title: '跨周任务测试',
+      title: '跨周任务测试完整名称',
       fields: {
         'startAt': '2026-10-15T08:00:00+08:00',
         'deadline': '2026-10-22T18:00:00+08:00',
@@ -144,7 +144,7 @@ void main() {
       ),
     );
     expect(mondayContinuation, findsOneWidget);
-    expect(t.widget<Text>(mondayContinuation).data, '跨周任务测试');
+    expect(t.widget<Text>(mondayContinuation).data, '跨周任务测试完整名称');
     expect(t.takeException(), isNull);
   });
 
@@ -374,9 +374,8 @@ void main() {
       expect(previewTitles, isNotEmpty);
       for (final title in previewTitles) {
         expect(title.style?.fontSize, inInclusiveRange(6, 10));
-        expect(title.overflow, TextOverflow.clip);
+        expect(title.overflow, TextOverflow.ellipsis);
         expect(title.maxLines, 1);
-        expect(title.data!.characters.length, lessThanOrEqualTo(6));
         expect(title.data, isNot('任务标题'));
       }
       final segmentRect = t.getRect(firstWeekSegment);
@@ -389,8 +388,8 @@ void main() {
       expect(segmentRect.left, startCell.left);
       expect(segmentRect.right, closeTo(endCell.right - 2, .01));
       expect(
-        t.getRect(find.text('数据结构实训')).right,
-        lessThanOrEqualTo(startCell.right),
+        t.getRect(find.descendant(of: firstWeekSegment, matching: find.text('数据结构实训'))).right,
+        closeTo(segmentRect.right - 10, .01),
       );
       final material = t.widget<Material>(
         find.descendant(of: firstWeekSegment, matching: find.byType(Material)),
@@ -403,16 +402,16 @@ void main() {
       await t.ensureVisible(cell);
       await t.tapAt(t.getTopLeft(cell) + const Offset(8, 8));
       await t.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byKey(const ValueKey('month-day-agenda')), findsOneWidget);
       expect(find.text('5 条记录'), findsOneWidget);
       expect(find.text('任务标题5'), findsOneWidget);
       expect(find.text('日志标题'), findsNothing);
       c.read(sessionProvider.notifier).state = const Session(active: false);
-      await t.pump();
+      await t.pumpAndSettle();
       expect(find.text('账号权限已变化，请关闭后重新查看'), findsOneWidget);
       expect(
         find.descendant(
-          of: find.byType(BottomSheet),
+          of: find.byKey(const ValueKey('month-day-agenda')),
           matching: find.text('任务标题0'),
         ),
         findsNothing,

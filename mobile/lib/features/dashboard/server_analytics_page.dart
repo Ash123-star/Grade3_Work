@@ -128,7 +128,7 @@ class ServerAnalyticsPage extends ConsumerWidget {
       final id = '${person.fields['department_id'] ?? ''}';
       if (id.isNotEmpty) {
         availableDepartments[id] =
-            '${person.fields['departmentName'] ?? person.fields['部门'] ?? id}';
+            '${person.fields['departmentName'] ?? person.fields['部门'] ?? '部门名称暂不可用'}';
       }
     }
     final availableTeams = <String, String>{};
@@ -139,8 +139,10 @@ class ServerAnalyticsPage extends ConsumerWidget {
       }
       final id = '${person.fields['team_id'] ?? ''}';
       if (id.isNotEmpty) {
+        final team = (tree?.fields['teams'] as List? ?? const [])
+            .whereType<Map>().where((team) => team['id'] == id).firstOrNull;
         availableTeams[id] =
-            '${person.fields['teamName'] ?? person.fields['team_name'] ?? id}';
+            '${team?['name'] ?? person.fields['teamName'] ?? person.fields['team_name'] ?? '团队名称暂不可用'}';
       }
     }
     final availableOwners = people.where((person) {

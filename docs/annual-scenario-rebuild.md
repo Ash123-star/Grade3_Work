@@ -83,6 +83,31 @@ sudo python3 scripts/prepare-annual-database.py --new-db workpanel_annual2026
 
 脚本读取当前Java进程的DB_URL/SPRING_DATASOURCE_URL，按实际映射端口定位唯一PostgreSQL容器，不猜测55432还是55435；先以0600权限备份原库到/root，再使用原DB_USER创建新空库。数据库用户需有创建库权限；无权限则停止，不改用另一套数据库。
 
+#### 报错“进程没有显式DB_URL/SPRING_DATASOURCE_URL”
+
+此时报错发生在备份、建库、写配置之前，不用删除任何东西。旧服务可能使用JAR默认配置或外部application.yml；脚本不能从环境变量读出URL，所以要求运维明确指定。
+
+先更新本分支脚本，然后查看当前Java到数据库的实际连接端口：
+
+```bash
+git pull --ff-only
+pid=$(systemctl show collaboration-server --property=MainPID --value)
+sudo ss -tnp | grep "pid=$pid,"
+```
+
+在服务器本地查看 `systemctl cat collaboration-server` 及其EnvironmentFile、Spring外部配置，核对库名和用户名，不分享包含密码的配置。仓库默认值为 `jdbc:postgresql://127.0.0.1:55432/workpanel` 和用户 `workpanel`；这些只是默认值，不足以证明云端实际使用它。若实际连接端口为55432，且配置确认库名/用户均为workpanel，执行：
+
+```bash
+sudo python3 scripts/prepare-annual-database.py \
+  --new-db workpanel_annual2026 \
+  --source-url jdbc:postgresql://127.0.0.1:55432/workpanel \
+  --source-user workpanel
+```
+
+如果确认使用55435或其他库名/用户，将参数替换为确认值，不能只因另一套库存在就选择它。显式参数仅指出源库，不关闭备份、目标库已存在拒绝或未知Spring属性覆盖保护。
+
+密码仍优先复用原进程环境/原Spring配置。若原密码只存在外部文件，或psql认证失败，可在服务器本地把该密码存入root持有的0600文件，附加 `--source-password-file /root/workpanel-source-password`；不要在命令行中写密码。脚本会将它写入新的0600环境文件供新服务使用。脚本完成后移除临时密码文件。若命令行/SPRING_APPLICATION_JSON强制指定了数据源，脚本仍拒绝操作，必须先由运维消除高优先级覆盖，避免重启后仍连旧库。
+
 它写入root-only `/etc/collaboration-annual2026.env` 和drop-in `/etc/systemd/system/collaboration-server.service.d/zzzz-annual2026.conf`，保留原用户名、密码、Redis与其他配置。脚本不停止、不重启、不替换JAR，也不删除旧库。存在额外Spring配置、目标库/同名配置已存在或无法确定连接时拒绝执行；先检查输出，不盲目重复。失败后可能留下已备份文件或空库，保留供核对。
 
 配置包含新DB_URL、`SCENARIO_DATA_ENABLED=true`、`SCENARIO_DATASET=annual-2026`、`SCENARIO_PASSWORD=test12345678`、`SESSION_HOURS=168`及默认维护管理员配置。存在别的更晚加载的drop-in或Spring属性覆盖时，须先在服务器本地核对统一；不要发送包含密码的完整配置。
@@ -107,6 +132,10 @@ journalctl -u collaboration-server -n 150 --no-pager
 
 ### 4. 成功后关闭场景开关
 
+若年度V1报 `42702: column reference "manager" is ambiguous`，正式V1–V23成功不代表场景初始化成功：该错误发生在ApplicationRunner阶段，可能晚于 `Started Application`。先停止systemd的失败重启，再将年度SQL中直属关系查询改为 `SELECT 'annual-'||p.key,'annual-'||p.manager,c FROM annual_people p WHERE p.manager IS NOT NULL;`。此处修复仅适用于年度V1尚未成功且事务已回滚的新库；不得修改其他库已成功应用的迁移或修复校验和来绕过历史。
+
+仅改源SQL不会改变运行JAR，必须重新打包部署。若使用 `git archive HEAD` 构建，须额外将本地修复的SQL复制进构建目录，否则未提交的修复会被遗漏。复用已有新库、环境文件和drop-in，不重复运行建库脚本，不删表或Flyway历史。等待年度 `flyway_annual2026_history` 的V1为success=true、业务数据存在且服务稳定后，才关闭场景开关。仓库已修复SQL，云端执行结果待确认。
+
 ```bash
 sudo sed -i 's/^SCENARIO_DATA_ENABLED=.*/SCENARIO_DATA_ENABLED=false/; /^SCENARIO_PASSWORD=/d; /^ADMIN_PASSWORD=/d' \
   /etc/collaboration-annual2026.env
@@ -116,6 +145,12 @@ sudo systemctl restart collaboration-server
 保留新DB_URL和annual-2026选项，不删除整个drop-in；否则会切回旧库。账号/任务不删除。不要修改Flyway历史来重新初始化或重置密码。
 
 ## 可复现的结果检查（本轮未执行）
+
+### 2026-10-30 云端恢复记录
+
+SSH检查确认云端已修复manager歧义并成功执行年度V1，未再次修改迁移或重建数据库。实际库workpanel_annual2026内有642条任务、1816条日志、10条有效公司重点；正常成员各36条自有任务，10月入职成员12条，停用成员18条历史任务，待确认成员0条。
+
+已备份年度环境文件到云端/root，关闭SCENARIO_DATA_ENABLED并移除一次性密码覆盖，重启systemd服务；检查时MainPID=743853、NRestarts=0、active/running。本机8080健康检查、zhou/boss登录/本人信息/退出均200；移动端公网地址的健康检查、zhou登录/本人信息/退出均200，登录返回有效期168小时。检查会话均已退出，未打印token。未重新编译、运行完整测试或验证移动端界面，其余验收仍待完成。
 
 在新库内可运行：
 
