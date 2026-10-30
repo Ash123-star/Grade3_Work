@@ -8,6 +8,7 @@ import 'package:pandora_mobile/data/repositories/repository.dart';
 /// 断言任务列表实际发出的 HTTP 参数，而不是只检查 Repository 的入参对象。
 class _CaptureAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
+  Map<String, dynamic> response = {'items': <dynamic>[], 'total': 0};
 
   @override
   void close({bool force = false}) {}
@@ -20,7 +21,7 @@ class _CaptureAdapter implements HttpClientAdapter {
   ) async {
     requests.add(options);
     return ResponseBody.fromString(
-      jsonEncode({'items': <dynamic>[], 'total': 0}),
+      jsonEncode(response),
       200,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
@@ -82,5 +83,36 @@ void main() {
     expect(query['period'], 'day');
     expect(query.containsKey('from'), isFalse);
     expect(query.containsKey('to'), isFalse);
+  });
+
+  test('task creation submits selected server label ID and idempotency key', () async {
+    adapter.response = {'id': 'review-1', 'status': 'PENDING', 'expected_version': 0};
+    await repository.execute(
+      'tasks',
+      const Command('create', {
+        '任务名称': '演示任务',
+        'participantIds': ['member-1'],
+        'deadline': '2026-11-01T10:00:00Z',
+        'tagId': 'current-label-id',
+      }, idempotencyKey: 'create-demo-1'),
+    );
+    final request = adapter.requests.single;
+    expect(request.path, '/tasks');
+    expect(request.method, 'POST');
+    expect(request.headers['Idempotency-Key'], 'create-demo-1');
+    expect((request.data as Map)['labelId'], 'current-label-id');
+  });
+
+  test('creation review decision sends expected version zero', () async {
+    adapter.response = {'id': 'review-1', 'status': 'APPROVED', 'expected_version': 0};
+    await repository.execute(
+      'reviews',
+      const Command('approve', {'id': 'review-1'}, version: 0),
+    );
+    final request = adapter.requests.single;
+    expect(request.path, '/reviews/review-1/decision');
+    expect(request.method, 'POST');
+    expect((request.data as Map)['expectedVersion'], 0);
+    expect((request.data as Map)['approve'], isTrue);
   });
 }
