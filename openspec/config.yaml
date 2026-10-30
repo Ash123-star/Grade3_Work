@@ -18,7 +18,9 @@ context: |
   后端按 Controller、应用、领域、基础设施分层；Controller 不编写 SQL 或核心规则，跨模块调用应用接口。
   数据库以 server/src/main/resources/db/migration 的 Flyway 模型为准，只新增迁移，不修改已发布迁移，不混用 deploy/postgresql。
   接口变更同步运行时 SpringDoc、docs/openapi.json、docs/backend-interface.md；包含权限、错误、分页、版本和幂等说明。
-  每项功能/缺陷关联 Issue、Sprint、负责人和 OpenSpec change/task；默认分支只通过 PR 合并。用户指定分支名时遵守用户指令。
+  每项功能/缺陷关联 Issue、Sprint、负责人；需要 OpenSpec 时关联 change/task，默认分支只通过 PR 合并。用户指定分支名时遵守用户指令。
+  文档优先更新已有通用主题文件，不为每轮会话或小改动新建计划、交接、验收记录；没有合适载体且有长期独立维护价值时才新建通用文档，过程产物放 output/。
+  OpenSpec 按复杂度使用：新能力或涉及架构、权限/数据范围、数据库、公共接口、跨模块契约、重要业务状态的复杂变更优先复用活动 change；简单文案/样式、小修复、文档/规则维护、无行为变化的配置整理和清理无需新建 change，现有规格受影响时同步相关内容。
   后端验收命令为 powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1，资源不足加 -DockerMaven；规范验收为 openspec.cmd validate --all --strict。
   课程要求核心单元测试、至少一条端到端集成/系统链路、正常及异常验收；PRD 重点质量要求为安全隔离和响应性能。
   分开记录已实现、已验证、未验证、未实现和环境阻塞；历史测试、Mock、编译通过和 task 勾选不能证明当前功能完成。

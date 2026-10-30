@@ -18,3 +18,7 @@ web/node_modules/
 web/dist/
 web/test-results/
 web/playwright-report/
+
+# 历史截图目录已清理；新证据统一放根目录 output/
+/mobile/docs/evidence/
+/mobile/docs/screenshots/

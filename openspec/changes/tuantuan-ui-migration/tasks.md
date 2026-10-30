@@ -51,4 +51,4 @@
 - [x] 7.3 统一运行分析、受影响测试、窄屏大字与模拟器验收、严格校验和差异检查并记录证据
 - [ ] 7.4 检查混合用户改动，满足条件后提交推送和 PR；阻塞时明确记录
 
-7.4 阻塞：原有两个 pubspec.lock 用户改动保留，依 AGENTS.md 第 4 节停止自动提交/推送；GitHub CLI 未登录，远程 Issue/PR 待关联。验收证据见 `mobile/docs/ai-map-layout-verification.md`。
+7.4 阻塞：原有两个 pubspec.lock 用户改动保留，依 AGENTS.md 第 4 节停止自动提交/推送；GitHub CLI 未登录，远程 Issue/PR 待关联。验收证据见 [历史文件](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/docs/ai-map-layout-verification.md)。

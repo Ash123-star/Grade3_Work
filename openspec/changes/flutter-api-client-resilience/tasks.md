@@ -10,4 +10,4 @@
   - `dart analyze`：No issues found!（`flutter analyze` 的 LSP 分析服务器首次运行崩溃，改用 `dart analyze` 取得干净结果）。
   - `flutter test`：All tests passed，26 个用例（含本次新增 8 个 client 层用例，无回归）。
   - OpenSpec 严格校验通过（本 change `change/flutter-api-client-resilience` 为 valid）。
-  - 工具链：D:\software\flutter，Flutter 3.47.7 / Dart 3.13.5。详见 `docs/frontend-validation.md`。
+  - 工具链：D:\software\flutter，Flutter 3.47.7 / Dart 3.13.5。详见 [历史文件](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/docs/frontend-validation.md)。
