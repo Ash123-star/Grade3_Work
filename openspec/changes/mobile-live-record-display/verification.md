@@ -42,3 +42,16 @@
 本批不新增数据库迁移、不重建或重新播种业务数据库；云端原有CI/Dockerfile等改动保留。云端本轮拉取至b76891d，但运行服务最后确认仍为113e30b，新版JAR替换和重启尚待成功证据。
 
 16:23前后复核：两次新SSH连接均在banner exchange阶段超时，已有SSH会话无响应；云端API直接与经本机代理访问均超时（HTTP000）。未执行服务停止或JAR替换，无法判断是网络还是主机资源问题，不能报告已重启。恢复连接后先检查负载和隔离验证进程，再安全清理本批测试容器并完成备份部署。
+
+
+## 2026-10-30 17:00 云端更新完成（替代此前连接阻塞状态）
+
+重新连接后确认主机可用，原后端运行；此前测试Java进程已不存在，未得到全量测试最终退出码。删除本批唯一遗留且已退出的临时验证容器workpanel-verify-1793346455，不操作业务数据容器。云端原有CI/Dockerfile及备份文件改动保持原状。
+
+云端分支chore/annual-scenario-dataset已快进至4a1885f。按该提交git archive到/opt/Grade3_Work-build.mlcFMA隔离构建，低内存Maven `-DskipTests package`退出0，BUILD SUCCESS；没有重新执行全量测试。
+
+备份目录/root/workpanel-deploy-20261030.2a05gg（0700）保存旧JAR、年度库pg_dump自定义格式备份、年度环境配置、systemd配置、源码提交及工作区差异。确认业务库仍为127.0.0.1:55432/workpanel_annual2026，场景初始化开关关闭；没有改连接、重置或播种数据。
+
+替换JAR并重启collaboration-server成功，部署脚本退出0：16:59:54（Asia/Shanghai）日志Started Application，Flyway验证23迁移成功，public已是最新且无需迁移。服务PID9214，active/running，NRestarts=0；新JAR SHA256为10a33c0b1c15ff27d801cc2d060d78be3988ca2cf0eee0052a07b207a0606c3d。公网http://39.96.84.51/api/health于17:00返回HTTP200、status=UP。
+
+本次仅确认新版部署与健康响应，不代表此前全量测试失败已解决。PR #50继续保持草稿且未合并main。后续仅部署文档提交不需要重建JAR，运行产物源码对应4a1885f。
