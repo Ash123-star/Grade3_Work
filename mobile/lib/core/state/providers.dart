@@ -279,7 +279,7 @@ final calendarMonthTasksProvider = FutureProvider.autoDispose
         ref.watch(repositoryProvider),
         'tasks',
         Query(
-          ownerId: key.$1,
+          ownerId: key.$1 ?? ref.watch(sessionProvider).id,
           from: range.from,
           to: range.to,
         ),
@@ -338,6 +338,7 @@ void refreshBusiness(WidgetRef ref) {
   ref.invalidate(recordsProvider);
   ref.invalidate(receivedTaskCardProvider);
   ref.invalidate(datedRecordsProvider);
+  ref.invalidate(calendarMonthTasksProvider);
   ref.invalidate(itemProvider);
   ref.invalidate(scopedItemProvider);
   ref.invalidate(organizationTreeProvider);

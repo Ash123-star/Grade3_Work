@@ -41,7 +41,7 @@ class TaskQueryServiceTest {
 
     Map<String,Object> card() {
         var task=new LinkedHashMap<String,Object>();
-        task.put("id","task-1"); task.put("title","卡片任务"); task.put("start_at",null);
+        task.put("id","task-1"); task.put("issuer_id","leader"); task.put("title","卡片任务"); task.put("start_at",null);
         task.put("deadline","2026-10-20T10:00:00Z"); task.put("phase","WITHDRAWN"); task.put("version",4);
         task.put("created_at","2026-10-10T10:00:00Z"); task.put("dispatch_at","2026-10-12T01:00:00Z");
         return task;
@@ -108,14 +108,16 @@ class TaskQueryServiceTest {
     }
 
     @Test void receivedCardKeepsPhasesAndSortsByEarliestRealDispatch() {
-        record(statement->statement.startsWith("SELECT t.id,t.title,t.start_at,t.deadline,t.phase")?List.of(card()):List.of());
+        record(statement->statement.startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.phase")?List.of(card()):List.of());
         var result=service.receivedCard(LEADER,0,30,"卡片");
         String cardSql=sql.stream().filter(statement->statement.contains("dispatched.dispatch_at")).findFirst().orElseThrow();
         assertTrue(cardSql.contains("ORDER BY dispatched.dispatch_at DESC NULLS LAST,t.id"),cardSql);
         assertTrue(cardSql.contains("min(e.created_at) AS dispatch_at"),cardSql);
         assertTrue(cardSql.contains("e.type='DISPATCHED'"),cardSql);
+        assertTrue(cardSql.contains("personal.user_id=?"),cardSql);
+        assertTrue(cardSql.contains("personal.company_id=t.company_id"),cardSql);
         @SuppressWarnings("unchecked") var item=((List<Map<String,Object>>)result.get("items")).getFirst();
-        assertEquals(Set.of("id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","label"),item.keySet());
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","label"),item.keySet());
         assertEquals("WITHDRAWN",item.get("phase"));
         assertEquals("2026-10-12T01:00:00Z",item.get("dispatchAt"));
         assertEquals("1",result.get("nextCursor"));

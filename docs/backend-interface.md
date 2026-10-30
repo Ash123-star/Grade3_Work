@@ -27,9 +27,15 @@
 
 ## 组织 `/organization`
 
+2026-10-30（Issue #49，源码实现，未运行验收）：`GET /organization/people` 每项新增 `participatingTaskCount`、`activeTaskCount`、`todayLogStatus`、`summaryDate`。任务计数同时限制在当前请求人任务权限和该成员参与关系内，未结束任务排除 ACCEPTED/ARCHIVED/WITHDRAWN；日志状态为 SUBMITTED/MISSING/UNKNOWN，以服务端上海业务日及已提交记录计算，待确认账号 UNKNOWN，不返回他人草稿信息。前端字段缺失显示未知，不伪造0或缺交。
+
+任务事件 `actor_name`、审核步骤 `reviewer_name`、审计 `actor_name` 为同公司 `users.name`。姓名缺失显示未知成员，不回退登录账号/内部ID。日志保留业务日期，但列表/卡片标题从work首个非空行生成最多48字符摘要，无正文显示工作日志，无新增存储字段。运行时OpenAPI模式已同步；`docs/openapi.json`快照留待统一验收时重新导出。
+
 组织树和 `/people` 返回范围内数据。管理员策略、人员和组织单元的关键变更使用 `version`、`reason`，通过审核后生效。主要接口：`GET /organization`、`GET /organization/departments`、`GET /organization/people`、`POST /organization/membership-application`、`GET/POST /organization/review-policy`、`POST /organization/reviewer-application`、`POST /organization/users/{id}/revisions`、`POST /organization/{departments|teams}/revisions`、`GET /organization/audit`。
 
 ## 任务 `/tasks`
+
+2026-10-30（Issue #49）：`GET /tasks/received-card` 仅返回当前用户本人参与的任务（包括本人派发且参与），包含全部生命周期状态，不再返回仅下属参与的授权范围任务。`items/total/nextCursor`使用相同过滤；每项增加`issuer_id`。导图卡片与完整列表共用该资源，管理任务表继续使用`GET /tasks`授权范围查询。
 
 `GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
 

@@ -1147,7 +1147,12 @@ class MockRepository implements Repository {
     if (resource == 'tasks' || resource == 'tasks/received-card') {
       items = items.where(taskVisible);
       if (query.ownerId != null) {
-        items = items.where((record) => record.ownerId == query.ownerId);
+        items = items.where((record) {
+          final participants = record.fields['participantIds'] as List?;
+          return participants == null
+              ? record.ownerId == query.ownerId
+              : participants.map((id) => '$id').contains(query.ownerId);
+        });
       }
       if (resource == 'tasks/received-card') {
         items = items.where((record) {
@@ -1155,8 +1160,7 @@ class MockRepository implements Repository {
           final received = participants == null
               ? record.ownerId == session.id
               : participants.map((id) => '$id').contains(session.id);
-          return received &&
-              '${record.fields['dispatcherId'] ?? ''}' != session.id;
+          return received;
         });
       }
     }
@@ -1267,13 +1271,32 @@ class MockRepository implements Repository {
             date.isBefore(rangeTo);
       });
     }
-    final result = items
-        .map(
-          (item) => resource == 'tasks' || resource == 'tasks/received-card'
-              ? _withTaskDisplay(item)
-              : item,
-        )
-        .toList();
+    final result = items.map((item) {
+      if (resource == 'tasks' || resource == 'tasks/received-card') {
+        return _withTaskDisplay(item);
+      }
+      if (resource == 'organization' || resource == 'organization/dispatch-people') {
+        final participating = rows('tasks').where((task) => taskVisible(task) &&
+            (task.fields['participantIds'] as List? ?? [task.ownerId]).contains(item.id));
+        final today = stamp(shanghaiWallTime(clock()));
+        final submitted = rows('logs').any((log) => log.ownerId == item.id &&
+            log.fields['businessDate'] == today && isSubmittedDiary(log));
+        return Record(
+          id: item.id, title: item.title, subtitle: item.subtitle,
+          ownerId: item.ownerId, version: item.version,
+          fields: {...item.fields,
+            'participatingTaskCount': participating.length,
+            'activeTaskCount': participating.where((task) => !const {
+              '已验收', '已归档', '已撤回', 'ACCEPTED', 'ARCHIVED', 'WITHDRAWN',
+            }.contains('${task.fields['phase'] ?? task.fields['status']}')).length,
+            'todayLogStatus': item.fields['status'] != 'ACTIVE' ? 'UNKNOWN'
+                : submitted ? 'SUBMITTED' : 'MISSING',
+            'summaryDate': today,
+          },
+        );
+      }
+      return item;
+    }).toList();
     if (resource == 'dashboard/personal') {
       result.sort(
         (a, b) => (int.tryParse('${a.fields['排序位置']}') ?? 0).compareTo(

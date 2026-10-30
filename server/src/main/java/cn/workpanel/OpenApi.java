@@ -118,7 +118,7 @@ public class OpenApi {
                 Map.entry("POST /api/ai-maps/development/jobs","DevelopmentRequest"),Map.entry("POST /api/ai-memories","MemoryCreate"),Map.entry("POST /api/ai-memories/{id}/revisions","MemoryRevision"),Map.entry("POST /api/ai-memories/{id}/confirm","MemoryConfirm"),Map.entry("PUT /api/ai-memories/preferences/me","MemoryPreferences"),Map.entry("POST /api/ai-maps/development/{id}/feedback","DevelopmentFeedback"));
             var responses=Map.ofEntries(
                 Map.entry("POST /api/ai/jobs/{id}/confirm-task","AiTaskConfirmationResult"),Map.entry("GET /api/organization/teams","TeamDirectory"),
-                Map.entry("GET /api/tasks","TaskPage"),Map.entry("GET /api/tasks/received-card","ReceivedTaskPage"),Map.entry("GET /api/logs/subordinates/calendar","MemberLogCalendar"),
+                Map.entry("GET /api/tasks","TaskPage"),Map.entry("GET /api/tasks/received-card","ReceivedTaskPage"),Map.entry("GET /api/logs/subordinates/calendar","MemberLogCalendar"),Map.entry("GET /api/organization/people","OrganizationPeoplePage"),
                 Map.entry("GET /api/analytics","AnalyticsSummary"),Map.entry("GET /api/analytics/details","AnalyticsDetailsPage"),Map.entry("GET /api/profiles/{id}","ProfileView"),Map.entry("PUT /api/profiles/me","ProfileView"),
                 Map.entry("GET /api/ai-maps/development","DevelopmentLatest"),Map.entry("POST /api/ai-maps/development/jobs","DevelopmentJob"),
                 Map.entry("GET /api/ai-maps/development/jobs/{id}","DevelopmentJob"),Map.entry("POST /api/ai-maps/development/jobs/{id}/retry","DevelopmentJob"),

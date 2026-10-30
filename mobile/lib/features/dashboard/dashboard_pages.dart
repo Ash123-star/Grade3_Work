@@ -63,7 +63,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           children: [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: period == '月' ? 12 : 0),
-              child: const DateControls(showTaskManagement: false),
+              child: const DateControls(showTaskManagement: true),
             ),
             Expanded(
               child: LayoutBuilder(

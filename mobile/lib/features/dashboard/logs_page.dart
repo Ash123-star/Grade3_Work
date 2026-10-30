@@ -5,6 +5,7 @@ import 'package:cute_ui/cute_ui.dart' show CuteTokens;
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/record_display.dart';
 import 'package:pandora_mobile/data/models/log_edit_window.dart';
 import 'package:pandora_mobile/features/dashboard/diary_composer_sheet.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
@@ -319,8 +320,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                             ? authors[r.ownerId] ??
                                   Record(
                                     id: r.ownerId,
-                                    title:
-                                        '${r.fields['authorName'] ?? r.ownerId}',
+                                    title: displayPersonName(r.fields['authorName']),
                                   )
                             : null,
                         onTap: () =>

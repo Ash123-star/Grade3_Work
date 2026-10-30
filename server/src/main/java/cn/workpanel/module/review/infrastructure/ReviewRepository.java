@@ -42,7 +42,7 @@ public class ReviewRepository {
         return rows.isEmpty()?"":Db.str(rows.getFirst(),"id");
     }
     public long assigned(String id,String actor) { return db.count("SELECT count(*) FROM review_steps WHERE request_id=? AND reviewer_id=?",id,actor); }
-    public java.util.List<Map<String,Object>> steps(String id) { return db.rows("SELECT * FROM review_steps WHERE request_id=? ORDER BY position",id); }
+    public java.util.List<Map<String,Object>> steps(String id) { return db.rows("SELECT s.*,u.name AS reviewer_name FROM review_steps s LEFT JOIN users u ON u.id=s.reviewer_id AND u.company_id=s.company_id WHERE s.request_id=? ORDER BY s.position",id); }
     public java.util.List<Map<String,Object>> pending(String id) { return db.rows("SELECT * FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position LIMIT 1",id); }
     public String currentReviewer(String id) { var rows=db.rows("SELECT s.reviewer_id,u.name AS reviewer_name FROM review_steps s JOIN users u ON u.id=s.reviewer_id AND u.company_id=s.company_id WHERE s.request_id=? AND s.state='PENDING' ORDER BY s.position LIMIT 1",id); return rows.isEmpty()?"":Db.str(rows.getFirst(),"reviewer_id"); }
     private static String validReviewer(String request,String user) {

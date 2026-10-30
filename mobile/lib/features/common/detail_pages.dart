@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:pandora_mobile/data/models/task_display.dart';
+import 'package:pandora_mobile/data/models/record_display.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,7 +24,7 @@ import '../../shared/generated_assets.dart';
 
 String _reviewMetadata(Record record) => [
   '${record.fields['reviewState'] ?? '审核状态未提供'}',
-  '申请人 ${record.fields['applicantName'] ?? record.ownerId}',
+  '申请人 ${displayPersonName(record.fields['applicantName'])}',
   prettyDate(record.fields['createdAt']),
 ].join(' · ');
 
@@ -550,7 +551,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                                         ),
                                       if (resource == 'audit')
                                         Text(
-                                          '${prettyDate(r.fields['createdAt'])} · 操作者 ${r.fields['actor_id'] ?? '未返回'}',
+                                          '${prettyDate(r.fields['createdAt'])} · 操作者 ${displayPersonName(r.fields['actor_name'])}',
                                           style: Theme.of(
                                             context,
                                           ).textTheme.bodySmall,
@@ -1238,12 +1239,12 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   Text(
                     f['reviewerConfigured'] == false || f['reviewerId'] == null
                         ? '直属上级未配置，申请保持待审'
-                        : '审核人 ${f['reviewerName'] ?? f['reviewerId']}',
+                        : '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
                   )
                 else if (f['reviewerId'] != null)
                   Text(
-                    '审核人 ${f['reviewerName'] ?? f['reviewerId']}',
+                    '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
                   ),
                 if (f['decisionSource'] == 'FOUNDER_EXEMPT')
@@ -1312,7 +1313,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${f['businessDate'] ?? ''} · 作者 ${f['authorName'] ?? item.ownerId} · ${f['status'] ?? (isSubmittedDiary(item) ? '已提交' : '提交状态未确认')}',
+                  '${f['businessDate'] ?? ''} · 作者 ${displayPersonName(f['authorName'])} · ${f['status'] ?? (isSubmittedDiary(item) ? '已提交' : '提交状态未确认')}',
                   style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                 ),
                 if (f['editableUntil'] != null)
@@ -1382,7 +1383,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 section('事件类型', f['type']),
-                section('操作者', f['actor_id']),
+                section('操作者', displayPersonName(f['actor_name'])),
                 section('发生时间', f['created_at']),
                 section('修改对象', f['object_id']),
                 section('变更理由', f['reason']),
