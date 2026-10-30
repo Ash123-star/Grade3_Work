@@ -34,6 +34,7 @@ app:
   session-hours: ${SESSION_HOURS:168}
   scenario-data-enabled: ${SCENARIO_DATA_ENABLED:false}
   scenario-password: ${SCENARIO_PASSWORD:}
+  scenario-dataset: ${SCENARIO_DATASET:legacy}
   jobs-enabled: ${JOBS_ENABLED:true}
   deepseek-key: ${DEEPSEEK_API_KEY:}
   deepseek-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}

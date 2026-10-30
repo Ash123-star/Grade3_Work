@@ -11,7 +11,7 @@ String taskTagLabel(Map<String, dynamic> fields) {
       .trim();
   final label = '${fields['tagName'] ?? fields['tag_name'] ?? ''}'.trim();
   if (label.isNotEmpty && label != id && label != '标签名称未提供') {
-    return taskTagLabels[label] ?? label;
+    return label;
   }
   return taskTagLabels[id] ??
       (id == 'customer-delivery'

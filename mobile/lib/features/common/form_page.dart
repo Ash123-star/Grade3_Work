@@ -21,15 +21,8 @@ import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/models/diary_task_links.dart';
 import 'package:pandora_mobile/shared/diary_task_links.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
+import 'package:pandora_mobile/shared/task_label_selector.dart';
 import 'catalog.dart';
-
-const _taskTagLabels = taskTagLabels;
-const _taskTagColors = <String, Color>{
-  'company-important': Color(0xFFFFD9A8),
-  'department-research': Color(0xFFBDEFD7),
-  'department-design': Color(0xFFCFE5FF),
-  'personal-today': Color(0xFFE7D4FF),
-};
 
 class FormPage extends ConsumerStatefulWidget {
   const FormPage(
@@ -703,113 +696,8 @@ class _FormPageState extends ConsumerState<FormPage> {
         ),
       );
     }
-    final options = switch (label) {
-      '标签' => _taskTagLabels.keys.toList(),
-      _ => const <String>[],
-    };
     if (label == '标签') {
-      return FormField<String>(
-        initialValue: controller.text,
-        validator: (_) => validate(label, controller.text),
-        builder: (state) => _taskRow(
-          label,
-          InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: busy
-                ? null
-                : () async {
-                    final choice = await showPremiumTagPicker(
-                      context,
-                      options: [
-                        for (final entry in _taskTagLabels.entries)
-                          PremiumTagOption(
-                            entry.key,
-                            entry.value,
-                            _taskTagColors[entry.key]!,
-                          ),
-                      ],
-                      selected: controller.text,
-                    );
-                    if (choice == null || !mounted) return;
-                    controller.text = choice;
-                    state.didChange(choice);
-                    setState(() {});
-                  },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  if (controller.text.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _taskTagColors[controller.text],
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        _taskTagLabels[controller.text] ?? controller.text,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  if (controller.text.isEmpty)
-                    const Text('选择标签', style: TextStyle(color: Colors.grey)),
-                  const Spacer(),
-                  const Icon(Icons.expand_more_rounded),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    if (options.isNotEmpty) {
-      return FormField<String>(
-        initialValue: controller.text,
-        validator: (_) => validate(label, controller.text),
-        builder: (state) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _taskRow(
-              label,
-              PremiumDropdownField<String>(
-                initialValue: options.contains(controller.text)
-                    ? controller.text
-                    : null,
-                isExpanded: true,
-                icon: const Icon(Icons.expand_more_rounded),
-                decoration: const InputDecoration(
-                  hintText: '选择字段值',
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 8),
-                ),
-                items: options
-                    .map(
-                      (option) => DropdownMenuItem(
-                        value: option,
-                        child: Text(
-                          label == '标签' ? _taskTagLabels[option]! : option,
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: busy
-                    ? null
-                    : (value) {
-                        controller.text = value ?? '';
-                        state.didChange(value);
-                        setState(() {});
-                      },
-              ),
-            ),
-            if (state.hasError) _taskError(state.errorText!),
-          ],
-        ),
-      );
+      return _taskRow(label, _taskLabelField(controller), topAligned: true);
     }
     return _taskRow(
       label,
@@ -842,9 +730,17 @@ class _FormPageState extends ConsumerState<FormPage> {
     ),
   );
 
+  Widget _taskLabelField(TextEditingController controller) => TaskLabelSelector(
+    controller: controller,
+    enabled: !busy && !loadingExisting,
+    historicalName: original == null ? null : taskTagLabel(original!.fields),
+    onChanged: () => setState(() {}),
+  );
+
   Widget field(String label) {
     if (widget.kind == 'dispatch') return _taskField(label);
     final controller = controllers[label]!;
+    if (label == '标签') return _taskLabelField(controller);
     if (widget.kind == 'register' && label == '部门' && !AppConfig.mock) {
       return ref
           .watch(registrationDepartmentsProvider)
@@ -874,7 +770,6 @@ class _FormPageState extends ConsumerState<FormPage> {
     }
     final options = switch (label) {
       '部门' || '上级部门' => ['产品部', '市场部', '技术部'],
-      '标签' => _taskTagLabels.keys.toList(),
       '角色' => UserRole.values.map((r) => r.label).toList(),
       '展示受众' => ['本团队', '本部门', '全公司'],
       _ => <String>[],
@@ -1033,13 +928,7 @@ class _FormPageState extends ConsumerState<FormPage> {
         },
       );
     }
-    final person = [
-      '主负责人',
-      '协作人',
-      '参与人',
-      '员工',
-      '直属上级',
-    ].contains(label);
+    final person = ['主负责人', '协作人', '参与人', '员工', '直属上级'].contains(label);
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
@@ -1553,35 +1442,35 @@ class _FormPageState extends ConsumerState<FormPage> {
       bottom: widget.kind == 'policy'
           ? null
           : Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 120),
-                child: SingleChildScrollView(child: failure()),
-              ),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 120),
+                      child: SingleChildScrollView(child: failure()),
+                    ),
+                  ),
+                BottomActions(
+                  primary: submitButton(),
+                  secondary: document && !log
+                      ? OutlinedButton(
+                          onPressed:
+                              busy ||
+                                  loadingExisting ||
+                                  draftRestoring ||
+                                  submitted ||
+                                  !windowOpen
+                              ? null
+                              : () => saveDraft(notify: true),
+                          child: const Text('保存草稿'),
+                        )
+                      : null,
+                  note: widget.kind == 'reject' ? '驳回必须填写原因；冲突后请重新读取' : null,
+                ),
+              ],
             ),
-          BottomActions(
-            primary: submitButton(),
-            secondary: document && !log
-                ? OutlinedButton(
-                    onPressed:
-                        busy ||
-                            loadingExisting ||
-                            draftRestoring ||
-                            submitted ||
-                            !windowOpen
-                        ? null
-                        : () => saveDraft(notify: true),
-                    child: const Text('保存草稿'),
-                  )
-                : null,
-            note: widget.kind == 'reject' ? '驳回必须填写原因；冲突后请重新读取' : null,
-          ),
-        ],
-      ),
       child: PageBody(
         children: [
           if (auth) ...[
@@ -1826,9 +1715,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('策略范围'),
             const PaperSurface(
-              child: Text(
-                '普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。',
-              ),
+              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。'),
             ),
             const SizedBox(height: 16),
           ],
@@ -1937,9 +1824,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('审核方式'),
             const PaperSurface(
-              child: Text(
-                '普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。',
-              ),
+              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。'),
             ),
           ],
           if (widget.kind == 'register')
