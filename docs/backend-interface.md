@@ -139,3 +139,9 @@ Content-Type: application/json
 - `GET /api/admin/workspace/organization/task-audit`（公共同权限入口`/api/organization/task-audit`）：仅ADMIN，taskId可选（最多100字）、cursor>=0、limit为1至100。返回items/total/nextCursor；条目包含审计原字段及actor_name/task_id。过滤任务直接事件、任务审核申请/决定及最终生效；数据库按公司过滤后计数分页。无权/未知taskId均空，非法分页400、非ADMIN403。无版本及幂等键，只读；Web任务审计入口支持翻页与前后值展示。
 - 新增V15 `log_comment_replies`，旧评论parent_id为null，通过复合外键禁止跨日志回复。不修改旧迁移，不回删历史评论。
 - 用户确认：标签模型与权限实际接入、C的新任务增删改审核联调等待C提供分支或契约。现有任务审计展示不代表新任务增删改闭环已经完成。
+
+### 审核与通知业务展示（Issue #51）
+
+GET /api/reviews/{id} 在现有审核读取权限校验之后追加 `display_references`：people、labels、departments、teams 分类下的 `{引用ID: 当前名称}`。只解析 before_value/candidate 内已有引用，查询必须限定 review_requests.company_id；缺失、已删除或跨公司引用不返回名称。该字段只供展示，不能提交为审核输入；原始快照、expected_version 及所有写入接口保持不变，无数据库迁移。名称反映读取时的当前名称，不能当作历史名称证据。
+
+移动端将审核快照显示为中文业务字段；时间按 Asia/Shanghai 展示，附件显示数量；缺失引用显示“名称暂不可用”，不回退内部ID。创建申请无“当前生效v0”，通过/驳回/失效记录无待审生效提示。GET /notifications 的 type/object_id 保持现有契约：历史 TASK_DISPATCHED 与 TASK_ASSIGNED 均显示收到新任务并指向 tasks；TASK_EVENT/REVISED/REASSIGNED/RESCHEDULED/COMMENT、DEADLINE、DELIVERY_CHECKED 指向 tasks；LOG_SUBMITTED/UPDATED/COMMENT 指向 logs；REVIEW_PENDING/APPROVED/REJECTED 指向 reviews；AI_READY 指向既有作业结果页，AI_WORK_UPDATED 指向工作详情页。未知类型显示“工作通知”，缺失或不支持目标明确提示；目标详情仍执行既有服务端权限校验，不新增旧接口或绕过鉴权。标记已读的网络失败保留错误提示并允许打开合法详情，401/403仍阻断。

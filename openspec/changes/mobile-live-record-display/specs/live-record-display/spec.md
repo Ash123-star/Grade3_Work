@@ -54,3 +54,29 @@
 #### Scenario: 未知与隐私边界
 - WHEN 账号待确认、接口未返回统计或他人只有草稿
 - THEN 待确认和缺失统计显示未知，他人草稿不作为已提交日志且不披露正文，跨公司数据不计入
+
+### Requirement: Business review presentation
+The client SHALL render review snapshots as localized business fields and state-aware descriptions, without raw property names or reference IDs. The server MUST resolve only references contained in an already authorized review and in the same company.
+
+#### Scenario: Approved task creation
+- **WHEN** an approved task creation review is opened
+- **THEN** it shows creation content, resolved names and local business time without an effective version zero or pending approval instruction
+
+#### Scenario: Missing reference
+- **WHEN** a referenced label or member is missing or belongs to another company
+- **THEN** the display indicates an unavailable name without exposing the identifier or another company's name
+
+### Requirement: Notification navigation and review card width
+The client SHALL localize supported notification types including historical TASK_DISPATCHED and navigate to their existing authorized detail pages. Review cards SHALL occupy the available list width.
+
+#### Scenario: Historical task notification
+- **WHEN** a user taps a TASK_DISPATCHED notification with a valid object identifier
+- **THEN** the task detail opens with a Chinese notification title
+
+#### Scenario: Missing target or failed read marking
+- **WHEN** a target is missing or marking the notification read fails
+- **THEN** a missing target is explained and a read marking failure does not prevent a valid detail navigation
+
+#### Scenario: Short review title
+- **WHEN** a review title and metadata are short
+- **THEN** its card still fills the available list width while preserving page margins

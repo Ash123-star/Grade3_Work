@@ -57,6 +57,10 @@ public class ReviewRepository {
     public void decideStep(Object id,boolean approve,String reason) { db.update("UPDATE review_steps SET state=?,reason=?,decided_at=now() WHERE id=?",approve?"APPROVED":"REJECTED",reason,id); }
     public void status(String id,String status,String decisionSource) { db.update("UPDATE review_requests SET status=?,decision_source=? WHERE id=?",status,decisionSource,id); }
     public Map<String,Object> json(Object value) { return db.read(value); }
+    /** Called only after review access validation; references never affect approval inputs. */
+    public Map<String,Object> displayReferences(String company,Object before,Object candidate) {
+        return new ReviewDisplayReferences(db).resolve(company,before,candidate);
+    }
     public void audit(Actor a,String type,String id,Object before,Object after,String reason) { db.audit(a,type,id,before,after,reason); }
     public void notify(Actor a,String recipient,String type,String id,String dedup) { db.notify(a,recipient,type,id,dedup); }
 }

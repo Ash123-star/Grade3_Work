@@ -67,6 +67,7 @@ public class ReviewApplicationService {
         var result=new LinkedHashMap<>(row);
         result.put("candidate",repository.json(row.get("candidate")));
         result.put("before_value",repository.json(row.get("before_value")));
+        result.put("display_references",repository.displayReferences(Db.str(row,"company_id"),result.get("before_value"),result.get("candidate")));
         result.put("steps",repository.steps(id));
         var current=repository.currentReviewerView(id);
         result.put("reviewer_id",current.getOrDefault("reviewer_id",null));

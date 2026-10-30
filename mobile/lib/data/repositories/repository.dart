@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/data/models/record_display.dart';
+import 'package:pandora_mobile/data/models/notification_display.dart';
 import 'package:dio/dio.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
@@ -544,6 +545,7 @@ class HttpRepository implements Repository {
       };
       fields['before'] = raw['before_value'];
       fields['after'] = raw['candidate'];
+      fields['displayReferences'] = raw['display_references'];
       fields['baseVersion'] = raw['expected_version'];
       fields['steps'] = raw['steps'];
       fields['reviewEvents'] = [
@@ -572,25 +574,8 @@ class HttpRepository implements Repository {
     }
     if (raw.containsKey('is_read')) fields['read'] = raw['is_read'] == true;
     if (raw.containsKey('recipient_id')) {
-      fields['type'] = switch (raw['type']) {
-        'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' => '任务',
-        'DEADLINE' => '截止提醒',
-        'LOG_SUBMITTED' || 'LOG_UPDATED' => '日志',
-        'LOG_COMMENT' || 'TASK_COMMENT' => '评论',
-        'REVIEW_PENDING' => '审批',
-        'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
-        _ => '${raw['type'] ?? '消息'}',
-      };
-      final target = switch (raw['type']) {
-        'TASK_ASSIGNED' ||
-        'TASK_EVENT' ||
-        'TASK_REVISED' ||
-        'TASK_COMMENT' ||
-        'DEADLINE' => 'tasks',
-        'LOG_SUBMITTED' || 'LOG_UPDATED' || 'LOG_COMMENT' => 'logs',
-        'REVIEW_PENDING' || 'REVIEW_APPROVED' || 'REVIEW_REJECTED' => 'reviews',
-        _ => null,
-      };
+      fields['type'] = notificationTitle(raw['type']);
+      final target = notificationResource(raw['type']);
       if (target != null && raw['object_id'] != null) {
         fields['targetResource'] = target;
         fields['targetId'] = raw['object_id'];
@@ -600,7 +585,9 @@ class HttpRepository implements Repository {
       fields['status'] = raw['submitted'] == true ? '已提交' : '草稿';
     }
     final taskReview = '${raw['kind'] ?? ''}'.startsWith('TASK');
-    final title = raw.containsKey('business_date') || raw.containsKey('businessDate')
+    final title = raw.containsKey('recipient_id')
+        ? notificationTitle(raw['type'])
+        : raw.containsKey('business_date') || raw.containsKey('businessDate')
         ? workLogTitle(fields, explicitTitle: raw['title'])
         : '${raw['title'] ?? raw['name'] ?? (taskReview ? '任务审核申请' : null) ?? (raw.containsKey('actor_id') ? raw['type'] : null) ?? (raw.containsKey('recipient_id') ? fields['type'] : null) ?? '记录'}';
     final owner =

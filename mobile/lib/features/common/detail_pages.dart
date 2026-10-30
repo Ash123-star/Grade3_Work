@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/data/models/record_display.dart';
+import 'package:pandora_mobile/data/models/review_display.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,23 +36,26 @@ class _ReviewListRow extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => PaperSurface(
-    onTap: onTap,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          record.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _reviewMetadata(record),
-          style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
-        ),
-      ],
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: PaperSurface(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            record.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _reviewMetadata(record),
+            style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -111,12 +115,21 @@ class _ListPageState extends ConsumerState<ListPage> {
       messageError = null;
     });
     try {
-      await repository.execute(
-        'notifications',
-        message == null
-            ? const Command('read-all', {})
-            : Command('read', {'id': message.id}),
-      );
+      try {
+        await repository.execute(
+          'notifications',
+          message == null
+              ? const Command('read-all', {})
+              : Command('read', {'id': message.id}),
+        );
+      } catch (error) {
+        if (message == null ||
+            error is ApiFailure && [FailureKind.forbidden, FailureKind.unauthorized]
+                .contains(error.kind)) rethrow;
+        if (!sameSession(session)) return;
+        setState(() => messageError = error);
+        notice(context, '未能标记已读，正在打开关联详情');
+      }
       if (!mounted) return;
       if (!sameSession(session)) return;
       ref.invalidate(recordsProvider('notifications'));
@@ -125,12 +138,16 @@ class _ListPageState extends ConsumerState<ListPage> {
       final id = message.fields['targetId'];
       if (id is! String ||
           id.trim().isEmpty ||
-          !['tasks', 'logs', 'reviews'].contains(target)) {
-        notice(context, '消息已读，关联内容暂不可用，请返回工作台查看');
+          !['tasks', 'logs', 'reviews', 'ai-jobs', 'ai-work'].contains(target)) {
+        notice(context, '关联内容暂不可用，请返回工作台查看');
         return;
       }
       if (target == 'reviews') {
         context.push('/me/reviews/${encode(id)}');
+      } else if (target == 'ai-jobs') {
+        context.push('/ai/jobs/${encode(id)}/edit');
+      } else if (target == 'ai-work') {
+        context.push('/ai/work/${encode(id)}');
       } else {
         openItem(context, target as String, id);
       }
@@ -1152,6 +1169,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             } else if (resource == 'reviews') {
               final self = item.ownerId == user.id;
               final pending = f['reviewState'] == '待审';
+              final creating = f['reviewKind'] == 'TASK_CREATE' ||
+                  f['baseVersion'] == 0;
               final assigned = f['reviewerId'] == user.id;
               if (!self && pending && assigned) {
                 bottom = button('通过申请', () => action(item, 'approve'));
@@ -1194,42 +1213,50 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     ],
                   ),
                 ),
-                const SectionHeader('修改内容'),
-                PaperSurface(
-                  outlined: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '当前生效 · v${f['effectiveVersion'] ?? f['baseVersion'] ?? 1}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: CuteTokens.muted,
+                SectionHeader(creating ? '创建内容' : '修改内容'),
+                if (!creating) ...[
+                  PaperSurface(
+                    outlined: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '申请前内容',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: CuteTokens.muted,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(_value(f['before'])),
-                      const SizedBox(height: 16),
-                      const Text(
-                        '直属上级审核通过前，继续使用此版本',
-                        style: TextStyle(color: CuteTokens.muted, fontSize: 12),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        Text(reviewSnapshotText(f['before'], f['displayReferences'])),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
                 PaperSurface(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '候选版本 · v${f['candidateVersion'] ?? ((f['baseVersion'] as int? ?? 1) + 1)}',
+                        creating ? '申请创建的内容' : '申请修改后的内容',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        _value(f['after']),
+                        reviewSnapshotText(f['after'], f['displayReferences']),
                         style: const TextStyle(height: 1.7),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        switch (f['reviewState']) {
+                          '待审' => creating ? '审核通过后创建记录' : '审核通过后生效，审核前保留原内容',
+                          '已通过' => '申请已通过，以上为本次申请获批时的内容',
+                          '已驳回' => '申请已驳回，以上内容未生效',
+                          '已失效' => '申请已失效，以上内容不再等待审核',
+                          _ => '以上为提交申请时记录的内容',
+                        },
+                        style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                       ),
                     ],
                   ),
