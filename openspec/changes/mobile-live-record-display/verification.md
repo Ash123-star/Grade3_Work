@@ -8,4 +8,8 @@
 
 此前五个年度数据库修复文件单独提交，包含已经在云端失败回滚后修正的年度V1 manager别名，不修改正式V1–V23。云端年度初始化开关保持关闭，不重新生成/清空数据。
 
-云端部署结果待后续记录；手机APK不会因后端重启自动更新。PR #48 评审中的驳回表单expectedVersion遗漏仍独立待修复，本批未更改。
+云端部署于2026-10-30完成：源码提交113e30b；隔离目录按该提交打包，Maven使用-Dmaven.test.skip=true，退出码0、BUILD SUCCESS，未编译或运行测试。13:54:49（Asia/Shanghai）日志记录Started Application；14:09复核systemd为active/running，PID 772425、NRestarts=0，8080由该进程监听。Flyway启动校验23项迁移通过，public版本23，无需迁移。上述仅为部署运行证据，不代表功能验收通过。
+
+云端备份目录/root/workpanel-deploy-20261030.D649S2保留旧JAR、数据库备份、原配置和工作区差异；云端原有CI工作流及Dockerfile改动已保留，旧脚本改动另存stash及patch。PR #50为本批草稿PR，尚未合并main。部署记录后续提交仅修改文档，运行JAR对应113e30b。
+
+手机APK不会因后端重启自动更新。PR #48 评审中的驳回表单expectedVersion遗漏仍独立待修复，本批未更改。
