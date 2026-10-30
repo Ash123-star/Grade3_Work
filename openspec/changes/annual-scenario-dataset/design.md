@@ -12,6 +12,8 @@
 公司重点10条；Mock五色来自mock_repository的seedTasks。真实标签ID由数据库提供；用户随后授权合并live-task-label-selector并行修复，创建页通过真实标签资源选取；未运行联调，不宣称端到端已验证。当前任务卡片仍按管理授权范围查询，不宣称其已改为个人范围。
 
 ## Credentials and deployment
+
+云端反馈旧服务没有显式DB_URL：新增--source-url/--source-user供运维核对后指定原连接，可选root-only密码文件，仍拒绝不明Spring命令行覆盖。显式用户名同时写入新库环境，不通过猜测默认值或读取未解析的配置文本决定数据库。
 账号短名至少3个合法字符，场景密码沿用正式12字符/72字节规则，示例test12345678。真实密码不入SQL。系统服务仍运行宿主JAR，原实例内新建库，不新建Docker数据容器；确认实际连接后以同一个DB_USER创建空库，独立root-only环境文件覆盖DB_URL/场景选项。保留旧库、备份、原配置以供切回；会话和客户端草稿需重新登录/按账号隔离。
 
 ## Verification limits
