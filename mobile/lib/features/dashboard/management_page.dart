@@ -313,6 +313,9 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
         !conflict;
     return PageFrame(
       title: managementTitles[widget.kind]!,
+      feedback: tree != null && error != null ? ErrorPanel(
+        '$error', key: ValueKey(error), retry: conflict ? reload : load,
+      ) : null,
       bottom: policy
           ? null
           : BottomActions(
@@ -527,14 +530,6 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                           v == null || v.trim().isEmpty ? '请填写变更理由' : null,
                     ),
                   ],
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: ErrorPanel(
-                        '$error',
-                        retry: conflict ? reload : load,
-                      ),
-                    ),
                   if (conflict)
                     TextButton(
                       onPressed: busy ? null : reload,

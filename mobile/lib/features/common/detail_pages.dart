@@ -128,7 +128,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                 .contains(error.kind)) rethrow;
         if (!sameSession(session)) return;
         setState(() => messageError = error);
-        notice(context, '未能标记已读，正在打开关联详情');
+        notice(context, '未能标记已读，正在打开关联详情', tone: NoticeTone.warning);
       }
       if (!mounted) return;
       if (!sameSession(session)) return;
@@ -210,6 +210,9 @@ class _ListPageState extends ConsumerState<ListPage> {
 
     return PageFrame(
       title: resourceTitles[resource] ?? '记录',
+      feedback: messageError != null && !deniedMessage
+          ? ErrorPanel('消息操作未完成：$messageError。请再次选择消息或全部已读重试。', key: ValueKey(messageError))
+          : null,
       actions: [
         if (resource == 'dashboard/personal')
           IconButton(
@@ -371,11 +374,6 @@ class _ListPageState extends ConsumerState<ListPage> {
               ],
             ),
           ],
-          if (messageError != null && !deniedMessage)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: ErrorPanel('消息操作未完成：$messageError。请再次选择消息或全部已读重试。'),
-            ),
           if (deniedMessage) ...[
             RecordFailure(messageError!),
             TextButton(
@@ -859,7 +857,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
           );
       refreshBusiness(ref);
       if (mounted) {
-        notice(context, AppConfig.mock ? '已保存' : '操作已提交');
+        notice(context, AppConfig.mock ? '已保存' : '操作已提交', success: true);
         if (action == 'archive' && widget.resource == 'dashboard/personal') {
           context.pop();
         }
@@ -1520,17 +1518,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 OwnPrivateNote(resource: resource, recordId: item.id),
               );
             }
-            if (error != null && bottom == null) {
-              children.add(
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: ErrorPanel(
-                    error!,
-                    retry: () => ref.invalidate(itemProvider(key)),
-                  ),
-                ),
-              );
-            }
             children.add(const DemoLabel());
             final review = resource == 'reviews' && bottom != null;
             return PageFrame(
@@ -1542,27 +1529,19 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ? '工作日志'
                   : '${resourceTitles[resource] ?? '记录'}详情',
               actions: actions,
+              feedback: error == null ? null : ErrorPanel(
+                error!,
+                key: ValueKey(error),
+                retry: () {
+                  setState(() => error = null);
+                  ref.invalidate(provider);
+                },
+              ),
               bottom: bottom == null
                   ? null
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (error != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 128),
-                              child: SingleChildScrollView(
-                                child: ErrorPanel(
-                                  error!,
-                                  retry: () {
-                                    setState(() => error = null);
-                                    ref.invalidate(itemProvider(key));
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
                         BottomActions(
                           primary: bottom,
                           secondary: review

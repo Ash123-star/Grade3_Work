@@ -552,8 +552,8 @@ Future<void> _showFocusCollection(
                             Padding(
                               padding: const EdgeInsets.only(top: 5),
                               child: Icon(
-                                Icons.radio_button_unchecked_rounded,
-                                size: 18,
+                                resource == 'dashboard/company' ? Icons.circle : Icons.radio_button_unchecked_rounded,
+                                size: resource == 'dashboard/company' ? 10 : 18,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
@@ -707,9 +707,7 @@ Future<void> _showPersonalItemActions(
     ref.invalidate(recordsProvider(collectionResource));
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('删除失败：$error')));
+      notice(context, '删除失败：$error', tone: NoticeTone.error);
     }
   }
 }

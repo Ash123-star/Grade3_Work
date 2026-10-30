@@ -1,8 +1,10 @@
 export 'paper_layout.dart'
     show TuantuanDialog, TuantuanSheet, showTuantuanBottomSheet;
 export 'page_states.dart';
+export 'floating_feedback.dart' show NoticeTone;
 export 'sunny_button.dart';
 import 'page_states.dart';
+import 'floating_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,49 +43,13 @@ void openForm(
   context.push('/form/$form${query.isEmpty ? '' : '?$query'}');
 }
 
-void notice(BuildContext context, String text, {bool success = false}) =>
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-            color: success
-                ? const Color(0xFFB9DED0)
-                : Theme.of(context).colorScheme.error.withValues(alpha: .28),
-          ),
-        ),
-        backgroundColor: success
-            ? const Color(0xFFEAF6F0)
-            : Theme.of(context).colorScheme.errorContainer,
-        elevation: 2,
-        closeIconColor: Theme.of(context).colorScheme.onSurface,
-        showCloseIcon: true,
-        content: Row(
-          children: [
-            Icon(
-              success ? Icons.check_circle_outline : Icons.error_outline,
-              color: success
-                  ? SunnyPalette.successInk
-                  : Theme.of(context).colorScheme.error,
-              size: 22,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: success
-                      ? const Color(0xFF246447)
-                      : Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+void notice(BuildContext context, String text, {
+  bool success = false,
+  NoticeTone tone = NoticeTone.info,
+  String? actionLabel,
+  VoidCallback? onAction,
+}) => showAppNotice(context, text, success ? NoticeTone.success : tone,
+    actionLabel: actionLabel, onAction: onAction);
 
 class PageBody extends StatelessWidget {
   const PageBody({
@@ -130,6 +96,7 @@ class PageFrame extends StatelessWidget {
     this.actions,
     this.fab,
     this.bottom,
+    this.feedback,
   });
   final String title;
   final Widget child;
@@ -137,6 +104,7 @@ class PageFrame extends StatelessWidget {
   final List<Widget>? actions;
   final Widget? fab;
   final Widget? bottom;
+  final Widget? feedback;
   @override
   Widget build(BuildContext context) {
     final canGoBack = Navigator.of(context).canPop();
@@ -202,22 +170,41 @@ class PageFrame extends StatelessWidget {
         : const SizedBox.shrink();
     final content = child;
     return Scaffold(
-      body: SafeArea(
-        child: content is PageBody
-            ? PageBody(
-                controller: content.controller,
-                bottomPadding: content.bottomPadding,
-                header: header,
-                children: content.children,
-              )
-            : TuantuanPaperBackdrop(
-                child: Column(
-                  children: [
-                    header,
-                    Expanded(child: content),
-                  ],
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: SafeArea(
+              child: content is PageBody
+                  ? PageBody(
+                      controller: content.controller,
+                      bottomPadding: content.bottomPadding,
+                      header: header,
+                      children: content.children,
+                    )
+                  : TuantuanPaperBackdrop(
+                      child: Column(
+                        children: [header, Expanded(child: content)],
+                      ),
+                    ),
+            ),
+          ),
+          if (feedback != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 12,
+              child: SafeArea(
+                top: false,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 728),
+                    child: FloatingFeedback(key: feedback!.key, child: feedback!),
+                  ),
                 ),
               ),
+            ),
+        ],
       ),
       floatingActionButton: fab,
       bottomNavigationBar: bottom == null

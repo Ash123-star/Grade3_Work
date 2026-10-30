@@ -395,9 +395,7 @@ class _WorkSettingsPageState extends ConsumerState<WorkSettingsPage> {
           .read(workRepositoryProvider)
           .request('POST', '/organization/review-policy/revisions', body: body);
       if (mounted && valid) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('已提交，等待复核')));
+        notice(context, '已提交，等待复核', success: true);
       }
       await load();
     } catch (e) {
@@ -1520,9 +1518,7 @@ class _DeliveryCheckPageState extends ConsumerState<DeliveryCheckPage>
           );
       if (!mounted || !valid) return;
       ref.invalidate(itemProvider(('tasks', widget.taskId)));
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已提交，等待验收')));
+      notice(context, '已提交，等待验收', success: true);
       context.pop();
     } catch (e) {
       if (mounted) setState(() => error = e);

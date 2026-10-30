@@ -42,7 +42,7 @@ DemoStore agendaStore() {
       ),
     const Record(
       id: 'earlier-span',
-      title: '跨周任务测试',
+      title: '跨周任务测试完整名称',
       fields: {
         'startAt': '2026-10-15T08:00:00+08:00',
         'deadline': '2026-10-22T18:00:00+08:00',
@@ -144,7 +144,7 @@ void main() {
       ),
     );
     expect(mondayContinuation, findsOneWidget);
-    expect(t.widget<Text>(mondayContinuation).data, '跨周任务测试');
+    expect(t.widget<Text>(mondayContinuation).data, '跨周任务测试完整名称');
     expect(t.takeException(), isNull);
   });
 
@@ -374,9 +374,8 @@ void main() {
       expect(previewTitles, isNotEmpty);
       for (final title in previewTitles) {
         expect(title.style?.fontSize, inInclusiveRange(6, 10));
-        expect(title.overflow, TextOverflow.clip);
+        expect(title.overflow, TextOverflow.ellipsis);
         expect(title.maxLines, 1);
-        expect(title.data!.characters.length, lessThanOrEqualTo(6));
         expect(title.data, isNot('任务标题'));
       }
       final segmentRect = t.getRect(firstWeekSegment);
@@ -389,8 +388,8 @@ void main() {
       expect(segmentRect.left, startCell.left);
       expect(segmentRect.right, closeTo(endCell.right - 2, .01));
       expect(
-        t.getRect(find.text('数据结构实训')).right,
-        lessThanOrEqualTo(startCell.right),
+        t.getRect(find.descendant(of: firstWeekSegment, matching: find.text('数据结构实训'))).right,
+        closeTo(segmentRect.right - 10, .01),
       );
       final material = t.widget<Material>(
         find.descendant(of: firstWeekSegment, matching: find.byType(Material)),

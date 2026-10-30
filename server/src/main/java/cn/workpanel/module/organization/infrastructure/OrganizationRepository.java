@@ -32,11 +32,12 @@ public class OrganizationRepository {
         pageArgs.addAll(args); pageArgs.add(limit); pageArgs.add(cursor);
         // 在同一请求的数据库快照中聚合，避免移动端逐人请求及重复参与记录放大计数。
         // 他人草稿不参与状态计算；所有任务同时受请求者的TaskAccess范围约束。
-        String sql="SELECT u.id,u.name,u.role,u.status,u.department_id,u.team_id,u.version,d.name AS department,"
+        String sql="SELECT u.id,u.name,u.role,u.status,u.department_id,u.team_id,u.version,d.name AS department,tm.name AS team_name,"
             +"summary.participating_count AS \"participatingTaskCount\",summary.active_count AS \"activeTaskCount\","
             +"(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date AS \"summaryDate\","
             +"CASE WHEN u.status<>'ACTIVE' THEN 'UNKNOWN' WHEN EXISTS (SELECT 1 FROM daily_logs l WHERE l.company_id=u.company_id AND l.owner_id=u.id AND l.submitted AND l.business_date=(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date) THEN 'SUBMITTED' ELSE 'MISSING' END AS \"todayLogStatus\" "
             +"FROM users u LEFT JOIN departments d ON d.id=u.department_id AND d.company_id=u.company_id "
+            +"LEFT JOIN teams tm ON tm.id=u.team_id AND tm.company_id=u.company_id "
             +"LEFT JOIN LATERAL (SELECT count(*) AS participating_count,count(*) FILTER (WHERE t.phase NOT IN ('ACCEPTED','ARCHIVED','WITHDRAWN')) AS active_count FROM tasks t WHERE "
             +taskScope.sql()+" AND t.company_id=u.company_id AND EXISTS (SELECT 1 FROM task_participants p WHERE p.company_id=t.company_id AND p.task_id=t.id AND p.user_id=u.id)) summary ON true "
             +"WHERE "+where+" ORDER BY u.name,u.id LIMIT ? OFFSET ?";

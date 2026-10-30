@@ -23,7 +23,7 @@ final class MobileP0OpenApi {
         card.addProperty("version",OpenApi.version()); card.addProperty("participants",new ArraySchema().items(OpenApi.ref("TaskParticipant"))); card.addProperty("label",OpenApi.ref("TaskLabel"));
         c.addSchemas("ReceivedTaskCard",card); c.addSchemas("ReceivedTaskPage",page("ReceivedTaskCard")); c.addSchemas("TaskPage",page("TaskListItem"));
         var person=OpenApi.object("id","name","role","status","version","participatingTaskCount","activeTaskCount","todayLogStatus","summaryDate");
-        for(String key:List.of("id","name","role","status","department_id","team_id","department")) person.addProperty(key,OpenApi.text().nullable(true));
+        for(String key:List.of("id","name","role","status","department_id","team_id","department","team_name")) person.addProperty(key,OpenApi.text().nullable(true));
         person.addProperty("version",OpenApi.version());
         for(String key:List.of("participatingTaskCount","activeTaskCount")) person.addProperty(key,new IntegerSchema().format("int64").minimum(java.math.BigDecimal.ZERO));
         person.addProperty("todayLogStatus",new StringSchema()._enum(List.of("SUBMITTED","MISSING","UNKNOWN")));

@@ -1138,7 +1138,7 @@ class _FormPageState extends ConsumerState<FormPage> {
         try {
           await draftStore.remove(draftLocation);
         } catch (cleanup) {
-          if (mounted) notice(context, '$cleanup');
+          if (mounted) notice(context, '$cleanup', tone: NoticeTone.error);
         }
         ref.invalidate(todayDraftProvider(accountId));
       }
@@ -1157,7 +1157,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           } catch (storage) {
             if (!mounted) return;
             ref.read(sessionStorageErrorProvider.notifier).state = '$storage';
-            notice(context, '$storage');
+            notice(context, '$storage', tone: NoticeTone.error);
           }
           if (!mounted || ref.read(sessionProvider).id != accountId) return;
           ref.read(sessionCheckProvider.notifier).state = null;
@@ -1202,7 +1202,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           role: UserRole.employee,
         );
         context.go('/auth/login');
-        notice(context, '密码已修改，请使用新密码重新登录');
+        notice(context, '密码已修改，请使用新密码重新登录', success: true);
       } else {
         notice(
           context,
@@ -1211,6 +1211,7 @@ class _FormPageState extends ConsumerState<FormPage> {
               : AppConfig.mock
               ? '已保存'
               : '已提交',
+          success: true,
         );
         if (context.canPop()) context.pop();
       }
@@ -1439,19 +1440,15 @@ class _FormPageState extends ConsumerState<FormPage> {
     return PageFrame(
       title: document ? (log ? '写日志' : '修改日志') : spec.title,
       showTitle: !auth,
+      feedback: error == null ? null : KeyedSubtree(
+        key: ValueKey(error),
+        child: failure(),
+      ),
       bottom: widget.kind == 'policy'
           ? null
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 120),
-                      child: SingleChildScrollView(child: failure()),
-                    ),
-                  ),
                 BottomActions(
                   primary: submitButton(),
                   secondary: document && !log

@@ -330,6 +330,13 @@ class HttpRepository implements Repository {
     } else if (raw['department'] != null) {
       fields['departmentName'] = raw['department'];
     }
+    if (raw['department_name'] != null) fields['departmentName'] = raw['department_name'];
+    if (raw['team'] is Map) {
+      fields['teamName'] = raw['team']['name'];
+      fields['teamId'] = raw['team']['id'];
+    } else if (raw['team_name'] != null) {
+      fields['teamName'] = raw['team_name'];
+    }
     if (raw['author'] is Map) fields['authorName'] = raw['author']['name'];
     if (raw['kind'] != null && raw['target_id'] != null) {
       fields['targetId'] = raw['target_id'];

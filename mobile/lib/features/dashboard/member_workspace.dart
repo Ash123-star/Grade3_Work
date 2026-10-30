@@ -619,9 +619,7 @@ class _MemberLogCalendarState extends ConsumerState<MemberLogCalendar> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('读取日志失败：$error')));
+        notice(context, '读取日志失败：$error', tone: NoticeTone.error);
       }
     } finally {
       if (mounted) setState(() => _opening = false);

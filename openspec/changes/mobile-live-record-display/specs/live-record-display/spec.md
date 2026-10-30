@@ -80,3 +80,33 @@ The client SHALL localize supported notification types including historical TASK
 #### Scenario: Short review title
 - **WHEN** a review title and metadata are short
 - **THEN** its card still fills the available list width while preserving page margins
+
+### Requirement: Floating operation feedback and organization names
+The client SHALL show operation feedback above content without reducing editor or button space, distinguish success, information and error by text and icons as well as color, and preserve recovery actions. It SHALL show authorized team names rather than internal identifiers, and company focus records SHALL use filled bullet markers.
+
+#### Scenario: Repeated feedback with keyboard open
+- WHEN a user receives successive operation messages with the keyboard visible
+- THEN the newest message replaces the old message without changing the editor or button layout and can be dismissed
+
+#### Scenario: Version conflict
+- WHEN a form submission conflicts with a newer record
+- THEN floating feedback retains the explicit reload confirmation and local draft preservation
+
+#### Scenario: Missing team name
+- WHEN a visible member references a team whose name is unavailable
+- THEN the UI shows an unavailable-name placeholder rather than the team identifier
+
+#### Scenario: Company focus list
+- WHEN the user expands company focus records
+- THEN each record uses a filled bullet while retaining its existing detail interaction
+
+### Requirement: Month task title width
+Month task labels SHALL use their weekly segment's full available width rather than a six-character or single-day width limit, reserve 10 logical pixels at the trailing edge, and ellipsize overflow. Cross-week continuation segments MUST repeat the title at the first day of each weekly segment.
+
+#### Scenario: Long duration and short title
+- WHEN a task spans several days and its complete title fits before the trailing safety margin
+- THEN its entire title is displayed without artificial character truncation
+
+#### Scenario: Cross-week continuation and overflow
+- WHEN a task continues into another week with a title too long for that week's segment
+- THEN the title repeats at the segment start and is ellipsized before the 10dp trailing margin

@@ -715,7 +715,7 @@ class _MonthGrid extends StatelessWidget {
           final barHeight =
               MediaQuery.textScalerOf(
                     context,
-                  ).scale(_monthRecordFontSize(cellWidth)) *
+                  ).scale(_monthRecordFontSize) *
                   1.15 +
               3;
           final capacity = ((cellHeight - recordTop - 2 + 1) / (barHeight + 1))
@@ -925,7 +925,7 @@ List<Widget> _monthWeekBars(
       24.0,
       MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
     );
-    final fontSize = _monthRecordFontSize(cellWidth);
+    final fontSize = _monthRecordFontSize;
     final barHeight =
         MediaQuery.textScalerOf(context).scale(fontSize) * 1.15 + 3;
     final top = recordTop + lane * (barHeight + 1);
@@ -952,18 +952,18 @@ List<Widget> _monthWeekBars(
               alignment: Alignment.centerLeft,
               child: starts || continuesAtWeekStart
                   ? SizedBox(
-                      width: cellWidth - (col == 0 ? 2 : 0),
+                      width: double.infinity,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 1),
+                        padding: const EdgeInsets.only(left: 2, right: 10),
                         child: Text(
                           key: ValueKey(
                             'month-span-label:tasks:${event.record.id}:${weekStart.toIso8601String()}',
                           ),
-                          event.record.title.characters.take(6).toString(),
+                          event.record.title,
                           semanticsLabel: event.record.title,
                           maxLines: 1,
                           softWrap: false,
-                          overflow: TextOverflow.clip,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: fontSize,
                             height: 1.15,
@@ -986,10 +986,8 @@ List<Widget> _monthWeekBars(
 
 String _calendarEventKey(CalendarEvent event) => event.record.id;
 
-// Six full-width characters fit on one line at the default text scale.
-// Larger accessibility text still clips rather than wrapping or adding dots.
-double _monthRecordFontSize(double cellWidth) =>
-    math.min(10.0, math.max(1.0, (cellWidth - 4) / 6));
+// Text is bounded by the weekly segment, never by a fixed character count.
+const double _monthRecordFontSize = 10.0;
 
 Map<String, int> _monthLanes(
   List<CalendarEvent> events,
