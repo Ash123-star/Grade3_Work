@@ -124,6 +124,11 @@ class _LogsPageState extends ConsumerState<LogsPage> {
       title: team ? '下属日志' : '日志',
       showTitle: team,
       actions: [
+        if (!team)
+          TextButton(
+            onPressed: () => context.push('/me/tasks'),
+            child: const Text('派发任务 ›'),
+          ),
         if (!team && user.manager)
           TextButton(
             onPressed: () => context.push('/logs/subordinates'),

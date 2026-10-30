@@ -256,7 +256,11 @@ final datedRecordsProvider = FutureProvider.autoDispose
       return readCompleteList(
         ref.watch(repositoryProvider),
         resource,
-        Query(from: from, to: to),
+        Query(
+          ownerId: resource == 'tasks' ? ref.watch(sessionProvider).id : null,
+          from: from,
+          to: to,
+        ),
         isActive: () => active,
       );
     });

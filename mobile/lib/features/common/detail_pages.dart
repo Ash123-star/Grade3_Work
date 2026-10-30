@@ -841,7 +841,9 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   '排序位置': item.fields['排序位置'] ?? item.fields['position'] ?? 0,
                 },
               },
-              version: item.version,
+              version: widget.resource == 'reviews'
+                  ? (item.fields['baseVersion'] as num?)?.toInt() ?? item.version
+                  : item.version,
               idempotencyKey: '${item.id}:${item.version}:$action',
             ),
           );

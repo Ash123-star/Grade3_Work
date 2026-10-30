@@ -708,6 +708,13 @@ class _FormPageState extends ConsumerState<FormPage> {
       _ => const <String>[],
     };
     if (label == '标签') {
+      final labels = AppConfig.mock ? null : ref.watch(recordsProvider('task-labels'));
+      final available = labels?.valueOrNull?.items
+              .where((item) => '${item.fields['status'] ?? 'ACTIVE'}' == 'ACTIVE')
+              .toList() ??
+          (AppConfig.mock
+              ? [for (final entry in _taskTagLabels.entries) Record(id: entry.key, title: entry.value)]
+              : const <Record>[]);
       return FormField<String>(
         initialValue: controller.text,
         validator: (_) => validate(label, controller.text),
@@ -715,17 +722,17 @@ class _FormPageState extends ConsumerState<FormPage> {
           label,
           InkWell(
             borderRadius: BorderRadius.circular(18),
-            onTap: busy
+            onTap: busy || labels?.isLoading == true || labels?.hasError == true
                 ? null
                 : () async {
                     final choice = await showPremiumTagPicker(
                       context,
                       options: [
-                        for (final entry in _taskTagLabels.entries)
+                        for (final entry in available)
                           PremiumTagOption(
-                            entry.key,
-                            entry.value,
-                            _taskTagColors[entry.key]!,
+                            entry.id,
+                            entry.title,
+                            _taskTagColors[entry.id] ?? const Color(0xFFDDF1FA),
                           ),
                       ],
                       selected: controller.text,
@@ -746,11 +753,12 @@ class _FormPageState extends ConsumerState<FormPage> {
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: _taskTagColors[controller.text],
+                        color: _taskTagColors[controller.text] ?? const Color(0xFFDDF1FA),
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
-                        _taskTagLabels[controller.text] ?? controller.text,
+                        available.where((item) => item.id == controller.text).firstOrNull?.title ??
+                            _taskTagLabels[controller.text] ?? controller.text,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),

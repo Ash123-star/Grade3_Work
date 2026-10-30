@@ -501,7 +501,7 @@ class HttpRepository implements Repository {
             );
       fields['events'] = [
         for (final e in events)
-          '${e['actor_id'] ?? '操作者未提供'} · ${_eventLabels[e['type']] ?? '未知事件（${e['type']}）'} · ${e['created_at'] ?? '时间未提供'}',
+          '${e['actor_name'] ?? '成员姓名未提供'} · ${_eventLabels[e['type']] ?? '未知事件（${e['type']}）'} · ${e['created_at'] ?? '时间未提供'}',
       ];
       for (final e in events) {
         if (e['type'] == 'DISPATCHED' && e['created_at'] != null) {
@@ -880,6 +880,7 @@ class HttpRepository implements Repository {
       return {
         'id': raw['id'],
         'parentCommentId': raw['parent_id'],
+        'actorName': raw['author_name'],
         'authorName': raw['author_name'],
         'text': raw['text'] ?? '',
         'actorId': raw['actor_id'],
@@ -1244,7 +1245,7 @@ class HttpRepository implements Repository {
           {
             'approve': command.action == 'approve',
             'reason': v['reason'] ?? v['驳回原因'] ?? '',
-            'expectedVersion': command.version,
+            'expectedVersion': v['expectedVersion'] ?? command.version,
           },
         );
       }
