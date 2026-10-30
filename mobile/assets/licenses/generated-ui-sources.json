@@ -1,9 +1,9 @@
 {
   "source_type": "user_provided_local_assets",
   "received_at": "2026-10-14",
-  "source_path": "D:/Github/Grade3_Work/mobile/assets/resources",
+  "source_path": "mobile/assets/resources (removed from current tree; see source_history)",
   "model": "image-2.5 (user-generated pack)",
-  "license_note": "User supplied the generated asset pack for this project. Retain the original files and review applicable model terms before public distribution.",
+  "license_note": "User supplied the generated asset pack for this project. Superseded resources/ originals are retained in Git history; current new/ and dog/ originals remain for regeneration. Review applicable model terms before public distribution.",
   "third_party_brands_or_characters": [],
   "derived_assets": {
     "source": "mobile/assets/new/*.png",
@@ -50,13 +50,6 @@
     "family": "TuantuanDisplay",
     "files": [
       {
-        "path": "mobile/assets/fonts/GenSenRounded2-B.ttc",
-        "source": "https://github.com/ButTaiwan/gensen-font/blob/master/ttc/GenSenRounded2-B.ttc",
-        "license": "OFL-1.1",
-        "sha256": "54e994cf59e2afc13ea48435ab872602518779870d323b006cf9d320803f178d",
-        "usage": "原始字体集合，保留用于来源和许可追溯"
-      },
-      {
         "path": "mobile/assets/fonts/GenSenRoundedTW-B.ttf",
         "source": "https://github.com/ButTaiwan/gensen-font/blob/master/otf/TW/GenSenRounded2TW-B.otf",
         "license": "OFL-1.1",
@@ -64,6 +57,9 @@
         "usage": "Flutter 离线主标题、重点分区标题和核心数字"
       }
     ],
-    "usage": "GenSen Rounded TW 粗体用于主标题、重点分区标题和核心数字；正文与日期仍使用系统字体"
-  }
+    "usage": "GenSen Rounded TW 粗体用于主标题、重点分区标题和核心数字；正文与日期仍使用系统字体",
+    "original_collection_history": "https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/assets/fonts/GenSenRounded2-B.ttc"
+  },
+  "source_history": "https://github.com/Ash123-star/Grade3_Work/tree/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/assets/resources",
+  "source_originals_retained": false
 }
