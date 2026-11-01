@@ -51,7 +51,13 @@ public class TaskDispatchService {
         db.audit(a,"TASK_DISPATCHED",id,Map.of(),body,"派发任务"); return detail(TaskAccess.issued(db,a,id));
     }
 
-    public Map<String,Object> read(Actor a,String id) { return detail(TaskAccess.readable(db,a,id,false)); }
+    /** 详情附带调用者本人的置顶状态 pinned/pinnedAt；他人的置顶不可见。 */
+    public Map<String,Object> read(Actor a,String id) {
+        var result=detail(TaskAccess.readable(db,a,id,false));
+        var pin=db.rows("SELECT pinned_at FROM task_pins WHERE user_id=? AND task_id=?",a.id(),id);
+        result.put("pinned",!pin.isEmpty()); result.put("pinnedAt",pin.isEmpty()?null:pin.getFirst().get("pinned_at"));
+        return result;
+    }
 
     Map<String,Object> detail(Map<String,Object> task) { return TaskView.of(db,task,TaskTimeline.list(db,Db.str(task,"id"))); }
 }

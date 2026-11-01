@@ -52,7 +52,7 @@ class TaskQueryServiceTest {
         when(db.rows(startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at"),any(Object[].class))).thenReturn(List.of(row()));
         var result=service.list(LEADER,new TaskQueryService.Query(0,20,"查询",null,null,null));
         @SuppressWarnings("unchecked") var item=((List<Map<String,Object>>)result.get("items")).getFirst();
-        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label"),item.keySet());
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label"),item.keySet(),"未选出置顶列时不追加置顶字段");
         for(String hidden:List.of("phase","status","completion","progress","done","body","events")) assertFalse(item.containsKey(hidden),hidden);
         verify(db).count(contains("FROM tasks t WHERE"),any(Object[].class));
         verify(db).rows(startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at"),any(Object[].class));
@@ -128,5 +128,19 @@ class TaskQueryServiceTest {
         assertThrows(ApiError.class,()->service.receivedCard(LEADER,-1,30,""));
         assertThrows(ApiError.class,()->service.receivedCard(LEADER,0,0,""));
         verifyNoInteractions(db);
+    }
+
+    @Test void listSortsCurrentUserPinsFirstAndExposesPinFields() {
+        var pinned=row(); pinned.put("pinned",true); pinned.put("pinned_at","2026-10-21T01:00:00Z");
+        record(statement->statement.startsWith("SELECT t.id")?List.of(pinned):List.of());
+        var result=service.list(LEADER,new TaskQueryService.Query(0,20,"",null,null,null));
+        String listSql=sql.get(1);
+        assertTrue(listSql.contains("LEFT JOIN task_pins tp ON tp.task_id=t.id AND tp.user_id=?"),listSql);
+        assertTrue(listSql.contains("ORDER BY (tp.task_id IS NOT NULL) DESC,tp.pinned_at DESC,t.deadline,t.id"),listSql);
+        assertEquals("leader",args.get(1).getFirst());
+        assertFalse(sql.getFirst().contains("task_pins"),"count 不受置顶影响");
+        @SuppressWarnings("unchecked") var item=((List<Map<String,Object>>)result.get("items")).getFirst();
+        assertEquals(true,item.get("pinned")); assertEquals("2026-10-21T01:00:00Z",item.get("pinnedAt"));
+        assertFalse(item.containsKey("pinned_at"));
     }
 }

@@ -9,7 +9,9 @@ import java.util.*;
 /** 任务列表应用服务：组织范围、时间区间相交和字段白名单只在服务端决定。 */
 @Service
 public class TaskQueryService {
-    private static final String LIST_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at";
+    private static final String LIST_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at,(tp.task_id IS NOT NULL) AS pinned,tp.pinned_at";
+    /** 当前用户的个人置顶；只影响本人排序。 */
+    private static final String PIN_JOIN=" LEFT JOIN task_pins tp ON tp.task_id=t.id AND tp.user_id=?";
     private static final String CARD_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.phase,t.version,t.created_at";
     /** 最早真实 DISPATCHED 事件时间；缺失时为 NULL，不推测。 */
     private static final String DISPATCH_LATERAL=" LEFT JOIN LATERAL (SELECT min(e.created_at) AS dispatch_at FROM task_events e WHERE e.company_id=t.company_id AND e.task_id=t.id AND e.type='DISPATCHED') dispatched ON true";
@@ -54,8 +56,9 @@ public class TaskQueryService {
             args.add(to.toString()); args.add(from.toString());
         }
         long total=db.count("SELECT count(*) FROM tasks t WHERE "+where,args.toArray());
-        args.add(query.limit()); args.add(query.cursor());
-        var items=db.rows("SELECT "+LIST_COLUMNS+" FROM tasks t WHERE "+where+" ORDER BY t.deadline,t.id LIMIT ? OFFSET ?",args.toArray())
+        args.add(0,actor.id()); args.add(query.limit()); args.add(query.cursor());
+        // 置顶优先（最近置顶在前），其余按截止时间；排序在服务端完成，跨页一致。
+        var items=db.rows("SELECT "+LIST_COLUMNS+" FROM tasks t"+PIN_JOIN+" WHERE "+where+" ORDER BY (tp.task_id IS NOT NULL) DESC,tp.pinned_at DESC,t.deadline,t.id LIMIT ? OFFSET ?",args.toArray())
             .stream().map(task->TaskListView.of(db,task)).toList();
         return Map.of("items",items,"total",total,"nextCursor",String.valueOf(query.cursor()+items.size()));
     }

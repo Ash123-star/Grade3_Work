@@ -135,7 +135,8 @@ class TaskDispatchIntegrationTest {
         var leaderPage=list(200,"search="+prefix+"&limit=10","leader");
         assertEquals(2,leaderPage.get("total").asInt());
         assertEquals(Set.of(alice,amy),Set.of(leaderPage.get("items").get(0).get("id").asText(),leaderPage.get("items").get(1).get("id").asText()));
-        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label");
+        // pinned/pinnedAt 为调用者本人的置顶状态，不是任务生命周期或完成情况字段。
+        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label","pinned","pinnedAt");
         for(JsonNode item:leaderPage.get("items")) {
             var names=new HashSet<String>(); item.fieldNames().forEachRemaining(names::add);
             assertEquals(allowed,names);

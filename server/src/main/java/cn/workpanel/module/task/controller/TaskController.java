@@ -12,8 +12,8 @@ import java.util.*;
 @RequestMapping("/api/tasks")
 /** 任务接口。列表隐藏完成情况字段，生命周期通过详情 events 表达。 */
 public class TaskController {
-    final Business business; final Db db; final ReviewApplicationService reviews; final cn.workpanel.module.task.TaskLifecycleService lifecycle; final cn.workpanel.module.task.TaskRevisionService revisions; final cn.workpanel.module.task.TaskQueryService queries;
-    public TaskController(Business business, Db db, ReviewApplicationService reviews, cn.workpanel.module.task.TaskLifecycleService lifecycle, cn.workpanel.module.task.TaskRevisionService revisions, cn.workpanel.module.task.TaskQueryService queries) { this.business=business; this.db=db; this.reviews=reviews; this.lifecycle=lifecycle; this.revisions=revisions; this.queries=queries; }
+    final Business business; final Db db; final ReviewApplicationService reviews; final cn.workpanel.module.task.TaskLifecycleService lifecycle; final cn.workpanel.module.task.TaskRevisionService revisions; final cn.workpanel.module.task.TaskQueryService queries; final cn.workpanel.module.task.TaskPinService pins;
+    public TaskController(Business business, Db db, ReviewApplicationService reviews, cn.workpanel.module.task.TaskLifecycleService lifecycle, cn.workpanel.module.task.TaskRevisionService revisions, cn.workpanel.module.task.TaskQueryService queries, cn.workpanel.module.task.TaskPinService pins) { this.pins=pins; this.business=business; this.db=db; this.reviews=reviews; this.lifecycle=lifecycle; this.revisions=revisions; this.queries=queries; }
     /**
      * 分页查询范围内任务。支持 date/period 或带时区 from/to、search、participantId（ownerId 为兼容别名）、cursor/limit。
      * from/to 必须成对出现、带时区且 to 晚于 from，不能与 date/period 混用；查询区间左闭右开，
@@ -26,6 +26,14 @@ public class TaskController {
         String participant=canonical!=null?canonical:alias;
         return queries.list(Actor.current(r),new cn.workpanel.module.task.TaskQueryService.Query(cursor,limit,search,participant,date,period,text(from),text(to)));
     }
+
+    /**
+     * 个人置顶本人可见任务，只影响本人 GET /api/tasks 排序（置顶优先、最近置顶在前），不改变任务 version、不走审核、不通知他人。
+     * 每人最多 10 项（仅计仍可见任务），超出 409 PIN_LIMIT；范围外任务 404；已置顶返回原 pinnedAt（幂等）。
+     */
+    @PutMapping("/{id}/pin") public Map<String,Object> pin(HttpServletRequest r,@PathVariable String id) { return pins.pin(Actor.current(r),id); }
+    /** 取消本人置顶；未置顶也返回成功（幂等）。范围外任务 404，无版本要求。 */
+    @DeleteMapping("/{id}/pin") public Map<String,Object> unpin(HttpServletRequest r,@PathVariable String id) { return pins.unpin(Actor.current(r),id); }
 
     /** 空白参数按未提供处理，避免 `ownerId=` 之类的空值被当成筛选值或区间端点。 */
     private static String text(String value) { return value==null||value.isBlank()?null:value.trim(); }
