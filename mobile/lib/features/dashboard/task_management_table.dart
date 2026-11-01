@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/models/task_display.dart';
@@ -103,6 +104,32 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
   final _horizontalController = ScrollController();
   final Map<String, Set<String>> _filters = {};
   final Map<String, DateTime> _dateFilters = {};
+  final Set<String> _pinBusy = {};
+
+  /// 个人置顶只影响本人列表；成功后刷新列表由服务端重新排序，失败保留原状态并提示。
+  Future<void> _togglePin(Record record) async {
+    if (_pinBusy.contains(record.id)) return;
+    final pinned = record.fields['pinned'] == true;
+    setState(() => _pinBusy.add(record.id));
+    try {
+      await ref.read(repositoryProvider).execute(
+        'tasks/pin',
+        Command(pinned ? 'unpin' : 'pin', {'id': record.id}),
+      );
+      ref.invalidate(recordsProvider('tasks'));
+      if (mounted) notice(context, pinned ? '已取消置顶' : '已置顶', success: true);
+    } catch (error) {
+      if (mounted) {
+        notice(
+          context,
+          error is ApiFailure ? error.message : '置顶失败，请稍后重试',
+          tone: NoticeTone.warning,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pinBusy.remove(record.id));
+    }
+  }
 
   @override
   void dispose() {
@@ -351,6 +378,11 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                                         itemBuilder: (context, index) =>
                                             _TaskRow(
                                               record: rows[index],
+                                              pinBusy: _pinBusy.contains(
+                                                rows[index].id,
+                                              ),
+                                              onPin: () =>
+                                                  _togglePin(rows[index]),
                                               onTap: () => context.push(
                                                 '/item/tasks/${rows[index].id}',
                                               ),
@@ -844,9 +876,16 @@ class _TaskHeaderCell extends StatelessWidget {
 }
 
 class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.record, required this.onTap});
+  const _TaskRow({
+    required this.record,
+    required this.onTap,
+    required this.onPin,
+    this.pinBusy = false,
+  });
   final Record record;
   final VoidCallback onTap;
+  final VoidCallback onPin;
+  final bool pinBusy;
 
   Future<void> _showValue(BuildContext context, int index, String value) async {
     await showTuantuanBottomSheet<void>(
@@ -899,10 +938,20 @@ class _TaskRow extends StatelessWidget {
                               Expanded(child: _valueText(context, index)),
                               SizedBox(
                                 width: 40,
-                                child: Center(
-                                  child: Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: colors.onSurfaceVariant,
+                                child: IconButton(
+                                  key: ValueKey('task-pin-${record.id}'),
+                                  tooltip: record.fields['pinned'] == true
+                                      ? '取消置顶'
+                                      : '置顶',
+                                  onPressed: pinBusy ? null : onPin,
+                                  icon: Icon(
+                                    record.fields['pinned'] == true
+                                        ? Icons.push_pin
+                                        : Icons.push_pin_outlined,
+                                    size: 20,
+                                    color: record.fields['pinned'] == true
+                                        ? colors.primary
+                                        : colors.onSurfaceVariant,
                                   ),
                                 ),
                               ),

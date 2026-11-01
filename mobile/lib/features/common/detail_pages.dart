@@ -144,7 +144,12 @@ class _ListPageState extends ConsumerState<ListPage> {
         notice(context, '关联内容暂不可用，请返回工作台查看');
         return;
       }
-      if (target == 'reviews') {
+      if (target == 'reviews' &&
+          message.fields['notificationType'] == 'REVIEW_UNASSIGNED' &&
+          session.role == UserRole.admin) {
+        // 管理员无审批权，只负责补齐直属关系；申请详情仅申请人和审核人可读。
+        context.push('/form/reporting');
+      } else if (target == 'reviews') {
         context.push('/me/reviews/${encode(id)}');
       } else if (target == 'ai-jobs') {
         context.push('/ai/jobs/${encode(id)}/edit');
@@ -870,6 +875,63 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     if (mounted) setState(() => busy = false);
   }
 
+  /// 个人置顶只影响本人任务列表；详情读取的是任务本身，切换后刷新列表与详情。
+  Future<void> togglePin(Record item, bool pinned) async {
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await ref.read(repositoryProvider).execute(
+        'tasks/pin',
+        Command(pinned ? 'unpin' : 'pin', {'id': item.id}),
+      );
+      ref.invalidate(recordsProvider('tasks'));
+      ref.invalidate(itemProvider(('tasks', item.id)));
+      if (mounted) notice(context, pinned ? '已取消置顶' : '已置顶', success: true);
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+    if (mounted) setState(() => busy = false);
+  }
+
+  /// 创始人互审申请人从其他在职创始人中更换审核人；失败保留原审核人并显示错误。
+  Future<void> selectReviewer(Record item) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (_) => _ReviewerPickerSheet(reviewId: item.id),
+    );
+    if (picked == null || picked == item.fields['reviewerId'] || !mounted) {
+      return;
+    }
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await ref.read(repositoryProvider).execute(
+        'reviews',
+        Command(
+          'select-reviewer',
+          {
+            'id': item.id,
+            'reviewerId': picked,
+            'expectedVersion':
+                (item.fields['baseVersion'] as num?)?.toInt() ?? item.version,
+          },
+          version: (item.fields['baseVersion'] as num?)?.toInt() ?? item.version,
+        ),
+      );
+      refreshBusiness(ref);
+      if (mounted) notice(context, '已更换审核人', success: true);
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+    if (mounted) setState(() => busy = false);
+  }
+
   void edit(Record item, String kind) {
     if (kind == 'log-revise' || kind == 'log-edit') {
       final date =
@@ -1054,6 +1116,15 @@ class _DetailPageState extends ConsumerState<DetailPage> {
               if (dispatcher && status == '已验收') {
                 bottom = button('归档任务', () => action(item, 'archive'));
               }
+              final pinned = f['pinned'] == true;
+              actions.add(
+                IconButton(
+                  key: const ValueKey('task-detail-pin'),
+                  tooltip: pinned ? '取消置顶' : '置顶',
+                  onPressed: busy ? null : () => togglePin(item, pinned),
+                  icon: Icon(pinned ? Icons.push_pin : Icons.push_pin_outlined),
+                ),
+              );
               children.addAll([
                 Wrap(
                   spacing: 12,
@@ -1261,11 +1332,11 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     ],
                   ),
                 ),
-                const SectionHeader('直属上级审核'),
+                SectionHeader(reviewModeTitle(f['approvalMode'])),
                 if (pending)
                   Text(
                     f['reviewerConfigured'] == false || f['reviewerId'] == null
-                        ? '直属上级未配置，申请保持待审'
+                        ? reviewUnassignedText(f['approvalMode'])
                         : '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
                   )
@@ -1274,9 +1345,18 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
                   ),
+                if (self && pending && f['reviewerSelectable'] == true)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: busy ? null : () => selectReviewer(item),
+                      icon: const Icon(Icons.swap_horiz),
+                      label: const Text('更换审核人'),
+                    ),
+                  ),
                 if (f['decisionSource'] == 'FOUNDER_EXEMPT')
                   const Text(
-                    '创始人授权操作已按免审规则自动批准',
+                    '公司仅一位在职创始人，授权操作已按免审规则自动批准',
                     style: TextStyle(color: CuteTokens.muted),
                   ),
                 for (final event in (f['reviewEvents'] as List? ?? []))
@@ -1764,3 +1844,77 @@ class MemberRecords extends ConsumerWidget {
     ],
   );
 }
+
+
+class _ReviewerPickerSheet extends ConsumerStatefulWidget {
+  const _ReviewerPickerSheet({required this.reviewId});
+  final String reviewId;
+
+  @override
+  ConsumerState<_ReviewerPickerSheet> createState() =>
+      _ReviewerPickerSheetState();
+}
+
+class _ReviewerPickerSheetState extends ConsumerState<_ReviewerPickerSheet> {
+  late Future<PageResult> candidates = load();
+
+  Future<PageResult> load() => ref
+      .read(repositoryProvider)
+      .list('reviews/reviewer-candidates', Query(ownerId: widget.reviewId));
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+    child: FutureBuilder<PageResult>(
+      future: candidates,
+      builder: (context, snapshot) {
+        final Widget body;
+        if (snapshot.connectionState != ConnectionState.done) {
+          body = const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        } else if (snapshot.hasError) {
+          body = ErrorPanel(
+            '${snapshot.error}',
+            retry: () => setState(() => candidates = load()),
+          );
+        } else if (snapshot.data!.items.isEmpty) {
+          body = const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text('暂无其他在职创始人可选', style: TextStyle(color: CuteTokens.muted)),
+          );
+        } else {
+          body = Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final person in snapshot.data!.items)
+                ListTile(
+                  title: Text(displayPersonName(person.fields['name'] ?? person.title)),
+                  trailing: person.fields['current'] == true
+                      ? const Text('当前审核人', style: TextStyle(color: CuteTokens.muted))
+                      : null,
+                  onTap: () => Navigator.pop(context, person.id),
+                ),
+            ],
+          );
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('选择审核人', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            const Text(
+              '只能从本公司其他在职创始人中选择，更换后原审核人不能再处理此申请。',
+              style: TextStyle(color: CuteTokens.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            body,
+          ],
+        );
+      },
+    ),
+  );
+}
+

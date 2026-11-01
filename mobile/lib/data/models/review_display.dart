@@ -158,3 +158,16 @@ String reviewSnapshotText(Object? snapshot, Object? references) {
   if (other) lines.add('其他设置：已记录变更');
   return lines.isEmpty ? '无内容' : lines.join('\n');
 }
+
+/// 审核模式对应的区块标题；未知或历史模式按直属上级展示。
+String reviewModeTitle(Object? mode) => switch (mode) {
+  'FOUNDER_PEER' => '创始人互审',
+  'ADMIN_MEMBERSHIP' => '管理员确认',
+  _ => '直属上级审核',
+};
+
+String reviewUnassignedText(Object? mode) => switch (mode) {
+  'FOUNDER_PEER' => '暂无其他在职创始人，申请保持待审',
+  'ADMIN_MEMBERSHIP' => '暂无可确认的管理员，申请保持待审',
+  _ => '直属上级未配置，申请保持待审',
+};

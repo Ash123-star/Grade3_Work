@@ -574,6 +574,7 @@ class HttpRepository implements Repository {
           ? raw['reviewer_configured'] == true
           : fields['reviewerId'] != null;
       fields['approvalMode'] = raw['approval_mode'] ?? 'DIRECT_MANAGER';
+      fields['reviewerSelectable'] = raw['reviewer_selectable'] == true;
       fields['decisionSource'] = raw['decision_source'];
     }
     if (raw['read'] == null && raw.containsKey('read_at')) {
@@ -582,6 +583,7 @@ class HttpRepository implements Repository {
     if (raw.containsKey('is_read')) fields['read'] = raw['is_read'] == true;
     if (raw.containsKey('recipient_id')) {
       fields['type'] = notificationTitle(raw['type']);
+      fields['notificationType'] = raw['type'];
       final target = notificationResource(raw['type']);
       if (target != null && raw['object_id'] != null) {
         fields['targetResource'] = target;
@@ -650,6 +652,13 @@ class HttpRepository implements Repository {
           '/auth/departments',
         );
         return _page(response.data ?? <dynamic>[]);
+      }
+      if (resource == 'reviews/reviewer-candidates') {
+        // ownerId 承载审核申请 ID；仅创始人互审申请人可读取。
+        final response = await _getWithRetry<Map<String, dynamic>>(
+          '/reviews/${Uri.encodeComponent(query.ownerId ?? '')}/reviewer-candidates',
+        );
+        return _page(response.data);
       }
       final parameters = _query(query, resource: resource);
       if (resource == 'tasks' &&
@@ -1051,6 +1060,15 @@ class HttpRepository implements Repository {
           'fields': {'accessToken': data['token'], ...user, ...data},
         });
       }
+      if (resource == 'tasks/pin') {
+        // 个人置顶：仅影响本人列表排序，不携带任务版本。
+        final path = '/tasks/${Uri.encodeComponent(_commandId(command))}/pin';
+        final response = command.action == 'unpin'
+            ? await dio.delete<Map<String, dynamic>>(path)
+            : await dio.put<Map<String, dynamic>>(path);
+        final data = response.data ?? <String, dynamic>{};
+        return _record({...data, 'id': data['taskId'] ?? _commandId(command)});
+      }
       if (resource == 'tasks') {
         if (command.action == 'create') {
           return await _postRecord(
@@ -1239,6 +1257,15 @@ class HttpRepository implements Repository {
           return await _postRecord(
             '/reviews/${Uri.encodeComponent(_commandId(command))}/reroute',
             const <String, dynamic>{},
+          );
+        }
+        if (command.action == 'select-reviewer') {
+          return await _postRecord(
+            '/reviews/${Uri.encodeComponent(_commandId(command))}/reviewer',
+            {
+              'reviewerId': v['reviewerId'],
+              'expectedVersion': v['expectedVersion'] ?? command.version,
+            },
           );
         }
         if (!['approve', 'reject'].contains(command.action)) {

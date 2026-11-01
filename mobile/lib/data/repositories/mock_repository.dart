@@ -336,6 +336,18 @@ const demoAccounts = <DemoAccount>[
     companyReviewer: true,
   ),
   DemoAccount(
+    id: 'u-cofounder',
+    name: '钟以宁',
+    role: UserRole.founder,
+    departmentId: 'd-executive',
+    departmentName: '经营管理层',
+    teamId: 't-executive',
+    teamName: '经营办公室',
+    managerId: '',
+    intro: '联合创始人，负责客户合作与经营复核。',
+    dispatch: true,
+  ),
+  DemoAccount(
     id: 'u-admin',
     name: '乔安宁',
     role: UserRole.admin,
@@ -348,7 +360,19 @@ const demoAccounts = <DemoAccount>[
   ),
 ];
 
+const _demoEmploymentStart = <String, String>{
+  'u-founder': '2019-03-01',
+  'u-cofounder': '2020-06-15',
+  'u-admin': '2022-09-01',
+  'u-product-dir': '2021-04-12',
+  'u1': '2024-07-08',
+  'u2': '2026-10-20',
+};
+
 class DemoStore {
+  DemoStore({this.founderIds});
+  /// 在职创始人；为空时取演示账号中的全部创始人，测试可收窄以覆盖单创始人免审。
+  final Set<String>? founderIds;
   final Map<String, List<Record>> records = {};
   final Map<String, Record> responses = {};
   final Map<String, SelectedAttachment> attachments = {};
@@ -452,6 +476,8 @@ class MockRepository implements Repository {
               '姓名': accountRecord.title,
               '个人介绍': accountRecord.fields['body'],
               '头像': '',
+              // 演示入职日期；未列出的成员保持未提供，与服务端历史账号一致。
+              'employmentStartDate': ?_demoEmploymentStart[accountRecord.id],
             },
           ),
       ];
@@ -573,6 +599,55 @@ class MockRepository implements Repository {
       );
     }
     return result;
+  }
+
+  /// 个人置顶：与服务端相同的可见性、上限和幂等规则；只改变本人视角的 pinned 字段。
+  Record _togglePin(Command command) {
+    final id = '${command.values['id'] ?? ''}';
+    final tasks = rows('tasks');
+    final index = tasks.indexWhere((task) => task.id == id);
+    if (index < 0) throw const ApiFailure(FailureKind.notFound, '任务不存在');
+    final task = tasks[index];
+    final pins = Map<String, dynamic>.from(task.fields['pinnedBy'] as Map? ?? {});
+    if (command.action == 'unpin') {
+      pins.remove(session.id);
+    } else if (!pins.containsKey(session.id)) {
+      final count = tasks
+          .where((item) => (item.fields['pinnedBy'] as Map?)?.containsKey(session.id) == true)
+          .length;
+      if (count >= 10) {
+        throw const ApiFailure(FailureKind.conflict, '最多置顶 10 项任务', code: 'PIN_LIMIT');
+      }
+      pins[session.id] = clock().toIso8601String();
+    }
+    tasks[index] = Record(
+      id: task.id,
+      title: task.title,
+      subtitle: task.subtitle,
+      ownerId: task.ownerId,
+      version: task.version,
+      fields: {...task.fields, 'pinnedBy': pins},
+    );
+    return Record(
+      id: id,
+      title: task.title,
+      fields: {'taskId': id, 'pinned': pins.containsKey(session.id), 'pinnedAt': pins[session.id]},
+    );
+  }
+
+  void _requireSelectable(Record? review) {
+    if (review == null) {
+      throw const ApiFailure(FailureKind.notFound, '申请不存在');
+    }
+    if (review.ownerId != session.id) {
+      throw const ApiFailure(FailureKind.forbidden, '仅申请人可以更换审核人');
+    }
+    if (review.fields['reviewState'] != '待审') {
+      throw const ApiFailure(FailureKind.conflict, '该申请已处理或已失效');
+    }
+    if (review.fields['approvalMode'] != 'FOUNDER_PEER') {
+      throw const ApiFailure(FailureKind.conflict, '仅创始人互审申请可以更换审核人');
+    }
   }
 
   DemoAccount _account(String id) => demoAccounts.firstWhere(
@@ -1113,6 +1188,23 @@ class MockRepository implements Repository {
   @override
   Future<PageResult> list(String resource, Query query) async {
     await _check(resource);
+    if (resource == 'reviews/reviewer-candidates') {
+      final review = rows('reviews')
+          .where((record) => record.id == query.ownerId)
+          .firstOrNull;
+      _requireSelectable(review);
+      return PageResult([
+        for (final peer in _founderPeers(review!.ownerId))
+          Record(
+            id: peer.id,
+            title: peer.name,
+            fields: {
+              'name': peer.name,
+              'current': peer.id == review.fields['reviewerId'],
+            },
+          ),
+      ]);
+    }
     if (scenario == DemoScenario.empty) return const PageResult([]);
     if (query.ownerId != null &&
         query.ownerId != session.id &&
@@ -1271,7 +1363,7 @@ class MockRepository implements Repository {
             date.isBefore(rangeTo);
       });
     }
-    final result = items.map((item) {
+    var result = items.map((item) {
       if (resource == 'tasks' || resource == 'tasks/received-card') {
         return _withTaskDisplay(item);
       }
@@ -1303,6 +1395,37 @@ class MockRepository implements Repository {
           int.tryParse('${b.fields['排序位置']}') ?? 0,
         ),
       );
+    }
+    if (resource == 'tasks') {
+      // 与服务端一致：本人置顶优先、最近置顶在前，其余保持原有顺序。
+      String? pinnedAt(Record task) =>
+          (task.fields['pinnedBy'] as Map?)?[session.id] as String?;
+      final ordered = [
+        for (final (index, task) in result.indexed)
+          (
+            index,
+            Record(
+              id: task.id,
+              title: task.title,
+              subtitle: task.subtitle,
+              ownerId: task.ownerId,
+              version: task.version,
+              fields: {
+                ...task.fields,
+                'pinned': pinnedAt(task) != null,
+                'pinnedAt': pinnedAt(task),
+              },
+            ),
+          ),
+      ]..sort((a, b) {
+          final left = a.$2.fields['pinnedAt'] as String?;
+          final right = b.$2.fields['pinnedAt'] as String?;
+          if (left != null && right != null) return right.compareTo(left);
+          if (left != null) return -1;
+          if (right != null) return 1;
+          return a.$1.compareTo(b.$1);
+        });
+      result = [for (final entry in ordered) entry.$2];
     }
     return PageResult(result, total: result.length);
   }
@@ -1937,7 +2060,17 @@ class MockRepository implements Repository {
         },
       );
     }
-    return resource == 'tasks' ? _withTaskDisplay(item) : item;
+    if (resource != 'tasks') return item;
+    final display = _withTaskDisplay(item);
+    final pinnedAt = (item.fields['pinnedBy'] as Map?)?[session.id];
+    return Record(
+      id: display.id,
+      title: display.title,
+      subtitle: display.subtitle,
+      ownerId: display.ownerId,
+      version: display.version,
+      fields: {...display.fields, 'pinned': pinnedAt != null, 'pinnedAt': pinnedAt},
+    );
   }
 
   Map<String, dynamic> _taskDisplayFields(Map<String, dynamic> fields) {
@@ -1978,6 +2111,25 @@ class MockRepository implements Repository {
     version: r.version + 1,
     fields: {...r.fields, ...fields},
   );
+
+  List<DemoAccount> _founderPeers(String applicantId) => demoAccounts
+      .where(
+        (account) =>
+            account.role == UserRole.founder &&
+            account.id != applicantId &&
+            (store.founderIds?.contains(account.id) ?? true),
+      )
+      .toList();
+
+  DemoAccount? _defaultFounderPeer(String applicantId) {
+    final peers = _founderPeers(applicantId);
+    if (peers.isEmpty) return null;
+    final manager = _directManager(applicantId);
+    return peers.firstWhere(
+      (peer) => peer.id == manager?.id,
+      orElse: () => peers.first,
+    );
+  }
 
   DemoAccount? _directManager(String ownerId) {
     final owner = demoAccounts
@@ -2070,6 +2222,7 @@ class MockRepository implements Repository {
     if (key != null && store.responses.containsKey(key)) {
       return store.responses[key]!;
     }
+    if (resource == 'tasks/pin') return _togglePin(command);
     if (resource == 'auth') {
       if (v.containsKey('role')) {
         throw const ApiFailure(FailureKind.forbidden, '注册只能申请员工账号');
@@ -2423,17 +2576,57 @@ class MockRepository implements Repository {
         command.version != previous.version) {
       throw const ApiFailure(FailureKind.conflict, '版本已更新，请返回刷新后重试');
     }
+    if (resource == 'reviews' && action == 'select-reviewer') {
+      _requireSelectable(previous);
+      if (command.version == null || command.version != previous!.version) {
+        throw const ApiFailure(FailureKind.conflict, '申请版本已变化，请重新读取');
+      }
+      final target = '${v['reviewerId'] ?? ''}';
+      final peer = _founderPeers(previous.ownerId)
+          .where((account) => account.id == target)
+          .firstOrNull;
+      if (peer == null) {
+        throw const ApiFailure(FailureKind.validation, '只能选择本公司其他在职创始人');
+      }
+      if (previous.fields['reviewerId'] == peer.id) return previous;
+      final changed = Record(
+        id: previous.id,
+        title: previous.title,
+        subtitle: previous.subtitle,
+        ownerId: previous.ownerId,
+        version: previous.version,
+        fields: {
+          ...previous.fields,
+          'reviewerId': peer.id,
+          'reviewerName': peer.name,
+          'reviewerConfigured': true,
+          'reviewEvents': [
+            ...?previous.fields['reviewEvents'] as List?,
+            '${session.name}更换审核人为${peer.name}',
+          ],
+        },
+      );
+      records[index] = changed;
+      notify('有新的修改申请待审核', 'reviews', changed.id, peer.id, '审批');
+      return changed;
+    }
     if (resource == 'reviews' && action != 'request-review') {
       if (previous?.fields['reviewState'] != '待审') {
         throw const ApiFailure(FailureKind.conflict, '该申请已处理或已失效');
       }
       final assignedReviewer = '${previous?.fields['reviewerId'] ?? ''}';
-      final currentManager = _directManager(previous!.ownerId);
+      final peerMode = previous!.fields['approvalMode'] == 'FOUNDER_PEER';
+      final validReviewer = peerMode
+          ? _founderPeers(previous.ownerId).any((peer) => peer.id == session.id)
+          : _directManager(previous.ownerId)?.id == session.id;
       if (previous.ownerId == session.id ||
           assignedReviewer.isEmpty ||
           assignedReviewer != session.id ||
-          currentManager?.id != session.id) {
-        throw const ApiFailure(FailureKind.forbidden, '仅当前配置的直属上级可审核');
+          !validReviewer) {
+        throw ApiFailure(
+          FailureKind.forbidden,
+          peerMode ? '仅当前指定的创始人可审核' : '仅当前配置的直属上级可审核',
+        );
       }
       if (command.version == null || command.version != previous.version) {
         throw const ApiFailure(FailureKind.conflict, '申请版本已变化，请重新读取');
@@ -2474,7 +2667,10 @@ class MockRepository implements Repository {
     }
     if (action == 'request-review') {
       final applicant = previous?.ownerId ?? session.id;
-      if (session.role == UserRole.founder) {
+      final founderPeer = session.role == UserRole.founder
+          ? _defaultFounderPeer(session.id)
+          : null;
+      if (session.role == UserRole.founder && founderPeer == null) {
         if (applicant != session.id) {
           throw const ApiFailure(FailureKind.forbidden, '创始人免审仅适用于本人有权发起的操作');
         }
@@ -2513,7 +2709,7 @@ class MockRepository implements Repository {
         if (key != null) store.responses[key] = approved;
         return approved;
       }
-      final reviewer = _directManager(applicant);
+      final reviewer = founderPeer ?? _directManager(applicant);
       final request = Record(
         id: 'r${DateTime.now().microsecondsSinceEpoch}',
         title: '${v['title'] ?? previous?.title ?? '内容'} · 修改申请',
@@ -2522,7 +2718,8 @@ class MockRepository implements Repository {
         fields: {
           'reviewState': '待审',
           'step': 0,
-          'approvalMode': 'DIRECT_MANAGER',
+          'approvalMode': founderPeer == null ? 'DIRECT_MANAGER' : 'FOUNDER_PEER',
+          'reviewerSelectable': founderPeer != null,
           'reviewerId': reviewer?.id,
           'reviewerName': reviewer?.name,
           'reviewerConfigured': reviewer != null,
@@ -2657,9 +2854,13 @@ class MockRepository implements Repository {
       }
       fields['reviewState'] = action == 'reject' ? '已驳回' : '已通过';
       fields['step'] = action == 'approve' ? 1 : 0;
+      fields['reviewerSelectable'] = false;
+      if (previous?.fields['approvalMode'] == 'FOUNDER_PEER') {
+        fields['decisionSource'] = 'FOUNDER_PEER';
+      }
       fields['reviewEvents'] = [
         ...?previous?.fields['reviewEvents'] as List?,
-        '直属上级 · ${session.name} · ${action == 'reject' ? '驳回：${v['reason']}' : '通过'} · ${clock().toString().substring(0, 16)}',
+        '${previous?.fields['approvalMode'] == 'FOUNDER_PEER' ? '创始人互审' : '直属上级'} · ${session.name} · ${action == 'reject' ? '驳回：${v['reason']}' : '通过'} · ${clock().toString().substring(0, 16)}',
       ];
       if (fields['reviewState'] == '已通过' && fields['candidate'] is Map) {
         final applied = _applyReviewCandidate(

@@ -7,6 +7,7 @@ import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/tenure.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
@@ -286,7 +287,23 @@ class ProfilePage extends ConsumerWidget {
                                   ),
                                 ),
                               const SizedBox(height: 8),
-                              AppLabelBadge(user.role.label),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  AppLabelBadge(user.role.label),
+                                  if (profile.valueOrNull != null)
+                                    Text(
+                                      '工龄 ${tenureLabel(parseEmploymentDate(profile.valueOrNull!.fields['employmentStartDate']), shanghaiWallTime(DateTime.now()))}',
+                                      key: const ValueKey('profile-tenure'),
+                                      style: const TextStyle(
+                                        color: CuteTokens.muted,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
