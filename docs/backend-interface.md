@@ -71,7 +71,9 @@
 
 ## 审核 `/reviews`
 
-`GET /reviews`、`GET /reviews/{id}` 返回申请人或当前仍有权的分配审核人可见内容，包含尚有当前权限的已决历史，SUPERSEDED步骤不提供读取权限。`POST /reviews/{id}/decision` 请求 `{approve,reason,expectedVersion}`，驳回须理由，禁止自审并复核目标版本及当前直属关系。除 `MEMBERSHIP` 管理员确认外，使用 `DIRECT_MANAGER` 单级审核；有效创始人权限内新操作自动批准并记录 `FOUNDER_EXEMPT`，管理员不免审。无审核人保持待审。`POST /reviews/{id}/reroute` 仅申请人继续PENDING申请，保留已决历史、替代待审步骤；有效创始人明确继续本人非MEMBERSHIP申请时，才按当前业务权限和目标版本免审应用，重复已免审请求返回原结果。迁移不会自动应用任何历史候选。
+`PUT /tasks/{id}/pin`、`DELETE /tasks/{id}/pin` 为个人置顶：调用者须能读取该任务（范围外404），只影响本人 `GET /tasks` 排序（置顶优先、最近置顶在前，其后按截止时间），列表项增加 `pinned`/`pinnedAt`；不改变任务 version、不走审核、不写通知。每人最多10项（仅计仍可见任务），超出409 `PIN_LIMIT`；重复置顶返回原 `pinnedAt`，取消未置顶任务也返回成功。日历、导图公司任务卡和已接收任务卡不受置顶影响。
+
+`GET /reviews`、`GET /reviews/{id}` 返回申请人或当前仍有权的分配审核人可见内容，包含尚有当前权限的已决历史，SUPERSEDED步骤不提供读取权限。`POST /reviews/{id}/decision` 请求 `{approve,reason,expectedVersion}`，驳回须理由，禁止自审并复核目标版本及当前直属关系。除 `MEMBERSHIP` 管理员确认外，使用 `DIRECT_MANAGER` 单级审核；创始人发起时，若同公司另有在职创始人则使用 `FOUNDER_PEER`：默认分配直属上级（若为在职创始人）或 id 最小的其他在职创始人，决定时复核审核人仍为在职创始人，成功记录 `decision_source=FOUNDER_PEER`；公司仅一位在职创始人时，其权限内新操作自动批准并记录 `FOUNDER_EXEMPT`。管理员不免审，也不因任何兜底获得审批权。无审核人保持待审，并向申请人和在职管理员发送去重的 `REVIEW_UNASSIGNED`。决定与改派均锁定申请行并以 `PENDING` 条件更新，重复或并发决定只生效一次，其余返回409。详情增加 `reviewer_selectable`（仅本人 PENDING 的 FOUNDER_PEER 为 true）。`GET /reviews/{id}/reviewer-candidates` 仅申请人可读，返回 `{items:[{id,name,current}]}`；`POST /reviews/{id}/reviewer` 请求 `{reviewerId,expectedVersion}`，非在职其他创始人400 `INVALID_REVIEWER`，非申请人403，已决/版本不符409，非 FOUNDER_PEER 409 `REVIEWER_SELECTION_UNSUPPORTED`，重复选择当前审核人返回原详情；原步骤SUPERSEDED并记录 `REVIEW_REVIEWER_CHANGED`。组织 `USER`（停用、改角色、改直属上级）或 `REVIEWER` 变更生效时，同一事务内复核本公司其他待审申请：审核人失效则作废并按当前规则重新分配，记录 `REVIEW_AUTO_REROUTED`；正被其他事务锁定的申请跳过，由该事务按最新关系校验。仅剩一位创始人时不自动免审，需申请人显式 reroute。`POST /reviews/{id}/reroute` 仅申请人继续PENDING申请，保留已决历史、替代待审步骤；有效创始人明确继续本人非MEMBERSHIP申请时，才按当前业务权限和目标版本免审应用，重复已免审请求返回原结果。迁移不会自动应用任何历史候选。
 
 ## 仪表盘、通知、分析和附件
 
@@ -148,3 +150,5 @@ GET /api/reviews/{id} 在现有审核读取权限校验之后追加 `display_ref
 
 ### 组织团队名称与操作反馈（Issue #52）
 GET /organization/people沿用原组织数据范围，追加可空team_name，按teams.id及company_id联合关联；无团队或名称不存在时返回null。客户端将team_name/嵌套team.name归一化为teamName；统计筛选优先取当前授权组织树teams名称，不将team_id当显示名称。无需数据库迁移，旧客户端可忽略新增字段。任务和组织查询权限保持现有规则。
+
+

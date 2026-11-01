@@ -174,8 +174,8 @@ paths:
   /api/reviews/{id}/decision:
     post:
       operationId: mobileReviewDecision
-      summary: 当前有效直属审核人或成员确认管理员决定申请
-      description: 禁止自审；驳回需理由；当前申请版本、目标版本及关系均由服务端复核。MEMBERSHIP不适用创始人免审。
+      summary: 当前有效直属审核人、创始人互审审核人或成员确认管理员决定申请
+      description: 禁止自审；驳回需理由；当前申请版本、目标版本及关系均由服务端复核。FOUNDER_PEER复核审核人仍为在职其他创始人。MEMBERSHIP不适用创始人免审。并发或重复决定只生效一次，其余409。
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}
       requestBody:
@@ -200,6 +200,50 @@ paths:
       description: 保留历史步骤并替代待审步骤。有效创始人明确继续本人非MEMBERSHIP申请时按当前权限及目标版本免审应用；重复该已免审请求返回原结果。成员确认仍分配管理员。
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Current review, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/reviews/{id}/reviewer-candidates:
+    get:
+      operationId: mobileReviewerCandidates
+      summary: 创始人互审申请人读取可选审核人
+      description: 仅申请人；申请须PENDING且approval_mode=FOUNDER_PEER，否则409 REVIEWER_SELECTION_UNSUPPORTED。返回本公司申请人以外的在职创始人，current标记当前审核人。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, current]
+                      properties: {id: {type: string}, name: {type: string}, current: {type: boolean}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/reviews/{id}/reviewer:
+    post:
+      operationId: mobileSelectReviewer
+      summary: 创始人互审申请人更换审核人
+      description: 只能选择本公司其他在职创始人（否则400 INVALID_REVIEWER）；非申请人403；已决或目标版本不符409；重复选择当前审核人返回原详情。原步骤SUPERSEDED，新审核人收到REVIEW_PENDING。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reviewerId, expectedVersion]
+              properties:
+                reviewerId: {type: string, minLength: 1}
+                expectedVersion: {type: integer, minimum: 0}
       responses:
         '200': {description: Current review, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
         default: {$ref: '#/components/responses/Error'}
