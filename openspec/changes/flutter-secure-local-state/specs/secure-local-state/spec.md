@@ -67,3 +67,22 @@ The client SHALL migrate existing draft preferences only for the current account
 
 - **WHEN** the legacy value cannot be encrypted or written
 - **THEN** the client keeps the editor input and legacy value for retry and reports a storage failure
+
+### Requirement: Confirmed default credential retention
+
+P0：原生移动端登录成功后 SHALL 默认保存受保护的最小认证记录，不保存账号密码。安全写入 SHALL 回读确认，服务端有效期和撤销权限 MUST 保持权威。
+
+#### Scenario: Login followed by application state recreation
+
+- **WHEN** 用户通过当前登录接口登录，随后销毁应用状态并重新打开同一服务地址的应用
+- **THEN** 客户端 SHALL 用保留的 token 调用 auth/me，在同一有效身份确认后进入默认导图，无需再次输入或提交账号密码
+
+#### Scenario: Unconfirmed secure write
+
+- **WHEN** 安全存储写入抛错或回读内容不一致
+- **THEN** 客户端 MUST 显示仅本次运行有效的保存失败提示，不声称下次可免密恢复，也不得降级保存明文密码
+
+#### Scenario: One week session lifetime
+
+- **WHEN** 用户在无 SESSION_HOURS 显式覆盖的环境登录
+- **THEN** 服务端 SHALL 签发自登录起168小时有效的会话并返回准确 expiresAt，移动端 MUST 保存此值；主动退出、改密、停用和过期仍使会话失效，已有记录不得自动延期

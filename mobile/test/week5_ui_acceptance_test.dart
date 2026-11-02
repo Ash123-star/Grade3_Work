@@ -10,7 +10,7 @@ import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
-import 'package:pandora_mobile/features/dashboard/task_management_page.dart';
+import 'package:pandora_mobile/features/dashboard/task_management_table.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
@@ -180,7 +180,8 @@ void main() {
         );
         await settle();
         expect(find.byType(PublicComments), findsOneWidget);
-        expect(find.text('申请修订日志'), findsOneWidget);
+        expect(find.text('申请修订日志'), findsNothing);
+        expect(find.text('提交修订申请'), findsNothing);
         await capture('07-log-detail');
         router.go('/me');
         await settle();
@@ -221,7 +222,7 @@ void main() {
   );
 
   testWidgets(
-    'diary row requests reviewed revisions; detail comments can post and reply',
+    'diary detail edits directly within the window; comments can post and reply',
     (t) async {
       t.view.physicalSize = const Size(390, 844);
       t.view.devicePixelRatio = 1;
@@ -241,11 +242,8 @@ void main() {
       await t.tap(find.byKey(const ValueKey('diary-row:1')));
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(
-        router.routerDelegate.currentConfiguration.last.matchedLocation,
-        '/form/log-revise',
-      );
-      expect(find.text('提交修订申请'), findsOneWidget);
+      expect(find.text('今日工作'), findsOneWidget);
+      expect(find.text('评论'), findsOneWidget);
       expect(find.textContaining('等待独立审核'), findsNothing);
       router.go('/item/logs/1');
       await t.pumpAndSettle();
@@ -381,7 +379,7 @@ void main() {
   );
 
   testWidgets(
-    'create diary, save draft, reopen, submit and request reviewed changes',
+    'create diary with autosaved draft and edit submitted work directly',
     (t) async {
       final repo = MockRepository(
         const Session(),
@@ -402,26 +400,25 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final work = find.byWidgetPredicate(
-        (w) => w is TextField && w.decoration?.hintText == '填写今日工作',
+        (w) => w is TextField && w.decoration?.hintText == '写下今天完成的工作',
       );
       await t.enterText(work, '从页面创建的草稿');
-      await t.tap(find.text('保存草稿'));
+      await t.pump(const Duration(milliseconds: 500));
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      final draft = (await t.runAsync(
-        () => repo.list('logs', const Query()),
-      ))!.items.single;
-      expect(draft.fields['status'], '草稿');
       router.pop();
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      await t.tap(find.byKey(ValueKey('diary-row:${draft.id}')));
+      await t.tap(find.byTooltip('创建日志'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(t.widget<TextField>(work).controller!.text, '从页面创建的草稿');
       await t.tap(find.text('提交'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
+      final draft = (await t.runAsync(
+        () => repo.list('logs', const Query()),
+      ))!.items.single;
       final submitted = await t.runAsync(() => repo.detail('logs', draft.id));
       expect(isSubmittedDiary(submitted!), isTrue);
       expect(submitted.fields['submittedAt'], isNotNull);
@@ -429,27 +426,13 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.textContaining('等待独立审核'), findsNothing);
-      await t.enterText(work, '提交后申请修订的正文');
-      final reason = find.byWidgetPredicate(
-        (w) => w is TextField && w.decoration?.hintText == '填写修改理由',
-      );
-      await t.ensureVisible(reason);
-      await t.enterText(reason, '补充验收记录');
-      await t.tap(find.text('提交修订申请'));
+      await t.enterText(work, '24小时内直接修改的正文');
+      await t.tap(find.text('提交修改'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final changed = await t.runAsync(() => repo.detail('logs', draft.id));
-      expect(changed!.fields['今日工作'], '从页面创建的草稿');
-      expect(
-        (await t.runAsync(
-          () => repo.list('reviews', const Query()),
-        ))!.items.any(
-          (r) =>
-              r.fields['targetId'] == draft.id &&
-              r.fields['reviewState'] == '待审',
-        ),
-        isTrue,
-      );
+      expect(changed!.fields['今日工作'], '24小时内直接修改的正文');
+      expect((await t.runAsync(() => repo.list('reviews', const Query())))!.items, isEmpty);
       expect(changed.fields['submittedAt'], submitted.fields['submittedAt']);
 
       t.testTextInput.hide();
@@ -471,12 +454,8 @@ void main() {
       await t.tap(find.byTooltip('创建日志'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(
-        router.routerDelegate.currentConfiguration.last.matchedLocation,
-        '/form/log-edit',
-      );
-      expect(t.widget<TextField>(work).controller!.text, isEmpty);
-      expect(find.text('提交'), findsOneWidget);
+      expect(find.text('今日工作'), findsOneWidget);
+      expect(find.text('自动保存到此设备'), findsOneWidget);
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox.shrink());
       c.dispose();
@@ -484,7 +463,7 @@ void main() {
   );
 
   testWidgets(
-    'employee profile opens own task management; failures and empty data are explicit',
+    'view opens task management; failures and empty data are explicit',
     (t) async {
       final c = testContainer(
         overrides: [
@@ -500,16 +479,16 @@ void main() {
       router.go('/me');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      await t.scrollUntilVisible(
-        find.text('任务管理'),
-        180,
-        scrollable: find.byType(Scrollable).first,
-      );
+      expect(find.text('任务管理'), findsNothing);
+      router.go('/view');
+      await settleLocalIo(t);
+      await t.pumpAndSettle();
+      expect(find.text('任务管理'), findsOneWidget);
       await t.tap(find.text('任务管理'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.byType(TaskManagementPage), findsOneWidget);
-      expect(find.text('本人的全部任务'), findsOneWidget);
+      expect(find.text('任务名称'), findsOneWidget);
       expect(find.byTooltip('新增任务'), findsNothing);
       c.read(scenarioProvider.notifier).state = DemoScenario.offline;
       c.invalidate(recordsProvider('tasks'));

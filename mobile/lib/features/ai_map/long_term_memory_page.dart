@@ -207,7 +207,7 @@ class _AiPageState extends ConsumerState<AiPage> {
       await client.call('PUT', '/ai-memories/preferences/me', body: value);
       await load();
     } catch (e) {
-      if (mounted) notice(context, e.toString());
+      if (mounted) notice(context, e.toString(), tone: NoticeTone.error);
     }
   }
 
@@ -291,7 +291,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                                               await load();
                                             } catch (e) {
                                               if (mounted) {
-                                                notice(context, e.toString());
+                                                notice(context, e.toString(), tone: NoticeTone.error);
                                               }
                                             }
                                           },
@@ -320,7 +320,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         ),
       );
     } catch (e) {
-      if (mounted) notice(context, e.toString());
+      if (mounted) notice(context, e.toString(), tone: NoticeTone.error);
     }
   }
 
@@ -395,13 +395,14 @@ class _AiPageState extends ConsumerState<AiPage> {
         notice(
           context,
           result['status'] == 'PENDING'
-              ? '已提交独立审核，尚未生效'
+              ? '已提交直属上级审核，尚未生效'
               : result['message'] as String? ?? '记忆已更新',
+          success: true,
         );
       }
       await load();
     } catch (e) {
-      if (mounted) notice(context, e.toString());
+      if (mounted) notice(context, e.toString(), tone: NoticeTone.error);
     }
   }
 
@@ -430,10 +431,10 @@ class _AiPageState extends ConsumerState<AiPage> {
         '/ai-memories/${item['id']}',
         headers: {'If-Match': item['version'].toString()},
       );
-      if (mounted) notice(context, '已停止使用，后台正在清理索引与图谱');
+      if (mounted) notice(context, '已停止使用，后台正在清理索引与图谱', success: true);
       await load();
     } catch (e) {
-      if (mounted) notice(context, e.toString());
+      if (mounted) notice(context, e.toString(), tone: NoticeTone.error);
     }
   }
 
@@ -468,7 +469,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         ),
       );
     } catch (e) {
-      if (mounted) notice(context, e.toString());
+      if (mounted) notice(context, e.toString(), tone: NoticeTone.error);
     }
   }
 
@@ -514,7 +515,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                   : scenario == DemoScenario.offline
                   ? '分析暂时无法加载'
                   : '从真实工作记录开始',
-              subtitle: '当前为页面演示，连接企业服务后积累个人与公司记忆，不展示预设发展结论。',
+              subtitle: '完成工作记录后，可在这里查看已积累的个人与公司记忆。',
             ),
           ] else if (!user.active)
             const EmptyIllustration(
@@ -667,10 +668,10 @@ class _AiPageState extends ConsumerState<AiPage> {
                                 },
                               );
                               if (mounted) {
-                                notice(this.context, '反馈已记录，可调整目标后重新分析');
+                                notice(this.context, '反馈已记录，可调整目标后重新分析', success: true);
                               }
                             } catch (e) {
-                              if (mounted) notice(this.context, e.toString());
+                              if (mounted) notice(this.context, e.toString(), tone: NoticeTone.error);
                             }
                           },
                           child: const Text('这条建议不合适'),

@@ -30,7 +30,8 @@ public class OrganizationReviewedRevisionApplication implements ReviewedRevision
             }
             case "MEMBERSHIP" -> {
                 db.one("SELECT id FROM departments WHERE id=? AND company_id=?",Db.required(c,"departmentId"),approver.company());
-                Db.conflict(db.update("UPDATE users SET status='ACTIVE',department_id=?,version=version+1 WHERE id=? AND company_id=? AND status='PENDING' AND version=?",c.get("departmentId"),target,approver.company(),v));
+                java.time.LocalDate effectiveDate=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+                Db.conflict(db.update("UPDATE users SET status='ACTIVE',department_id=?,employment_start_date=COALESCE(employment_start_date,?::date),version=version+1 WHERE id=? AND company_id=? AND status='PENDING' AND version=?",c.get("departmentId"),effectiveDate,target,approver.company(),v));
             }
             case "REVIEWER" -> Db.conflict(db.update("UPDATE users SET company_reviewer=true,version=version+1 WHERE id=? AND company_id=? AND status='ACTIVE' AND version=?",target,approver.company(),v));
             case "USER" -> {

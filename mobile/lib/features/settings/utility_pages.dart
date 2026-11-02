@@ -312,7 +312,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               color: const Color(0xFFF1E7FF),
               child: Text(
                 AppConfig.mock
-                    ? '本地预设样例不调用模型，也不消耗额度。'
+                    ? '用量查询服务尚未接入，当前不能显示调用次数或预算。'
                     : '用量查询服务待接入，当前不能显示调用次数或预算。',
               ),
             ),
@@ -344,7 +344,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
               for (final entry in {
                 'department': '部门与团队',
                 'membership': '确认员工归属',
-                'role': '角色与权限（含公司复核资格）',
+                'role': '角色与权限',
                 'reporting': '直属汇报关系',
                 'disable': '停用账号',
                 'policy': '审核策略',

@@ -186,7 +186,12 @@ class AiAdapter implements HttpClientAdapter {
       }
     } else if (o.path.endsWith('/confirm-task')) {
       status = confirmStatus;
-      data = {'id': 'task-created'};
+      if (status == 200 && o.data['version'] != jobs[id]?['version']) {
+        status = 409;
+        data = {'code': 'VERSION_CONFLICT', 'message': '建议已变化，请重新读取'};
+      } else {
+        data = {'id': 'task-created'};
+      }
     } else if (o.path.startsWith('/ai/jobs/')) {
       if (o.method == 'DELETE') {
         jobs[id] = fixture(id: id, state: 'CANCELLED');
@@ -370,6 +375,7 @@ void main() {
         'date': '2026-10-13',
         'period': 'week',
         'purpose': 'EXPLAIN_RISK',
+        'scope': 'AUTHORIZED',
         'focusSourceId': 'task:task-1',
       });
       expect(adapter.requests.first.headers['Authorization'], 'Bearer token');
@@ -400,9 +406,9 @@ void main() {
         'attachments': ['file'],
         'collaborators': ['person'],
       };
-      expect(await repo.confirm(edited, 0, task, 'stable-key'), 'task-created');
+      expect((await repo.confirm(edited, 0, task, 'stable-key'))['id'], 'task-created');
       expect(adapter.requests.last.path, '/ai/jobs/job/confirm-task');
-      expect(adapter.requests.last.data, {'actionIndex': 0, 'task': task});
+      expect(adapter.requests.last.data, {'version': 5, 'actionIndex': 0, 'task': task});
       expect(adapter.requests.last.headers['Idempotency-Key'], 'stable-key');
       await repo.cancel(created.id);
       expect(adapter.requests.last.method, 'DELETE');
@@ -841,7 +847,7 @@ void main() {
   }
 
   Future<void> confirm(WidgetTester t) async {
-    await t.tap(find.text('确认并派发任务'));
+    await t.tap(find.text('确认并提交任务申请'));
     await t.pumpAndSettle();
     await t.tap(find.text('确认派发'));
     await settle(t);
@@ -882,7 +888,7 @@ void main() {
     },
   );
   testWidgets(
-    'changed recommendation between edit and confirm preserves human input and blocks POST',
+    'changed recommendation is rejected atomically by server and preserves human input',
     (t) async {
       await launch(t, '/ai/jobs/job/confirm/0');
       await fillConfirmation(t);
@@ -893,11 +899,11 @@ void main() {
           .position
           .jumpTo(0);
       await t.pumpAndSettle();
-      expect(find.textContaining('建议已变化'), findsOneWidget);
+      expect(find.textContaining('内容已有新版本'), findsWidgets);
       expect(find.text('先核对发布依赖'), findsOneWidget);
       expect(
         adapter.requests.where((r) => r.path.endsWith('/confirm-task')),
-        isEmpty,
+        hasLength(1),
       );
       await close(t);
     },
@@ -1017,6 +1023,7 @@ void main() {
         'period': 'day',
         'purpose': 'EXPLAIN_RISK',
         'focusSourceId': 'task:task-1',
+        'scope': 'AUTHORIZED',
       });
       expect(
         adapter.requests.where((r) => r.path.endsWith('/confirm-task')),

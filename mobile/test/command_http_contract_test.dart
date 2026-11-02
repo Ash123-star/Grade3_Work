@@ -15,6 +15,7 @@ import 'package:pandora_mobile/data/repositories/repository.dart';
 class CommandAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   int mutationStatus = 200, submitStatus = 200, draftVersion = 0;
+  Map<String, dynamic>? savedLog;
   final task = <String, dynamic>{
     'id': 'task-1',
     'title': '发布验收',
@@ -78,8 +79,12 @@ class CommandAdapter implements HttpClientAdapter {
         status = 409;
       } else {
         draftVersion = draftVersion == 0 ? 9 : draftVersion + 1;
-        body = {'id': 'saved-log', 'title': '日报', 'version': draftVersion};
+        body = savedLog = {'id': 'saved-log', 'title': '日报', 'version': draftVersion, 'owner_id':'u1', 'business_date': data['businessDate'], 'submitted':false, 'body':data['body']};
       }
+    } else if (options.path == '/logs/saved-log' && options.method == 'GET') {
+      body = savedLog!;
+    } else if (options.path == '/logs/log-1/content' && status == 200) {
+      body = {'id': 'log-1', 'title': '日报', 'version': 6};
     } else if (options.path.endsWith('/submit')) {
       status = submitStatus;
       if (draftVersion != 0 &&
@@ -116,13 +121,29 @@ void main() {
   Matcher failure(FailureKind kind) =>
       isA<ApiFailure>().having((e) => e.kind, 'kind', kind);
 
-  test('log withdrawal carries optimistic version and reason', () async {
+  test('retired and unknown log operations cannot issue requests', () async {
+    for (final action in ['withdraw', 'read', 'request-review', 'typo']) {
+      await expectLater(repo.execute('logs', Command(action, {'id':'log-1'},version:5)), throwsA(failure(FailureKind.unavailable)));
+    }
+    expect(adapter.requests,isEmpty);
+  });
+
+  test('diary content update uses the 24h direct-write contract', () async {
     await repo.execute(
       'logs',
-      const Command('withdraw', {'id': 'log-1', '撤回原因': '补充说明'}, version: 5),
+      const Command(
+        'update-content',
+        {'id': 'log-1', 'work': '补充了工作结果'},
+        version: 5,
+        idempotencyKey: 'log-edit-v5',
+      ),
     );
-    expect(adapter.requests.single.path, '/logs/log-1/withdraw');
-    expect(adapter.requests.single.data, {'version': 5, 'reason': '补充说明'});
+
+    final request = adapter.requests.last;
+    expect(request.method, 'PUT');
+    expect(request.path, '/logs/log-1/content');
+    expect(request.data, {'work': '补充了工作结果', 'version': 5});
+    expect(request.headers['Idempotency-Key'], 'log-edit-v5');
   });
 
   test('log reply maps frontend parentCommentId to backend parentId', () async {
@@ -157,7 +178,17 @@ void main() {
           'reviews',
           'approve',
           '/reviews/review-1/decision',
-          {'approve': true, 'reason': ''},
+          {'approve': true, 'reason': '', 'expectedVersion': 5},
+        ),
+        (
+          'reviews',
+          'reject',
+          '/reviews/review-1/decision',
+          {
+            'approve': false,
+            'reason': '补充依据',
+            'expectedVersion': 5,
+          },
         ),
         ('notifications', 'read', '/notifications/message-1/read', null),
       ]) {
@@ -172,6 +203,8 @@ void main() {
           Command(action, {
             'id': id,
             if (resource == 'logs/comments') '评语': '已核对',
+            if (resource == 'reviews' && action == 'reject')
+              '驳回原因': '补充依据',
           }, version: 5),
         );
         expect(adapter.requests.last.path, path);
@@ -181,14 +214,13 @@ void main() {
   );
 
   test(
-    'missing existing IDs and unsupported return issue no mutation',
+    'missing IDs and missing return version issue no mutation',
     () async {
       for (final (resource, action) in [
         ('tasks', 'receive'),
         ('logs/comments', 'comment'),
         ('reviews', 'approve'),
         ('notifications', 'read'),
-        ('logs', 'request-review'),
       ]) {
         await expectLater(
           repo.execute(resource, Command(action, const {})),
@@ -197,7 +229,7 @@ void main() {
       }
       await expectLater(
         repo.execute('tasks', const Command('return', {'id': 'task-1'})),
-        throwsA(failure(FailureKind.unavailable)),
+        throwsA(failure(FailureKind.validation)),
       );
       expect(adapter.requests, isEmpty);
     },
@@ -206,7 +238,7 @@ void main() {
   test(
     'unregistered list/detail resources fail before HTTP requests',
     () async {
-      for (final resource in ['feedback', 'organization/teams']) {
+      for (final resource in ['feedback']) {
         await expectLater(
           repo.list(resource, const Query()),
           throwsA(failure(FailureKind.unavailable)),
@@ -223,18 +255,10 @@ void main() {
   test(
     'submitted log update never writes through the draft endpoint',
     () async {
-      await expectLater(
-        repo.execute(
-          'logs',
-          const Command('update', {
-            'id': 'submitted-log',
-            'businessDate': '2026-10-20',
-            '今日工作': '修订内容',
-          }, version: 3),
-        ),
-        throwsA(failure(FailureKind.unavailable)),
-      );
-      expect(adapter.requests, isEmpty);
+      await repo.execute('logs',const Command('update',{'id':'submitted-log','work':'修订内容'},version:3));
+      expect(adapter.requests.single.path,'/logs/submitted-log/content');
+      expect(adapter.requests.single.method,'PUT');
+      expect(adapter.requests.single.data,{'work':'修订内容','version':3});
     },
   );
 
@@ -440,13 +464,7 @@ void main() {
       ]);
       expect(adapter.requests.first.data, {
         'businessDate': '2026-10-13',
-        'body': {
-          'work': '验收接口',
-          'blockers': '',
-          'tomorrow': '',
-          'hours': 0,
-          'taskIds': [],
-        },
+        'body': {'work': '验收接口'},
         'version': 0,
       });
       expect(adapter.requests.last.data, {'version': 9});
@@ -526,7 +544,7 @@ void main() {
         ('notifications', 'read', {'id': 'message-1'}),
       ]) {
         await expectLater(
-          repo.execute(resource, Command(action, values)),
+          repo.execute(resource, Command(action, values,version:5)),
           throwsA(failure(FailureKind.conflict)),
         );
       }
@@ -556,17 +574,15 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 80)),
       );
       await t.pumpAndSettle();
-      await t.enterText(find.byType(TextFormField).first, '不能丢失的工作正文');
+      await t.enterText(find.byType(TextField).first, '不能丢失的工作正文');
       adapter.submitStatus = 503;
-      await t.tap(find.widgetWithText(FilledButton, '提交'));
-      await t.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 80)),
-      );
+      await t.tap(find.text('提交'));
+      await waitForLocalState(t,find.text('无法连接企业服务，请确认后端已启动及连接地址正确'));
       await t.pumpAndSettle();
       expect(find.text('无法连接企业服务，请确认后端已启动及连接地址正确'), findsOneWidget);
       expect(
         t
-            .widget<TextFormField>(find.byType(TextFormField).first)
+            .widget<TextField>(find.byType(TextField).first)
             .controller!
             .text,
         '不能丢失的工作正文',
@@ -577,17 +593,17 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       c.read(routerProvider).go('/form/log-edit?draftSource=diary');
-      await settleLocalIo(t);
+      await waitForLocalState(t,find.text('不能丢失的工作正文'));
       await t.pumpAndSettle();
       expect(
         t
-            .widget<TextFormField>(find.byType(TextFormField).first)
+            .widget<TextField>(find.byType(TextField).first)
             .controller!
             .text,
         '不能丢失的工作正文',
       );
       adapter.submitStatus = 200;
-      await t.tap(find.widgetWithText(FilledButton, '提交'));
+      await t.tap(find.text('提交'));
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 80)),
       );

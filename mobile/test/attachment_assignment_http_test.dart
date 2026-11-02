@@ -106,6 +106,17 @@ class AttachmentAdapter implements HttpClientAdapter {
         profile['version'] = 8;
       }
       data = profile;
+    } else if (o.path == '/task-labels') {
+      data = {
+        'items': [
+          {
+            'id': 'database-label-important',
+            'name': '重要',
+            'color': '#FFD9A8',
+            'status': 'ACTIVE',
+          },
+        ],
+      };
     } else if (o.path == '/tasks' && o.method == 'POST') {
       data = {
         'id': 'review-created',
@@ -295,6 +306,7 @@ void main() {
       expect(adapter.requests.last.data, {
         'type': 'FEEDBACK',
         'version': 3,
+        'attachments': [],
         'text': '交付内容\n\n遇到的阻碍：等待复核',
       });
       await repo.list(
@@ -667,6 +679,7 @@ void main() {
               as Map;
       expect(body['participants'], ['first', 'second']);
       expect(body['attachments'], ['uploaded-1']);
+      expect(body['labelId'], 'database-label-important');
       expect(body.keys.contains('status'), isFalse);
       await close(t);
     },

@@ -15,11 +15,13 @@
 | 表 | 字段 | 作用 |
 |---|---|---|
 | `companies` | `id`, `name` | 公司租户及名称 |
-| `companies` | `version`, `review_policy` | 公司配置版本和任务审核层级策略 |
+| `companies` | `version`, `review_policy` | 公司配置版本与旧审核策略兼容载荷；当前固定直属上级单级，MEMBERSHIP由管理员确认，不允许恢复旧多级策略 |
 | `departments` | `id`, `company_id`, `name` | 部门及所属公司 |
 | `teams` | `id`, `company_id`, `department_id`, `name` | 团队及部门归属 |
 | `users` | `id`, `company_id`, `account`, `password_hash` | 登录身份和密码摘要 |
 | `users` | `phone`, `name`, `profile` | 手机号、姓名和个人资料；手机号不能重复 |
+| `users` | `email`, `gender`, `age` | V22权威资料列；可空，邮箱最长320、性别最长32、年龄为非负整数；简介/头像仍merge至profile，读列不被旧JSON值覆盖 |
+| `users` | `employment_start_date` | V22可信入职业务日；历史无来源为NULL，新成员确认生效时写上海日期；NULL不推导缺交 |
 | `users` | `department_id`, `team_id` | 组织归属；复合外键防止跨公司或跨部门团队引用 |
 | `users` | `role`, `status` | 主角色和 `PENDING/ACTIVE/DISABLED` 状态 |
 | `users` | `must_change_password` | 是否必须首次改密 |
@@ -37,13 +39,15 @@
 | `dashboard_items` | `kind`, `owner_id` | `COMPANY` 公司重点或 `PERSONAL` 个人重点 |
 | `dashboard_items` | `title`, `body`, `pinned`, `archived`, `position` | 重点内容、置顶、归档和排序 |
 | `private_notes` | `owner_id`, `resource`, `object_id`, `text` | 仅本人可见的任务或公司重点备注 |
-| `tasks` | `issuer_id`, `owner_id` | 派发者和唯一主负责人 |
-| `tasks` | `title`, `deadline`, `body` | 任务标题、截止时间和表单字段；不保存派发页面的完成情况字段 |
+| `tasks` | `issuer_id`, `owner_id` | 派发者及兼容负责人投影；当前业务参与人以task_participants为准 |
+| `tasks` | `title`, `start_at`, `deadline`, `body` | 标题、可空开始时间、截止时间和表单字段；不保存派发页面的完成情况字段 |
+| `task_participants` | `task_id`, `user_id`, `company_id` | V20无角色参与人集合，复合外键限制同公司；查询按start_at/deadline与网格区间相交 |
 | `tasks` | `phase`, `version` | 后台流转阶段和并发版本 |
 | `task_assignees` | `task_id`, `user_id`, `kind` | 主负责人或协作者；主负责人由唯一索引保证只有一名 |
 | `task_events` | `sequence`, `type`, `actor_id`, `body` | 任务事件时间线，包含派发、接收、反馈、验收、撤回、归档和修订 |
 | `attachments` | `owner_id`, `filename`, `content_type`, `data` | 附件元数据和二进制内容；授权由服务端再次判断 |
 | `attachments` | `task_id` | 已关联任务；未关联时只有上传者可见 |
+| `attachments` | `expires_at` | 已有附件有效期；成果反馈引用要求有实际文件且未过期，单次最多5个、任务累计最多100个，绑定与事件同事务 |
 
 ## 日报
 
@@ -65,9 +69,12 @@
 |---|---|---|
 | `review_requests` | `kind`, `target_id`, `applicant_id` | 被审核对象、对象 ID 和申请人 |
 | `review_requests` | `expected_version`, `before_value`, `candidate` | 版本基线、原值和候选值 |
-| `review_requests` | `reason`, `status` | 变更理由和 `PENDING/APPROVED/REJECTED` 状态 |
+| `review_requests` | `reason`, `status` | 变更理由和 `PENDING/APPROVED/REJECTED/SUPERSEDED` 状态 |
+| `review_requests` | `approval_mode`, `decision_source` | V22增加DIRECT_MANAGER/ADMIN_MEMBERSHIP/LEGACY模式和DIRECT_MANAGER/ADMIN_MEMBERSHIP/FOUNDER_EXEMPT决定来源；历史待审迁移不应用候选 |
 | `review_steps` | `request_id`, `applicant_id`, `reviewer_id`, `position` | 审核申请人、审核人和审核顺序；V4 禁止审核人等于申请人 |
 | `review_steps` | `state`, `reason`, `decided_at` | 步骤结果、驳回理由和决定时间 |
+
+V22将旧待审步骤标记为SUPERSEDED并保留历史，每个申请至多一个PENDING步骤（部分唯一索引）；旧LOG正文候选失效。接口决定命令携带expectedVersion，重验当前直属关系；MEMBERSHIP不适用创始人免审。
 | `audit_records` | `actor_id`, `type`, `object_id` | 操作者、审计事件和对象 |
 | `audit_records` | `before_value`, `after_value`, `reason` | 修改前后内容和理由 |
 
@@ -86,6 +93,9 @@
 |---|---|---|
 | `ai_jobs` | `owner_id`, `state`, `input`, `output` | AI 请求所有者、执行状态、脱敏输入和建议草稿 |
 | `ai_jobs` | `partial`, `tokens`, `version`, `error` | 流式中间文本、用量、编辑版本和失败信息 |
+| `ai_jobs.input` | `scope` | SELF或AUTHORIZED，旧输入缺失时按AUTHORIZED兼容；worker/retry保留选定范围，不另设重复列 |
+| `ai_task_confirmations` | `company_id`, `owner_id`, `job_id`, `client_key` | V23确认回执；复合外键关联同公司同所有者作业，owner/job/key唯一 |
+| `ai_task_confirmations` | `job_version`, `action_index`, `request_hash`, `source_refs`, `response` | 原确认版本、0–2行动索引、规范化命令摘要、原来源和原响应；与TASK_CREATE审核同事务，重放前重验来源权限 |
 | `ai_map_nodes` | `owner_id`, `job_id`, `body` | 归用户所有的 AI 地图节点及来源 |
 | `ai_map_edges` | `owner_id`, `source_id`, `target_id`, `body` | 节点关系；复合外键保证节点属于同一用户和公司 |
 

@@ -1,5 +1,7 @@
 # Mobile API Surface Coverage
 
+> 2026-10-29补充：剩余接口代码接入状态以 docs/mobile-remaining-api-implementation-status.md 为准。用户已取消意见反馈，移动端入口/表单/Mock资源已删除，旧深链转帮助页；不新增feedback服务。任务评论/日志回复沿用现有真实接口，RETURNED、成果附件、团队目录、AI scope和确认version/幂等回执已接入源码，尚未统一验收。日志阅读登记已停用，不新增人员清单。下文保留的旧缺口或历史验证不能代表本批已通过。
+
 更新日期：2026-10-20（Asia/Shanghai）。本表是后端联调输入，不把 Mock、静态检查或文档视为功能完成。服务器权限、组织范围和最终状态机以运行时 OpenAPI 与后端实现为准。
 
 状态含义：
@@ -18,7 +20,7 @@
 | 个人重点 | list/detail/create/update/archive | `/dashboard/personal` | HTTP 已接入 | 本人范围、排序、版本 |
 | 任务 | list/detail/create/events/revisions | `/tasks`、`/tasks/{id}`、`/tasks/{id}/events`、`/tasks/{id}/revisions` | 客户端待对齐 | 当前 Flutter 发 `startAt/tagId/participantIds`；服务端现有 normalizer 仍接受旧 `group/collaborators` 字段，需后端统一 DTO |
 | 任务转派/改期 | transfer/reschedule | `/tasks/{id}/reassignments`、`/tasks/{id}/reschedules`（或已评审统一命令） | 客户端待对齐 | 版本、理由、审核链、幂等 |
-| 任务退回补充 | return | 路径和事件枚举待定 | 待定契约 | 权限、可用阶段、原因、通知、重提 |
+| 任务退回补充 | return | POST /tasks/{id}/events RETURNED，version/text | 源码接入未验证 | FEEDBACK→RECEIVED，派发人/管理员，事件/outbox |
 | 日志草稿/提交 | save-draft/submit | `PUT /logs/draft`、`POST /logs/{id}/submit` | HTTP 已接入 | 业务日唯一、版本冲突、首次提交时间 |
 | 已提交日志 24h 修改 | update | 当前无正式直改路径 | 待定契约 | 服务端提交成功起算 24h、越界拒绝、并发/版本规则 |
 | 日志候选修订 | request-review | `POST /logs/{id}/revisions` | HTTP 已接入 | 审核链、自审拒绝、旧版持续有效 |
@@ -30,18 +32,18 @@
 | 审批 | list/detail/approve/reject/reroute | `/reviews`、`/reviews/{id}`、`/reviews/{id}/decision`、`/reviews/{id}/reroute` | HTTP 已接入 | 自审拒绝、驳回原因、版本 |
 | 组织/成员/策略 | tree/list/profile/revisions | `/organization`、`/organization/people`、`/profiles/{id}`、组织 revisions | HTTP 已接入 | 公司范围、管理员、版本和审核 |
 | 组织部门 | list | `GET /organization/departments` | HTTP 已接入 | 团队层级由服务端字段明确返回；OpenAPI 当前没有独立 `GET /organization/teams` |
-| 组织团队单独列表 | list | 当前无独立列表路径 | 待定契约 | 未登记的 `organization/teams` 已由 HTTP adapter 阻断，不自动请求猜测路径 |
+| 组织团队单独列表 | list | GET /organization/teams | 源码接入未验证 | 沿用当前组织树范围，不扩大人员权限 |
 | 角色/成员归属/直属上级/停用 | revise | `POST /organization/users/{id}/revisions` | HTTP 已接入或待核对具体表单 action | 字段按用户修改集提交；缺少接口调用的表单 action 必须在后续专项适配，不以共用 URL 存在推断完成 |
 | 通知 | list/read/read-all/stream | `/notifications`、`/notifications/{id}/read`、`/notifications/read-all`、`/notifications/stream` | HTTP 已接入 | SSE Last-Event-ID、outbox、去重 |
 | 附件 | upload/download | `POST /attachments`、`GET /attachments/{id}` | HTTP 已接入 | 1B–10MB、权限、文件名安全；删除未提供 |
 | 统计/导出 | summary/export | `/analytics`、`/analytics/export` | HTTP 已接入 | 统计与导出同权限范围 |
 | AI 作业 | create/get/cancel/retry/draft/stream/confirm/usage | `/ai/jobs*`、`/ai/usage` | HTTP 已接入但有并发缺口 | 范围由服务端 Actor；confirm 缺 job version 原子前置条件 |
-| AI 范围选择 | scope | 现有创建接口未提供正式 scope 参数 | 待定契约 | 角色允许范围取交集，来源重验，敏感数据隔离 |
+| AI 范围选择 | scope SELF/AUTHORIZED | POST /ai/jobs，默认AUTHORIZED，worker/retry保持 | 源码接入未验证 | 当前权限上限、失权与后台一致性 |
 | AI 地图 | list/edge | `/ai-maps`、`/ai-maps/edges` | HTTP 已接入 | 禁止自身依赖、来源授权 |
 | AI 发展关系分析 | list/create/get/retry/evidence/feedback/stream | `/ai-maps/development`、`/ai-maps/development/jobs`、`/ai-maps/development/jobs/{id}`、`/ai-maps/development/{id}/evidence`、`/ai-maps/development/{id}/feedback` | HTTP 已接入 | 权限范围和模型密钥由服务端负责；Mock 关系图不作为真实分析结果 |
 | 长期记忆 | list/create/revise/confirm/delete | `/ai-memories`、`/ai-memories/{id}/revisions`、`/ai-memories/{id}/confirm`、`/ai-memories/{id}` | HTTP 已接入 | 记忆来源、scope、审核/删除和敏感字段约束 |
 | 长期记忆索引/偏好 | status/preferences/rebuild/backfill/forget/retry | `/ai-memories/knowledge-status`、`/ai-memories/preferences/me`、`/ai-memories/index-rebuild*`、`/ai-memories/backfill`、`/ai-memories/forget-jobs/{id}` | HTTP 已接入/逐操作核对 | 管理权限、幂等、后台任务失败重试与结果读取 |
-| 我的反馈 | list/detail/submit/progress | 当前无 feedback Controller | 待定契约 | 本人范围、状态、附件、分页、错误码 |
+| 意见反馈 | 已移除 | 用户取消；移动端表单/入口/Mock支持删除，旧深链回帮助页 | 不在产品范围 | 不新增服务 |
 | 标签字典 | list/create/revise/archive | 当前没有稳定标签字典查询/维护契约 | 待定契约 | 当前 UI 静态标签不能作为稳定 tagId 字典 |
 | 本地草稿/安全会话 | save/read/clear | 本机 Drift/安全存储 | 本地/演示 | 不上传密码/API Key；设备安全能力需单独验收 |
 | 页面装饰/柴犬素材 | load asset | Flutter bundle | 本地/演示 | 不产生后端接口，不承担状态语义 |

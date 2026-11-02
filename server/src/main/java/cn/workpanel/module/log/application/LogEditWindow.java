@@ -4,7 +4,7 @@ import cn.workpanel.*;
 import java.time.*;
 import java.util.*;
 
-/** 首次提交开启不可重置的窗口；审核申请后可以跨窗口完成审批。 */
+/** 首次提交开启不可重置的24小时本人正文直接编辑窗口。 */
 public final class LogEditWindow {
     private LogEditWindow() {}
     public static Instant submittedAt(Map<String,Object> log) {
@@ -20,7 +20,7 @@ public final class LogEditWindow {
         return start==null ? !Boolean.TRUE.equals(log.get("submitted")) : now.isBefore(start.plus(Duration.ofHours(24)));
     }
     public static void requireOpen(Map<String,Object> log,Instant now) {
-        if(!open(log,now)) throw new ApiError(409,"LOG_EDIT_WINDOW_EXPIRED","日志首次提交已满24小时，不可修改或撤回");
+        if(!open(log,now)) throw new ApiError(409,"LOG_EDIT_WINDOW_EXPIRED","日志首次提交已满24小时，不可修改");
     }
     public static Map<String,Object> view(Db db,Actor actor,Map<String,Object> log,Instant now) {
         var result=new LinkedHashMap<>(Business.logDto(db,log));
@@ -29,8 +29,8 @@ public final class LogEditWindow {
         boolean submitted=Boolean.TRUE.equals(log.get("submitted"));
         result.put("submittedAt",start);
         result.put("editableUntil",start==null?null:start.plus(Duration.ofHours(24)));
-        result.put("canEdit",(owner||(submitted&&actor.admin()))&&open(log,now));
-        result.put("canWithdraw",owner&&submitted&&open(log,now));
+        result.put("canEdit",owner&&actor.status().equals("ACTIVE")&&open(log,now));
+        result.put("canWithdraw",false);
         return result;
     }
 }

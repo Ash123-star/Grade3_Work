@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +30,13 @@ class _PersonnelPageState extends ConsumerState<PersonnelPage> {
     final people = ref.watch(recordsProvider('organization'));
     return PageFrame(
       title: '人员展示',
+      actions: [
+        IconButton(
+          tooltip: '刷新人员数据',
+          onPressed: () => ref.invalidate(recordsProvider('organization')),
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
       child: PageBody(
         children: [
           PaperSurface(
@@ -137,11 +145,24 @@ class _PersonnelPageState extends ConsumerState<PersonnelPage> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _PersonnelCard(
                           person: person,
-                          onTap: () => context.push(
-                            current.manager && person.id != current.id
-                                ? '/me/team/${encode(person.id)}'
-                                : '/me/profile',
-                          ),
+                          onTap: () {
+                            if (current.manager && person.id != current.id) {
+                              final month = ref.read(
+                                memberCalendarDateProvider(person.id),
+                              );
+                              unawaited(
+                                ref.read(
+                                  calendarMonthTasksProvider((
+                                    person.id,
+                                    month.year * 12 + month.month - 1,
+                                  )).future,
+                                ),
+                              );
+                              context.push('/me/team/${encode(person.id)}');
+                            } else {
+                              context.push('/me/profile');
+                            }
+                          },
                         ),
                       ),
                   ],
@@ -167,12 +188,20 @@ class _PersonnelCard extends StatelessWidget {
     final fields = person.fields;
     final department =
         '${fields['departmentName'] ?? fields['department'] ?? '未分组'}';
-    final taskCount =
-        fields['participatingTaskCount'] ?? fields['taskCount'] ?? 0;
-    final logState =
-        '${fields['logStatus'] ?? fields['todayLogStatus'] ?? '暂无今日日志'}';
-    final taskState =
-        '${fields['taskStatus'] ?? fields['completionStatus'] ?? '暂无任务状态'}';
+    final taskCount = fields['participatingTaskCount'] as num?;
+    final activeCount = fields['activeTaskCount'] as num?;
+    final logState = switch (fields['todayLogStatus']) {
+      'SUBMITTED' => '今日日志已提交',
+      'MISSING' => '今日日志未提交',
+      '今日日志已提交' => '今日日志已提交',
+      '今日日志待提交' => '今日日志未提交',
+      _ => '今日日志状态未知',
+    };
+    final taskState = activeCount == null
+        ? '任务状态未知'
+        : activeCount > 0
+        ? '未结束任务 ${activeCount.toInt()}'
+        : '暂无未结束任务';
     return PaperSurface(
       color: DogBrandPalette.surface,
       borderColor: DogBrandPalette.line,
@@ -201,7 +230,7 @@ class _PersonnelCard extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     AppLabelBadge(
-                      '参与任务 $taskCount',
+                      taskCount == null ? '参与任务数未知' : '参与任务 ${taskCount.toInt()}',
                       color: SunnyPalette.orange,
                       compact: true,
                     ),

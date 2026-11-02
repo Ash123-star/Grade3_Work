@@ -44,10 +44,12 @@ class AiRepository {
     String date,
     String period, {
     String purpose = 'SUMMARY',
+    String scope = 'AUTHORIZED',
     String? focus,
     CancelToken? token,
   }) async {
-    if (DateTime.tryParse(date) == null ||
+    if (!['SELF', 'AUTHORIZED'].contains(scope) ||
+        DateTime.tryParse(date) == null ||
         !['day', 'week', 'month'].contains(period) ||
         ![
           'SUMMARY',
@@ -67,6 +69,7 @@ class AiRepository {
           'date': date,
           'period': period,
           'purpose': purpose,
+          'scope': scope,
           'focusSourceId': ?focus,
         },
       ),
@@ -124,7 +127,7 @@ class AiRepository {
     );
   }
 
-  Future<String> confirm(
+  Future<Map<String, dynamic>> confirm(
     AiJob job,
     int index,
     Map<String, dynamic> task,
@@ -144,14 +147,14 @@ class AiRepository {
     final result = await request(
       'POST',
       '${path(job.id)}/confirm-task',
-      data: {'actionIndex': index, 'task': task},
+      data: {'version': job.version, 'actionIndex': index, 'task': task},
       token: token,
       idem: idem,
     );
     if (result['id'] is! String || '${result['id']}'.isEmpty) {
       throw const ApiFailure(FailureKind.server, '任务创建响应不完整，请用原内容重试');
     }
-    return result['id'];
+    return result;
   }
 
   Stream<AiStreamEvent> stream(String id, CancelToken token) async* {

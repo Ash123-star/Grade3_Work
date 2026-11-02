@@ -22,7 +22,7 @@ import 'package:pandora_mobile/data/local/secure_values.dart';
 import 'package:pandora_mobile/data/local/session_store.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
-import 'auth_state_contract_test.dart' show AuthAdapter;
+import 'auth_state_contract_test.dart' show AuthAdapter, signedOut;
 import 'support/local_test_state.dart';
 
 const server = 'http://localhost:8080/api';
@@ -45,6 +45,11 @@ Record identity(String id, {String status = 'ACTIVE', bool password = false}) =>
         'dispatch_enabled': false,
       },
     );
+
+class UnconfirmedSecureValues extends MemorySecureValues {
+  @override
+  Future<void> write(String key, String value) async {}
+}
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -320,6 +325,105 @@ void main() {
     },
   );
 
+  test(
+    'a platform write that cannot be read back reports persistence failure',
+    () async {
+      final store = SessionStore(UnconfirmedSecureValues(), server: server);
+      await expectLater(
+        store.save(session()),
+        throwsA(isA<LocalStorageFailure>()),
+      );
+      expect(await store.read(), isNull);
+    },
+  );
+
+  testWidgets(
+    'login survives application state recreation without a second password request',
+    (t) async {
+      final secure = MemorySecureValues();
+      final adapter = AuthAdapter()..user['status'] = 'ACTIVE';
+      ProviderContainer application() => testContainer(
+        overrides: [
+          sessionProvider.overrideWith((ref) => signedOut),
+          sessionStoreProvider.overrideWith(
+            (ref) => SessionStore(secure, server: server),
+          ),
+          sessionRecoveryEnabledProvider.overrideWithValue(true),
+          repositoryProvider.overrideWith((ref) {
+            final repo = ref.watch(httpRepositoryProvider);
+            repo.dio.httpClientAdapter = adapter;
+            return repo;
+          }),
+          recoveryIdentityProvider.overrideWithValue((credential) async {
+            final repo = HttpRepository(
+              server,
+              credential.token,
+              businessAllowed: false,
+            )..dio.httpClientAdapter = adapter;
+            try {
+              return await repo.detail('auth', 'me');
+            } finally {
+              repo.dio.close();
+            }
+          }),
+        ],
+      );
+      Widget root(ProviderContainer container) => UncontrolledProviderScope(
+        container: container,
+        child: const SessionBootstrap(child: PandoraApp()),
+      );
+      final first = application();
+      var firstDisposed = false;
+      addTearDown(() {
+        if (!firstDisposed) first.dispose();
+      });
+      await t.pumpWidget(root(first));
+      await settleLocalIo(t);
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextFormField).at(0), 'orange');
+      await t.enterText(find.byType(TextFormField).at(1), 'password-1234');
+      await t.tap(find.widgetWithText(FilledButton, '登录'));
+      await settleLocalIo(t);
+      await t.pumpAndSettle();
+      expect(first.read(sessionProvider).id, 'account-1');
+      expect(first.read(sessionProvider).canReadBusiness, isTrue);
+      expect(
+        (await t.runAsync(first.read(sessionStoreProvider).read))!.token,
+        'token-1',
+      );
+      await t.pumpWidget(const SizedBox.shrink());
+      await t.pumpAndSettle();
+      first.dispose();
+      firstDisposed = true;
+      final requestCount = adapter.requests.length;
+      final second = application();
+      addTearDown(second.dispose);
+      expect(second.read(sessionProvider).authenticated, isFalse);
+      await t.pumpWidget(root(second));
+      await settleLocalIo(t);
+      await t.pumpAndSettle();
+      expect(second.read(sessionProvider).id, 'account-1');
+      expect(second.read(sessionProvider).canReadBusiness, isTrue);
+      expect(
+        second.read(routerProvider).routeInformationProvider.value.uri.path,
+        '/dashboard',
+      );
+      expect(adapter.requests[requestCount].path, '/auth/me');
+      expect(
+        adapter.requests[requestCount].headers['Authorization'],
+        'Bearer token-1',
+      );
+      expect(
+        adapter.requests.where((r) => r.path == '/auth/login'),
+        hasLength(1),
+      );
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox.shrink());
+      await t.pumpAndSettle();
+    },
+  );
+
   testWidgets(
     'editor restores encrypted draft across disposal; account/date not leaked',
     (t) async {
@@ -342,9 +446,8 @@ void main() {
       await t.pumpAndSettle();
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      await t.enterText(find.byType(TextFormField).first, '真实加密编辑链路');
-      await t.tap(find.text('保存草稿'));
-      await waitForLocalState(t, find.text('草稿已加密保存到此设备'));
+      await t.enterText(find.byType(TextField).first, '真实加密编辑链路');
+      await waitForLocalState(t, find.text('自动保存到此设备'));
       await t.pumpAndSettle();
       final saved = await t.runAsync(
         () => store.read(DraftLocation.diary('u1', day)),
@@ -357,10 +460,7 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(
-        t
-            .widget<TextFormField>(find.byType(TextFormField).first)
-            .controller!
-            .text,
+        t.widget<TextField>(find.byType(TextField).first).controller!.text,
         '真实加密编辑链路',
       );
       c.read(sessionProvider.notifier).state = const Session(id: 'u2');
@@ -448,7 +548,7 @@ void main() {
   );
 
   testWidgets(
-    'failed encryption keeps editor input and recovers with explicit save',
+    'failed draft restore blocks editing until retry; recovered editor auto-saves',
     (t) async {
       final c = testContainer(
         overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
@@ -465,22 +565,12 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.textContaining('草稿读取失败'), findsOneWidget);
-      await t.enterText(find.byType(TextFormField).first, '本机失败仍保留');
-      await t.tap(find.text('保存草稿'));
-      await waitForLocalState(t, find.textContaining('草稿保存失败'));
+      secure.failRead = false;
+      await t.tap(find.text('重试读取'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.textContaining('草稿保存失败'), findsOneWidget);
-      expect(
-        t
-            .widget<TextFormField>(find.byType(TextFormField).first)
-            .controller!
-            .text,
-        '本机失败仍保留',
-      );
-      secure.failRead = false;
-      await t.tap(find.text('保存草稿'));
-      await waitForLocalState(t, find.text('草稿已加密保存到此设备'));
+      await t.enterText(find.byType(TextField).first, '本机失败仍保留');
+      await waitForLocalState(t, find.text('自动保存到此设备'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final draft = await t.runAsync(
@@ -489,7 +579,7 @@ void main() {
             .read(DraftLocation.diary('u1', DateTime(2026, 10, 13))),
       );
       expect(draft!.fields['今日工作'], '本机失败仍保留');
-      expect(find.textContaining('草稿保存失败'), findsNothing);
+      expect(find.textContaining('草稿读取失败'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pump(const Duration(milliseconds: 300));
     },

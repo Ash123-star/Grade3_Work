@@ -8,6 +8,9 @@ public interface AnalyticsApi {
     /** 按业务日期和周期返回指标、分子、分母、口径和更新时间。 */
     Map<String, Object> statistics(ActorContext actor, Map<String, Object> query);
 
+    /** 同一过滤范围内的白名单指标分页明细，不包含日志正文或私人资料。 */
+    Map<String, Object> details(ActorContext actor, Map<String, Object> query);
+
     /** 导出当前范围内资源；实现负责 CSV 公式注入转义和上限控制。 */
     String export(ActorContext actor, Map<String, Object> query);
 }

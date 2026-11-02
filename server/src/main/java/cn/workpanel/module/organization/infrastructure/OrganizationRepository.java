@@ -1,6 +1,7 @@
 package cn.workpanel.module.organization.infrastructure;
 
 import cn.workpanel.Actor;
+import cn.workpanel.Business;
 import cn.workpanel.Db;
 import org.springframework.stereotype.Repository;
 import java.util.*;
@@ -26,8 +27,21 @@ public class OrganizationRepository {
         args.add("%" + search + "%"); args.add("%" + search + "%");
         String where = "u.company_id=? AND (" + actor.userScope("u") + ") AND " + (dispatch ? "u.status='ACTIVE'" : "u.status<>'DISABLED'") + " AND (u.name ILIKE ? OR d.name ILIKE ?)";
         long total = db.count("SELECT count(*) FROM users u LEFT JOIN departments d ON d.id=u.department_id WHERE " + where, args.toArray());
-        args.add(limit); args.add(cursor);
-        var items = db.rows("SELECT u.id,u.name,u.role,u.status,u.department_id,u.team_id,u.version,d.name AS department FROM users u LEFT JOIN departments d ON d.id=u.department_id WHERE " + where + " ORDER BY u.name,u.id LIMIT ? OFFSET ?", args.toArray());
+        var taskScope=Business.taskScope(actor);
+        var pageArgs=new ArrayList<Object>(taskScope.args());
+        pageArgs.addAll(args); pageArgs.add(limit); pageArgs.add(cursor);
+        // 在同一请求的数据库快照中聚合，避免移动端逐人请求及重复参与记录放大计数。
+        // 他人草稿不参与状态计算；所有任务同时受请求者的TaskAccess范围约束。
+        String sql="SELECT u.id,u.name,u.role,u.status,u.department_id,u.team_id,u.version,d.name AS department,tm.name AS team_name,"
+            +"summary.participating_count AS \"participatingTaskCount\",summary.active_count AS \"activeTaskCount\","
+            +"(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date AS \"summaryDate\","
+            +"CASE WHEN u.status<>'ACTIVE' THEN 'UNKNOWN' WHEN EXISTS (SELECT 1 FROM daily_logs l WHERE l.company_id=u.company_id AND l.owner_id=u.id AND l.submitted AND l.business_date=(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date) THEN 'SUBMITTED' ELSE 'MISSING' END AS \"todayLogStatus\" "
+            +"FROM users u LEFT JOIN departments d ON d.id=u.department_id AND d.company_id=u.company_id "
+            +"LEFT JOIN teams tm ON tm.id=u.team_id AND tm.company_id=u.company_id "
+            +"LEFT JOIN LATERAL (SELECT count(*) AS participating_count,count(*) FILTER (WHERE t.phase NOT IN ('ACCEPTED','ARCHIVED','WITHDRAWN')) AS active_count FROM tasks t WHERE "
+            +taskScope.sql()+" AND t.company_id=u.company_id AND EXISTS (SELECT 1 FROM task_participants p WHERE p.company_id=t.company_id AND p.task_id=t.id AND p.user_id=u.id)) summary ON true "
+            +"WHERE "+where+" ORDER BY u.name,u.id LIMIT ? OFFSET ?";
+        var items = db.rows(sql, pageArgs.toArray());
         return Map.of("items", items, "total", total, "nextCursor", String.valueOf((long) cursor + items.size()));
     }
     public void department(String id, String company) { db.one("SELECT id FROM departments WHERE id=? AND company_id=?", id, company); }
@@ -56,7 +70,7 @@ public class OrganizationRepository {
         return Map.of("items",items,"total",total,"nextCursor",String.valueOf((long)cursor+items.size()));
     }
     public Map<String, Object> audit(String company, int cursor, int limit) {
-        return Map.of("items", db.rows("SELECT * FROM audit_records WHERE company_id=? ORDER BY id DESC LIMIT ? OFFSET ?", company, limit, cursor),
+        return Map.of("items", db.rows("SELECT a.*,u.name AS actor_name FROM audit_records a LEFT JOIN users u ON u.id=a.actor_id AND u.company_id=a.company_id WHERE a.company_id=? ORDER BY a.id DESC LIMIT ? OFFSET ?", company, limit, cursor),
             "total", db.count("SELECT count(*) FROM audit_records WHERE company_id=?", company), "nextCursor", String.valueOf((long) cursor + limit));
     }
 }

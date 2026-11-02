@@ -24,5 +24,5 @@ public class DefaultReviewApi implements ReviewApi {
         };
     }
     public Map<String,Object> get(ActorContext a,String id){return service.get(actors.fresh(a),id);}
-    @Transactional public Map<String,Object> decide(ActorContext a,String id,boolean approve,String reason){return service.decide(actors.fresh(a),id,approve,reason);}
+    @Transactional public Map<String,Object> decide(ActorContext a,String id,boolean approve,String reason,int expectedVersion){return service.decide(actors.fresh(a),id,approve,reason,expectedVersion);}
 }

@@ -67,7 +67,7 @@ public class OrganizationIntegrationTest extends MemberBHttpSupport {
         assertEquals(1, db.count("SELECT count(*) FROM tasks WHERE id=? AND owner_id=?", historicalTask, employee));
         var rejected = revision(employee, Map.of("name", "不应生效"));
         var detail = call(200, "GET", "/reviews/" + rejected.get("id").asText(), admin, null);
-        call(200, "POST", "/reviews/" + rejected.get("id").asText() + "/decision", detail.get("steps").get(0).get("reviewer_id").asText(), Map.of("approve", false, "reason", "不予通过"));
+        call(200, "POST", "/reviews/" + rejected.get("id").asText() + "/decision", detail.get("steps").get(0).get("reviewer_id").asText(), Map.of("approve", false, "reason", "不予通过", "expectedVersion", detail.get("expected_version").asInt()));
         assertEquals(employee, db.one("SELECT name FROM users WHERE id=?", employee).get("name"));
     }
     @Test void pendingAccountsAndInvalidPagingAreRejected() throws Exception {
@@ -82,15 +82,17 @@ public class OrganizationIntegrationTest extends MemberBHttpSupport {
         call(409, "POST", "/organization/membership-application", employee, Map.of("version", 1, "reason", "重复申请", "departmentId", department));
         approve(membership.get("id").asText(), employee);
         assertEquals("ACTIVE", call(200, "GET", "/auth/me", employee, null).get("status").asText());
+        db.update("INSERT INTO reporting_relations VALUES (?,?,?)", employee, leader, company);
         var reviewerRequest = call(200, "POST", "/organization/reviewer-application", employee, Map.of("version", 2, "reason", "复核职责"));
         approve(reviewerRequest.get("id").asText(), employee);
         var user = call(200, "GET", "/auth/me", employee, null);
         assertEquals("EMPLOYEE", user.get("role").asText()); assertTrue(user.get("company_reviewer").asBoolean());
         var policy = call(200, "GET", "/organization/review-policy", admin, null);
-        var request = call(200, "POST", "/organization/review-policy/revisions", admin, Map.of("version", policy.get("version").asInt(), "reason", "策略审核", "taskTeamReview", false));
-        assertTrue(call(200, "GET", "/organization/review-policy", admin, null).at("/review_policy/taskTeamReview").asBoolean());
+        call(400, "POST", "/organization/review-policy/revisions", admin, Map.of("version", policy.get("version").asInt(), "reason", "退役多级策略", "taskTeamReview", false));
+        var request = call(200, "POST", "/organization/review-policy/revisions", admin, Map.of("version", policy.get("version").asInt(), "reason", "授权策略审核", "aiWorkAuthorizationMaxDays", 15));
+        assertFalse(policy.get("review_policy").has("taskTeamReview"));
         approve(request.get("id").asText(), admin);
-        assertFalse(call(200, "GET", "/organization/review-policy", admin, null).at("/review_policy/taskTeamReview").asBoolean());
+        assertEquals(15, call(200, "GET", "/organization/review-policy", admin, null).at("/review_policy/aiWorkAuthorizationMaxDays").asInt());
     }
     @Test void departmentAndTeamCandidatesRemainInactiveUntilApproved() throws Exception {
         var request = call(200, "POST", "/organization/departments/revisions", admin, Map.of("version", 0, "reason", "新部门", "name", "新部门"));

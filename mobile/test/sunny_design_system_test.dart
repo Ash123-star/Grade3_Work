@@ -196,11 +196,14 @@ void main() {
     await t.pump();
     expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
     expect(find.byType(TuantuanSkin), findsNothing);
-    ScaffoldMessenger.of(context).removeCurrentSnackBar();
-    await t.pump();
     notice(context, '修订已提交，等待复核');
     await t.pump();
+    expect(find.byIcon(Icons.info_outline), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
     expect(find.byType(DogPose), findsNothing);
+    await t.tap(find.byTooltip('关闭提示'));
+    await t.pump();
   });
 
   testWidgets('dropdown choices use the shared rounded option sheet', (

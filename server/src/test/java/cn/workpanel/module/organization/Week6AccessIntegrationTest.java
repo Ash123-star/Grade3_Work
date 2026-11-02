@@ -17,7 +17,7 @@ class Week6AccessIntegrationTest extends MemberBHttpSupport {
         var rejected=revision(director,Map.of("role","EMPLOYEE"));
         var pending=call(200,"GET","/reviews/"+rejected.get("id").asText(),admin,null);
         String judge=pending.get("steps").get(0).get("reviewer_id").asText();
-        call(200,"POST","/reviews/"+rejected.get("id").asText()+"/decision",judge,Map.of("approve",false,"reason","保留角色"));
+        call(200,"POST","/reviews/"+rejected.get("id").asText()+"/decision",judge,Map.of("approve",false,"reason","保留角色","expectedVersion",pending.get("expected_version").asInt()));
         call(200,"GET","/auth/me",director,null);
         var accepted=revision(director,Map.of("role","EMPLOYEE"));
         approve(accepted.get("id").asText(),admin);
@@ -87,40 +87,27 @@ class Week6AccessIntegrationTest extends MemberBHttpSupport {
         db.update("INSERT INTO daily_logs(id,company_id,owner_id,business_date,body,submitted,submitted_at) VALUES (?,?,?,CURRENT_DATE,?::jsonb,?,?)",id,c,owner,"{\"work\":\"week6 searchable work\"}",submitted,time==null?null:Timestamp.from(time));
         return id;
     }
-    Map<String,Object> revision(int version) { return Map.of("version",version,"reason","更正","body",Map.of("work","updated")); }
-    @Test void timeWindowUsesServerTimeAndAllowsLateApproval() throws Exception {
+    @Test void contentEditingUsesServerWindowAndCannotBeExtended() throws Exception {
         String id=log(employee,true,Instant.now().minusSeconds(86340));
+        var first=db.one("SELECT submitted_at FROM daily_logs WHERE id=?",id).get("submitted_at");
         var detail=call(200,"GET","/logs/"+id,employee,null);
-        assertTrue(detail.get("canEdit").asBoolean()); assertTrue(detail.get("canWithdraw").asBoolean());
-        assertFalse(detail.get("editableUntil").isNull());
-        assertEquals(department,detail.get("department").get("id").asText());
-        assertEquals(employee,detail.get("author").get("id").asText());
-        var pending=call(200,"POST","/logs/"+id+"/revisions",employee,revision(1));
+        assertTrue(detail.get("canEdit").asBoolean()); assertFalse(detail.get("canWithdraw").asBoolean());
+        call(403,"PUT","/logs/"+id+"/content",admin,Map.of("version",1,"work","代改"));
+        call(200,"PUT","/logs/"+id+"/content",employee,Map.of("version",1,"work","updated"));
+        assertEquals(first,db.one("SELECT submitted_at FROM daily_logs WHERE id=?",id).get("submitted_at"));
         db.update("UPDATE daily_logs SET submitted_at=now()-interval '25 hours' WHERE id=?",id);
-        assertEquals("LOG_EDIT_WINDOW_EXPIRED",call(409,"POST","/logs/"+id+"/revisions",employee,revision(1)).get("code").asText());
-        call(409,"POST","/logs/"+id+"/revisions",admin,revision(1));
-        call(409,"POST","/logs/"+id+"/withdraw",employee,Map.of("version",1,"reason","撤回"));
-        approve(pending.get("id").asText(),employee);
+        assertEquals("LOG_EDIT_WINDOW_EXPIRED",call(409,"PUT","/logs/"+id+"/content",employee,Map.of("version",2,"work","过期" )).get("code").asText());
+        call(400,"PUT","/logs/"+id+"/content",employee,Map.of("version",2,"work","伪造","submittedAt",Instant.now().toString()));
         assertEquals("updated",call(200,"GET","/logs/"+id,employee,null).get("body").get("work").asText());
-        assertFalse(call(200,"GET","/logs/"+id,employee,null).get("canEdit").asBoolean());
-        call(400,"POST","/logs/"+id+"/revisions",employee,Map.of("version",2,"body",Map.of("work","x"),"reason","x","submittedAt",Instant.now().toString()));
     }
-    @Test void withdrawalAndResubmissionKeepFirstTimestampAndInvalidatePendingRevision() throws Exception {
+    @Test void submittedContentNeverReturnsToDraftOrResetsFirstTimestamp() throws Exception {
         String id=log(employee,true,Instant.now().minusSeconds(100));
-        var start=db.one("SELECT submitted_at FROM daily_logs WHERE id=?",id).get("submitted_at");
-        var pending=call(200,"POST","/logs/"+id+"/revisions",employee,revision(1));
-        call(403,"POST","/logs/"+id+"/withdraw",admin,Map.of("version",1,"reason","非本人"));
-        call(200,"POST","/logs/"+id+"/withdraw",employee,Map.of("version",1,"reason","补充"));
-        call(404,"GET","/logs/"+id,director,null);
-        call(200,"POST","/logs/"+id+"/submit",employee,Map.of("version",2));
-        assertEquals(start,db.one("SELECT submitted_at FROM daily_logs WHERE id=?",id).get("submitted_at"));
-        var review=call(200,"GET","/reviews/"+pending.get("id").asText(),employee,null);
-        var steps=review.get("steps");
-        for(int i=0;i<steps.size();i++) call(i==steps.size()-1?409:200,"POST","/reviews/"+pending.get("id").asText()+"/decision",steps.get(i).get("reviewer_id").asText(),Map.of("approve",true));
-        assertEquals("week6 searchable work",call(200,"GET","/logs/"+id,employee,null).get("body").get("work").asText());
-        db.update("UPDATE daily_logs SET submitted=false,submitted_at=now()-interval '25 hours' WHERE id=?",id);
-        call(409,"PUT","/logs/draft",employee,Map.of("businessDate",LocalDate.now().toString(),"version",3,"body",Map.of("work","reset")));
-        call(409,"POST","/logs/"+id+"/submit",employee,Map.of("version",3));
+        var first=db.one("SELECT submitted_at FROM daily_logs WHERE id=?",id).get("submitted_at");
+        call(409,"PUT","/logs/draft",employee,Map.of("businessDate",LocalDate.now(ZoneId.of("Asia/Shanghai")).toString(),"version",1,"body",Map.of("work","绕过正文入口")));
+        call(409,"POST","/logs/"+id+"/submit",employee,Map.of("version",1));
+        call(200,"PUT","/logs/"+id+"/content",employee,Map.of("version",1,"work","直接编辑"));
+        assertEquals(first,db.one("SELECT submitted_at FROM daily_logs WHERE id=?",id).get("submitted_at"));
+        assertTrue(call(200,"GET","/logs/"+id,director,null).get("submitted").asBoolean());
     }
     @Test void departmentSearchGroupingAndPrivacy() throws Exception {
         String own=log(employee,true,Instant.now()); log(colleague,false,null); log(outside,true,Instant.now()); log(foreign,true,Instant.now());
@@ -129,7 +116,8 @@ class Week6AccessIntegrationTest extends MemberBHttpSupport {
         assertEquals(own,result.get("items").get(0).get("id").asText());
         assertEquals(department,result.get("items").get(0).get("department").get("id").asText());
         assertEquals(employee,result.get("items").get(0).get("author").get("id").asText());
-        for(String d:List.of(otherDepartment,Db.id())) assertEquals(0,call(200,"GET","/logs/subordinates?departmentId="+d,director,null).get("total").asInt());
+        call(403,"GET","/logs/subordinates?departmentId="+otherDepartment,director,null);
+        call(404,"GET","/logs/subordinates?departmentId="+Db.id(),director,null);
         assertEquals(0,call(200,"GET","/logs/subordinates?search=absent",director,null).get("total").asInt());
         assertEquals(2,call(200,"GET","/logs/subordinates",admin,null).get("groups").size());
         call(403,"GET","/logs/subordinates",employee,null);

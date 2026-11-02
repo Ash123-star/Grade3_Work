@@ -28,7 +28,7 @@ public class AuthController {
         limiter.check("register:" + request.getRemoteAddr(), 10, 3600);
         return service.register(body);
     }
-    /** 公开登录：account/password；返回 token/expiresAt/user。错误或锁定 401，密码已验证的停用账号 403，IP 限流 429。
+    /** 公开登录：account/password；返回 token/expiresAt/user；默认有效期168小时（SESSION_HOURS可覆盖），退出、改密及停用可提前撤销。错误或锁定 401，密码已验证的停用账号 403，IP 限流 429。
      * 五次失败锁十分钟；每次成功创建新会话，无版本或幂等键要求。 */
     @Operation(summary = "账号密码登录", description = "连续五次失败锁定十分钟，锁定期间不续期。未知账号与错误密码统一返回 INVALID_CREDENTIALS；成功创建新会话。")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "返回 token、expiresAt 和公开 user"),

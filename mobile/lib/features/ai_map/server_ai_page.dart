@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -61,14 +62,11 @@ abstract class AiProtectedState<T extends ConsumerStatefulWidget>
       ref.read(sessionProvider).id == originalAccount.id &&
       ref.read(sessionProvider).token == originalAccount.token &&
       ref.read(sessionProvider).canReadBusiness;
-  CancelToken nextTransport() {
-    transport?.cancel();
-    return transport = CancelToken();
-  }
 
-  bool guard() {
-    ref.watch(sessionProvider);
-    ref.listen(sessionProvider, (_, next) {
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual<Session>(sessionProvider, (_, next) {
       if (next.id != originalAccount.id ||
           next.token != originalAccount.token ||
           !next.canReadBusiness) {
@@ -81,6 +79,15 @@ abstract class AiProtectedState<T extends ConsumerStatefulWidget>
         }
       }
     });
+  }
+
+  CancelToken nextTransport() {
+    transport?.cancel();
+    return transport = CancelToken();
+  }
+
+  bool guard() {
+    ref.watch(sessionProvider);
     return alive;
   }
 
@@ -170,6 +177,7 @@ class ServerAiPage extends ConsumerStatefulWidget {
 class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
   DateTime date = DateTime.now();
   String period = 'day';
+  String selectedScope = 'AUTHORIZED';
   AiJob? current, completed;
   bool busy = false, connected = false;
   int tab = 0;
@@ -235,6 +243,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
               source == null ? aiDate(date) : '${completed!.input['date']}',
               source == null ? period : '${completed!.input['period']}',
               purpose: purpose,
+              scope: source == null ? selectedScope : '${completed!.input['scope'] ?? 'AUTHORIZED'}',
               focus: source,
               token: token,
             );
@@ -323,7 +332,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
       if (id != null && id != current?.id && alive && !busy) refresh(id);
     });
     final job = completed;
-    return PageFrame(
+    final page = PageFrame(
       title: 'AI地图',
       bottom: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -341,6 +350,16 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
             wrapLabels: true,
             selected: tab,
             onChanged: (v) => setState(() => tab = v),
+          ),
+          const SizedBox(height: 12),
+          PillTabs(
+            labels: const ['本人', '当前授权范围'],
+            selected: selectedScope == 'SELF' ? 0 : 1,
+            onChanged: (value) {
+              if (!busy && current?.running != true) {
+                setState(() => selectedScope = value == 0 ? 'SELF' : 'AUTHORIZED');
+              }
+            },
           ),
           const SizedBox(height: 12),
           if (error != null)
@@ -412,6 +431,7 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
             ),
           if (job != null) ...[
             const SizedBox(height: 20),
+            Text('本次结果范围：${job.input['scope'] == 'SELF' ? '本人' : '当前授权范围'}'),
             if (job.id != current?.id) const Text('以下为上一次完成的结果，当前生成尚未替换它。'),
             if (tab == 0) ...[
               Text(job.summary, style: const TextStyle(height: 1.7)),
@@ -469,6 +489,18 @@ class _ServerAiPageState extends AiProtectedState<ServerAiPage> {
           const SizedBox(height: 24),
         ],
       ),
+    );
+    return SiblingSwipe(
+      index: job == null ? 0 : tab,
+      itemCount: job == null ? 1 : 3,
+      onStep: (step) {
+        if (job == null) return false;
+        final next = tab + step;
+        if (next < 0 || next > 2) return false;
+        setState(() => tab = next);
+        return true;
+      },
+      child: page,
     );
   }
 }

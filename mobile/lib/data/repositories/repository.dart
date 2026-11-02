@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:pandora_mobile/data/models/task_display.dart';
+import 'package:pandora_mobile/data/models/record_display.dart';
+import 'package:pandora_mobile/data/models/notification_display.dart';
 import 'package:dio/dio.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
@@ -9,7 +12,10 @@ import 'complete_list.dart';
 
 abstract interface class Repository {
   Future<PageResult> list(String resource, Query query);
+  Future<MemberLogMonth> memberLogMonth(String ownerId, DateTime month);
   Future<Record> detail(String resource, String id, {String? ownerId});
+  Future<Record> analytics(AnalyticsQuery query);
+  Future<PageResult> analyticsDetails(AnalyticsDetailsQuery query);
   Future<Record> execute(String resource, Command command);
   Future<UploadedAttachment> uploadAttachment(
     SelectedAttachment file, {
@@ -205,6 +211,7 @@ class HttpRepository implements Repository {
     'REVISED': '待接收',
     'RECEIVED': '进行中',
     'FEEDBACK': '待验收',
+    'RETURNED': '需补充',
     'ACCEPTED': '已验收',
     'ARCHIVED': '已归档',
     'WITHDRAWN': '已撤回',
@@ -214,10 +221,12 @@ class HttpRepository implements Repository {
     'REVISED': '审核生效，重新接收',
     'RECEIVED': '接收任务',
     'FEEDBACK': '提交成果反馈',
+    'RETURNED': '退回补充',
     'ACCEPTED': '验收任务',
     'ARCHIVED': '归档任务',
     'WITHDRAWN': '撤回任务',
     'TRANSFERRED': '转派任务',
+    'REASSIGNED': '转派任务',
     'RESCHEDULED': '调整截止时间',
   };
 
@@ -262,6 +271,7 @@ class HttpRepository implements Repository {
   };
 
   String _pathForList(String resource) => switch (resource) {
+    'tasks/received-card' => '/tasks/received-card',
     'tasks' => '/tasks',
     'task-labels' => '/task-labels',
     'logs' => '/logs',
@@ -275,6 +285,7 @@ class HttpRepository implements Repository {
     'analytics' => '/analytics',
     'ai-maps' => '/ai-maps',
     'organization/departments' => '/organization/departments',
+    'organization/teams' => '/organization/teams',
     'reviews' => '/reviews',
     'notifications' => '/notifications',
     _ => throw ApiFailure(FailureKind.unavailable, '列表接口尚未登记：$resource'),
@@ -306,6 +317,11 @@ class HttpRepository implements Repository {
       if (profile.containsKey('avatarAttachmentId')) {
         fields['avatarAttachmentId'] = profile['avatarAttachmentId'];
       }
+      for (final key in ['phone', 'email', 'gender', 'age']) {
+        if (!raw.containsKey(key) && profile.containsKey(key)) {
+          fields[key] = profile[key];
+        }
+      }
       fields['姓名'] = raw['name'];
     }
     if (raw['department'] is Map) {
@@ -313,6 +329,13 @@ class HttpRepository implements Repository {
       fields['departmentId'] = raw['department']['id'];
     } else if (raw['department'] != null) {
       fields['departmentName'] = raw['department'];
+    }
+    if (raw['department_name'] != null) fields['departmentName'] = raw['department_name'];
+    if (raw['team'] is Map) {
+      fields['teamName'] = raw['team']['name'];
+      fields['teamId'] = raw['team']['id'];
+    } else if (raw['team_name'] != null) {
+      fields['teamName'] = raw['team_name'];
     }
     if (raw['author'] is Map) fields['authorName'] = raw['author']['name'];
     if (raw['kind'] != null && raw['target_id'] != null) {
@@ -349,6 +372,13 @@ class HttpRepository implements Repository {
       fields['businessDate'] = raw['business_date'];
     }
     if (raw.containsKey('created_at')) fields['createdAt'] = raw['created_at'];
+    final dispatchAt =
+        raw['dispatchAt'] ??
+        raw['dispatched_at'] ??
+        raw['dispatch_at'] ??
+        fields['dispatched_at'] ??
+        fields['dispatch_at'];
+    if (dispatchAt != null) fields['dispatchAt'] = dispatchAt;
     if (raw['author'] is Map) {
       fields['authorName'] = (raw['author'] as Map)['name'];
     }
@@ -386,18 +416,55 @@ class HttpRepository implements Repository {
     if (raw['participantIds'] is List) {
       fields['participantIds'] = raw['participantIds'];
     }
+    if (fields['participant_names'] is List &&
+        fields['participantNames'] is! List) {
+      fields['participantNames'] = fields['participant_names'];
+    }
     if (raw['participants'] is List) {
-      final values = raw['participants'] as List;
+      final values = (raw['participants'] as List).indexed.where((entry) {
+        final value = entry.$2;
+        final id = value is Map
+            ? value['id'] ?? value['user_id'] ?? value['userId']
+            : value;
+        return id != null && '$id'.trim().isNotEmpty;
+      }).toList();
+      final existingNames = fields['participantNames'] is List
+          ? fields['participantNames'] as List
+          : const [];
+      final existingIds = fields['participantIds'] ?? fields['participant_ids'];
+      final namesById = <String, dynamic>{
+        if (existingIds is List)
+          for (
+            var i = 0;
+            i < existingIds.length && i < existingNames.length;
+            i++
+          )
+            '${existingIds[i]}'.trim(): existingNames[i],
+      };
+      String fallbackName(String id, int originalIndex) =>
+          '${namesById[id] ?? (existingIds is! List && originalIndex < existingNames.length ? existingNames[originalIndex] : '')}';
       fields['participantIds'] = [
-        for (final value in values)
-          value is Map ? '${value['id'] ?? value['user_id'] ?? ''}' : '$value',
-      ].where((value) => value.isNotEmpty).toList();
-      fields['participantNames'] = [
-        for (final value in values)
+        for (final (_, value) in values)
           value is Map
-              ? '${value['name'] ?? value['display_name'] ?? value['title'] ?? value['id'] ?? ''}'
+              ? '${value['id'] ?? value['user_id'] ?? value['userId']}'
               : '$value',
       ];
+      fields['participantNames'] = [
+        for (final (index, value) in values)
+          value is Map
+              ? '${value['name'] ?? value['display_name'] ?? value['displayName'] ?? value['title'] ?? fallbackName('${value['id'] ?? value['user_id'] ?? value['userId']}'.trim(), index)}'
+              : fallbackName('$value'.trim(), index),
+      ];
+    }
+    if (fields.containsKey('tagId') ||
+        fields.containsKey('tagName') ||
+        fields.containsKey('tag_id') ||
+        fields.containsKey('tag_name')) {
+      fields['tagName'] = taskTagLabel(fields);
+    }
+    if (fields['participantIds'] is List ||
+        fields['participantNames'] is List) {
+      fields['participantNames'] = taskParticipantNames(fields);
     }
     for (final pair in [
       ('work', '今日工作'),
@@ -449,9 +516,12 @@ class HttpRepository implements Repository {
             );
       fields['events'] = [
         for (final e in events)
-          '${e['actor_id'] ?? '操作者未提供'} · ${_eventLabels[e['type']] ?? '未知事件（${e['type']}）'} · ${e['created_at'] ?? '时间未提供'}',
+          '${displayPersonName(e['actor_name'])} · ${_eventLabels[e['type']] ?? '未知事件（${e['type']}）'} · ${e['created_at'] ?? '时间未提供'}',
       ];
       for (final e in events) {
+        if (e['type'] == 'DISPATCHED' && e['created_at'] != null) {
+          fields['dispatchAt'] = e['created_at'];
+        }
         if (raw['phase'] == null && _taskPhases.containsKey(e['type'])) {
           fields['status'] = _taskPhases[e['type']];
         }
@@ -477,36 +547,42 @@ class HttpRepository implements Repository {
         'PENDING' => '待审',
         'APPROVED' => '已通过',
         'REJECTED' => '已驳回',
+        'SUPERSEDED' => '已失效',
         _ => '${raw['status']}',
       };
       fields['before'] = raw['before_value'];
       fields['after'] = raw['candidate'];
+      fields['displayReferences'] = raw['display_references'];
       fields['baseVersion'] = raw['expected_version'];
       fields['steps'] = raw['steps'];
+      fields['reviewEvents'] = [
+        for (final step in (raw['steps'] as List? ?? const []).whereType<Map>())
+          '${displayPersonName(step['reviewer_name'])} · ${switch (step['state']) {
+            'APPROVED' => '审核通过',
+            'REJECTED' => '驳回',
+            'SUPERSEDED' => '已失效',
+            _ => '待审核',
+          }}${'${step['reason'] ?? ''}'.trim().isEmpty ? '' : ' · ${step['reason']}'}${step['decided_at'] == null ? '' : ' · ${step['decided_at']}'}',
+      ];
+      fields['applicantId'] = raw['applicant_id'];
+      fields['applicantName'] =
+          raw['applicant_name'] ?? (raw['applicant'] is Map ? raw['applicant']['name'] : null);
+      fields['reviewerId'] = raw['reviewer_id'];
+      fields['reviewerName'] =
+          raw['reviewer_name'] ?? (raw['reviewer'] is Map ? raw['reviewer']['name'] : null);
+      fields['reviewerConfigured'] = raw.containsKey('reviewer_configured')
+          ? raw['reviewer_configured'] == true
+          : fields['reviewerId'] != null;
+      fields['approvalMode'] = raw['approval_mode'] ?? 'DIRECT_MANAGER';
+      fields['decisionSource'] = raw['decision_source'];
     }
     if (raw['read'] == null && raw.containsKey('read_at')) {
       fields['read'] = raw['read_at'] != null;
     }
     if (raw.containsKey('is_read')) fields['read'] = raw['is_read'] == true;
     if (raw.containsKey('recipient_id')) {
-      fields['type'] = switch (raw['type']) {
-        'TASK_ASSIGNED' || 'TASK_EVENT' || 'TASK_REVISED' => '任务',
-        'DEADLINE' => '截止提醒',
-        'LOG_SUBMITTED' => '日志',
-        'LOG_COMMENT' => '评论',
-        'REVIEW_PENDING' => '审批',
-        'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
-        _ => '${raw['type'] ?? '消息'}',
-      };
-      final target = switch (raw['type']) {
-        'TASK_ASSIGNED' ||
-        'TASK_EVENT' ||
-        'TASK_REVISED' ||
-        'DEADLINE' => 'tasks',
-        'LOG_SUBMITTED' || 'LOG_COMMENT' => 'logs',
-        'REVIEW_PENDING' || 'REVIEW_APPROVED' || 'REVIEW_REJECTED' => 'reviews',
-        _ => null,
-      };
+      fields['type'] = notificationTitle(raw['type']);
+      final target = notificationResource(raw['type']);
       if (target != null && raw['object_id'] != null) {
         fields['targetResource'] = target;
         fields['targetId'] = raw['object_id'];
@@ -516,8 +592,11 @@ class HttpRepository implements Repository {
       fields['status'] = raw['submitted'] == true ? '已提交' : '草稿';
     }
     final taskReview = '${raw['kind'] ?? ''}'.startsWith('TASK');
-    final title =
-        '${raw['title'] ?? raw['name'] ?? raw['business_date'] ?? (taskReview ? '任务审核申请' : null) ?? (raw.containsKey('actor_id') ? raw['type'] : null) ?? (raw.containsKey('recipient_id') ? fields['type'] : null) ?? '记录'}';
+    final title = raw.containsKey('recipient_id')
+        ? notificationDisplayTitle(raw['title'], raw['type'])
+        : raw.containsKey('business_date') || raw.containsKey('businessDate')
+        ? workLogTitle(fields, explicitTitle: raw['title'])
+        : '${raw['title'] ?? raw['name'] ?? (taskReview ? '任务审核申请' : null) ?? (raw.containsKey('actor_id') ? raw['type'] : null) ?? (raw.containsKey('recipient_id') ? fields['type'] : null) ?? '记录'}';
     final owner =
         '${raw['ownerId'] ?? raw['owner_id'] ?? raw['user_id'] ?? raw['applicant_id'] ?? raw['recipient_id'] ?? ''}';
     final version = raw['version'] is num ? (raw['version'] as num).toInt() : 1;
@@ -572,16 +651,99 @@ class HttpRepository implements Repository {
         );
         return _page(response.data ?? <dynamic>[]);
       }
+      final parameters = _query(query, resource: resource);
+      if (resource == 'tasks' &&
+          query.from != null &&
+          query.to != null) {
+        parameters
+          ..remove('date')
+          ..remove('period')
+          ..['from'] = query.from!.toUtc().toIso8601String()
+          ..['to'] = query.to!.toUtc().toIso8601String();
+      }
+      if (resource == 'logs/subordinates' &&
+          query.from != null &&
+          query.to != null) {
+        parameters
+          ..remove('date')
+          ..remove('period')
+          ..['from'] = query.from!.toUtc().toIso8601String()
+          ..['to'] = query.to!.toUtc().toIso8601String();
+      }
       final response = await _getWithRetry<Map<String, dynamic>>(
         _pathForList(resource),
         queryParameters: {
-          ..._query(query, resource: resource),
+          ...parameters,
           if (resource == 'organization/dispatch-people') 'dispatch': true,
         },
       );
       return _page(response.data);
     } on DioException catch (e) {
       throw ApiFailure.fromDio(e);
+    }
+  }
+
+  @override
+  Future<MemberLogMonth> memberLogMonth(String ownerId, DateTime month) async {
+    try {
+      final response = await _getWithRetry<dynamic>(
+        '/logs/subordinates/calendar',
+        queryParameters: {
+          'ownerId': ownerId,
+          'month':
+              '${month.year.toString().padLeft(4, '0')}-${month.month.toString().padLeft(2, '0')}',
+        },
+      );
+      final result = MemberLogMonth.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+      if (result.ownerId != ownerId ||
+          result.month.year != month.year ||
+          result.month.month != month.month) {
+        throw const ApiFailure(
+          FailureKind.unavailable,
+          '成员日志日历响应范围不匹配',
+        );
+      }
+      return result;
+    } on DioException catch (error) {
+      throw ApiFailure.fromDio(error);
+    }
+  }
+
+  @override
+  Future<Record> analytics(AnalyticsQuery query) async {
+    try {
+      final response = await _getWithRetry<Map<String, dynamic>>(
+        '/analytics',
+        queryParameters: query.toJson(),
+      );
+      return _record(response.data!);
+    } on DioException catch (error) {
+      throw ApiFailure.fromDio(error);
+    }
+  }
+
+  @override
+  Future<PageResult> analyticsDetails(AnalyticsDetailsQuery query) async {
+    try {
+      final response = await _getWithRetry<Map<String, dynamic>>(
+        '/analytics/details',
+        queryParameters: query.toJson(),
+      );
+      final data = response.data!;
+      return PageResult(
+        (data['items'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => _record(Map<String, dynamic>.from(item)))
+            .toList(),
+        total: (data['total'] as num?)?.toInt() ?? 0,
+        nextCursor: '${data['nextCursor'] ?? ''}'.isEmpty
+            ? null
+            : '${data['nextCursor']}',
+      );
+    } on DioException catch (error) {
+      throw ApiFailure.fromDio(error);
     }
   }
 
@@ -732,7 +894,8 @@ class HttpRepository implements Repository {
       return {
         'id': raw['id'],
         'parentCommentId': raw['parent_id'],
-        'authorName': raw['author_name'],
+        'actorName': displayPersonName(raw['author_name']),
+        'authorName': displayPersonName(raw['author_name']),
         'text': raw['text'] ?? '',
         'actorId': raw['actor_id'],
         'parentId': raw['parent_id'],
@@ -773,7 +936,7 @@ class HttpRepository implements Repository {
     'id': raw['id'],
     'parentCommentId': raw['parent_id'],
     'actorId': raw['author_id'],
-    'actorName': raw['nickname'],
+    'actorName': displayPersonName(raw['nickname']),
     'avatarId': raw['avatar_id'],
     'text': raw['body'] ?? '',
     'createdAt': raw['created_at'],
@@ -792,11 +955,7 @@ class HttpRepository implements Repository {
   }
 
   Map<String, dynamic> _diaryBody(Map<String, dynamic> v) => {
-    'work': v['今日工作'] ?? '',
-    'blockers': v['遇到的阻碍'] ?? '',
-    'tomorrow': v['明日计划'] ?? '',
-    'hours': num.tryParse('${v['工时'] ?? 0}') ?? 0,
-    'taskIds': DiaryTaskLinks.parse(v['关联任务']),
+    'work': v['今日工作'] ?? v['work'] ?? '',
   };
 
   Map<String, dynamic> _taskDraft(Command command) {
@@ -901,9 +1060,6 @@ class HttpRepository implements Repository {
           );
         }
         final id = Uri.encodeComponent(_commandId(command));
-        if (command.action == 'return') {
-          throw const ApiFailure(FailureKind.unavailable, '退回补充服务尚未接入，原任务未改变');
-        }
         if (command.action == 'transfer' || command.action == 'reschedule') {
           final reason = '${v['变更理由'] ?? v['reason'] ?? ''}'.trim();
           if (reason.isEmpty || command.version == null) {
@@ -959,14 +1115,19 @@ class HttpRepository implements Repository {
         final event = switch (command.action) {
           'receive' => 'RECEIVED',
           'feedback' => 'FEEDBACK',
+          'return' => 'RETURNED',
           'accept' => 'ACCEPTED',
           'withdraw' => 'WITHDRAWN',
           'archive' => 'ARCHIVED',
           _ => throw const ApiFailure(FailureKind.unavailable, '后端未提供该任务操作'),
         };
+        if (command.version == null) {
+          throw const ApiFailure(FailureKind.validation, '请重新读取任务当前版本');
+        }
         return await _postRecord('/tasks/$id/events', {
           'type': event,
-          'version': command.version ?? 1,
+          'version': command.version,
+          if (command.action == 'feedback') 'attachments': v['attachments'] ?? [],
           if (v['成果说明'] != null)
             'text':
                 '${v['成果说明']}${'${v['遇到的阻碍'] ?? ''}'.trim().isEmpty ? '' : '\n\n遇到的阻碍：${v['遇到的阻碍']}'}',
@@ -975,6 +1136,9 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'tasks/comments') {
+        if (command.idempotencyKey == null || command.idempotencyKey!.trim().isEmpty) {
+          throw const ApiFailure(FailureKind.validation, '评论需要幂等键', code: 'IDEMPOTENCY_REQUIRED');
+        }
         final text = '${v['text'] ?? v['评语'] ?? ''}'.trim();
         if (text.isEmpty) {
           throw const ApiFailure(FailureKind.validation, '评论不能为空');
@@ -1002,45 +1166,32 @@ class HttpRepository implements Repository {
         throw const ApiFailure(FailureKind.unavailable, '后端未提供该标签操作');
       }
       if (resource == 'logs') {
-        if (command.action == 'withdraw') {
-          return await _postRecord(
-            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
-            {
-              'version': command.version,
-              'reason': v['reason'] ?? v['撤回原因'] ?? '',
-            },
-          );
+        if (!const {'update-content', 'update', 'submit', 'save-draft'}.contains(command.action)) {
+          throw const ApiFailure(FailureKind.unavailable, '不支持该日志操作，请使用当前日志编辑入口');
         }
-        if (command.action == 'read') {
-          final id = _commandId(command);
-          final response = await dio.post<dynamic>(
-            '/logs/${Uri.encodeComponent(id)}/read',
-            data: <String, dynamic>{},
-          );
-          if (response.data is! Map || (response.data as Map)['ok'] != true) {
-            throw const ApiFailure(FailureKind.server, '服务器未确认阅读登记，请重试');
+        if (command.action == 'update-content' || command.action == 'update') {
+          final work = '${v['work'] ?? v['今日工作'] ?? ''}'.trim();
+          if (work.isEmpty || command.version == null) {
+            throw const ApiFailure(
+              FailureKind.validation,
+              '请填写今日工作并读取当前日志版本',
+            );
           }
-          return Record(id: id, title: '阅读已登记', fields: const {'ok': true});
-        }
-        if (command.action == 'withdraw') {
-          return await _postRecord(
-            '/logs/${Uri.encodeComponent(_commandId(command))}/withdraw',
-            {'version': command.version, 'reason': v['撤回原因']},
+          final response = await dio.put<Map<String, dynamic>>(
+            '/logs/${Uri.encodeComponent(_commandId(command))}/content',
+            data: {'work': v['work'] ?? v['今日工作'], 'version': command.version},
+            options: Options(
+              headers: {'Idempotency-Key': ?command.idempotencyKey},
+            ),
           );
-        }
-        if (command.action == 'request-review') {
-          return await _postRecord(
-            '/logs/${Uri.encodeComponent(_commandId(command))}/revisions',
-            {
-              'version': command.version ?? 1,
-              'reason': v['修改理由'] ?? '',
-              'body': _diaryBody(v),
-            },
-          );
+          return _record(response.data!);
         }
         if (command.action == 'submit') {
           var id = v['id']?.toString();
           var submitVersion = command.version;
+          if (id != null && id.isNotEmpty && submitVersion == null) {
+            throw const ApiFailure(FailureKind.validation, '请读取日志当前版本后提交');
+          }
           if (id == null || id.isEmpty || v.containsKey('今日工作')) {
             if ('${v['businessDate'] ?? ''}'.isEmpty) {
               throw const ApiFailure(FailureKind.validation, '请选择日报业务日期');
@@ -1067,12 +1218,6 @@ class HttpRepository implements Repository {
             );
           }
         }
-        if (command.action == 'update') {
-          throw const ApiFailure(
-            FailureKind.unavailable,
-            '已提交日志修改接口尚未定案；当前不会误写入草稿',
-          );
-        }
         return await _putRecord('/logs/draft', {
           'businessDate': v['businessDate'],
           'body': _diaryBody(v),
@@ -1090,11 +1235,21 @@ class HttpRepository implements Repository {
         );
       }
       if (resource == 'reviews') {
+        if (command.action == 'reroute') {
+          return await _postRecord(
+            '/reviews/${Uri.encodeComponent(_commandId(command))}/reroute',
+            const <String, dynamic>{},
+          );
+        }
+        if (!['approve', 'reject'].contains(command.action)) {
+          throw const ApiFailure(FailureKind.validation, '不支持的审核操作');
+        }
         return await _postRecord(
           '/reviews/${Uri.encodeComponent(_commandId(command))}/decision',
           {
             'approve': command.action == 'approve',
             'reason': v['reason'] ?? v['驳回原因'] ?? '',
+            'expectedVersion': v['expectedVersion'] ?? command.version,
           },
         );
       }
@@ -1138,7 +1293,14 @@ class HttpRepository implements Repository {
       }
       if (resource == 'organization/profile') {
         return await _putRecord('/profiles/me', {
-          'introduction': v['个人介绍'] ?? '',
+          if (v.containsKey('个人介绍')) 'introduction': v['个人介绍'],
+          if (v.containsKey('手机号'))
+            'phone': v['手机号'] == null || '${v['手机号']}'.trim().isEmpty ? null : v['手机号'],
+          if (v.containsKey('邮箱'))
+            'email': v['邮箱'] == null || '${v['邮箱']}'.trim().isEmpty ? null : v['邮箱'],
+          if (v.containsKey('性别'))
+            'gender': v['性别'] == null || '${v['性别']}'.trim().isEmpty ? null : v['性别'],
+          if (v.containsKey('年龄')) 'age': v['年龄'],
           if (v.containsKey('avatarAttachmentId'))
             'avatarAttachmentId': v['avatarAttachmentId'],
           'version': command.version ?? 1,
@@ -1184,19 +1346,10 @@ class HttpRepository implements Repository {
           });
         }
         if (command.action == 'policy') {
-          if (command.version! < 1) {
-            throw const ApiFailure(FailureKind.validation, '请读取当前审核策略版本');
-          }
-          if (v['taskTeamReview'] is! bool ||
-              v['taskDepartmentReview'] is! bool) {
-            throw const ApiFailure(FailureKind.validation, '请选择有效的审核策略开关');
-          }
-          return await _postRecord('/organization/review-policy/revisions', {
-            'version': command.version,
-            'reason': reason,
-            'taskTeamReview': v['taskTeamReview'],
-            'taskDepartmentReview': v['taskDepartmentReview'],
-          });
+          throw const ApiFailure(
+            FailureKind.unavailable,
+            '审核方式由组织直属关系确定，移动端不再配置多级审核开关',
+          );
         }
         if (command.action == 'user') {
           if (command.version! < 1) {
@@ -1250,7 +1403,13 @@ class HttpRepository implements Repository {
         }
         final response = await dio.get<List<int>>(
           '/analytics/export',
-          queryParameters: {'date': date, 'period': period, 'resource': target},
+          queryParameters: {
+            'date': date,
+            'period': period,
+            'resource': target,
+            for (final key in ['departmentId', 'teamId', 'ownerId', 'groupBy'])
+              if (v[key] != null && '${v[key]}'.isNotEmpty) key: v[key],
+          },
           options: Options(responseType: ResponseType.bytes),
         );
         return _record({

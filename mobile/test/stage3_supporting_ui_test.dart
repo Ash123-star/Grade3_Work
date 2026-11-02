@@ -64,6 +64,8 @@ void main() {
             '成果说明': '已核对交付文件',
             '遇到的阻碍': '需核实版权',
             '主负责人': '陈一诺',
+            'participantIds': ['u2'],
+            'participantNames': ['陈一诺'],
             'deadline': '2026-10-14T18:00:00',
             'dispatcherId': 'u1',
           },
@@ -145,9 +147,11 @@ void main() {
       expect(find.text('当前正式工作'), findsNothing);
       c.read(routerProvider).go('/me/profile');
       await t.pumpAndSettle();
-      expect(find.text('日志时间线'), findsOneWidget);
+      expect(find.text('我的个人主页'), findsOneWidget);
+      expect(find.text('日志时间线'), findsNothing);
+      expect(find.text('个人公开重点'), findsNothing);
       expect(find.text('不应出现在公开时间线'), findsNothing);
-      expect(find.text('验收工作日报'), findsOneWidget);
+      expect(find.text('验收工作日报'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pumpAndSettle();
     },

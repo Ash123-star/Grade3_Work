@@ -10,6 +10,7 @@ import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/repositories/ai_work_repository.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/widgets.dart' show notice;
 import 'package:pandora_mobile/theme/app_theme.dart';
 
 class WorkTargetPicker extends ConsumerStatefulWidget {
@@ -395,9 +396,7 @@ class _WorkSettingsPageState extends ConsumerState<WorkSettingsPage> {
           .read(workRepositoryProvider)
           .request('POST', '/organization/review-policy/revisions', body: body);
       if (mounted && valid) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('已提交，等待复核')));
+        notice(context, '已提交，等待复核', success: true);
       }
       await load();
     } catch (e) {
@@ -1520,9 +1519,7 @@ class _DeliveryCheckPageState extends ConsumerState<DeliveryCheckPage>
           );
       if (!mounted || !valid) return;
       ref.invalidate(itemProvider(('tasks', widget.taskId)));
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已提交，等待验收')));
+      notice(context, '已提交，等待验收', success: true);
       context.pop();
     } catch (e) {
       if (mounted) setState(() => error = e);

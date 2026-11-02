@@ -42,7 +42,12 @@ void main() {
             id: '1',
             title: '他人申请',
             ownerId: 'u2',
-            fields: {'reviewState': '待审', 'step': 0},
+            fields: {
+              'reviewState': '待审',
+              'step': 0,
+              'approvalMode': 'DIRECT_MANAGER',
+              'reviewerId': 'u1',
+            },
           ),
           const Record(
             id: '2',
@@ -56,6 +61,13 @@ void main() {
       repo.execute(
         'reviews',
         const Command('approve', {'id': '2'}, version: 1),
+      ),
+      throwsA(isA<ApiFailure>()),
+    );
+    await expectLater(
+      repo.execute(
+        'reviews',
+        const Command('approve', {'id': '1'}, version: 0),
       ),
       throwsA(isA<ApiFailure>()),
     );

@@ -11,7 +11,7 @@ public interface TaskApi {
     /** 获取任务详情及事件时间线；越权资源应映射为统一资源错误。 */
     Map<String, Object> get(ActorContext actor, String taskId);
 
-    /** 创建任务；必须校验派发资格、一个主负责人、幂等键和跨公司隔离。 */
+    /** 提交任务创建申请；校验派发资格、参与人集合、幂等键和跨公司隔离。返回TASK_CREATE审核，id为审核ID，target_id为任务ID；仅APPROVED时任务已生效。 */
     Map<String, Object> create(ActorContext actor, Map<String, Object> command, String idempotencyKey);
 
     /** 追加任务生命周期事件；实现负责校验当前阶段和操作者权限。 */

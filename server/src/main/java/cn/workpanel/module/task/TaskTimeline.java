@@ -20,6 +20,6 @@ public final class TaskTimeline {
     }
 
     public static List<Map<String,Object>> list(Db db,String taskId) {
-        return db.rows("SELECT sequence,actor_id,type,body,from_phase,to_phase,task_version,created_at FROM task_events WHERE task_id=? ORDER BY sequence",taskId);
+        return db.rows("SELECT e.sequence,e.actor_id,u.name AS actor_name,e.type,e.body,e.from_phase,e.to_phase,e.task_version,e.created_at FROM task_events e LEFT JOIN users u ON u.id=e.actor_id AND u.company_id=e.company_id WHERE e.task_id=? ORDER BY e.sequence",taskId);
     }
 }

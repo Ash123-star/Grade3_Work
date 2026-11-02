@@ -11,6 +11,7 @@ import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/models/log_edit_window.dart';
+import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
@@ -20,20 +21,8 @@ import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/models/diary_task_links.dart';
 import 'package:pandora_mobile/shared/diary_task_links.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
+import 'package:pandora_mobile/shared/task_label_selector.dart';
 import 'catalog.dart';
-
-const _taskTagLabels = <String, String>{
-  'company-important': '重要',
-  'department-research': '研发',
-  'department-design': '设计',
-  'personal-today': '今日',
-};
-const _taskTagColors = <String, Color>{
-  'company-important': Color(0xFFFFD9A8),
-  'department-research': Color(0xFFBDEFD7),
-  'department-design': Color(0xFFCFE5FF),
-  'personal-today': Color(0xFFE7D4FF),
-};
 
 class FormPage extends ConsumerStatefulWidget {
   const FormPage(
@@ -194,16 +183,14 @@ class _FormPageState extends ConsumerState<FormPage> {
       selectedOwner = item.ownerId;
       final participantValues =
           item.fields['participantIds'] ?? item.fields['participant_ids'];
-      final participantNames = item.fields['participantNames'] is List
-          ? (item.fields['participantNames'] as List)
-          : const <dynamic>[];
+      final participantNames = taskParticipantNames(item.fields);
       if (participantValues is List) {
         for (final (index, value) in participantValues.indexed) {
           final id = '$value'.trim();
           if (id.isNotEmpty) {
             final name = index < participantNames.length
-                ? '${participantNames[index]}'
-                : id;
+                ? participantNames[index]
+                : '成员姓名未提供';
             participants[id] = Record(id: id, title: name);
           }
         }
@@ -709,113 +696,8 @@ class _FormPageState extends ConsumerState<FormPage> {
         ),
       );
     }
-    final options = switch (label) {
-      '标签' => _taskTagLabels.keys.toList(),
-      _ => const <String>[],
-    };
     if (label == '标签') {
-      return FormField<String>(
-        initialValue: controller.text,
-        validator: (_) => validate(label, controller.text),
-        builder: (state) => _taskRow(
-          label,
-          InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: busy
-                ? null
-                : () async {
-                    final choice = await showPremiumTagPicker(
-                      context,
-                      options: [
-                        for (final entry in _taskTagLabels.entries)
-                          PremiumTagOption(
-                            entry.key,
-                            entry.value,
-                            _taskTagColors[entry.key]!,
-                          ),
-                      ],
-                      selected: controller.text,
-                    );
-                    if (choice == null || !mounted) return;
-                    controller.text = choice;
-                    state.didChange(choice);
-                    setState(() {});
-                  },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  if (controller.text.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _taskTagColors[controller.text],
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        _taskTagLabels[controller.text] ?? controller.text,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  if (controller.text.isEmpty)
-                    const Text('选择标签', style: TextStyle(color: Colors.grey)),
-                  const Spacer(),
-                  const Icon(Icons.expand_more_rounded),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    if (options.isNotEmpty) {
-      return FormField<String>(
-        initialValue: controller.text,
-        validator: (_) => validate(label, controller.text),
-        builder: (state) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _taskRow(
-              label,
-              PremiumDropdownField<String>(
-                initialValue: options.contains(controller.text)
-                    ? controller.text
-                    : null,
-                isExpanded: true,
-                icon: const Icon(Icons.expand_more_rounded),
-                decoration: const InputDecoration(
-                  hintText: '选择字段值',
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 8),
-                ),
-                items: options
-                    .map(
-                      (option) => DropdownMenuItem(
-                        value: option,
-                        child: Text(
-                          label == '标签' ? _taskTagLabels[option]! : option,
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: busy
-                    ? null
-                    : (value) {
-                        controller.text = value ?? '';
-                        state.didChange(value);
-                        setState(() {});
-                      },
-              ),
-            ),
-            if (state.hasError) _taskError(state.errorText!),
-          ],
-        ),
-      );
+      return _taskRow(label, _taskLabelField(controller), topAligned: true);
     }
     return _taskRow(
       label,
@@ -848,9 +730,17 @@ class _FormPageState extends ConsumerState<FormPage> {
     ),
   );
 
+  Widget _taskLabelField(TextEditingController controller) => TaskLabelSelector(
+    controller: controller,
+    enabled: !busy && !loadingExisting,
+    historicalName: original == null ? null : taskTagLabel(original!.fields),
+    onChanged: () => setState(() {}),
+  );
+
   Widget field(String label) {
     if (widget.kind == 'dispatch') return _taskField(label);
     final controller = controllers[label]!;
+    if (label == '标签') return _taskLabelField(controller);
     if (widget.kind == 'register' && label == '部门' && !AppConfig.mock) {
       return ref
           .watch(registrationDepartmentsProvider)
@@ -880,7 +770,6 @@ class _FormPageState extends ConsumerState<FormPage> {
     }
     final options = switch (label) {
       '部门' || '上级部门' => ['产品部', '市场部', '技术部'],
-      '标签' => _taskTagLabels.keys.toList(),
       '角色' => UserRole.values.map((r) => r.label).toList(),
       '展示受众' => ['本团队', '本部门', '全公司'],
       _ => <String>[],
@@ -909,12 +798,12 @@ class _FormPageState extends ConsumerState<FormPage> {
       );
     }
     if (['附件', '头像'].contains(label)) {
-      if (label == '附件' && !['dispatch'].contains(widget.kind)) {
+      if (label == '附件' && !['dispatch', 'feedback'].contains(widget.kind)) {
         return const ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.info_outline),
           title: Text('附件关联暂不可用'),
-          subtitle: Text('当前成果反馈/意见反馈接口不支持附件关联，请在说明中补充材料信息。'),
+          subtitle: Text('当前操作不支持附件关联。'),
         );
       }
       return Column(
@@ -1039,14 +928,7 @@ class _FormPageState extends ConsumerState<FormPage> {
         },
       );
     }
-    final person = [
-      '主负责人',
-      '协作人',
-      '参与人',
-      '员工',
-      '直属上级',
-      '指定公司复核人',
-    ].contains(label);
+    final person = ['主负责人', '协作人', '参与人', '员工', '直属上级'].contains(label);
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
@@ -1136,6 +1018,10 @@ class _FormPageState extends ConsumerState<FormPage> {
   }
 
   Future<void> submit() async {
+    if (widget.kind == 'feedback' && uploadedAttachments.length > 5) {
+      setState(() => error = '成果反馈最多添加5个附件');
+      return;
+    }
     if (loadingExisting ||
         loadFailed ||
         conflict ||
@@ -1196,7 +1082,7 @@ class _FormPageState extends ConsumerState<FormPage> {
             uploadedAttachments.firstOrNull?.id ??
             original?.fields['avatarAttachmentId'] ??
             '',
-      if (widget.kind == 'dispatch')
+      if (['dispatch', 'feedback'].contains(widget.kind))
         'attachments': uploadedAttachments.map((f) => f.id).toList(),
       if (widget.kind == 'dispatch')
         'participantIds': participants.keys.toList(),
@@ -1209,7 +1095,6 @@ class _FormPageState extends ConsumerState<FormPage> {
         'title':
             controllers['任务名称']?.text ??
             controllers['标题']?.text ??
-            controllers['问题描述']?.text ??
             (log
                 ? '${businessDate.toIso8601String().split('T').first} 工作日报'
                 : spec.title),
@@ -1253,7 +1138,7 @@ class _FormPageState extends ConsumerState<FormPage> {
         try {
           await draftStore.remove(draftLocation);
         } catch (cleanup) {
-          if (mounted) notice(context, '$cleanup');
+          if (mounted) notice(context, '$cleanup', tone: NoticeTone.error);
         }
         ref.invalidate(todayDraftProvider(accountId));
       }
@@ -1272,7 +1157,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           } catch (storage) {
             if (!mounted) return;
             ref.read(sessionStorageErrorProvider.notifier).state = '$storage';
-            notice(context, '$storage');
+            notice(context, '$storage', tone: NoticeTone.error);
           }
           if (!mounted || ref.read(sessionProvider).id != accountId) return;
           ref.read(sessionCheckProvider.notifier).state = null;
@@ -1317,15 +1202,16 @@ class _FormPageState extends ConsumerState<FormPage> {
           role: UserRole.employee,
         );
         context.go('/auth/login');
-        notice(context, '密码已修改，请使用新密码重新登录');
+        notice(context, '密码已修改，请使用新密码重新登录', success: true);
       } else {
         notice(
           context,
           widget.kind == 'log-revise'
               ? '修订申请已提交，审核通过后生效'
               : AppConfig.mock
-              ? '已保存到演示数据'
+              ? '已保存'
               : '已提交',
+          success: true,
         );
         if (context.canPop()) context.pop();
       }
@@ -1352,12 +1238,14 @@ class _FormPageState extends ConsumerState<FormPage> {
             loadFailed ||
             conflict ||
             !windowOpen ||
-            (!AppConfig.mock && widget.kind == 'return')
+            widget.kind == 'policy'
         ? null
         : submit,
     child: Text(
       loadingExisting
           ? '正在读取…'
+          : widget.kind == 'policy'
+          ? '当前规则'
           : widget.kind == 'login'
           ? '登录'
           : widget.kind == 'register'
@@ -1446,7 +1334,9 @@ class _FormPageState extends ConsumerState<FormPage> {
         : ['内容'];
     String value(String label) => switch (label) {
       '参与人' =>
-        '${(f['participantNames'] as List?)?.join('、') ?? f['participantIds'] ?? f['主负责人'] ?? item.ownerId}',
+        taskParticipantNames(f).isEmpty
+            ? '未设置'
+            : taskParticipantNames(f).join('、'),
       '截止时间' => f['deadline'] == null ? '未设置' : '${f['deadline']}',
       '业务日期' => '${f['businessDate'] ?? '未标记'}',
       '内容' => '${f['内容'] ?? f['body'] ?? '暂无内容'}',
@@ -1550,53 +1440,34 @@ class _FormPageState extends ConsumerState<FormPage> {
     return PageFrame(
       title: document ? (log ? '写日志' : '修改日志') : spec.title,
       showTitle: !auth,
-      actions: document
-          ? [
-              Padding(
-                padding: EdgeInsets.only(right: 16),
-                child: Center(
-                  child: Text(
-                    log
-                        ? '草稿'
-                        : windowOpen
-                        ? '24小时内可修改'
-                        : '已锁定',
-                    style: const TextStyle(color: CuteTokens.muted),
-                  ),
-                ),
-              ),
-            ]
-          : null,
-      bottom: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 120),
-                child: SingleChildScrollView(child: failure()),
-              ),
-            ),
-          BottomActions(
-            primary: submitButton(),
-            secondary: document
-                ? OutlinedButton(
-                    onPressed:
-                        busy ||
-                            loadingExisting ||
-                            draftRestoring ||
-                            submitted ||
-                            !windowOpen
-                        ? null
-                        : () => saveDraft(notify: true),
-                    child: const Text('保存草稿'),
-                  )
-                : null,
-            note: widget.kind == 'reject' ? '驳回必须填写原因；冲突后请重新读取' : null,
-          ),
-        ],
+      feedback: error == null ? null : KeyedSubtree(
+        key: ValueKey(error),
+        child: failure(),
       ),
+      bottom: widget.kind == 'policy'
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                BottomActions(
+                  primary: submitButton(),
+                  secondary: document && !log
+                      ? OutlinedButton(
+                          onPressed:
+                              busy ||
+                                  loadingExisting ||
+                                  draftRestoring ||
+                                  submitted ||
+                                  !windowOpen
+                              ? null
+                              : () => saveDraft(notify: true),
+                          child: const Text('保存草稿'),
+                        )
+                      : null,
+                  note: widget.kind == 'reject' ? '驳回必须填写原因；冲突后请重新读取' : null,
+                ),
+              ],
+            ),
       child: PageBody(
         children: [
           if (auth) ...[
@@ -1766,12 +1637,26 @@ class _FormPageState extends ConsumerState<FormPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        savedAt == null
-                            ? '尚未保存 · 草稿仅本人可见'
-                            : saved
-                            ? '上次本机保存 ${savedAt!.hour.toString().padLeft(2, '0')}:${savedAt!.minute.toString().padLeft(2, '0')}'
-                            : '保存中…',
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: log
+                                  ? '草稿 · '
+                                  : windowOpen
+                                  ? '24小时内可修改 · '
+                                  : '已锁定 · ',
+                            ),
+                            TextSpan(
+                              text: savedAt == null
+                                  ? '尚未保存 · 草稿仅本人可见'
+                                  : saved
+                                  ? '上次本机保存 ${savedAt!.hour.toString().padLeft(2, '0')}:${savedAt!.minute.toString().padLeft(2, '0')}'
+                                  : '保存中…',
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.start,
                         style: const TextStyle(
                           fontSize: 12,
                           color: CuteTokens.muted,
@@ -1791,11 +1676,6 @@ class _FormPageState extends ConsumerState<FormPage> {
               padding: EdgeInsets.only(bottom: 16),
               child: Text('私人备注仅本人可见，不进入下属面板或 AI。'),
             ),
-          if (!AppConfig.mock && widget.kind == 'return')
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16),
-              child: Text('退回补充服务尚未接入；可以阅读成果，当前任务不会改变。'),
-            ),
           if (widget.kind == 'profile-edit')
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
@@ -1807,13 +1687,12 @@ class _FormPageState extends ConsumerState<FormPage> {
             'reschedule',
             'role',
             'membership',
-            'policy',
             'reporting',
           ].contains(widget.kind))
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
               child: Text(
-                '提交候选修改后等待独立审核，原版本继续生效。',
+                '提交候选修改后由配置的直属上级单级审核，原版本继续生效。',
                 style: TextStyle(color: CuteTokens.muted),
               ),
             ),
@@ -1833,9 +1712,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('策略范围'),
             const PaperSurface(
-              child: Text(
-                '任务关键修改 · 提交候选配置后等待独立审核。当前生效策略与完整组织审核链需要服务端返回，不用下方预览替代。',
-              ),
+              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。'),
             ),
             const SizedBox(height: 16),
           ],
@@ -1942,24 +1819,9 @@ class _FormPageState extends ConsumerState<FormPage> {
               ),
             ),
           if (widget.kind == 'policy') ...[
-            const SectionHeader('候选路由预览'),
-            PaperSurface(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('1 · 申请人提交候选修改'),
-                  const SizedBox(height: 12),
-                  const Text('2 · 按服务端组织范围解析独立复核节点'),
-                  const SizedBox(height: 12),
-                  Text(
-                    '3 · 公司复核人：${controllers['指定公司复核人']!.text.isEmpty ? '尚未指定' : controllers['指定公司复核人']!.text}',
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '申请人不能自审；节点缺失时等待配置，不自动通过。此处为候选配置示意，实际人选、顺序与生效结果以服务端为准。',
-                  ),
-                ],
-              ),
+            const SectionHeader('审核方式'),
+            const PaperSurface(
+              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。'),
             ),
           ],
           if (widget.kind == 'register')
@@ -2012,7 +1874,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                   Expanded(
                     child: Text(
                       widget.kind == 'login'
-                          ? '企业账号用于进入对应组织空间，业务数据范围按账号权限控制。'
+                          ? '本机自动记住登录，有效期一周；下次打开无需重复输入账号密码。退出登录或会话失效后需重新登录。'
                           : '账号归属由管理员确认；确认前不会开放公司业务资料。',
                       style: const TextStyle(
                         fontSize: 12,

@@ -210,7 +210,11 @@ class _AiJobPageState extends AiProtectedState<AiJobPage> {
           if (error != null && value == null)
             ErrorPanel(error!, retry: conflict ? reload : load),
           if (!loading && value != null) ...[
-            Text(aiScope(originalAccount)),
+            Text(
+              value.input['scope'] == 'SELF'
+                  ? '分析范围：本人'
+                  : aiScope(originalAccount),
+            ),
             Text(
               '${value.input['date']} · ${aiPeriod(value.input['period'])} · ${aiTime(value.output?['generatedAt'])}',
             ),
@@ -315,6 +319,7 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
   DateTime? deadline;
   List<UploadedAttachment> files = [];
   String? successfulId;
+  bool successfulReview = false;
   String? attemptedPayload, attemptedKey;
   Map<String, dynamic>? get action =>
       job != null && widget.index >= 0 && widget.index < job!.actions.length
@@ -336,6 +341,10 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
     content.clear();
     progress.clear();
     group.clear();
+    successfulId = null;
+    successfulReview = false;
+    attemptedPayload = null;
+    attemptedKey = null;
   }
 
   @override
@@ -480,29 +489,19 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
       error = null;
     });
     try {
-      final latest = await repo.job(job!.id, token: token);
-      if (!alive || token.isCancelled) return;
-      if (latest.data['owner_id'] != originalAccount.id ||
-          latest.version != job!.version ||
-          latest.state != 'SUCCEEDED' ||
-          widget.index >= latest.actions.length ||
-          jsonEncode(latest.actions[widget.index]) != jsonEncode(action) ||
-          !latest.validRefs(
-            latest.actions[widget.index]['sourceIds'],
-            originalAccount.id,
-          )) {
-        setState(() => stale = true);
-        throw const ApiFailure(FailureKind.conflict, '建议已变化，请返回核对最新来源后重新确认');
-      }
-      final id = await repo.confirm(
-        latest,
+      // 原版本由服务端在确认事务中校验；同键重试仍可取得已成功的原回执。
+      final result = await repo.confirm(
+        job!,
         widget.index,
         task,
         attemptedKey!,
         token: token,
       );
       if (!alive || token.isCancelled) return;
-      setState(() => successfulId = id);
+      setState(() {
+        successfulId = '${result['id']}';
+        successfulReview = result['kind'] == 'TASK_CREATE';
+      });
       refreshBusiness(ref);
     } catch (e) {
       if (alive && !token.isCancelled) fail(e);
@@ -526,11 +525,11 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
         primary: SunnyPrimaryButton(
           loading: busy,
           onPressed: successfulId != null
-              ? () => context.push('/item/tasks/${encode(successfulId!)}')
+              ? () => context.push('/item/${successfulReview ? 'reviews' : 'tasks'}/${encode(successfulId!)}')
               : loading || busy || !ready || stale || job == null
               ? null
               : submit,
-          child: Text(successfulId != null ? '查看已创建任务' : '确认并派发任务'),
+          child: Text(successfulId != null ? (successfulReview ? '查看任务申请' : '查看已创建任务') : '确认并提交任务申请'),
         ),
         note: job == null ? '核对来源与分工后人工派发' : error ?? '核对来源与分工后人工派发，包含实际附件ID',
       ),
@@ -539,7 +538,7 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
           if (loading) const LoadingSkeleton(),
           if (error != null && job == null)
             ErrorPanel(error!, retry: job == null ? load : null),
-          if (successfulId != null) const Text('任务已创建，原AI建议仍保留为草稿。'),
+          if (successfulId != null) Text(successfulReview ? '任务申请已提交，请以审核结果确认生效状态。原AI建议仍保留。' : '任务已创建，原AI建议仍保留为草稿。'),
           if (job != null)
             Form(
               key: form,

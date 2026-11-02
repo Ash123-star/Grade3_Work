@@ -353,14 +353,30 @@ Future<T?> showTuantuanBottomSheet<T>({
   bool isScrollControlled = false,
   bool? showDragHandle,
   bool useSafeArea = false,
+  bool isDismissible = true,
+  bool enableDrag = true,
+  Color? barrierColor,
 }) => showModalBottomSheet<T>(
   context: context,
   isScrollControlled: isScrollControlled,
   showDragHandle: showDragHandle,
   useSafeArea: useSafeArea,
+  isDismissible: isDismissible,
+  enableDrag: enableDrag,
+  barrierColor: barrierColor,
   builder: (context) {
     final body = builder(context);
-    return body is TuantuanSheet ? body : TuantuanSheet(child: body);
+    final sheet = body is TuantuanSheet ? body : TuantuanSheet(child: body);
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          FocusManager.instance.primaryFocus?.unfocus(
+            disposition: UnfocusDisposition.scope,
+          );
+        }
+      },
+      child: sheet,
+    );
   },
 );
 
@@ -375,6 +391,84 @@ class TuantuanSheet extends StatelessWidget {
     child: child,
   );
 }
+
+/// Centered cream information sheet used for focus cards and calendar days.
+Future<T?> showTuantuanFocusSheet<T>({
+  required BuildContext context,
+  required String title,
+  required Widget child,
+  Widget? trailing,
+  Widget? floatingActionButton,
+}) => showGeneralDialog<T>(
+  context: context,
+  barrierDismissible: true,
+  barrierLabel: '关闭$title',
+  barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: .68),
+  transitionDuration: MediaQuery.disableAnimationsOf(context)
+      ? Duration.zero
+      : WorkMotion.overlay,
+  pageBuilder: (dialogContext, _, _) => Center(
+    child: SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: MediaQuery.sizeOf(dialogContext).height * .78,
+        ),
+        child: PaperSurface(
+          color: Theme.of(dialogContext).colorScheme.surface,
+          borderColor: Theme.of(dialogContext).colorScheme.outlineVariant,
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 8, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(dialogContext).textTheme.titleLarge,
+                      ),
+                    ),
+                    ?trailing,
+                    IconButton(
+                      tooltip: '关闭',
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: Theme.of(dialogContext).colorScheme.outlineVariant),
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: child),
+                    if (floatingActionButton != null)
+                      Positioned(
+                        right: 20,
+                        bottom: 20,
+                        child: floatingActionButton,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  ),
+  transitionBuilder: (context, animation, _, child) => FadeTransition(
+    opacity: animation,
+    child: ScaleTransition(
+      scale: Tween<double>(begin: .96, end: 1).animate(
+        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+      ),
+      child: child,
+    ),
+  ),
+);
 
 class BottomActions extends StatelessWidget {
   const BottomActions({

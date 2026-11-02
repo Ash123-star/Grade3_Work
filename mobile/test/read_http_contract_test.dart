@@ -16,6 +16,7 @@ class ReadAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   int focusStatus = 200, versionStatus = 200, commentStatus = 200;
   bool submitted = true;
+  DateTime? editDeadline;
   final task = <String, dynamic>{
     'id': 'task-1',
     'title': '真实任务内容',
@@ -54,6 +55,14 @@ class ReadAdapter implements HttpClientAdapter {
         'business_date': '2026-10-12',
         'owner_id': 'u1',
         'submitted': submitted,
+        if (editDeadline != null) ...{
+          'editableUntil': editDeadline!.toUtc().toIso8601String(),
+          'submittedAt': editDeadline!
+              .subtract(const Duration(hours: 24))
+              .toUtc()
+              .toIso8601String(),
+          'canEdit': true,
+        },
         'version': 3,
         'body': {
           'work': '当前生效正文',
@@ -93,6 +102,24 @@ class ReadAdapter implements HttpClientAdapter {
           'created_at': '2026-10-12T12:00:00Z',
         },
       ];
+    } else if (options.path == '/reviews/review-1') {
+      body = {
+        'id': 'review-1',
+        'title': '日报正文调整',
+        'kind': 'LOG',
+        'status': 'PENDING',
+        'applicant_id': 'u2',
+        'applicant_name': '申请人',
+        'reviewer_id': 'u1',
+        'reviewer_name': '直属主管',
+        'reviewer_configured': true,
+        'approval_mode': 'DIRECT_MANAGER',
+        'expected_version': 3,
+        'version': 4,
+        'steps': [
+          {'reviewer_id': 'historical-reviewer', 'status': 'APPROVED'},
+        ],
+      };
     } else if (options.path.startsWith('/dashboard/')) {
       status = focusStatus;
       final own = options.queryParameters['ownerId'];
@@ -309,6 +336,20 @@ void main() {
     },
   );
 
+  test('review HTTP fields expose the configured direct reviewer only', () async {
+    final review = await repo.detail('reviews', 'review-1');
+    expect(review.fields['reviewState'], '待审');
+    expect(review.fields['applicantId'], 'u2');
+    expect(review.fields['reviewerId'], 'u1');
+    expect(review.fields['reviewerName'], '直属主管');
+    expect(review.fields['reviewerConfigured'], isTrue);
+    expect(review.fields['approvalMode'], 'DIRECT_MANAGER');
+    expect(review.fields['baseVersion'], 3);
+    expect(review.fields['steps'], [
+      {'reviewer_id': 'historical-reviewer', 'status': 'APPROVED'},
+    ]);
+  });
+
   Future<void> settleHttp(WidgetTester t) async {
     await t.pump();
     await t.runAsync(
@@ -346,6 +387,24 @@ void main() {
     await t.pumpWidget(const SizedBox.shrink());
     await t.pumpAndSettle();
   }
+
+  testWidgets(
+    'diary direct edit locks when its server deadline passes',
+    (t) async {
+      adapter.editDeadline = DateTime.now().add(const Duration(seconds: 3));
+      await launch(t, '/item/logs/log-1');
+      expect(find.text('编辑日志'), findsOneWidget);
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 3100)),
+      );
+      await t.pump(const Duration(seconds: 4));
+      await t.pumpAndSettle();
+      expect(find.text('编辑日志'), findsNothing);
+      expect(find.text('已满24小时 · 日志已锁定'),findsOneWidget);
+      expect(adapter.requests.any((r) => r.method == 'PUT'), false);
+      await closeUi(t);
+    },
+  );
 
   testWidgets(
     'historical document displays HTTP version body rather than current content',

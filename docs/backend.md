@@ -4,6 +4,8 @@
 
 ## 启动
 
+云端 `39.96.84.51` 已确认使用宿主机 `collaboration-server.service` 运行JAR。该环境按 [systemd云端更新指南](cloud-systemd-deployment.md) 操作，保留原数据库连接。下面的Compose方式是另一种独立部署方式，不要在原服务占用8080时同时启动Compose api，也不要据此切换数据卷。
+
 需要 Docker Desktop（Linux 容器）和 Compose v2。复制 `deploy/backend/.env.example` 为 `.env`，填写 `DB_PASSWORD`、`REDIS_PASSWORD`、`NEO4J_PASSWORD`、`ADMIN_ACCOUNT`、`ADMIN_PASSWORD`、`ADMIN_PHONE`。密码无默认值；管理员密码至少 12 个字符且 UTF-8 编码不超过 72 字节。手机号需满足大陆手机格式。
 
 Redis 密码使用字母、数字、下划线或连字符，建议随机生成至少 32 字符。Neo4j 密码至少 16 字符。三个数据库运行在同一个 `data` 容器，各自拥有独立持久卷。

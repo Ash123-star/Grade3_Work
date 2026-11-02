@@ -251,6 +251,7 @@ class _ServerAiGraphPageState extends AiProtectedState<ServerAiGraphPage> {
         '${job.input['date']}',
         '${job.input['period']}',
         purpose: purpose,
+        scope: '${job.input['scope'] ?? 'AUTHORIZED'}',
         focus: source,
         token: token,
       );

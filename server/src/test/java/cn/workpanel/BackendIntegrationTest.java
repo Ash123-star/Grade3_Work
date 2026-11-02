@@ -120,10 +120,10 @@ class BackendIntegrationTest {
         ids.put(who,result.get("id").asText()); login(who,PASSWORD); return result.get("reviewId").asText();
     }
     JsonNode approve(String review,String requester) throws Exception {
-        var detail=get("/reviews/"+review,requester); assertFalse(detail.get("steps").isEmpty(),"缺少独立审核人"); JsonNode result=detail;
+        var detail=get("/reviews/"+review,requester); if("APPROVED".equals(detail.get("status").asText())) return detail; assertFalse(detail.get("steps").isEmpty(),"缺少直属审核人"); JsonNode result=detail;
         for(var step:detail.get("steps")) if(step.get("state").asText().equals("PENDING")) {
             String who=ids.entrySet().stream().filter(e->e.getValue().equals(step.get("reviewer_id").asText())).findFirst().orElseThrow().getKey();
-            result=post("/reviews/"+review+"/decision",who,Map.of("approve",true,"reason","独立复核"));
+            result=post("/reviews/"+review+"/decision",who,Map.of("approve",true,"reason","独立复核","expectedVersion",detail.get("expected_version").asInt()));
         }
         assertEquals("APPROVED",result.get("status").asText()); return result;
     }
@@ -168,23 +168,27 @@ class BackendIntegrationTest {
         call(400,"POST","/tasks","integration-admin",taskBody("未指定幂等键","integration-admin"),null);
         var item=post("/dashboard/company/revisions","integration-admin",Map.of("title","公司重点","pinned",true,"version",0,"reason","发布公司重点")); pendingItem=item.get("id").asText();
         assertTrue(get("/reviews/"+pendingItem,"integration-admin").get("steps").isEmpty()); assertEquals(0,get("/dashboard/company","integration-admin").get("total").asInt());
-        call(403,"POST","/reviews/"+pendingItem+"/decision","integration-admin",Map.of("approve",true),null);
+        call(403,"POST","/reviews/"+pendingItem+"/decision","integration-admin",Map.of("approve",true,"expectedVersion",0),null);
     }
     @Test @Order(2) void registrationAndIndependentOrganizationReview() throws Exception {
         String application=register("reviewer","product",2); call(403,"GET","/dashboard","reviewer",null,null); approve(application,"reviewer");
         var user=get("/auth/me","reviewer"); assertEquals("EMPLOYEE",user.get("role").asText());
-        var request=post("/organization/reviewer-application","reviewer",Map.of("version",user.get("version").asInt(),"reason","申请公司复核职责")); approve(request.get("id").asText(),"reviewer");
+        // 部署配置的独立管理员及直属关系，不再依靠职级随机推断审核人。
+        String judge=Db.id(),judgeToken=Db.id();ids.put("current-judge",judge);tokens.put("current-judge",judgeToken);
+        String company=Db.str(db.one("SELECT company_id FROM users WHERE id=?",ids.get("integration-admin")),"company_id");
+        db.update("INSERT INTO users(id,company_id,account,password_hash,phone,name,role,status,company_reviewer) VALUES (?,?,?,'x',?,?,'ADMIN','ACTIVE',true)",judge,company,judge,judge,"独立审核管理员");
+        db.update("INSERT INTO sessions VALUES (?,?,now()+interval '1 hour')",Db.hash(judgeToken),judge);
+        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",ids.get("integration-admin"),judge,company);
         assertEquals("EMPLOYEE",get("/auth/me","reviewer").get("role").asText());
         call(403,"POST","/tasks","reviewer",taskBody("越权","reviewer"),"no-dispatch");
         post("/reviews/"+pendingItem+"/reroute","integration-admin",Map.of()); approve(pendingItem,"integration-admin");
         assertEquals(1,get("/dashboard/company","reviewer").get("total").asInt());
-        var policy=get("/organization/review-policy","integration-admin"); var policyRequest=post("/organization/review-policy/revisions","integration-admin",Map.of("version",policy.get("version").asInt(),"reason","调整任务复核策略","taskTeamReview",false));
-        assertTrue(get("/organization/review-policy","integration-admin").at("/review_policy/taskTeamReview").asBoolean()); approve(policyRequest.get("id").asText(),"integration-admin"); assertFalse(get("/organization/review-policy","integration-admin").at("/review_policy/taskTeamReview").asBoolean());
-        var restore=post("/organization/review-policy/revisions","integration-admin",Map.of("version",2,"reason","恢复完整复核链","taskTeamReview",true)); approve(restore.get("id").asText(),"integration-admin");
-        call(400,"POST","/organization/review-policy/revisions","integration-admin",Map.of("version",3,"reason","尝试关闭公司复核","companyReview",false),null);
+        call(400,"POST","/organization/review-policy/revisions","integration-admin",Map.of("version",1,"reason","退役策略","taskTeamReview",false),null);
         for(String who:List.of("alice","bob","leader","director","founder")) approve(register(who,who.equals("bob")||who.equals("founder")?"marketing":"product",ids.size()+1),who);
         var teamRequest=post("/organization/teams/revisions","integration-admin",Map.of("name","产品团队","departmentId","product","version",0,"reason","建立团队")); team=teamRequest.get("target_id").asText(); approve(teamRequest.get("id").asText(),"integration-admin");
         configure("alice",Map.of("teamId",team)); configure("reviewer",Map.of("teamId",team)); configure("leader",Map.of("teamId",team,"role","LEADER")); configure("director",Map.of("role","DIRECTOR")); configure("founder",Map.of("role","FOUNDER"));
+        for(String child:List.of("leader","director","reviewer")) db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) SELECT ?,?,company_id FROM users WHERE id=?",ids.get(child),judge,ids.get(child));
+        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) SELECT ?,?,company_id FROM users WHERE id=?",ids.get("alice"),ids.get("leader"),ids.get("alice"));
         var dispatchPeople=get("/organization/people?dispatch=true","leader");
         assertEquals(3,dispatchPeople.get("total").asInt());
         var dispatchIds=new HashSet<String>(); dispatchPeople.get("items").forEach(person->dispatchIds.add(person.get("id").asText()));
@@ -193,14 +197,15 @@ class BackendIntegrationTest {
         call(403,"GET","/profiles/"+ids.get("bob"),"leader",null,null);
         call(400,"POST","/auth/register",null,Map.of("account","bad","password","短密码","phone","13800000099","name","bad","departmentId","product"),null);
         call(409,"POST","/auth/register",null,Map.of("account","duplicate","password",PASSWORD,"phone","13800000002","name","重复手机号","departmentId","product"),null);
-        String rejectedMembership=register("pending-retry","product",90); post("/reviews/"+rejectedMembership+"/decision","integration-admin",Map.of("approve",false,"reason","部门申请有误"));
+        String rejectedMembership=register("pending-retry","product",90); post("/reviews/"+rejectedMembership+"/decision","integration-admin",Map.of("approve",false,"reason","部门申请有误","expectedVersion",0));
         var resubmitted=post("/organization/membership-application","pending-retry",Map.of("version",1,"departmentId","marketing","reason","改为市场部重提")); approve(resubmitted.get("id").asText(),"pending-retry"); assertEquals("marketing",get("/auth/me","pending-retry").get("department_id").asText());
     }
     @Test @Order(3) void scopedTasksIdempotencyAndLifecycle() throws Exception {
-        var content=taskBody("产品任务","alice"); var created=call(200,"POST","/tasks","leader",content,"product-task"); task=created.get("id").asText();
+        var content=taskBody("产品任务","alice"); var created=call(200,"POST","/tasks","leader",content,"product-task"); approve(created.get("id").asText(),"leader"); task=created.get("target_id").asText();
         var transitionTask=call(200,"POST","/tasks","leader",taskBody("转派改期契约","alice"),"transfer-reschedule-task");
-        String transitionId=transitionTask.get("id").asText();
-        var reassignment=post("/tasks/"+transitionId+"/reassignments","leader",Map.of("ownerId",ids.get("reviewer"),"version",transitionTask.get("version").asInt(),"reason","调整负责人"));
+        approve(transitionTask.get("id").asText(),"leader");
+        String transitionId=transitionTask.get("target_id").asText();
+        var reassignment=post("/tasks/"+transitionId+"/reassignments","leader",Map.of("ownerId",ids.get("reviewer"),"version",1,"reason","调整负责人"));
         assertEquals(ids.get("alice"),get("/tasks/"+transitionId,"leader").get("owner_id").asText()); approve(reassignment.get("id").asText(),"leader");
         var transferred=get("/tasks/"+transitionId,"leader"); assertEquals(ids.get("reviewer"),transferred.get("owner_id").asText()); assertEquals(2,transferred.get("version").asInt());
         String revisedDeadline=LocalDate.now().plusDays(2).atTime(18,0).atZone(ZoneId.of("Asia/Shanghai")).toOffsetDateTime().toString();
@@ -209,7 +214,7 @@ class BackendIntegrationTest {
         assertEquals(3,get("/tasks/"+transitionId,"leader").get("version").asInt());
         call(400,"POST","/tasks/"+transitionId+"/reschedules","leader",Map.of("deadline",revisedDeadline,"version",3,"reason","重复截止时间"),null);
         var concurrent=taskBody("并发幂等派发","alice"); var first=CompletableFuture.supplyAsync(()->{try{return call(200,"POST","/tasks","leader",concurrent,"parallel-key").get("id").asText();}catch(Exception e){throw new CompletionException(e);}}); var second=CompletableFuture.supplyAsync(()->{try{return call(200,"POST","/tasks","leader",concurrent,"parallel-key").get("id").asText();}catch(Exception e){throw new CompletionException(e);}}); assertEquals(first.get(),second.get());
-        assertEquals(task,call(200,"POST","/tasks","leader",content,"product-task").get("id").asText());
+        assertEquals(task,call(200,"POST","/tasks","leader",content,"product-task").get("target_id").asText());
         content.put("title","不同内容"); call(409,"POST","/tasks","leader",content,"product-task");
         call(403,"POST","/tasks","leader",taskBody("跨部门","bob"),"wrong-owner");
         call(403,"POST","/tasks","alice",taskBody("员工派发","alice"),"employee");
@@ -238,23 +243,13 @@ class BackendIntegrationTest {
         assertEquals(1,db.count("SELECT count(*) FROM log_tasks WHERE log_id=? AND task_id=?",log,task));
         assertEquals(1,get("/logs/subordinates?date="+date,"leader").get("total").asInt());
         call(403,"GET","/logs/subordinates","alice",null,null);
-        var revision=post("/logs/"+log+"/revisions","alice",Map.of("version",3,"body",Map.of("work","修订后的研发成果","blockers","联系13812345678 密码:never-send"),"reason","补充成果"));
-        review=revision.get("id").asText(); var chain=get("/reviews/"+review,"alice").get("steps"); assertEquals(3,chain.size());
-        assertEquals(ids.get("leader"),chain.get(0).get("reviewer_id").asText()); assertEquals(ids.get("director"),chain.get(1).get("reviewer_id").asText());
-        call(403,"POST","/reviews/"+review+"/decision","director",Map.of("approve",true),null);
-        call(403,"POST","/reviews/"+review+"/decision","alice",Map.of("approve",true),null);
-        assertTrue(get("/logs/"+log,"leader").at("/body/work").asText().startsWith("研发工作"));
-        var stale=post("/logs/"+log+"/revisions","alice",Map.of("version",3,"body",Map.of("work","过期成果"),"reason","并发修订"));
-        approve(review,"alice"); assertEquals("修订后的研发成果",get("/logs/"+log,"leader").at("/body/work").asText());
-        String staleId=stale.get("id").asText(); var staleSteps=get("/reviews/"+staleId,"alice").get("steps");
-        post("/reviews/"+staleId+"/decision","leader",Map.of("approve",true)); post("/reviews/"+staleId+"/decision","director",Map.of("approve",true));
-        String finalWho=ids.entrySet().stream().filter(e->e.getValue().equals(staleSteps.get(2).get("reviewer_id").asText())).findFirst().orElseThrow().getKey();
-        call(409,"POST","/reviews/"+staleId+"/decision",finalWho,Map.of("approve",true),null);
-        assertEquals(2,get("/logs/"+log+"/versions","leader").size()); post("/logs/"+log+"/read","leader",Map.of()); post("/logs/"+log+"/comments","leader",Map.of("text","已阅成果"));
-        assertEquals(1,get("/logs/"+log+"/comments","alice").size());
-        var rejected=post("/logs/"+log+"/revisions","alice",Map.of("version",4,"body",Map.of("work","待驳回"),"reason","修订"));
-        call(400,"POST","/reviews/"+rejected.get("id").asText()+"/decision","leader",Map.of("approve",false),null);
-        post("/reviews/"+rejected.get("id").asText()+"/decision","leader",Map.of("approve",false,"reason","需要补充依据"));
+        var updated=call(200,"PUT","/logs/"+log+"/content","alice",Map.of("version",3,"work","修订后的研发成果"),null);
+        assertEquals(4,updated.get("version").asInt());
+        call(403,"PUT","/logs/"+log+"/content","integration-admin",Map.of("version",4,"work","非作者代改"),null);
+        call(409,"PUT","/logs/"+log+"/content","alice",Map.of("version",3,"work","过期成果"),null);
+        assertEquals(2,get("/logs/"+log+"/versions","leader").size());
+        post("/logs/"+log+"/comments","leader",Map.of("text","已阅成果"));
+        assertEquals("修订后的研发成果",get("/logs/"+log,"alice").at("/body/work").asText());
     }
     @Test @Order(5) void dashboardNotesPinsAndAttachments() throws Exception {
         var item=get("/dashboard/company","alice").get("items").get(0);
@@ -273,7 +268,7 @@ class BackendIntegrationTest {
         call(403,"GET","/attachments/"+avatar,"bob",null,null);
         var taskUpload=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/attachments")).header("Authorization","Bearer "+tokens.get("leader")).header("Content-Type","multipart/form-data; boundary="+boundary).POST(HttpRequest.BodyPublishers.ofString(content)).build(),HttpResponse.BodyHandlers.ofString()); assertEquals(200,taskUpload.statusCode()); String taskFile=JSON.readTree(taskUpload.body()).get("id").asText();
         var withFile=taskBody("附件授权任务","alice"); withFile.put("attachments",List.of(taskFile)); var attached=call(200,"POST","/tasks","leader",withFile,"file-task");
-        String fileTask=attached.get("id").asText(); assertEquals("avatar-bytes",request("GET","/attachments/"+taskFile,"integration-admin",null,null).body()); call(404,"GET","/attachments/"+taskFile,"bob",null,null);
+        approve(attached.get("id").asText(),"leader"); String fileTask=attached.get("target_id").asText(); assertEquals("avatar-bytes",request("GET","/attachments/"+taskFile,"integration-admin",null,null).body()); call(404,"GET","/attachments/"+taskFile,"bob",null,null);
         withFile.put("title","调整期限并保留附件"); var retained=post("/tasks/"+fileTask+"/revisions","integration-admin",Map.of("version",1,"candidate",withFile,"reason","管理员修改保留已有附件")); approve(retained.get("id").asText(),"integration-admin");
     }
     @Test @Order(6) void timelineAnalyticsAndScopedExport() throws Exception {
@@ -306,7 +301,7 @@ class BackendIntegrationTest {
         post("/ai-maps/edges","leader",Map.of("sourceId",map.get("nodes").get(0).get("id").asText(),"targetId",map.get("nodes").get(1).get("id").asText(),"label","影响")); assertEquals(1,get("/ai-maps","leader").get("edges").size());
         var edited=JSON.convertValue(result.get("output"),new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){}); edited.remove("generatedAt"); edited.remove("draft"); edited.put("version",result.get("version").asInt()); edited.put("summary","人工确认的摘要");
         assertEquals("人工确认的摘要",call(200,"PUT","/ai/jobs/"+successfulJob+"/draft","leader",edited,null).at("/output/summary").asText()); call(409,"PUT","/ai/jobs/"+successfulJob+"/draft","leader",edited,null);
-        var task=call(200,"POST","/ai/jobs/"+successfulJob+"/confirm-task","leader",Map.of("actionIndex",0,"task",taskBody("人工确认任务","alice")),"confirmed-ai-task");
+        var task=call(200,"POST","/ai/jobs/"+successfulJob+"/confirm-task","leader",Map.of("version",get("/ai/jobs/"+successfulJob,"leader").get("version").asInt(),"actionIndex",0,"task",taskBody("人工确认任务","alice")),"confirmed-ai-task");
         assertTrue(task.hasNonNull("id")); assertEquals(tasksBefore+1,db.count("SELECT count(*) FROM tasks"));
         var stream=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/ai/jobs/"+successfulJob+"/stream")).header("Authorization","Bearer "+tokens.get("leader")).GET().build(),HttpResponse.BodyHandlers.ofString()); assertEquals(200,stream.statusCode()); assertTrue(stream.body().contains("event:result"));
         assertTrue(get("/ai/usage","leader").get("usage").get(0).get("tokens").asInt()>=100);

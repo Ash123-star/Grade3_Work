@@ -1,5 +1,7 @@
 import 'dart:async';
-import 'package:pandora_mobile/data/models/log_edit_window.dart';
+import 'package:pandora_mobile/data/models/task_display.dart';
+import 'package:pandora_mobile/data/models/record_display.dart';
+import 'package:pandora_mobile/data/models/review_display.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,14 +14,51 @@ import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/log_edit_window.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'catalog.dart';
 import 'form_page.dart';
+import '../dashboard/diary_composer_sheet.dart';
 import '../../core/state/live_notifications.dart';
-import '../../shared/diary_task_links.dart';
-import '../../shared/diary_read_receipt.dart';
 import '../../shared/generated_assets.dart';
+
+String _reviewMetadata(Record record) => [
+  '${record.fields['reviewState'] ?? '审核状态未提供'}',
+  '申请人 ${displayPersonName(record.fields['applicantName'])}',
+  prettyDate(record.fields['createdAt']),
+].join(' · ');
+
+class _ReviewListRow extends StatelessWidget {
+  const _ReviewListRow({required this.record, required this.onTap});
+
+  final Record record;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: PaperSurface(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            record.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _reviewMetadata(record),
+            style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 class ListPage extends ConsumerStatefulWidget {
   const ListPage(this.resource, {super.key});
@@ -30,7 +69,7 @@ class ListPage extends ConsumerStatefulWidget {
 
 class _ListPageState extends ConsumerState<ListPage> {
   String search = '', filter = '全部', group = '全部标签', deadline = '全部期限';
-  String? owner;
+  String? owner, ownerName;
   int inbox = 0;
   String auditActor = '';
   DateTime? auditDate;
@@ -38,6 +77,24 @@ class _ListPageState extends ConsumerState<ListPage> {
   bool readingAll = false;
   Object? messageError;
   bool get messageBusy => readingMessage != null || readingAll;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual<Session>(sessionProvider, (before, after) {
+      if (before?.id != after.id ||
+          before?.token != after.token ||
+          !after.canReadBusiness) {
+        setState(() {
+          readingMessage = null;
+          readingAll = false;
+          messageError = null;
+          owner = null;
+          ownerName = null;
+        });
+      }
+    });
+  }
 
   bool sameSession(Session captured) {
     if (!mounted) return false;
@@ -58,12 +115,23 @@ class _ListPageState extends ConsumerState<ListPage> {
       messageError = null;
     });
     try {
-      await repository.execute(
-        'notifications',
-        message == null
-            ? const Command('read-all', {})
-            : Command('read', {'id': message.id}),
-      );
+      try {
+        await repository.execute(
+          'notifications',
+          message == null
+              ? const Command('read-all', {})
+              : Command('read', {'id': message.id}),
+        );
+      } catch (error) {
+        if (message == null ||
+            error is ApiFailure && [FailureKind.forbidden, FailureKind.unauthorized]
+                .contains(error.kind)) {
+          rethrow;
+        }
+        if (!mounted || !sameSession(session)) return;
+        setState(() => messageError = error);
+        notice(context, '未能标记已读，正在打开关联详情', tone: NoticeTone.warning);
+      }
       if (!mounted) return;
       if (!sameSession(session)) return;
       ref.invalidate(recordsProvider('notifications'));
@@ -72,12 +140,16 @@ class _ListPageState extends ConsumerState<ListPage> {
       final id = message.fields['targetId'];
       if (id is! String ||
           id.trim().isEmpty ||
-          !['tasks', 'logs', 'reviews'].contains(target)) {
-        notice(context, '消息已读，关联内容暂不可用，请返回工作台查看');
+          !['tasks', 'logs', 'reviews', 'ai-jobs', 'ai-work'].contains(target)) {
+        notice(context, '关联内容暂不可用，请返回工作台查看');
         return;
       }
       if (target == 'reviews') {
         context.push('/me/reviews/${encode(id)}');
+      } else if (target == 'ai-jobs') {
+        context.push('/ai/jobs/${encode(id)}/edit');
+      } else if (target == 'ai-work') {
+        context.push('/ai/work/${encode(id)}');
       } else {
         openItem(context, target as String, id);
       }
@@ -95,18 +167,6 @@ class _ListPageState extends ConsumerState<ListPage> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(sessionProvider, (before, after) {
-      if (before?.id != after.id ||
-          before?.token != after.token ||
-          !after.canReadBusiness) {
-        setState(() {
-          readingMessage = null;
-          readingAll = false;
-          messageError = null;
-          owner = null;
-        });
-      }
-    });
     final resource = widget.resource,
         user = ref.watch(sessionProvider),
         data = resource == 'audit'
@@ -152,6 +212,9 @@ class _ListPageState extends ConsumerState<ListPage> {
 
     return PageFrame(
       title: resourceTitles[resource] ?? '记录',
+      feedback: messageError != null && !deniedMessage
+          ? ErrorPanel('消息操作未完成：$messageError。请再次选择消息或全部已读重试。', key: ValueKey(messageError))
+          : null,
       actions: [
         if (resource == 'dashboard/personal')
           IconButton(
@@ -164,12 +227,6 @@ class _ListPageState extends ConsumerState<ListPage> {
             tooltip: '派发任务',
             onPressed: () => openForm(context, 'dispatch'),
             icon: const Icon(Icons.add),
-          ),
-        if (resource == 'feedback')
-          IconButton(
-            tooltip: '提交反馈',
-            onPressed: () => openForm(context, 'support'),
-            icon: const Icon(Icons.add_comment_outlined),
           ),
         if (resource == 'notifications')
           TextButton(
@@ -221,8 +278,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                     '全部标签',
                     group,
                     ...data.valueOrNull?.items.map(
-                          (r) =>
-                              '${r.fields['tagName'] ?? r.fields['tagId'] ?? '未分类'}',
+                          (r) => taskTagLabel(r.fields),
                         ) ??
                         <String>[],
                   }.toList(),
@@ -241,14 +297,22 @@ class _ListPageState extends ConsumerState<ListPage> {
                         isScrollControlled: true,
                         builder: (_) => const PersonPicker(),
                       );
-                      if (p != null && mounted) setState(() => owner = p.id);
+                      if (p != null && mounted) {
+                        setState(() {
+                          owner = p.id;
+                          ownerName = p.title;
+                        });
+                      }
                     },
                     icon: const Icon(Icons.person_outline, size: 18),
-                    label: Text(owner == null ? '参与人' : '参与人 $owner'),
+                    label: Text(owner == null ? '参与人' : '参与人 $ownerName'),
                   ),
                 if (owner != null)
                   TextButton(
-                    onPressed: () => setState(() => owner = null),
+                    onPressed: () => setState(() {
+                      owner = null;
+                      ownerName = null;
+                    }),
                     child: const Text('清除人员'),
                   ),
               ],
@@ -261,7 +325,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                 children: [
                   for (final value
                       in resource == 'notifications'
-                          ? ['全部', '任务', '审批', '评论', '截止提醒', '审核结果']
+                          ? ['全部', '任务', '审批', '评论', '待阅提醒', '截止提醒', '审核结果']
                           : resource == 'reviews'
                           ? ['全部', '待审', '已通过', '已驳回']
                           : ['全部', '日志', '任务', '组织'])
@@ -312,11 +376,6 @@ class _ListPageState extends ConsumerState<ListPage> {
               ],
             ),
           ],
-          if (messageError != null && !deniedMessage)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: ErrorPanel('消息操作未完成：$messageError。请再次选择消息或全部已读重试。'),
-            ),
           if (deniedMessage) ...[
             RecordFailure(messageError!),
             TextButton(
@@ -350,9 +409,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                             .contains(owner)) {
                       return false;
                     }
-                    if (group != '全部标签' &&
-                        '${r.fields['tagName'] ?? r.fields['tagId'] ?? '未分类'}' !=
-                            group) {
+                    if (group != '全部标签' && taskTagLabel(r.fields) != group) {
                       return false;
                     }
                     final due = DateTime.tryParse('${r.fields['deadline']}');
@@ -430,6 +487,14 @@ class _ListPageState extends ConsumerState<ListPage> {
                       ],
                       if (resource == 'tasks')
                         _taskCard(context, r, () => open(r))
+                      else if (resource == 'reviews')
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _ReviewListRow(
+                            record: r,
+                            onTap: () => open(r),
+                          ),
+                        )
                       else
                         InkWell(
                           onTap: resource == 'notifications' && messageBusy
@@ -488,19 +553,6 @@ class _ListPageState extends ConsumerState<ListPage> {
                                           fontSize: 12,
                                         ),
                                       ),
-                                      if (resource == 'reviews')
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 6,
-                                          ),
-                                          child: Text(
-                                            '${r.fields['reviewState'] ?? ''} · 申请人 ${r.fields['applicantName'] ?? r.ownerId}',
-                                            style: const TextStyle(
-                                              color: CuteTokens.muted,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
                                       if (resource == 'notifications')
                                         Padding(
                                           padding: const EdgeInsets.only(
@@ -516,7 +568,7 @@ class _ListPageState extends ConsumerState<ListPage> {
                                         ),
                                       if (resource == 'audit')
                                         Text(
-                                          '${prettyDate(r.fields['createdAt'])} · 操作者 ${r.fields['actor_id'] ?? '未返回'}',
+                                          '${prettyDate(r.fields['createdAt'])} · 操作者 ${displayPersonName(r.fields['actor_name'])}',
                                           style: Theme.of(
                                             context,
                                           ).textTheme.bodySmall,
@@ -538,7 +590,8 @@ class _ListPageState extends ConsumerState<ListPage> {
                             ),
                           ),
                         ),
-                      if (resource != 'tasks') const Divider(height: 1),
+                      if (!['tasks', 'reviews'].contains(resource))
+                        const Divider(height: 1),
                     ],
                   ],
                 );
@@ -552,17 +605,8 @@ class _ListPageState extends ConsumerState<ListPage> {
 
   Widget _taskCard(BuildContext context, Record record, VoidCallback onTap) {
     final f = record.fields;
-    final participantNames =
-        (f['participantNames'] as List?)
-            ?.map((value) => '$value')
-            .where((value) => value.trim().isNotEmpty)
-            .toList() ??
-        (f['participantIds'] as List?)
-            ?.map((value) => '$value')
-            .where((value) => value.trim().isNotEmpty)
-            .toList() ??
-        const <String>[];
-    final tagName = '${f['tagName'] ?? f['tag_id'] ?? f['tagId'] ?? '未分类'}';
+    final participantNames = taskParticipantNames(f);
+    final tagName = taskTagLabel(f);
     final tagCategory = '${f['tagCategory'] ?? ''}';
     final tagColor = _recordColor(f['tagColor'] ?? f['tag_color']);
     return PaperSurface(
@@ -733,10 +777,22 @@ class DetailPage extends ConsumerStatefulWidget {
 }
 
 class _DetailPageState extends ConsumerState<DetailPage> {
+  Timer? logDeadlineTimer;
+  DateTime? scheduledLogDeadline;
+  void scheduleLogDeadline(Record item) {
+    final deadline = LogEditWindow(item).until;
+    if (deadline == scheduledLogDeadline) return;
+    scheduledLogDeadline = deadline;
+    logDeadlineTimer?.cancel();
+    if (deadline != null && deadline.isAfter(DateTime.now())) {
+      logDeadlineTimer = Timer(deadline.difference(DateTime.now()), () {
+        if (mounted) setState(() {});
+      });
+    }
+  }
   bool busy = false;
   String? error;
   late final Session initialLogIdentity = ref.read(sessionProvider);
-  ApiFailure? logAccessError;
   Timer? windowTimer;
   @override
   void initState() {
@@ -748,10 +804,12 @@ class _DetailPageState extends ConsumerState<DetailPage> {
 
   @override
   void dispose() {
+    logDeadlineTimer?.cancel();
     windowTimer?.cancel();
     super.dispose();
   }
 
+  ApiFailure? logAccessError;
   Future<void> action(Record item, String action) async {
     if (action == 'archive') {
       final yes = await showDialog<bool>(
@@ -793,13 +851,15 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   '排序位置': item.fields['排序位置'] ?? item.fields['position'] ?? 0,
                 },
               },
-              version: item.version,
+              version: widget.resource == 'reviews'
+                  ? (item.fields['baseVersion'] as num?)?.toInt() ?? item.version
+                  : item.version,
               idempotencyKey: '${item.id}:${item.version}:$action',
             ),
           );
       refreshBusiness(ref);
       if (mounted) {
-        notice(context, AppConfig.mock ? '演示操作已保存' : '操作已提交');
+        notice(context, AppConfig.mock ? '已保存' : '操作已提交', success: true);
         if (action == 'archive' && widget.resource == 'dashboard/personal') {
           context.pop();
         }
@@ -810,63 +870,23 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     if (mounted) setState(() => busy = false);
   }
 
-  Future<void> withdrawLog(Record item) async {
-    final controller = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('撤回日志'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 300,
-          decoration: const InputDecoration(labelText: '撤回原因'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialog),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(dialog, controller.text.trim());
-              }
-            },
-            child: const Text('撤回'),
-          ),
-        ],
-      ),
-    );
-    if (reason == null || !mounted) return;
-    setState(() {
-      busy = true;
-      error = null;
-    });
-    try {
-      await ref
-          .read(repositoryProvider)
-          .execute(
-            'logs',
-            Command('withdraw', {
-              'id': item.id,
-              'reason': reason,
-            }, version: item.version),
-          );
-      refreshBusiness(ref);
-      if (mounted) notice(context, '日志已撤回，可以继续编辑');
-    } catch (failure) {
-      refreshBusiness(ref);
-      if (mounted) setState(() => error = '$failure');
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
-  }
-
   void edit(Record item, String kind) {
-    if (kind == 'log-revise') {
-      ref.read(logDateProvider.notifier).state =
+    if (kind == 'log-revise' || kind == 'log-edit') {
+      final date =
           DateTime.tryParse('${item.fields['businessDate']}') ?? DateTime.now();
+      ref.read(logDateProvider.notifier).state = date;
+      unawaited(
+        showDiaryComposer(
+          context,
+          ref,
+          date: date,
+          recordId: item.id,
+          version: item.version,
+        ).then((saved) {
+          if (saved == true) refreshBusiness(ref);
+        }),
+      );
+      return;
     }
     openForm(
       context,
@@ -969,8 +989,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
   Widget build(BuildContext context) {
     final key = (widget.resource, widget.id), user = ref.watch(sessionProvider);
     if (widget.resource.startsWith('logs') &&
-        (logAccessError != null ||
-            user.id != initialLogIdentity.id ||
+        (user.id != initialLogIdentity.id ||
             user.token != initialLogIdentity.token ||
             !user.canReadBusiness)) {
       return PageFrame(
@@ -978,7 +997,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
         child: PageBody(
           children: [
             RecordFailure(
-              logAccessError ??
+              error ??
                   const ApiFailure(
                     FailureKind.forbidden,
                     '阅读访问已停止，请返回后重新确认账号与权限',
@@ -1017,12 +1036,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
               final participantIds = (f['participantIds'] as List? ?? const [])
                   .map((value) => '$value')
                   .toSet();
-              final participantNames =
-                  (f['participantNames'] as List?)
-                      ?.map((value) => '$value')
-                      .where((value) => value.trim().isNotEmpty)
-                      .toList() ??
-                  participantIds.toList();
+              final participantNames = taskParticipantNames(f);
               final canActOnTask =
                   participantIds.contains(user.id) || item.ownerId == user.id;
               final dispatcher =
@@ -1051,7 +1065,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       icon: Icons.flag_outlined,
                     ),
                     TuantuanStatusPill(
-                      '${f['tagCategory'] == null ? '' : '${f['tagCategory']} · '}${f['tagName'] ?? f['tagId'] ?? '未分类'}',
+                      '${f['tagCategory'] == null ? '' : '${f['tagCategory']} · '}${taskTagLabel(f)}',
                       color: _recordColor(f['tagColor'] ?? f['tag_color']),
                       icon: Icons.sell_outlined,
                     ),
@@ -1135,7 +1149,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            '演示记录未提供文件内容',
+                            '附件暂不支持预览',
                             style: TextStyle(
                               color: CuteTokens.muted,
                               fontSize: 12,
@@ -1155,47 +1169,38 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             } else if (resource == 'reviews') {
               final self = item.ownerId == user.id;
               final pending = f['reviewState'] == '待审';
-              final steps = f['steps'] as List?;
-              final assigned =
-                  AppConfig.mock ||
-                  (steps
-                              ?.where(
-                                (s) => s is Map && s['state'] == 'PENDING',
-                              )
-                              .firstOrNull
-                          as Map?)?['reviewer_id'] ==
-                      user.id;
-              if (user.manager && !self && pending && assigned) {
-                bottom = button('通过本级审核', () => action(item, 'approve'));
+              final creating = f['reviewKind'] == 'TASK_CREATE' ||
+                  f['baseVersion'] == 0;
+              final assigned = f['reviewerId'] == user.id;
+              if (!self && pending && assigned) {
+                bottom = button('通过申请', () => action(item, 'approve'));
               }
-              actions.add(
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Center(
-                    child: Text(
-                      '${f['reviewState'] ?? '审核状态未提供'}',
-                      style: const TextStyle(color: CuteTokens.muted),
-                    ),
-                  ),
-                ),
-              );
               children.addAll([
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontFamily: AppTypography.displayFamily,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w700,
+                PaperSurface(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontFamily: AppTypography.displayFamily,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _reviewMetadata(item),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: CuteTokens.muted,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '申请人 ${f['applicantName'] ?? item.ownerId} · ${prettyDate(f['createdAt'])}',
-                  style: const TextStyle(fontSize: 12, color: CuteTokens.muted),
                 ),
                 const SizedBox(height: 20),
                 PaperSurface(
-                  color: const Color(0xFFFFF0DA),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1208,83 +1213,72 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     ],
                   ),
                 ),
-                const SectionHeader('修改内容'),
-                PaperSurface(
-                  outlined: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '当前生效 · v${f['effectiveVersion'] ?? f['baseVersion'] ?? 1}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: CuteTokens.muted,
+                SectionHeader(creating ? '创建内容' : '修改内容'),
+                if (!creating) ...[
+                  PaperSurface(
+                    outlined: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '申请前内容',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: CuteTokens.muted,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(_value(f['before'])),
-                      const SizedBox(height: 16),
-                      const Text(
-                        '全部审核通过前，继续使用此版本',
-                        style: TextStyle(color: CuteTokens.muted, fontSize: 12),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        Text(reviewSnapshotText(f['before'], f['displayReferences'])),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
                 PaperSurface(
-                  color: CuteTokens.mint,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '候选版本 · v${f['candidateVersion'] ?? ((f['baseVersion'] as int? ?? 1) + 1)} · ${pending ? '待审核' : f['reviewState']}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF246447),
-                        ),
+                        creating ? '申请创建的内容' : '申请修改后的内容',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        _value(f['after']),
+                        reviewSnapshotText(f['after'], f['displayReferences']),
                         style: const TextStyle(height: 1.7),
                       ),
+                      const SizedBox(height: 12),
+                      Text(
+                        switch (f['reviewState']) {
+                          '待审' => creating ? '审核通过后创建记录' : '审核通过后生效，审核前保留原内容',
+                          '已通过' => '申请已通过，以上为本次申请获批时的内容',
+                          '已驳回' => '申请已驳回，以上内容未生效',
+                          '已失效' => '申请已失效，以上内容不再等待审核',
+                          _ => '以上为提交申请时记录的内容',
+                        },
+                        style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
-                const SectionHeader('审核链'),
-                if (!AppConfig.mock && (steps == null || steps.isEmpty))
+                const SectionHeader('直属上级审核'),
+                if (pending)
+                  Text(
+                    f['reviewerConfigured'] == false || f['reviewerId'] == null
+                        ? '直属上级未配置，申请保持待审'
+                        : '审核人 ${displayPersonName(f['reviewerName'])}',
+                    style: const TextStyle(color: CuteTokens.muted),
+                  )
+                else if (f['reviewerId'] != null)
+                  Text(
+                    '审核人 ${displayPersonName(f['reviewerName'])}',
+                    style: const TextStyle(color: CuteTokens.muted),
+                  ),
+                if (f['decisionSource'] == 'FOUNDER_EXEMPT')
                   const Text(
-                    '等待配置独立复核人',
+                    '创始人授权操作已按免审规则自动批准',
                     style: TextStyle(color: CuteTokens.muted),
                   ),
-                if (!AppConfig.mock && steps != null)
-                  for (final node in steps)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        '复核人 ${node['reviewer_id']} · ${node['state']} ${node['reason'] ?? ''}',
-                      ),
-                    ),
-                if (AppConfig.mock)
-                  for (final (i, label) in ['团队复核', '部门复核', '公司复核'].indexed)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        '${i < (f['step'] as int? ?? 0) ? '●' : '○'} $label · ${f['reviewState'] == '已驳回'
-                            ? '申请已驳回'
-                            : i < (f['step'] as int? ?? 0)
-                            ? '已处理'
-                            : i == (f['step'] as int? ?? 0)
-                            ? '等待独立复核'
-                            : '下一步'}',
-                        style: TextStyle(
-                          color: i == (f['step'] as int? ?? 0)
-                              ? CuteTokens.ink
-                              : CuteTokens.muted,
-                        ),
-                      ),
-                    ),
                 for (final event in (f['reviewEvents'] as List? ?? []))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -1309,17 +1303,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ),
               ]);
             } else if (resource.startsWith('logs')) {
+              scheduleLogDeadline(item);
               final window = LogEditWindow(item);
-              if (item.ownerId == user.id &&
-                  f['canWithdraw'] == true &&
-                  window.canEditAt(DateTime.now())) {
-                actions.add(
-                  TextButton(
-                    onPressed: busy ? null : () => edit(item, 'log-withdraw'),
-                    child: const Text('撤回日志'),
-                  ),
-                );
-              }
               if (item.ownerId == user.id) {
                 final canEdit = window.canEditAt(DateTime.now());
                 bottom = !window.submitted
@@ -1333,7 +1318,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                         onPressed: busy || !canEdit
                             ? null
                             : () => edit(item, 'log-revise'),
-                        child: Text(canEdit ? '申请修订日志' : '已满24小时 · 日志已锁定'),
+                        child: Text(canEdit ? '编辑日志' : '已满24小时 · 日志已锁定'),
                       );
                 if (!window.submitted) {
                   actions.add(
@@ -1355,9 +1340,11 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${f['businessDate'] ?? ''} · 作者 ${f['authorName'] ?? item.ownerId} · ${f['status'] ?? (isSubmittedDiary(item) ? '已提交' : '提交状态未确认')}',
+                  '${f['businessDate'] ?? ''} · 作者 ${displayPersonName(f['authorName'])} · ${f['status'] ?? (isSubmittedDiary(item) ? '已提交' : '提交状态未确认')}',
                   style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
                 ),
+                if (f['editableUntil'] != null)
+                  Text('可编辑至 ${prettyDate(f['editableUntil'])}'),
                 if (isSubmittedDiary(item) &&
                     businessEventTime(f['submittedAt']) != null)
                   Padding(
@@ -1372,46 +1359,21 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final label in [
+                      Text(
                         '今日工作',
-                        '关联任务',
-                        '遇到的阻碍',
-                        '明日计划',
-                        '工时',
-                      ]) ...[
-                        if (label != '工时' ||
-                            '${f[label] ?? ''}'.isNotEmpty) ...[
-                          Text(
-                            label,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          if (label == '关联任务')
-                            DiaryTaskLinksReader(f['taskIds'] ?? f[label])
-                          else
-                            Text(
-                              _value(f[label]),
-                              style: const TextStyle(fontSize: 15, height: 1.8),
-                            ),
-                          if (label != '工时') const Divider(height: 32),
-                        ],
-                      ],
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _value(f['今日工作']),
+                        style: const TextStyle(fontSize: 15, height: 1.8),
+                      ),
                     ],
                   ),
                 ),
-                if (isSubmittedDiary(item)) ...[
-                  const SizedBox(height: 20),
-                  DiaryReadReceipt(
-                    item,
-                    key: ValueKey('diary-read:${item.id}'),
-                    onAccessDenied: (failure) {
-                      if (mounted) setState(() => logAccessError = failure);
-                    },
-                  ),
-                ],
                 if (isSubmittedDiary(item))
                   PublicComments(resource: 'logs', record: item),
               ]);
@@ -1448,7 +1410,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 section('事件类型', f['type']),
-                section('操作者', f['actor_id']),
+                section('操作者', displayPersonName(f['actor_name'])),
                 section('发生时间', f['created_at']),
                 section('修改对象', f['object_id']),
                 section('变更理由', f['reason']),
@@ -1516,7 +1478,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   style: const TextStyle(color: CuteTokens.muted),
                 ),
                 section(
-                  resource == 'feedback' ? '问题描述' : '内容',
+                  '内容',
                   f['内容'] ?? f['body'],
                 ),
               ]);
@@ -1558,17 +1520,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 OwnPrivateNote(resource: resource, recordId: item.id),
               );
             }
-            if (error != null && bottom == null) {
-              children.add(
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: ErrorPanel(
-                    error!,
-                    retry: () => ref.invalidate(itemProvider(key)),
-                  ),
-                ),
-              );
-            }
             children.add(const DemoLabel());
             final review = resource == 'reviews' && bottom != null;
             return PageFrame(
@@ -1580,27 +1531,19 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ? '工作日志'
                   : '${resourceTitles[resource] ?? '记录'}详情',
               actions: actions,
+              feedback: error == null ? null : ErrorPanel(
+                error!,
+                key: ValueKey(error),
+                retry: () {
+                  setState(() => error = null);
+                  ref.invalidate(provider);
+                },
+              ),
               bottom: bottom == null
                   ? null
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (error != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 128),
-                              child: SingleChildScrollView(
-                                child: ErrorPanel(
-                                  error!,
-                                  retry: () {
-                                    setState(() => error = null);
-                                    ref.invalidate(itemProvider(key));
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
                         BottomActions(
                           primary: bottom,
                           secondary: review

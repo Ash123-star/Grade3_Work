@@ -1,15 +1,16 @@
 export 'paper_layout.dart'
     show TuantuanDialog, TuantuanSheet, showTuantuanBottomSheet;
 export 'page_states.dart';
+export 'floating_feedback.dart' show NoticeTone;
 export 'sunny_button.dart';
 import 'page_states.dart';
+import 'floating_feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
-import 'package:pandora_mobile/core/config.dart';
 import 'paper_layout.dart';
 import 'generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
@@ -42,49 +43,13 @@ void openForm(
   context.push('/form/$form${query.isEmpty ? '' : '?$query'}');
 }
 
-void notice(BuildContext context, String text, {bool success = false}) =>
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-            color: success
-                ? const Color(0xFFB9DED0)
-                : Theme.of(context).colorScheme.error.withValues(alpha: .28),
-          ),
-        ),
-        backgroundColor: success
-            ? const Color(0xFFEAF6F0)
-            : Theme.of(context).colorScheme.errorContainer,
-        elevation: 2,
-        closeIconColor: Theme.of(context).colorScheme.onSurface,
-        showCloseIcon: true,
-        content: Row(
-          children: [
-            Icon(
-              success ? Icons.check_circle_outline : Icons.error_outline,
-              color: success
-                  ? SunnyPalette.successInk
-                  : Theme.of(context).colorScheme.error,
-              size: 22,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: success
-                      ? const Color(0xFF246447)
-                      : Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+void notice(BuildContext context, String text, {
+  bool success = false,
+  NoticeTone tone = NoticeTone.info,
+  String? actionLabel,
+  VoidCallback? onAction,
+}) => showAppNotice(context, text, success ? NoticeTone.success : tone,
+    actionLabel: actionLabel, onAction: onAction);
 
 class PageBody extends StatelessWidget {
   const PageBody({
@@ -106,8 +71,15 @@ class PageBody extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 760),
         child: ListView(
           controller: controller,
-          padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
-          children: [?header, ...children],
+          padding: EdgeInsets.only(top: 8, bottom: bottomPadding),
+          children: [
+            ?header,
+            for (final child in children)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: child,
+              ),
+          ],
         ),
       ),
     );
@@ -124,6 +96,7 @@ class PageFrame extends StatelessWidget {
     this.actions,
     this.fab,
     this.bottom,
+    this.feedback,
   });
   final String title;
   final Widget child;
@@ -131,68 +104,107 @@ class PageFrame extends StatelessWidget {
   final List<Widget>? actions;
   final Widget? fab;
   final Widget? bottom;
+  final Widget? feedback;
   @override
   Widget build(BuildContext context) {
     final canGoBack = Navigator.of(context).canPop();
     final headerContent = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (showTitle)
-            Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showTitle || canGoBack)
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Row(
               children: [
-                const DogAvatar(index: DogAssets.friendly, size: 30),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: canGoBack ? const BackButton() : null,
                 ),
-              ],
-            ),
-          if (canGoBack || (actions?.isNotEmpty ?? false))
-            ConstrainedBox(
-              key: const ValueKey('page-scroll-actions'),
-              constraints: const BoxConstraints(minHeight: 40),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (canGoBack) const BackButton(),
+                if (showTitle) ...[
                   Expanded(
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: actions ?? const [],
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const DogAvatar(index: DogAssets.friendly, size: 30),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleLarge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 48),
                 ],
+              ],
+            ),
+          ),
+        if (actions?.isNotEmpty ?? false)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ConstrainedBox(
+              key: const ValueKey('page-scroll-actions'),
+              constraints: const BoxConstraints(minHeight: 40),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: actions!,
               ),
             ),
-        ],
-      );
+          ),
+      ],
+    );
     final header = showTitle || canGoBack || (actions?.isNotEmpty ?? false)
         ? Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
             child: headerContent,
           )
         : const SizedBox.shrink();
     final content = child;
     return Scaffold(
-      body: SafeArea(
-        child: content is PageBody
-            ? PageBody(
-                controller: content.controller,
-                bottomPadding: content.bottomPadding,
-                header: header,
-                children: content.children,
-              )
-            : TuantuanPaperBackdrop(
-                child: Column(
-                  children: [header, Expanded(child: content)],
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: SafeArea(
+              child: content is PageBody
+                  ? PageBody(
+                      controller: content.controller,
+                      bottomPadding: content.bottomPadding,
+                      header: header,
+                      children: content.children,
+                    )
+                  : TuantuanPaperBackdrop(
+                      child: Column(
+                        children: [header, Expanded(child: content)],
+                      ),
+                    ),
+            ),
+          ),
+          if (feedback != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 12,
+              child: SafeArea(
+                top: false,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 728),
+                    child: FloatingFeedback(key: feedback!.key, child: feedback!),
+                  ),
                 ),
               ),
+            ),
+        ],
       ),
       floatingActionButton: fab,
       bottomNavigationBar: bottom == null
@@ -210,18 +222,7 @@ class PageFrame extends StatelessWidget {
 class DemoLabel extends StatelessWidget {
   const DemoLabel({super.key});
   @override
-  Widget build(BuildContext context) => AppConfig.mock
-      ? const Padding(
-          padding: EdgeInsets.only(top: 8, bottom: 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '演示数据 · 未连接企业服务',
-              style: TextStyle(fontSize: 11, color: CuteTokens.muted),
-            ),
-          ),
-        )
-      : const SizedBox.shrink();
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 class RecordList extends ConsumerWidget {
@@ -293,7 +294,8 @@ Color _resourceAccent(BuildContext context, String resource) =>
     };
 
 class DateControls extends ConsumerWidget {
-  const DateControls({super.key});
+  const DateControls({super.key, this.showTaskManagement = false});
+  final bool showTaskManagement;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final date = ref.watch(selectedDateProvider),
@@ -308,12 +310,20 @@ class DateControls extends ConsumerWidget {
       onChanged: (i) =>
           ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
     );
-    final today = TextButton.icon(
-      onPressed: () =>
-          ref.read(selectedDateProvider.notifier).state = DateTime.now(),
-      icon: const Icon(Icons.today_outlined, size: 18),
-      label: const Text('今天'),
-    );
+    void todayAction() {
+      ref.read(selectedDateProvider.notifier).state = DateTime.now();
+    }
+    final Widget today = showTaskManagement
+        ? _DateControlAction(
+            label: '今天',
+            icon: Icons.today_outlined,
+            onPressed: todayAction,
+          )
+        : TextButton.icon(
+            onPressed: todayAction,
+            icon: const Icon(Icons.today_outlined, size: 18),
+            label: const Text('今天'),
+          );
     return Column(
       children: [
         Row(
@@ -365,20 +375,83 @@ class DateControls extends ConsumerWidget {
             ),
           ],
         ),
-        if (period == '月')
+        tabs,
+        if (showTaskManagement)
           Row(
             children: [
-              Expanded(child: tabs),
-              const SizedBox(width: 4),
-              today,
+              Expanded(
+                child: _DateControlAction(
+                  label: '派发任务',
+                  icon: Icons.table_rows_rounded,
+                  onPressed: () => context.push('/me/tasks'),
+                  emphasized: false,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: today),
             ],
           )
-        else ...[
-          tabs,
+        else
           Align(alignment: Alignment.centerRight, child: today),
-        ],
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+class _DateControlAction extends StatelessWidget {
+  const _DateControlAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.emphasized = true,
+  });
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: emphasized ? colors.primaryContainer : colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: colors.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: colors.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

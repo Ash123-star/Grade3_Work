@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,7 +46,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   Widget build(BuildContext context) {
     final user = ref.watch(sessionProvider);
     final period = ref.watch(periodProvider);
-    return PageFrame(
+    final page = PageFrame(
       title: '视图',
       showTitle: false,
       fab: user.manager && user.dispatch
@@ -57,10 +58,13 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             )
           : null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.symmetric(horizontal: period == '月' ? 0 : 16),
         child: Column(
           children: [
-            const DateControls(),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: period == '月' ? 12 : 0),
+              child: const DateControls(showTaskManagement: true),
+            ),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, viewport) => period == '月'
@@ -78,7 +82,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             height: user.manager && user.dispatch ? 72 : null,
                             child: Padding(
                               padding: EdgeInsets.only(
-                                right: user.manager && user.dispatch ? 72 : 0,
+                                left: 16,
+                                right: user.manager && user.dispatch ? 88 : 16,
                               ),
                               child: const Align(
                                 alignment: Alignment.centerLeft,
@@ -106,6 +111,18 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           ],
         ),
       ),
+    );
+    return SiblingSwipe(
+      index: ['日', '周', '月'].indexOf(period),
+      itemCount: 3,
+      onStep: (step) {
+        const periods = ['日', '周', '月'];
+        final next = periods.indexOf(period) + step;
+        if (next < 0 || next >= periods.length) return false;
+        ref.read(periodProvider.notifier).state = periods[next];
+        return true;
+      },
+      child: page,
     );
   }
 }
@@ -135,19 +152,15 @@ class ProfilePage extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
-                  child: TuantuanIcon(
-                    switch (title) {
-                      '消息中心' => 'notification',
-                      '任务管理' => 'task',
-                      '工作统计' || '审计记录' => 'report',
-                      '审批中心' || '我的申请' => 'approval',
-                      '组织与权限' || '人员展示' => 'members',
-                      '设置' => 'settings',
-                      '帮助与反馈' => 'help',
-                      _ => 'members',
-                    },
-                    size: 27,
-                  ),
+                  child: TuantuanIcon(switch (title) {
+                    '消息中心' => 'notification',
+                    '工作统计' || '审计记录' => 'report',
+                    '审批中心' || '我的申请' => 'approval',
+                    '组织与权限' || '人员展示' => 'members',
+                    '设置' => 'settings',
+                    '帮助与反馈' => 'help',
+                    _ => 'members',
+                  }, size: 27),
                 ),
               ),
               const SizedBox(width: 12),
@@ -165,7 +178,6 @@ class ProfilePage extends ConsumerWidget {
                         '消息中心' => '任务、审批与工作提醒',
                         '工作统计' => '查看授权范围内的工作数据',
                         '审批中心' || '我的申请' => '核对审核进度',
-                        '任务管理' => '查看本人及下属全部任务',
                         '人员展示' => '按部门查看授权范围内的成员',
                         '组织与权限' => '组织配置与权限申请',
                         '设置' => '偏好与隐私',
@@ -230,12 +242,6 @@ class ProfilePage extends ConsumerWidget {
     return PageFrame(
       title: '我的',
       showTitle: false,
-      actions: [
-        TextButton(
-          onPressed: () => openForm(context, 'profile-edit'),
-          child: const Text('编辑资料'),
-        ),
-      ],
       child: PageBody(
         children: [
           PaperSurface(
@@ -319,7 +325,6 @@ class ProfilePage extends ConsumerWidget {
               badge:
                   '${unread.valueOrNull?.items.where((r) => r.fields['read'] != true).length ?? '—'}',
             ),
-            link('任务管理', () => context.push('/me/tasks')),
             if (user.manager)
               link('工作统计', () => context.push('/me/statistics')),
             link(

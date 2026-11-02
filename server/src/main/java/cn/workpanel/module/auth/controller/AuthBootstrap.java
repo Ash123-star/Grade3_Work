@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 /** 启动适配器：只调用初始化用例，不覆盖已有管理员。 */
 @Component
+@org.springframework.core.annotation.Order(0)
 public class AuthBootstrap implements ApplicationRunner {
     private final DefaultAuthApplicationService service;
     private final String account, password, phone;

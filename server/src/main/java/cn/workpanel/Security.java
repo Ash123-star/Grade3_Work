@@ -32,7 +32,8 @@ public class Security {
                     if(path.startsWith("/api/")&&!path.equals("/api/health")&&!path.startsWith("/api/openapi")&&!path.startsWith("/api/docs")&&!path.equals("/api/auth/departments")&&!path.equals("/api/auth/register")&&!path.equals("/api/auth/login")&&!r.getMethod().equals("OPTIONS")) {
                         Actor a=authenticate(db,r.getHeader("Authorization")); r.setAttribute("actor",a);
                         if(a.mustChange()&&!Set.of("/api/auth/password","/api/auth/me","/api/auth/logout").contains(path)) throw new ApiError(403,"PASSWORD_CHANGE_REQUIRED","首次登录请修改密码");
-                        boolean ownReviewRead=r.getMethod().equals("GET")&&(path.equals("/api/reviews")||path.matches("/api/reviews/[^/]+"));
+                        // 待确认账号仅可读取本人审核或重路由本人确认申请；对象归属由审核应用服务再校验。
+                        boolean ownReviewRead=r.getMethod().equals("GET")&&(path.equals("/api/reviews")||path.matches("/api/reviews/[^/]+"))||r.getMethod().equals("POST")&&path.matches("/api/reviews/[^/]+/reroute");
                         if(!a.status().equals("ACTIVE")&&!Set.of("/api/auth/password","/api/auth/me","/api/auth/logout","/api/organization/membership-application").contains(path)&&!ownReviewRead) throw new ApiError(403,"MEMBERSHIP_PENDING","部门归属尚未确认");
                         limiter.check("api:"+a.id(),120,60);
                         if(path.startsWith("/api/admin/workspace/")) {
