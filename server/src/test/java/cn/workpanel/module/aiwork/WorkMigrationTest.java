@@ -8,10 +8,10 @@ import javax.sql.DataSource;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties={"app.jobs-enabled=false","app.memory-extract-enabled=false"})
+@SpringBootTest(properties={"app.jobs-enabled=false","app.memory-extract-enabled=false","app.ai-work-enabled=false"})
 class WorkMigrationTest {
     @Autowired DataSource source;@Autowired Db db;
-    private void fixture(String schema,String sql) throws Exception{try(var connection=source.getConnection();var statement=connection.createStatement()){connection.setSchema(schema);statement.execute(sql);}}
+    private void fixture(String schema,String sql) throws Exception{try(var connection=source.getConnection();var statement=connection.createStatement()){String previous=connection.getSchema();try{connection.setSchema(schema);statement.execute(sql);}finally{connection.setSchema(previous);}}}
     @Test void historicalSnapshotSurvivesAndCompositeKeysRejectOtherCompanies() throws Exception{
         String schema="work_upgrade_"+UUID.randomUUID().toString().replace("-","");
         try{

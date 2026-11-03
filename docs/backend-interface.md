@@ -148,3 +148,7 @@ GET /api/reviews/{id} 在现有审核读取权限校验之后追加 `display_ref
 
 ### 组织团队名称与操作反馈（Issue #52）
 GET /organization/people沿用原组织数据范围，追加可空team_name，按teams.id及company_id联合关联；无团队或名称不存在时返回null。客户端将team_name/嵌套team.name归一化为teamName；统计筛选优先取当前授权组织树teams名称，不将team_id当显示名称。无需数据库迁移，旧客户端可忽略新增字段。任务和组织查询权限保持现有规则。
+
+### 中国大陆节假日月历（成员 D）
+`GET /api/calendar/holidays?year=2026`：已登录、已确认且无需强制改密的账号可读；沿用公共认证规则。year为2007至2100，越界400 `INVALID_YEAR`；缺失/格式错误400；未登录401、无业务访问权限403。只读幂等，无写入版本及分页。返回 `{year,days:[{date,name,isOffDay}],papers,status,fetchedAt}`；date为中国大陆业务日期，isOffDay=false表示公告指定的调休上班日。status为FRESH、STALE或UNAVAILABLE；fetchedAt为最后成功获取的UTC时间，无成功记录为空字符串。
+固定来源为 NateScarlet/holiday-cn 的 GitHub contents API（raw JSON Accept），保留国务院公告链接。缓存24小时；失败5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。客户端查询相邻公告年份处理跨年网格；数据故障不阻塞任务。服务端响应上限256 KiB、完整请求6秒超时；无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。

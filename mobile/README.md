@@ -40,7 +40,7 @@ D:\flutter\bin\flutter.bat run --dart-define=USE_MOCK=false --dart-define=API_BA
 flutter pub get
 flutter run -d <android-device>
 flutter analyze
-flutter test --dart-define=USE_MOCK=true
+powershell -ExecutionPolicy Bypass -File ../scripts/test-flutter.ps1
 ```
 
 本机 Flutter 位于 D:\flutter，未加入 PATH 时可使用 D:\flutter\bin\flutter.bat。
@@ -123,3 +123,5 @@ OpenMoji 通过 flutter_svg 从本地 assets 加载。作者、来源和 CC BY-S
 原成员工作台补齐2.21：完整授权分页、紧凑概览、独立成员日期与下属日志导航、失权整页清理和公开正式日志过滤；帮助无结果搜索/能力说明已纠正。最新156Mock/129formalHTTP、分析exit0、49实际单页证据，见stage-3-verification.md。
 
 阶段3 task2.22：完整授权通用列表/消息忙碌与失权账号保护；设置→草稿与同步已读取实际加密稿及服务器日志版本，支持只读对照、独立选日和原版本编辑。最终分析、171全量Mock/144正式HTTP及追加后17项定向通过；51张实际Flutter页面证据。全部产品未完成，真实服务/设备和远程交付缺口见docs/stage-3-completion-audit.md；不构建APK。
+
+全量测试须使用 scripts/test-flutter.ps1：正式 HTTP 契约测试使用 USE_MOCK=false，展示与通用测试使用 USE_MOCK=true，避免混淆 AI 工作台与演示页。结果保存在仓库 output/flutter-regression。3项需要真实服务的 opt-in 测试默认跳过，不能据此报告真机联调完成。

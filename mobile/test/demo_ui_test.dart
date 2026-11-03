@@ -135,10 +135,10 @@ void main() {
       }
       await tester.tap(find.text('AI地图').last);
       await tester.pumpAndSettle();
-      expect(find.text('说说要办什么…'), findsOneWidget);
+      expect(find.text('方向分析 · 待验证'), findsOneWidget);
       expect(find.text('日'), findsNothing);
-      expect(find.text('行动规划'), findsNothing);
-      expect(find.text('发送'), findsOneWidget);
+      expect(find.text('行动规划'), findsOneWidget);
+      expect(find.text('查看分析依据'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

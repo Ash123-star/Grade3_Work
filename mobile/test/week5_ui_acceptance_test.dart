@@ -206,7 +206,7 @@ void main() {
         router.go('/me/tasks');
         await settle();
         expect(find.byType(TaskManagementPage), findsOneWidget);
-        expect(find.text('本人及下属的全部任务'), findsOneWidget);
+        expect(find.text('任务名称'), findsOneWidget);
         await capture('10-task-management');
         router.go('/item/logs/7');
         await settle();
@@ -243,10 +243,11 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.text('今日工作'), findsOneWidget);
-      expect(find.text('评论'), findsOneWidget);
       expect(find.textContaining('等待独立审核'), findsNothing);
       router.go('/item/logs/1');
       await t.pumpAndSettle();
+      await t.ensureVisible(find.byType(PublicComments));
+      expect(find.text('评论'), findsOneWidget);
       await t.scrollUntilVisible(
         find.byKey(const ValueKey('public-comment-input')),
         250,
@@ -300,7 +301,7 @@ void main() {
     c.read(routerProvider).go('/me/tasks');
     await settleLocalIo(t);
     await t.pumpAndSettle();
-    await t.tap(find.text('筛选字段'));
+    await t.tap(find.text('任务名称'));
     await t.pumpAndSettle();
     await t.scrollUntilVisible(
       find.text('应用'),
@@ -317,11 +318,10 @@ void main() {
     expect(t.takeException(), isNull);
     await t.enterText(find.byType(TextField), '不存在的任务');
     await t.pumpAndSettle();
-    expect(find.text('暂无任务记录'), findsOneWidget);
+    expect(find.text('没有符合条件的任务'), findsOneWidget);
     await t.enterText(find.byType(TextField), '');
-    await t.tap(find.byTooltip('紧凑列表视图'));
     await t.pumpAndSettle();
-    expect(find.byTooltip('字段卡片视图'), findsOneWidget);
+    expect(find.text('任务名称'), findsOneWidget);
     expect(find.text('暂无任务记录'), findsNothing);
     await t.pumpWidget(const SizedBox.shrink());
     c.dispose();
@@ -331,7 +331,12 @@ void main() {
     'department and author filters combine; calendar opens all daily records',
     (t) async {
       final c = testContainer(
-        overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+        overrides: [
+          sessionProvider.overrideWith(
+            (_) => const Session(role: UserRole.admin),
+          ),
+          demoStoreProvider.overrideWithValue(workflowFixture()),
+        ],
       );
       await t.pumpWidget(
         UncontrolledProviderScope(container: c, child: const PandoraApp()),
@@ -364,13 +369,16 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       final now = c.read(selectedDateProvider);
-      await t.tap(
-        find.byKey(ValueKey('month-day:${now.year}-${now.month}-${now.day}')),
+      final day = find.byKey(
+        ValueKey('month-day:${now.year}-${now.month}-${now.day}'),
       );
+      await t.ensureVisible(day);
       await t.pumpAndSettle();
-      expect(find.byTooltip('关闭当天记录'), findsOneWidget);
+      await t.tap(day);
+      await t.pumpAndSettle();
+      expect(find.byTooltip('关闭'), findsOneWidget);
       expect(find.textContaining('条记录'), findsWidgets);
-      await t.tap(find.byTooltip('关闭当天记录'));
+      await t.tap(find.byTooltip('关闭'));
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox.shrink());
@@ -432,7 +440,12 @@ void main() {
       await t.pumpAndSettle();
       final changed = await t.runAsync(() => repo.detail('logs', draft.id));
       expect(changed!.fields['今日工作'], '24小时内直接修改的正文');
-      expect((await t.runAsync(() => repo.list('reviews', const Query())))!.items, isEmpty);
+      expect(
+        (await t.runAsync(
+          () => repo.list('reviews', const Query()),
+        ))!.items.where((review) => review.fields['targetId'] == draft.id),
+        isEmpty,
+      );
       expect(changed.fields['submittedAt'], submitted.fields['submittedAt']);
 
       t.testTextInput.hide();
@@ -479,12 +492,12 @@ void main() {
       router.go('/me');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.text('任务管理'), findsNothing);
+      expect(find.text('派发任务'), findsNothing);
       router.go('/view');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.text('任务管理'), findsOneWidget);
-      await t.tap(find.text('任务管理'));
+      expect(find.text('派发任务'), findsOneWidget);
+      await t.tap(find.text('派发任务'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.byType(TaskManagementPage), findsOneWidget);

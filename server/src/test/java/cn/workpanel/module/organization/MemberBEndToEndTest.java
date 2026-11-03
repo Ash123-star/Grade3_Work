@@ -29,6 +29,7 @@ class MemberBEndToEndTest extends MemberBHttpSupport {
         db.update("UPDATE users SET password_hash=?,must_change_password=true,department_id=NULL WHERE id=?", encoder.encode("Initial-test-password-2026"), admin);
         reviewer = user(company, department, "", "ADMIN", true);
         db.update("UPDATE users SET password_hash=? WHERE id=?", encoder.encode(PASSWORD), reviewer);
+        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",admin,reviewer,company);
     }
     @AfterEach void restoreReviewers() {
         db.update("UPDATE users SET company_reviewer=false WHERE id IN (?,?)", admin, reviewer);
@@ -53,7 +54,7 @@ class MemberBEndToEndTest extends MemberBHttpSupport {
         call(200, "GET", "/organization", employee, null);
         String revision = revision(employee, Map.of("departmentId", otherDepartment)).get("id").asText();
         assertEquals(department, call(200, "GET", "/auth/me", employee, null).get("department_id").asText());
-        call(403, "POST", "/reviews/" + revision + "/decision", admin, Map.of("approve", true));
+        call(403, "POST", "/reviews/" + revision + "/decision", admin, Map.of("approve", true, "expectedVersion", call(200, "GET", "/reviews/" + revision, admin, null).get("expected_version").asInt()));
         approve(revision, admin);
         assertEquals(otherDepartment, call(200, "GET", "/auth/me", employee, null).get("department_id").asText());
         assertEquals(3, db.count("SELECT version FROM users WHERE id=?", employee));

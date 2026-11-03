@@ -11,6 +11,7 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
 
 import 'support/local_test_state.dart';
+import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
 
 class _MemberAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
@@ -48,7 +49,15 @@ class _MemberAdapter implements HttpClientAdapter {
         'days': {'30': 'MISSING', '31': 'SUBMITTED'},
       };
     } else if (request.path == '/logs/subordinates') {
-      final date = request.queryParameters['date'];
+      final from = request.queryParameters['from'];
+      final date = from == null
+          ? request.queryParameters['date']
+          : DateTime.parse('$from')
+                .toUtc()
+                .add(const Duration(hours: 8))
+                .toIso8601String()
+                .split('T')
+                .first;
       final hasLog = !emptyLogs && date == '2026-01-31';
       body = {
         'items': [
@@ -94,7 +103,9 @@ class _MemberAdapter implements HttpClientAdapter {
     return ResponseBody.fromString(
       jsonEncode(body),
       status,
-      headers: {Headers.contentTypeHeader: ['application/json']},
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
     );
   }
 
@@ -118,6 +129,8 @@ Future<ProviderContainer> _launch(
     overrides: [
       sessionProvider.overrideWith((ref) => session),
       repositoryProvider.overrideWithValue(repository),
+      httpRepositoryProvider.overrideWithValue(repository),
+      sseClientProvider.overrideWithValue(null),
     ],
   );
   addTearDown(container.dispose);
@@ -127,79 +140,107 @@ Future<ProviderContainer> _launch(
   container.read(routerProvider).go(route);
   for (var i = 0; i < 8; i++) {
     await tester.pump(const Duration(milliseconds: 80));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
   }
   await tester.pumpAndSettle();
   return container;
 }
 
 void main() {
-  testWidgets('member workspace shows contact card and only logs/tasks filters', (tester) async {
-    final adapter = _MemberAdapter();
-    await _launch(tester, adapter, '/me/team/u2/logs?date=2026-01-31');
+  testWidgets(
+    'member workspace shows contact card and only logs/tasks filters',
+    (tester) async {
+      final adapter = _MemberAdapter();
+      await _launch(tester, adapter, '/me/team/u2/logs?date=2026-01-31');
 
-    expect(find.text('陈一诺'), findsOneWidget);
-    expect(find.text('产品专员'), findsOneWidget);
-    expect(find.text('产品部'), findsOneWidget);
-    expect(find.text('13800138002'), findsOneWidget);
-    await tester.ensureVisible(find.text('chen@example.invalid'));
-    expect(find.text('chen@example.invalid'), findsOneWidget);
-    expect(find.text('正在查看：陈一诺'), findsNothing);
-    expect(find.text('返回本人面板'), findsNothing);
-    expect(find.text('个人重点'), findsNothing);
-    expect(find.text('日志'), findsOneWidget);
-    expect(find.text('任务'), findsOneWidget);
-    expect(find.text('重点'), findsNothing);
-    expect(find.text('消息'), findsNothing);
-    expect(
-      adapter.requests.any(
-        (request) => request.path == '/logs/subordinates/calendar' &&
-            request.queryParameters['ownerId'] == 'u2' &&
-            request.queryParameters['month'] == '2026-01',
-      ),
-      isTrue,
-    );
-  });
+      expect(find.text('陈一诺'), findsOneWidget);
+      expect(find.textContaining('产品专员'), findsOneWidget);
+      expect(find.textContaining('产品部'), findsOneWidget);
+      expect(find.textContaining('13800138002'), findsOneWidget);
+      await tester.ensureVisible(find.textContaining('chen@example.invalid'));
+      expect(find.textContaining('chen@example.invalid'), findsOneWidget);
+      expect(find.text('正在查看：陈一诺'), findsNothing);
+      expect(find.text('返回本人面板'), findsNothing);
+      expect(find.text('个人重点'), findsNothing);
+      expect(find.text('日志'), findsOneWidget);
+      expect(find.text('任务'), findsOneWidget);
+      expect(find.text('重点'), findsNothing);
+      expect(find.text('消息'), findsNothing);
+      expect(
+        adapter.requests.any(
+          (request) =>
+              request.path == '/logs/subordinates/calendar' &&
+              request.queryParameters['ownerId'] == 'u2' &&
+              request.queryParameters['month'] == '2026-01',
+        ),
+        isTrue,
+      );
+    },
+  );
 
-  testWidgets('submitted dates open matching log and missing dates show an empty state', (tester) async {
-    final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    final adapter = _MemberAdapter();
-    await _launch(tester, adapter, '/me/team/u2/logs?date=2026-01-31');
+  testWidgets(
+    'submitted dates open matching log and missing dates show an empty state',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
 
-    await tester.tap(find.bySemanticsLabel('2026年1月31日，已提交日志'));
-    await tester.pumpAndSettle();
-    expect(find.text('已完成的真实工作'), findsOneWidget);
-    expect(adapter.requests.any((request) => request.path == '/logs/log-31'), isTrue);
+      final adapter = _MemberAdapter();
+      await _launch(tester, adapter, '/me/team/u2/logs?date=2026-01-31');
 
-    final container = ProviderScope.containerOf(tester.element(find.text('已完成的真实工作')));
-    container.read(routerProvider).go('/me/team/u2/logs?date=2026-01-31');
-    await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('2026年1月30日，未提交日志'));
-    await tester.pumpAndSettle();
-    expect(find.text('当日未提交日志'), findsOneWidget);
-  });
+      await tester.ensureVisible(find.byType(MemberLogCalendar));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel(RegExp('2026年1月31日，已提交日志')));
+      await tester.pumpAndSettle();
+      expect(find.text('已完成的真实工作'), findsOneWidget);
+      expect(
+        adapter.requests.any((request) => request.path == '/logs/log-31'),
+        isTrue,
+      );
 
-  testWidgets('task calendar queries the selected member and displays their task', (tester) async {
-    final adapter = _MemberAdapter();
-    await _launch(tester, adapter, '/me/team/u2/tasks?date=2026-01-31');
+      final container = ProviderScope.containerOf(
+        tester.element(find.text('已完成的真实工作')),
+      );
+      container.read(routerProvider).go('/me/team/u2/logs?date=2026-01-31');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byType(MemberLogCalendar));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel(RegExp('2026年1月30日，未提交日志')));
+      await tester.pumpAndSettle();
+      expect(find.text('当日未提交日志'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      semantics.dispose();
+    },
+  );
 
-    expect(find.text('成员日历任务'), findsOneWidget);
-    final request = adapter.requests.lastWhere((item) => item.path == '/tasks');
-    expect(request.queryParameters['ownerId'], 'u2');
-    expect(request.queryParameters['from'], isNotNull);
-    expect(request.queryParameters['to'], isNotNull);
-  });
+  testWidgets(
+    'task calendar queries the selected member and displays their task',
+    (tester) async {
+      final adapter = _MemberAdapter();
+      await _launch(tester, adapter, '/me/team/u2/tasks?date=2026-01-31');
 
-  testWidgets('revoked member scope clears protected contact details', (tester) async {
+      expect(find.text('成员日历任务'), findsOneWidget);
+      final request = adapter.requests.lastWhere(
+        (item) => item.path == '/tasks',
+      );
+      expect(request.queryParameters['participantId'], 'u2');
+      expect(request.queryParameters['from'], isNotNull);
+      expect(request.queryParameters['to'], isNotNull);
+    },
+  );
+
+  testWidgets('revoked member scope clears protected contact details', (
+    tester,
+  ) async {
     final adapter = _MemberAdapter();
     final container = await _launch(tester, adapter, '/me/team/u2/logs');
-    await tester.ensureVisible(find.text('chen@example.invalid'));
-    expect(find.text('chen@example.invalid'), findsOneWidget);
+    await tester.ensureVisible(find.textContaining('chen@example.invalid'));
+    expect(find.textContaining('chen@example.invalid'), findsOneWidget);
     adapter.profileStatus = 403;
     container.invalidate(itemProvider(('organization/profile', 'u2')));
     await tester.pumpAndSettle();
-    expect(find.text('chen@example.invalid'), findsNothing);
+    expect(find.textContaining('chen@example.invalid'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

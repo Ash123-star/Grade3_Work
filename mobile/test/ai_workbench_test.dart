@@ -265,6 +265,7 @@ void main() {
     final focus = FocusNode();
     await t.pumpWidget(
       ProviderScope(
+        overrides: [sessionProvider.overrideWith((_) => const Session())],
         child: MaterialApp(
           theme: appTheme(),
           home: Scaffold(
@@ -436,6 +437,7 @@ void main() {
       var fail = true;
       await t.pumpWidget(
         ProviderScope(
+          overrides: [sessionProvider.overrideWith((_) => const Session())],
           child: MaterialApp(
             theme: appTheme(),
             home: Scaffold(

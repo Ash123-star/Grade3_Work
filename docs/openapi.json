@@ -8600,14 +8600,11 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "当前授权结果",
             "content": {
-              "*/*": {
+              "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object"
-                  }
+                  "$ref": "#/components/schemas/ReviewDetail"
                 }
               }
             }
@@ -9447,14 +9444,11 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "当前授权结果",
             "content": {
-              "*/*": {
+              "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object"
-                  }
+                  "$ref": "#/components/schemas/OrganizationPeoplePage"
                 }
               }
             }
@@ -11681,7 +11675,7 @@
         "tags": [
           "work-controller"
         ],
-        "operationId": "get_3",
+        "operationId": "get_4",
         "parameters": [
           {
             "name": "id",
@@ -12412,7 +12406,7 @@
         "tags": [
           "ai-http-controller"
         ],
-        "operationId": "get_4",
+        "operationId": "get_5",
         "parameters": [
           {
             "name": "id",
@@ -18759,6 +18753,107 @@
           }
         }
       }
+    },
+    "/api/calendar/holidays": {
+      "get": {
+        "tags": [
+          "holiday-controller"
+        ],
+        "operationId": "get_3",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -20813,6 +20908,10 @@
           },
           "label": {
             "$ref": "#/components/schemas/TaskLabel"
+          },
+          "issuer_id": {
+            "type": "string",
+            "maxLength": 20000
           }
         },
         "required": [
@@ -20822,7 +20921,8 @@
           "phase",
           "title",
           "version"
-        ]
+        ],
+        "description": "当前用户本人参与的任务历史，含本人派发且参与的任务；按最早DISPATCHED时间倒序，包含终态。"
       },
       "ReceivedTaskPage": {
         "type": "object",
@@ -21490,6 +21590,222 @@
           "items",
           "nextCursor",
           "total"
+        ]
+      },
+      "Day": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isOffDay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Snapshot": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Day"
+            }
+          },
+          "papers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "fetchedAt": {
+            "type": "string"
+          }
+        }
+      },
+      "OrganizationPerson": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "department_id": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "team_id": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "department": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "team_name": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "participatingTaskCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "activeTaskCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "todayLogStatus": {
+            "type": "string",
+            "enum": [
+              "SUBMITTED",
+              "MISSING",
+              "UNKNOWN"
+            ]
+          },
+          "summaryDate": {
+            "type": "string",
+            "format": "date",
+            "description": "服务端Asia/Shanghai业务日"
+          }
+        },
+        "required": [
+          "activeTaskCount",
+          "id",
+          "name",
+          "participatingTaskCount",
+          "role",
+          "status",
+          "summaryDate",
+          "todayLogStatus",
+          "version"
+        ]
+      },
+      "OrganizationPeoplePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationPerson"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
+        ]
+      },
+      "ReviewDetail": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "kind": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "before_value": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "candidate": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "display_references": {
+            "type": "object",
+            "description": "已授权审核快照引用的同公司ID到当前名称映射；名称非历史快照，缺失引用不返回",
+            "properties": {
+              "people": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 20000
+                }
+              },
+              "labels": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 20000
+                }
+              },
+              "departments": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 20000
+                }
+              },
+              "teams": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 20000
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "before_value",
+          "candidate",
+          "display_references",
+          "expected_version",
+          "id",
+          "kind",
+          "status"
         ]
       }
     },

@@ -461,7 +461,12 @@ class _WorkComposerState extends ConsumerState<WorkComposer> {
             padding: const EdgeInsets.only(bottom: 10),
             child: Semantics(
               liveRegion: true,
-              child: Text(error!, style: const TextStyle(fontSize: 15)),
+              child: Column(
+                children: [
+                  Text(error!, style: const TextStyle(fontSize: 15)),
+                  if (!error!.contains('内容已保留')) const Text('内容已保留，可重试'),
+                ],
+              ),
             ),
           ),
         AnimatedSize(

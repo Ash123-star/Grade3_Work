@@ -1,3 +1,4 @@
+import 'holiday_data.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -331,6 +332,9 @@ class _StableMonthPagerState extends State<_StableMonthPager> {
           ownerId: widget.ownerId,
           availableHeight: height,
           onDayChanged: widget.onDayChanged,
+          onBoundary: (direction) => widget.onMonthChanged(
+            _monthFromIndex(_baseMonth + page + direction),
+          ),
         ),
       ),
     );
@@ -343,7 +347,9 @@ class _StableMonthPage extends ConsumerWidget {
     required this.ownerId,
     required this.availableHeight,
     required this.onDayChanged,
+    required this.onBoundary,
   });
+  final ValueChanged<int> onBoundary;
   final DateTime month;
   final String? ownerId;
   final double availableHeight;
@@ -354,6 +360,7 @@ class _StableMonthPage extends ConsumerWidget {
     final state = ref.watch(
       calendarMonthTasksProvider((ownerId, _monthIndex(month))),
     );
+    final holidays = ref.watch(holidayCalendarProvider(month.year));
     return state.when(
       loading: () => const Center(child: SunnyLoadingIndicator()),
       error: (error, _) => Center(
@@ -366,11 +373,27 @@ class _StableMonthPage extends ConsumerWidget {
       ),
       data: (page) {
         final events = _calendarEvents(page.items);
-        return _MonthGrid(
-          date: month,
-          events: events,
-          onChanged: (day) => onDayChanged(day, events),
-          availableHeight: availableHeight,
+        return NotificationListener<OverscrollNotification>(
+          onNotification: (notice) {
+            if (notice.dragDetails != null && notice.overscroll.abs() > 20) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => onBoundary(notice.overscroll > 0 ? 1 : -1),
+              );
+            }
+            return false;
+          },
+          child: _MonthGrid(
+            date: month,
+            selectedDate: ref.watch(
+              ownerId == null
+                  ? selectedDateProvider
+                  : memberCalendarDateProvider(ownerId!),
+            ),
+            holidays: holidays.valueOrNull,
+            events: events,
+            onChanged: (day) => onDayChanged(day, events),
+            availableHeight: availableHeight,
+          ),
         );
       },
     );
@@ -685,17 +708,22 @@ class _WeekOverview extends StatelessWidget {
   }
 }
 
+/// Five task rows, independent holiday label, full agenda on every date.
 class _MonthGrid extends StatelessWidget {
   const _MonthGrid({
     required this.date,
     required this.events,
     required this.onChanged,
     required this.availableHeight,
+    this.holidays,
+    this.selectedDate,
   });
   final DateTime date;
+  final DateTime? selectedDate;
   final List<CalendarEvent> events;
   final ValueChanged<DateTime> onChanged;
   final double availableHeight;
+  final HolidayCalendar? holidays;
   @override
   Widget build(BuildContext context) {
     final first = DateTime(date.year, date.month);
@@ -703,395 +731,258 @@ class _MonthGrid extends StatelessWidget {
     final weeks =
         ((first.weekday - 1 + DateTime(date.year, date.month + 1, 0).day) / 7)
             .ceil();
-    final gridStart = first.subtract(Duration(days: first.weekday - 1));
-    return PaperSurface(
+    final scale = MediaQuery.textScalerOf(context);
+    final rowHeight = scale.scale(10) * 1.3 + 3;
+    final minimum = scale.scale(13) * 1.5 + 20 + (rowHeight + 1) * 6;
+    final cellHeight = math.max(minimum, (availableHeight - 70) / weeks);
+    return SingleChildScrollView(
       key: const ValueKey('calendar-month-grid'),
-      decorated: true,
-      skin: TuantuanAssets.surfaces['warm'],
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final cellWidth = constraints.maxWidth / 7;
-          final weekdayHeight = math.max(
-            34.0,
-            MediaQuery.textScalerOf(context).scale(12) * 1.5 + 8,
-          );
-          final height = availableHeight > 0
-              ? availableHeight
-              : constraints.maxWidth * 1.6;
-          final cellHeight = math.max(
-            0.0,
-            (height - 16 - weekdayHeight) / weeks,
-          );
-          final recordTop = math.max(
-            24.0,
-            MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
-          );
-          final barHeight =
-              MediaQuery.textScalerOf(context).scale(_monthRecordFontSize) *
-                  1.15 +
-              3;
-          final capacity = ((cellHeight - recordTop - 2 + 1) / (barHeight + 1))
-              .floor()
-              .clamp(0, 5);
-          final lanes = _monthLanes(
-            events,
-            gridStart,
-            gridStart.add(Duration(days: weeks * 7 - 1)),
-            capacity,
-          );
-          return Column(
-            children: [
-              SizedBox(
-                height: weekdayHeight,
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _weekdays.length; i++)
-                      Expanded(
-                        child: Stack(
-                          alignment: Alignment.center,
-                          clipBehavior: Clip.none,
-                          children: [
-                            Align(
-                              alignment: Alignment.bottomCenter,
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 3),
-                                child: Text(
-                                  _weekdays[i],
-                                  key: ValueKey(
-                                    'month-weekday:${_weekdays[i]}',
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
+      child: PaperSurface(
+        decorated: true,
+        skin: TuantuanAssets.surfaces['warm'],
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            if (holidays?.warning.isNotEmpty ?? false)
+              Text(
+                holidays!.warning,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            SizedBox(
+              height: 34,
+              child: Row(
+                children: [
+                  for (final weekday in _weekdays)
+                    Expanded(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Text(
+                              weekday,
+                              key: ValueKey('month-weekday:$weekday'),
+                              textAlign: TextAlign.center,
                             ),
-                            Positioned(
-                              top: -2,
-                              right: 0,
-                              child: DogAvatar(
-                                index: DogAssets.weekdayAvatars[i],
-                                size: 20,
-                              ),
+                          ),
+                          Positioned(
+                            top: -2,
+                            right: 0,
+                            child: DogAvatar(
+                              index: DogAssets
+                                  .weekdayAvatars[_weekdays.indexOf(weekday)],
+                              size: 20,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                    ),
+                ],
+              ),
+            ),
+            for (var week = 0; week < weeks; week++)
+              LayoutBuilder(
+                builder: (context, constraints) => Stack(
+                  children: [
+                    Row(
+                      children: [
+                        for (var col = 0; col < 7; col++)
+                          Expanded(
+                            child: Builder(
+                              builder: (context) {
+                                final day = start.add(
+                                  Duration(days: week * 7 + col),
+                                );
+                                final entries = monthPreviewEvents(events, day);
+                                final visible = entries
+                                    .take(entries.length > 5 ? 4 : 5)
+                                    .toList();
+                                final holiday =
+                                    holidays?.days[holidayDateKey(day)];
+                                final current = day.month == date.month;
+                                return Semantics(
+                                  label:
+                                      '${dayHeading(day)}，${entries.length}条任务，${holiday?.label ?? ''}',
+                                  child: InkWell(
+                                    key: ValueKey(
+                                      'month-day:${day.year}-${day.month}-${day.day}',
+                                    ),
+                                    onTap: () => onChanged(day),
+                                    child: Container(
+                                      height: cellHeight,
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            sameDay(day, selectedDate ?? date)
+                                            ? SunnyPalette.orange.withValues(
+                                                alpha: .18,
+                                              )
+                                            : null,
+                                        border: Border.all(
+                                          color: SunnyPalette.ink.withValues(
+                                            alpha: .08,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Text(
+                                            '${day.day}',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: current
+                                                  ? SunnyPalette.ink
+                                                  : SunnyPalette.ink.withValues(
+                                                      alpha: .55,
+                                                    ),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            height: rowHeight,
+                                            child: holiday == null
+                                                ? null
+                                                : Tooltip(
+                                                    message: holiday.label,
+                                                    child: Text(
+                                                      holiday.label,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 10,
+                                                      ),
+                                                    ),
+                                                  ),
+                                          ),
+                                          for (final event in visible)
+                                            Container(
+                                              key: ValueKey(
+                                                'month-preview:${holidayDateKey(day)}:${event.record.id}',
+                                              ),
+                                              height: rowHeight,
+                                              margin: const EdgeInsets.only(
+                                                bottom: 1,
+                                              ),
+                                            ),
+                                          if (entries.length > 5)
+                                            SizedBox(
+                                              height: rowHeight,
+                                              child: Text(
+                                                '+${entries.length - 4}',
+                                                key: ValueKey(
+                                                  'month-overflow:${holidayDateKey(day)}',
+                                                ),
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                    ..._previewBars(
+                      events,
+                      start.add(Duration(days: week * 7)),
+                      constraints.maxWidth / 7,
+                      rowHeight,
+                      scale.scale(13) * 1.2 + 2 + rowHeight,
+                    ),
                   ],
                 ),
               ),
-              for (var week = 0; week < weeks; week++)
-                SizedBox(
-                  height: cellHeight,
-                  child: Stack(
-                    clipBehavior: Clip.hardEdge,
-                    children: [
-                      for (var col = 0; col < 7; col++)
-                        Builder(
-                          builder: (context) {
-                            final day = start.add(
-                              Duration(days: week * 7 + col),
-                            );
-                            final selected = sameDay(day, date),
-                                today = sameDay(
-                                  day,
-                                  shanghaiWallTime(DateTime.now()),
-                                );
-                            final currentMonth = day.month == date.month;
-                            return Positioned(
-                              left: col * cellWidth,
-                              top: 0,
-                              width: cellWidth,
-                              height: cellHeight,
-                              child: Semantics(
-                                label: currentMonth
-                                    ? '${dayHeading(day)}${today ? '，今天' : ''}，查看当天全部记录'
-                                    : null,
-                                selected: selected,
-                                child: InkWell(
-                                  key: ValueKey(
-                                    'month-day:${day.year}-${day.month}-${day.day}',
-                                  ),
-                                  onTap: currentMonth
-                                      ? () => onChanged(day)
-                                      : null,
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 1,
-                                      vertical: 2,
-                                    ),
-                                    padding: const EdgeInsets.only(
-                                      left: 3,
-                                      top: 3,
-                                    ),
-                                    alignment: Alignment.topLeft,
-                                    decoration: BoxDecoration(
-                                      color: selected
-                                          ? SunnyPalette.orange.withValues(
-                                              alpha: .18,
-                                            )
-                                          : null,
-                                      border: Border(
-                                        right: BorderSide(
-                                          color: SunnyPalette.ink.withValues(
-                                            alpha: .08,
-                                          ),
-                                        ),
-                                        bottom: BorderSide(
-                                          color: SunnyPalette.ink.withValues(
-                                            alpha: .08,
-                                          ),
-                                        ),
-                                        top: today
-                                            ? BorderSide(
-                                                color: SunnyPalette.primary,
-                                                width: 1.5,
-                                              )
-                                            : BorderSide.none,
-                                      ),
-                                    ),
-                                    child: currentMonth
-                                        ? Stack(
-                                            children: [
-                                              Positioned(
-                                                left: 3,
-                                                top: 3,
-                                                child: Text(
-                                                  '${day.day}',
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    height: 1.15,
-                                                    fontWeight:
-                                                        selected || today
-                                                        ? FontWeight.w700
-                                                        : null,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (eventsOnDay(events, day).any(
-                                                (event) => !lanes.containsKey(
-                                                  _calendarEventKey(event),
-                                                ),
-                                              ))
-                                                Positioned(
-                                                  right: 1,
-                                                  top: 3,
-                                                  child: Text(
-                                                    '+${eventsOnDay(events, day).where((event) => !lanes.containsKey(_calendarEventKey(event))).length}',
-                                                    key: ValueKey(
-                                                      'month-overflow:${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
-                                                    ),
-                                                    style: const TextStyle(
-                                                      fontSize: 10,
-                                                    ),
-                                                  ),
-                                                ),
-                                              if (today &&
-                                                  cellWidth >= 38 &&
-                                                  eventsOnDay(
-                                                    events,
-                                                    day,
-                                                  ).every(
-                                                    (event) =>
-                                                        lanes.containsKey(
-                                                          _calendarEventKey(
-                                                            event,
-                                                          ),
-                                                        ),
-                                                  ))
-                                                const Positioned(
-                                                  top: 1,
-                                                  right: 1,
-                                                  child: DogAvatar(
-                                                    index:
-                                                        DogAssets.todayAvatar,
-                                                    size: 22,
-                                                  ),
-                                                ),
-                                            ],
-                                          )
-                                        : null,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ..._monthWeekBars(
-                        context,
-                        events,
-                        start.add(Duration(days: week * 7)),
-                        cellWidth,
-                        lanes,
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          );
-        },
+          ],
+        ),
       ),
     );
   }
 }
 
-List<Widget> _monthWeekBars(
-  BuildContext context,
+List<CalendarEvent> monthPreviewEvents(
+  List<CalendarEvent> events,
+  DateTime day,
+) => eventsOnDay(events, day)
+  ..sort((a, b) {
+    final result = a.firstDay.compareTo(b.firstDay);
+    return result != 0 ? result : a.record.id.compareTo(b.record.id);
+  });
+
+List<Widget> _previewBars(
   List<CalendarEvent> events,
   DateTime weekStart,
-  double cellWidth,
-  Map<String, int> lanes,
+  double width,
+  double height,
+  double top,
 ) {
-  final weekEnd = weekStart.add(const Duration(days: 6));
-  final candidates =
-      events
-          .where(
-            (e) =>
-                !e.lastDay.isBefore(weekStart) && !e.firstDay.isAfter(weekEnd),
-          )
-          .toList()
-        ..sort((a, b) => a.firstDay.compareTo(b.firstDay));
-  final bars = <Widget>[];
-  for (final event in candidates) {
-    final lane = lanes[_calendarEventKey(event)];
-    if (lane == null) continue;
-    final from = event.firstDay.isBefore(weekStart)
-        ? weekStart
-        : event.firstDay;
-    final to = event.lastDay.isAfter(weekEnd) ? weekEnd : event.lastDay;
-    final col = from.difference(weekStart).inDays,
-        days = to.difference(from).inDays + 1;
-    final starts = sameDay(from, event.firstDay),
-        continuesAtWeekStart = col == 0 && !starts,
-        ends = sameDay(to, event.lastDay);
-    final recordTop = math.max(
-      24.0,
-      MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
+  final previews = List.generate(7, (i) {
+    final entries = monthPreviewEvents(
+      events,
+      weekStart.add(Duration(days: i)),
     );
-    final fontSize = _monthRecordFontSize;
-    final barHeight =
-        MediaQuery.textScalerOf(context).scale(fontSize) * 1.15 + 3;
-    final top = recordTop + lane * (barHeight + 1);
-    bars.add(
-      Positioned(
-        key: ValueKey(
-          'month-span:tasks:${event.record.id}:${weekStart.toIso8601String()}',
-        ),
-        left: col * cellWidth + (col == 0 ? 2 : 0),
-        top: top,
-        width:
-            days * cellWidth -
-            (col == 0 ? 2 : 0) -
-            (sameDay(to, weekEnd) ? 2 : 0),
-        height: barHeight,
-        child: IgnorePointer(
-          child: Material(
-            color: event.color,
-            borderRadius: BorderRadius.horizontal(
-              left: starts ? const Radius.circular(4) : Radius.zero,
-              right: ends ? const Radius.circular(4) : Radius.zero,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: starts || continuesAtWeekStart
-                  ? SizedBox(
-                      width: double.infinity,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 2, right: 10),
-                        child: Text(
-                          key: ValueKey(
-                            'month-span-label:tasks:${event.record.id}:${weekStart.toIso8601String()}',
-                          ),
-                          event.record.title,
-                          semanticsLabel: event.record.title,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: fontSize,
-                            height: 1.15,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0,
-                            color: SunnyPalette.ink,
-                          ),
-                        ),
-                      ),
-                    )
-                  : null,
+    return entries.take(entries.length > 5 ? 4 : 5).toList();
+  });
+  final bars = <Widget>[];
+  final segments = <String, int>{};
+  for (var row = 0; row < 5; row++) {
+    var col = 0;
+    while (col < 7) {
+      if (previews[col].length <= row) {
+        col++;
+        continue;
+      }
+      final event = previews[col][row];
+      final from = col++;
+      while (col < 7 &&
+          previews[col].length > row &&
+          previews[col][row].record.id == event.record.id) {
+        col++;
+      }
+      final segment = segments.update(
+        event.record.id,
+        (n) => n + 1,
+        ifAbsent: () => 0,
+      );
+      final suffix = segment == 0 ? '' : ':$segment';
+      bars.add(
+        Positioned(
+          left: from * width + (from == 0 ? 2 : 0),
+          width:
+              (col - from) * width - (from == 0 ? 2 : 0) - (col == 7 ? 2 : 0),
+          top: top + row * (height + 1),
+          height: height,
+          key: ValueKey(
+            'month-span:tasks:${event.record.id}:${weekStart.toIso8601String()}$suffix',
+          ),
+          child: IgnorePointer(
+            child: Material(
+              color: event.color,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Text(
+                  event.record.title,
+                  key: ValueKey(
+                    'month-span-label:tasks:${event.record.id}:${weekStart.toIso8601String()}$suffix',
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, height: 1.3),
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
   return bars;
-}
-
-String _calendarEventKey(CalendarEvent event) => event.record.id;
-
-// Text is bounded by the weekly segment, never by a fixed character count.
-const double _monthRecordFontSize = 10.0;
-
-Map<String, int> _monthLanes(
-  List<CalendarEvent> events,
-  DateTime gridStart,
-  DateTime gridEnd,
-  int capacity,
-) {
-  final candidates =
-      events
-          .where(
-            (event) =>
-                !event.lastDay.isBefore(gridStart) &&
-                !event.firstDay.isAfter(gridEnd),
-          )
-          .toList()
-        ..sort((a, b) {
-          final start = a.firstDay.compareTo(b.firstDay);
-          if (start != 0) return start;
-          // Reserve the lane for a continuous span before same-day previews.
-          final duration = b.lastDay.compareTo(a.lastDay);
-          return duration != 0
-              ? duration
-              : _calendarEventKey(a).compareTo(_calendarEventKey(b));
-        });
-  final laneEvents = List.generate(capacity, (_) => <CalendarEvent>[]);
-  final dailyCounts = <DateTime, int>{};
-  final result = <String, int>{};
-  for (final event in candidates) {
-    final from = event.firstDay.isBefore(gridStart)
-        ? gridStart
-        : event.firstDay;
-    final to = event.lastDay.isAfter(gridEnd) ? gridEnd : event.lastDay;
-    var exceedsDayCapacity = false;
-    for (
-      var day = from;
-      !day.isAfter(to);
-      day = day.add(const Duration(days: 1))
-    ) {
-      if ((dailyCounts[day] ?? 0) >= capacity) {
-        exceedsDayCapacity = true;
-        break;
-      }
-    }
-    if (exceedsDayCapacity) continue;
-    final lane = laneEvents.indexWhere(
-      (items) => items.every(
-        (other) => other.lastDay.isBefore(from) || other.firstDay.isAfter(to),
-      ),
-    );
-    if (lane < 0) continue;
-    laneEvents[lane].add(event);
-    result[_calendarEventKey(event)] = lane;
-    for (
-      var day = from;
-      !day.isAfter(to);
-      day = day.add(const Duration(days: 1))
-    ) {
-      dailyCounts[day] = (dailyCounts[day] ?? 0) + 1;
-    }
-  }
-  return result;
 }
 
 class _WeekStrip extends StatelessWidget {

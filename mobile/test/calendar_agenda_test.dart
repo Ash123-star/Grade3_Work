@@ -331,14 +331,14 @@ void main() {
         find.byKey(
           const ValueKey('month-span:tasks:t5:2026-10-12T00:00:00.000'),
         ),
-        findsNothing,
-        reason: 'overflow records are represented by the day counter',
+        findsOneWidget,
+        reason: 'exactly five tasks remain visible under the new requirement',
       );
       expect(
         find.byKey(const ValueKey('month-overflow:2026-10-13')),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.textContaining('+'), findsWidgets);
+
       final firstWeekSegment = find.byKey(
         const ValueKey('month-span:tasks:t6:2026-10-12T00:00:00.000'),
       );
@@ -388,7 +388,14 @@ void main() {
       expect(segmentRect.left, startCell.left);
       expect(segmentRect.right, closeTo(endCell.right - 2, .01));
       expect(
-        t.getRect(find.descendant(of: firstWeekSegment, matching: find.text('数据结构实训'))).right,
+        t
+            .getRect(
+              find.descendant(
+                of: firstWeekSegment,
+                matching: find.text('数据结构实训'),
+              ),
+            )
+            .right,
         closeTo(segmentRect.right - 10, .01),
       );
       final material = t.widget<Material>(
@@ -404,7 +411,13 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('month-day-agenda')), findsOneWidget);
       expect(find.text('5 条记录'), findsOneWidget);
-      expect(find.text('任务标题5'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('month-day-agenda')),
+          matching: find.text('任务标题5'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('日志标题'), findsNothing);
       c.read(sessionProvider.notifier).state = const Session(active: false);
       await t.pumpAndSettle();

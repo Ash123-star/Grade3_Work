@@ -277,7 +277,7 @@ class WorkIntegrationTest {
                 assertThrows(TimeoutException.class,()->stop.get(150,TimeUnit.MILLISECONDS));statement.execute("SELECT pg_advisory_unlock("+barrier+")");stop.get(10,TimeUnit.SECONDS);
                 var current=call(200,"GET","/ai/work-items/"+id,"leader",null,null);assertEquals(1,current.get("receipts").size());String key=Db.id();int version=current.get("version").asInt();
                 for(int replay=0;replay<20;replay++)if(delete)deleteWork(202,id,version,key);else call(200,"POST","/ai/work-items/"+id+"/cancel","leader",Map.of("version",version),key);
-                assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));assertEquals(1,db.count("SELECT count(*) FROM tasks WHERE id IN (SELECT result->>'taskId' FROM ai_action_receipts WHERE work_id=?)",id));assertEquals(0,db.count("SELECT count(*) FROM ai_work_steps WHERE work_id=? AND state IN ('PENDING','RUNNING','WAITING')",id));
+                assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));assertEquals(0,db.count("SELECT count(*) FROM tasks WHERE id IN (SELECT result->>'taskId' FROM ai_action_receipts WHERE work_id=?)",id));assertEquals(1,db.count("SELECT count(*) FROM review_requests WHERE id IN (SELECT result->>'reviewId' FROM ai_action_receipts WHERE work_id=?) AND status='PENDING'",id));assertEquals(0,db.count("SELECT count(*) FROM ai_work_steps WHERE work_id=? AND state IN ('PENDING','RUNNING','WAITING')",id));
                 if(delete){call(404,"GET","/ai/work-items/"+id,"leader",null,null);deleteWork(409,id,version+1,key);assertEquals(0,db.count("SELECT count(*) FROM ai_work_messages WHERE work_id=?",id));}
                 else assertEquals("CANCELLED",call(200,"GET","/ai/work-items/"+id,"leader",null,null).get("state").asText());
             }finally{org.springframework.test.util.ReflectionTestUtils.setField(workService,"executionEnabled",true);pool.shutdownNow();db.update("DROP TRIGGER "+trigger+" ON ai_action_receipts");db.update("DROP FUNCTION "+function+"()");}
@@ -329,7 +329,7 @@ class WorkIntegrationTest {
         call(404,"GET","/ai/work-items/"+id,"admin",null,null);call(403,"GET","/attachments/"+file,"alice",null,null);call(200,"GET","/tasks/"+task,"alice",null,null);
         call(409,"POST","/ai/work-items","leader",Map.of("text","不同内容"),key);
         assertTrue(input.get().contains("people"));assertFalse(input.get().contains("password_hash"));
-        assertEquals(1,db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='TASK_DISPATCHED'",task));
+        assertEquals(1,db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='TASK_ASSIGNED'",task));
     }
     @Test void explicitTaskAndEmployeeCannotDispatch()throws Exception{
         String id=call(202,"POST","/ai/work-items","leader",Map.of("text","请帮我创建任务：小李在2099年10月23日17:00交付成本表"),Db.id()).get("id").asText();approveTaskReviewsAndAwaitSuccess(id);
@@ -447,10 +447,10 @@ class WorkIntegrationTest {
         db.update("UPDATE users SET department_id=NULL,team_id=NULL WHERE id=?",ids.get("admin"));
         String id=call(200,"POST","/procedures","admin",Map.of("title","独立复核边界","type","POLICY","content","报价需要成本材料"),Db.id()).get("id").asText();String request;
         try{
-            db.update("UPDATE users SET company_reviewer=false WHERE company_id=?",company);
+            db.update("DELETE FROM reporting_relations WHERE employee_id=?",ids.get("admin"));
             request=call(200,"POST","/procedures/"+id+"/publish-requests","admin",Map.of("version",1,"reason","发布资料"),Db.id()).get("id").asText();
             assertEquals("PENDING",call(200,"GET","/reviews/"+request,"admin",null,null).get("status").asText());assertEquals(0,db.count("SELECT count(*) FROM review_steps WHERE request_id=?",request));call(404,"GET","/procedures/"+id,"alice",null,null);
-        }finally{db.update("UPDATE users SET company_reviewer=true WHERE id=?",ids.get("reviewer"));}
+        }finally{db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",ids.get("admin"),ids.get("reviewer"),company);}
         call(200,"POST","/reviews/"+request+"/reroute","admin",null,null);
         call(200,"POST","/procedures/"+id+"/revisions","admin",Map.of("version",1,"candidate",Map.of("title","独立复核边界","type","POLICY","content","报价需要新版成本材料")),Db.id());
         call(409,"POST","/reviews/"+request+"/decision","reviewer",Map.of("approve",true,"expectedVersion",reviewVersion("/reviews/"+request+"/decision")),null);assertEquals("PENDING",call(200,"GET","/reviews/"+request,"admin",null,null).get("status").asText());assertEquals(0,db.count("SELECT count(*) FROM review_steps WHERE request_id=? AND state<>'PENDING'",request));call(404,"GET","/procedures/"+id,"alice",null,null);
@@ -614,6 +614,10 @@ class WorkIntegrationTest {
         assertEquals("FAILED",db.one("SELECT state FROM ai_work_items WHERE id=?",failed).get("state"));
         assertEquals(2,db.count("SELECT count(*) FROM ai_work_steps WHERE work_id=? AND state='FAILED' AND error_code='DEPENDENCY_FAILED'",partial));
         assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",partial));
+        // Simulate the process stopping after committing failed steps but before settling the item.
+        db.update("UPDATE ai_work_items SET state='EXECUTING' WHERE id=?",partial);
+        workExecutor.propagateDependencyFailures();
+        assertEquals("PARTIAL",db.one("SELECT state FROM ai_work_items WHERE id=?",partial).get("state"));
     }
     @Test void successfulActionReceiptIsReusedOnceAndNeedsMaterialIsNeverReused(){
         String reusable=Db.id(),needsMaterial=Db.id();var payload=Map.<String,Object>of("title","重复任务","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00");
@@ -635,7 +639,7 @@ class WorkIntegrationTest {
         String suffix=Db.id().replace("-",""),function="it_batch_"+suffix,trigger="it_batch_trigger_"+suffix;
         db.update("CREATE FUNCTION "+function+"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.work_id='"+id+"' AND NEW.step_key='action-2' THEN RAISE EXCEPTION 'injected batch failure'; END IF; RETURN NEW; END $$");
         db.update("CREATE TRIGGER "+trigger+" BEFORE INSERT ON ai_action_receipts FOR EACH ROW EXECUTE FUNCTION "+function+"()");
-        try{confirmation.put("actions",List.of("action-1","action-2"));call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirmation,Db.id());await(id,"PARTIAL");assertEquals(before+1,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));}
+        try{confirmation.put("actions",List.of("action-1","action-2"));call(200,"POST","/ai/work-items/"+id+"/confirm","leader",confirmation,Db.id());await(id,"PARTIAL");assertEquals(before,db.count("SELECT count(*) FROM tasks WHERE company_id=?",company));assertEquals(1,db.count("SELECT count(*) FROM review_requests WHERE company_id=? AND applicant_id=? AND status='PENDING' AND id IN (SELECT result->>'reviewId' FROM ai_action_receipts WHERE work_id=?)",company,ids.get("leader"),id));assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",id));}
         finally{db.update("DROP TRIGGER "+trigger+" ON ai_action_receipts");db.update("DROP FUNCTION "+function+"()");}
         var partial=call(200,"GET","/ai/work-items/"+id,"leader",null,null);String key=Db.id();var body=Map.of("version",partial.get("version").asInt());
         for(int i=0;i<20;i++)call(200,"POST","/ai/work-items/"+id+"/retry","leader",body,key);
