@@ -106,7 +106,7 @@ void main() {
   }
 
   testWidgets(
-    'reads real catalog, shows server color and submits database ID',
+    'reads real catalog, supports zero or multiple selections and submits database IDs',
     (t) async {
       await mount(t);
       await t.pumpAndSettle();
@@ -121,60 +121,67 @@ void main() {
       expect(find.text('重要'), findsNothing);
       await t.tap(find.text('门店质量核验'));
       await t.pumpAndSettle();
+      await t.tap(find.text('确定'));
+      await t.pumpAndSettle();
       expect(controller.text, 'db-custom-927');
       expect(form.currentState!.validate(), isTrue);
-      final chip = t.widget<Container>(
-        find.byKey(const ValueKey('task-label-selected')),
-      );
-      expect((chip.decoration as BoxDecoration).color, const Color(0xFFCFE5FF));
+      expect(find.text('门店质量核验'), findsOneWidget);
       await repository.execute(
         'tasks',
         Command('create', {
           'title': '门店核验',
           'participantIds': ['member-1'],
-          'tagId': controller.text,
+          'labelIds': [controller.text],
           'startAt': '2026-11-02T09:00:00+08:00',
           'deadline': '2026-11-03T18:00:00+08:00',
         }, idempotencyKey: 'label-contract'),
       );
       final post = adapter.requests.last;
       expect(post.path, '/tasks');
-      expect(post.data['labelId'], 'db-custom-927');
+      expect(post.data['labelIds'], ['db-custom-927']);
     },
   );
 
-  testWidgets('loading catalog blocks submission', (t) async {
+  testWidgets('loading catalog still permits an optional zero-label task', (
+    t,
+  ) async {
     adapter.hold = Completer<void>();
     await mount(t);
     expect(find.text('正在加载标签…'), findsOneWidget);
-    expect(form.currentState!.validate(), isFalse);
+    expect(form.currentState!.validate(), isTrue);
     adapter.hold!.complete();
     await t.pumpAndSettle();
-    expect(find.text('选择标签'), findsOneWidget);
+    expect(find.text('可不选，点击选择标签'), findsOneWidget);
   });
 
-  testWidgets('failed catalog offers retry without fixed fallback', (t) async {
-    adapter.status = 400;
-    await mount(t);
-    await t.pumpAndSettle();
-    expect(find.text('标签加载失败，请重试'), findsOneWidget);
-    expect(form.currentState!.validate(), isFalse);
-    expect(find.text('重要'), findsNothing);
-    adapter.status = 200;
-    await t.tap(find.text('重新加载标签'));
-    await t.pumpAndSettle();
-    expect(find.text('选择标签'), findsOneWidget);
-    expect(adapter.requests.length, 2);
-  });
+  testWidgets(
+    'failed catalog offers retry and still permits an optional zero-label task',
+    (t) async {
+      adapter.status = 400;
+      await mount(t);
+      await t.pumpAndSettle();
+      expect(find.text('标签加载失败，请重试'), findsOneWidget);
+      expect(form.currentState!.validate(), isTrue);
+      expect(find.text('重要'), findsNothing);
+      adapter.status = 200;
+      await t.tap(find.text('重新加载标签'));
+      await t.pumpAndSettle();
+      expect(find.text('可不选，点击选择标签'), findsOneWidget);
+      expect(adapter.requests.length, 2);
+    },
+  );
 
-  testWidgets('empty catalog blocks submit and permits refresh', (t) async {
-    adapter.labels.clear();
-    await mount(t);
-    await t.pumpAndSettle();
-    expect(find.text('当前没有可用标签'), findsOneWidget);
-    expect(form.currentState!.validate(), isFalse);
-    expect(find.text('刷新标签'), findsOneWidget);
-  });
+  testWidgets(
+    'empty catalog permits an optional zero-label task and permits refresh',
+    (t) async {
+      adapter.labels.clear();
+      await mount(t);
+      await t.pumpAndSettle();
+      expect(find.text('可不选，点击选择标签'), findsOneWidget);
+      expect(form.currentState!.validate(), isTrue);
+      expect(find.text('刷新标签'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'async editing backfill shows valid label; disabled ID requires replacement',
@@ -205,4 +212,26 @@ void main() {
     expect(form.currentState!.validate(), isFalse);
     expect(find.byKey(const ValueKey('task-label-selected')), findsNothing);
   });
+
+  testWidgets(
+    'multiple labels retain selected IDs in a stable transport value',
+    (t) async {
+      adapter.labels.add({
+        'id': 'db-second',
+        'name': '第二标签',
+        'color': '#FFDDAA',
+        'status': 'ACTIVE',
+      });
+      await mount(t);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('task-label-select')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('门店质量核验'));
+      await t.tap(find.text('第二标签'));
+      await t.tap(find.text('确定'));
+      await t.pumpAndSettle();
+      expect(controller.text.split(','), ['db-custom-927', 'db-second']);
+      expect(form.currentState!.validate(), isTrue);
+    },
+  );
 }

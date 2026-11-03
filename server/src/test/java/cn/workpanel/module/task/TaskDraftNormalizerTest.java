@@ -56,6 +56,16 @@ class TaskDraftNormalizerTest {
         many.removeLast(); assertEquals(100,TaskDraftNormalizer.normalize(with("attachments",many)).attachments().size());
     }
 
+    @Test void labelsAreOptionalDeduplicatedAndRejectConflictingLegacyField() {
+        assertEquals(List.of(),TaskDraftNormalizer.normalize(base()).labelIds());
+        var multi=with("labelIds",List.of("l-b","l-a","l-b"));
+        assertEquals(List.of("l-a","l-b"),TaskDraftNormalizer.normalize(multi).labelIds());
+        multi.put("labelId","l-a");
+        assertEquals("LABEL_CONTRACT_CONFLICT",code(multi));
+        var compatible=with("labelIds",List.of("l-a")); compatible.put("labelId","l-a");
+        assertEquals(List.of("l-a"),TaskDraftNormalizer.normalize(compatible).labelIds());
+    }
+
     @Test void hashIgnoresOrderAndDuplicates() {
         var a=base(); a.put("participants",List.of("u-owner","u-a","u-b")); a.put("attachments",List.of("f1","f2"));
         var b=base(); b.put("participants",List.of("u-b","u-owner","u-a","u-a")); b.put("attachments",List.of("f2","f1")); b.put("urgency","NORMAL");

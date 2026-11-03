@@ -85,12 +85,24 @@ class AttachmentAdapter implements HttpClientAdapter {
                   'name': '第二页负责人',
                   'status': 'ACTIVE',
                   'department': '产品部',
+                  'team_name': '任务组',
+                  'taskSelectable': true,
+                  'organizationPath': [
+                    {'id': 'dept-product', 'name': '产品部', 'kind': 'DEPARTMENT'},
+                    {'id': 'team-task', 'name': '任务组', 'kind': 'TEAM'},
+                  ],
                 }
               : {
                   'id': 'first',
                   'name': '第一页成员',
                   'status': 'ACTIVE',
                   'department': '产品部',
+                  'team_name': '任务组',
+                  'taskSelectable': true,
+                  'organizationPath': [
+                    {'id': 'dept-product', 'name': '产品部', 'kind': 'DEPARTMENT'},
+                    {'id': 'team-task', 'name': '任务组', 'kind': 'TEAM'},
+                  ],
                 },
           if (!later) {'id': 'pending', 'name': '待确认成员', 'status': 'PENDING'},
         ],
@@ -545,7 +557,7 @@ void main() {
     },
   );
   testWidgets(
-    'paged people search passes server search and dispatch flag; inactive people excluded',
+    'organization picker pages through department, team and person and searches path',
     (t) async {
       final c = await launch(t, '/form/dispatch');
       await t.pumpWidget(
@@ -559,6 +571,33 @@ void main() {
       );
       await settle(t);
       expect(find.text('待确认成员'), findsNothing);
+      expect(find.text('产品部'), findsOneWidget);
+      // 每页只展示一层：部门 → 团队 → 人员，返回入口逐级回退。
+      expect(find.text('任务组'), findsNothing);
+      expect(find.text('第一页成员'), findsNothing);
+      await t.tap(find.text('产品部'));
+      await t.pumpAndSettle();
+      expect(find.text('任务组'), findsOneWidget);
+      expect(find.text('第一页成员'), findsNothing);
+      await t.tap(find.byTooltip('返回上一级'));
+      await t.pumpAndSettle();
+      expect(find.text('任务组'), findsNothing);
+      await t.tap(find.text('产品部'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('任务组'));
+      await t.pumpAndSettle();
+      expect(find.text('第一页成员'), findsOneWidget);
+      await t.tap(find.byTooltip('返回上一级'));
+      await t.pumpAndSettle();
+      expect(find.text('第一页成员'), findsNothing);
+      await t.tap(find.byTooltip('返回上一级'));
+      await t.pumpAndSettle();
+      expect(find.text('任务组'), findsNothing);
+      await t.tap(find.text('产品部'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('任务组'));
+      await t.pumpAndSettle();
+      await t.ensureVisible(find.text('加载更多成员'));
       await t.tap(find.text('加载更多成员'));
       await settle(t);
       expect(find.text('第二页负责人'), findsOneWidget);
@@ -571,6 +610,14 @@ void main() {
       expect(request.queryParameters['search'], '产品');
       expect(request.queryParameters['dispatch'], true);
       expect(request.queryParameters.containsKey('cursor'), isFalse);
+      // 命中后按组织路径展示部门、团队节点，人员挂在节点下。
+      expect(find.text('产品部'), findsOneWidget);
+      expect(find.text('任务组'), findsOneWidget);
+      expect(find.text('第一页成员'), findsOneWidget);
+      await t.tap(find.text('产品部'));
+      await settle(t);
+      expect(find.text('任务组'), findsOneWidget);
+      expect(find.text('第一页成员'), findsNothing);
       await close(t);
     },
   );
@@ -637,13 +684,27 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(primary);
       await settle(t);
-      await t.tap(find.text('第一页成员'));
+      await t.tap(find.text('产品部'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('任务组'));
+      await t.pumpAndSettle();
+      await t.tap(
+        find.descendant(
+          of: find.byType(PersonPicker),
+          matching: find.text('第一页成员'),
+        ),
+      );
       await t.pumpAndSettle();
       for (var i = 0; i < 2; i++) {
         await t.ensureVisible(primary);
         await t.pumpAndSettle();
         await t.tap(primary);
         await settle(t);
+        await t.tap(find.text('产品部'));
+        await t.pumpAndSettle();
+        await t.tap(find.text('任务组'));
+        await t.pumpAndSettle();
+        await t.ensureVisible(find.text('加载更多成员'));
         await t.tap(find.text('加载更多成员'));
         await settle(t);
         await t.tap(
@@ -655,10 +716,12 @@ void main() {
         await t.pumpAndSettle();
       }
       expect(find.widgetWithText(InputChip, '第二页负责人'), findsOneWidget);
-      await t.ensureVisible(find.text('选择标签'));
-      await t.tap(find.text('选择标签'));
+      await t.ensureVisible(find.byKey(const ValueKey('task-label-select')));
+      await t.tap(find.byKey(const ValueKey('task-label-select')));
       await t.pumpAndSettle();
       await t.tap(find.text('重要'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('确定').last);
       await t.pumpAndSettle();
       await choose(t);
       await t.tap(find.widgetWithText(FilledButton, '派发任务'));
@@ -679,7 +742,7 @@ void main() {
               as Map;
       expect(body['participants'], ['first', 'second']);
       expect(body['attachments'], ['uploaded-1']);
-      expect(body['labelId'], 'database-label-important');
+      expect(body['labelIds'], ['database-label-important']);
       expect(body.keys.contains('status'), isFalse);
       await close(t);
     },

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
-import 'premium_pickers.dart';
 
-/// Uses the same server label records projected into task-management rows.
-/// The controller stores only the label ID; names are never submitted as IDs.
+/// Existing task-form label surface with optional, zero-or-more selection.
+/// IDs are kept in the controller as a comma-separated transport value; names
+/// and colours always come from the server catalogue.
 class TaskLabelSelector extends ConsumerWidget {
   const TaskLabelSelector({
     super.key,
@@ -20,10 +20,15 @@ class TaskLabelSelector extends ConsumerWidget {
   final String? historicalName;
   final VoidCallback? onChanged;
 
+  Set<String> _ids(String value) => value
+      .split(',')
+      .map((id) => id.trim())
+      .where((id) => id.isNotEmpty)
+      .toSet();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final catalog = ref.watch(recordsProvider('task-labels'));
-    // Do not offer stale cached values while refreshing or after a failed fetch.
     final labels = catalog.isLoading || catalog.hasError
         ? <Record>[]
         : (catalog.valueOrNull?.items ?? <Record>[])
@@ -32,19 +37,21 @@ class TaskLabelSelector extends ConsumerWidget {
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
+        final selectedIds = _ids(value.text);
         final selected = labels
-            .where((label) => label.id == value.text)
-            .firstOrNull;
+            .where((label) => selectedIds.contains(label.id))
+            .toList();
+        final unavailable = selectedIds.difference(
+          labels.map((e) => e.id).toSet(),
+        );
         return FormField<String>(
           initialValue: value.text,
           validator: (_) {
+            // 标签本身是可选项；没有选择任何标签时，目录加载/刷新不应阻止派发。
+            if (selectedIds.isEmpty) return null;
             if (catalog.isLoading) return '标签正在加载，请稍后提交';
             if (catalog.hasError) return '请重新加载标签后再提交';
-            if (labels.isEmpty) return '当前没有可用标签';
-            if (controller.text.isEmpty) return '请选择标签';
-            if (!labels.any((label) => label.id == controller.text)) {
-              return '原标签已停用或不可选，请重新选择';
-            }
+            if (unavailable.isNotEmpty) return '原标签已停用或不可选，请重新选择';
             return null;
           },
           builder: (state) => Column(
@@ -67,21 +74,14 @@ class TaskLabelSelector extends ConsumerWidget {
                 InkWell(
                   key: const ValueKey('task-label-select'),
                   borderRadius: BorderRadius.circular(18),
-                  onTap: !enabled || labels.isEmpty
+                  onTap: !enabled
                       ? null
                       : () async {
                           final session = ref.read(sessionProvider);
-                          final choice = await showPremiumTagPicker(
+                          final choice = await _showLabelSheet(
                             context,
-                            options: [
-                              for (final label in labels)
-                                PremiumTagOption(
-                                  label.id,
-                                  label.title,
-                                  _color(label.fields['color']),
-                                ),
-                            ],
-                            selected: controller.text,
+                            labels,
+                            selectedIds,
                           );
                           if (choice == null || !context.mounted) return;
                           final currentSession = ref.read(sessionProvider);
@@ -92,19 +92,24 @@ class TaskLabelSelector extends ConsumerWidget {
                           final current = ref.read(
                             recordsProvider('task-labels'),
                           );
+                          final active =
+                              current.valueOrNull?.items
+                                  .where(
+                                    (label) =>
+                                        label.fields['status'] == 'ACTIVE',
+                                  )
+                                  .map((label) => label.id)
+                                  .toSet() ??
+                              <String>{};
                           if (current.isLoading ||
                               current.hasError ||
-                              !(current.valueOrNull?.items.any(
-                                    (label) =>
-                                        label.id == choice &&
-                                        label.fields['status'] == 'ACTIVE',
-                                  ) ??
-                                  false)) {
+                              !active.containsAll(choice)) {
                             state.validate();
                             return;
                           }
-                          controller.text = choice;
-                          state.didChange(choice);
+                          final ordered = choice.toList()..sort();
+                          controller.text = ordered.join(',');
+                          state.didChange(controller.text);
                           state.validate();
                           onChanged?.call();
                         },
@@ -113,27 +118,33 @@ class TaskLabelSelector extends ConsumerWidget {
                     child: Row(
                       children: [
                         Expanded(
-                          child: selected == null
-                              ? Text(labels.isEmpty ? '当前没有可用标签' : '选择标签')
-                              : Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Container(
-                                    key: const ValueKey('task-label-selected'),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 7,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _color(selected.fields['color']),
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                    child: Text(
-                                      selected.title,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
+                          child: selected.isEmpty
+                              ? const Text('可不选，点击选择标签')
+                              : Wrap(
+                                  key: const ValueKey('task-label-selected'),
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: [
+                                    for (final label in selected)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 7,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _color(label.fields['color']),
+                                          borderRadius: BorderRadius.circular(
+                                            18,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          label.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
+                                  ],
                                 ),
                         ),
                         const Icon(Icons.expand_more_rounded),
@@ -148,7 +159,7 @@ class TaskLabelSelector extends ConsumerWidget {
                         : null,
                     child: const Text('刷新标签'),
                   ),
-                if (value.text.isNotEmpty && selected == null)
+                if (unavailable.isNotEmpty)
                   Text(
                     '原标签：${historicalName?.trim().isNotEmpty == true ? historicalName : '名称未提供'}（已停用或不可选，请重新选择）',
                   ),
@@ -165,6 +176,16 @@ class TaskLabelSelector extends ConsumerWidget {
     );
   }
 
+  Future<Set<String>?> _showLabelSheet(
+    BuildContext context,
+    List<Record> labels,
+    Set<String> selected,
+  ) => showModalBottomSheet<Set<String>>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => _TaskLabelSheet(labels: labels, selected: selected),
+  );
+
   static Color _color(dynamic raw) {
     final hex = '$raw'.replaceFirst('#', '');
     final value = RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)
@@ -172,4 +193,74 @@ class TaskLabelSelector extends ConsumerWidget {
         : null;
     return value == null ? Colors.grey.shade200 : Color(0xFF000000 | value);
   }
+}
+
+class _TaskLabelSheet extends StatefulWidget {
+  const _TaskLabelSheet({required this.labels, required this.selected});
+  final List<Record> labels;
+  final Set<String> selected;
+  @override
+  State<_TaskLabelSheet> createState() => _TaskLabelSheetState();
+}
+
+class _TaskLabelSheetState extends State<_TaskLabelSheet> {
+  late final Set<String> selected = {...widget.selected};
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '选择标签',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final label in widget.labels)
+                FilterChip(
+                  label: Text(label.title),
+                  selected: selected.contains(label.id),
+                  selectedColor: TaskLabelSelector._color(
+                    label.fields['color'],
+                  ),
+                  onSelected: (value) => setState(() {
+                    if (value) {
+                      selected.add(label.id);
+                    } else {
+                      selected.remove(label.id);
+                    }
+                  }),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, selected),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

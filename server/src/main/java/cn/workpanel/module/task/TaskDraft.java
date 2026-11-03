@@ -4,10 +4,11 @@ import java.util.*;
 
 /** 规范化后的任务候选：参与人是无角色的去重集合。 */
 public record TaskDraft(String title,List<String> participants,String startAt,String deadline,String urgency,
-                        String group,String content,String labelId,List<String> attachments,
+                        String group,String content,List<String> labelIds,List<String> attachments,
                         List<Map<String,Object>> acceptanceChecklist) {
     public TaskDraft {
         participants=List.copyOf(participants);
+        labelIds=List.copyOf(labelIds);
         attachments=List.copyOf(attachments);
         acceptanceChecklist=List.copyOf(acceptanceChecklist);
     }
@@ -15,17 +16,19 @@ public record TaskDraft(String title,List<String> participants,String startAt,St
     /** 仅供仍在编译的历史模块和迁移测试读取；新接口不得使用负责人/协作人语义。 */
     @Deprecated public TaskDraft(String title,String ownerId,String deadline,String urgency,String group,String content,
                                  String ignoredProgressNote,List<String> collaborators,List<String> attachments) {
-        this(title, legacyParticipants(ownerId,collaborators), null, deadline, urgency, group, content, null, attachments, List.of());
+        this(title, legacyParticipants(ownerId,collaborators), null, deadline, urgency, group, content, List.of(), attachments, List.of());
     }
     /** 兼容主线既有交付清单输入，但不恢复负责人/协作人语义。 */
     @Deprecated public TaskDraft(String title,String ownerId,String deadline,String urgency,String group,String content,
                                  String ignoredProgressNote,List<String> collaborators,List<String> attachments,
                                  List<Map<String,Object>> acceptanceChecklist) {
-        this(title, legacyParticipants(ownerId,collaborators), null, deadline, urgency, group, content, null, attachments, acceptanceChecklist);
+        this(title, legacyParticipants(ownerId,collaborators), null, deadline, urgency, group, content, List.of(), attachments, acceptanceChecklist);
     }
     @Deprecated public String ownerId() { return participants.isEmpty()?"":participants.getFirst(); }
     @Deprecated public List<String> collaborators() { return participants.size()<2?List.of():participants.subList(1,participants.size()); }
     @Deprecated public String progressNote() { return null; }
+    /** 旧读取方只识别单标签；多标签时不伪造一个主标签。 */
+    @Deprecated public String labelId() { return labelIds.size()==1 ? labelIds.getFirst() : null; }
     private static List<String> legacyParticipants(String ownerId,List<String> collaborators) {
         var ids=new TreeSet<String>(); if(ownerId!=null&&!ownerId.isBlank()) ids.add(ownerId);
         if(collaborators!=null) ids.addAll(collaborators); return List.copyOf(ids);
@@ -35,7 +38,7 @@ public record TaskDraft(String title,List<String> participants,String startAt,St
     public Map<String,Object> body() {
         var m=new TreeMap<String,Object>();
         m.put("title",title); m.put("participants",participants); m.put("deadline",deadline); m.put("urgency",urgency);
-        if(startAt!=null) m.put("startAt",startAt); if(group!=null) m.put("group",group); if(content!=null) m.put("content",content); if(labelId!=null) m.put("labelId",labelId);
+        if(startAt!=null) m.put("startAt",startAt); if(group!=null) m.put("group",group); if(content!=null) m.put("content",content); m.put("labelIds",labelIds);
         m.put("attachments",attachments);
         if(!acceptanceChecklist.isEmpty()) m.put("acceptanceChecklist",acceptanceChecklist);
         return m;

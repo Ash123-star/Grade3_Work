@@ -7,6 +7,15 @@ const taskTagLabels = <String, String>{
 };
 
 String taskTagLabel(Map<String, dynamic> fields) {
+  final labels = fields['labels'];
+  if (labels is List) {
+    final names = labels
+        .whereType<Map>()
+        .map((label) => '${label['name'] ?? label['title'] ?? ''}'.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
+    if (names.isNotEmpty) return names.join('、');
+  }
   final id = '${fields['tagId'] ?? fields['tag_id'] ?? fields['标签'] ?? ''}'
       .trim();
   final label = '${fields['tagName'] ?? fields['tag_name'] ?? ''}'.trim();
