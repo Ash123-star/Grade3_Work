@@ -1,0 +1,167 @@
+{
+  "recordedAt": "2026-11-03",
+  "issue": 58,
+  "base": "19db6f3",
+  "branch": "feature/58-calendar-task-drag",
+  "environment": {
+    "api": "Docker / Temurin21 / Flyway V22",
+    "data": "Docker PostgreSQL16 / Redis",
+    "android": "Codex_Calendar58_API37 / emulator-5556 / SwiftShader"
+  },
+  "live": {
+    "taskId": "calendar-373c2d9d87-task",
+    "moveReviewId": "73c6827a-1754-410d-bd6d-446a37e15b8c",
+    "originalVersion": 1,
+    "beforeStart": "2026-12-29T01:00:00.000Z",
+    "beforeDeadline": "2026-12-31T10:00:00.000Z",
+    "approvedVersion": 2,
+    "afterStart": "2026-12-31T01:00:00.000Z",
+    "afterDeadline": "2027-01-02T10:00:00.000Z",
+    "createReviewId": "91a9d205-aa55-4f3a-a646-5ae1f3059757",
+    "createdTaskId": "e6691a34-9cdc-4ae3-ba29-052b5be48f99"
+  },
+  "restartReplay": {
+    "api": "workpanel-calendar58-api",
+    "taskId": "calendar-373c2d9d87-task",
+    "before": {
+      "status": 200,
+      "id": "73c6827a-1754-410d-bd6d-446a37e15b8c",
+      "result": "APPROVED"
+    },
+    "after": {
+      "status": 200,
+      "id": "73c6827a-1754-410d-bd6d-446a37e15b8c",
+      "result": "APPROVED"
+    },
+    "commandCount": 1,
+    "rescheduleEventCount": 1
+  },
+  "profile": {
+    "mode": "profile",
+    "device": "emulator-5556 / API37 / swiftshader",
+    "dragCount": 10,
+    "frameCount": 233,
+    "slowFrameCount": 233,
+    "slowFrameRatio": 1,
+    "over100msCount": 0,
+    "maxSpanUs": 57938,
+    "performanceTargetMet": false,
+    "samples": [
+      {
+        "iteration": 1,
+        "frames": 22
+      },
+      {
+        "iteration": 2,
+        "frames": 24
+      },
+      {
+        "iteration": 3,
+        "frames": 23
+      },
+      {
+        "iteration": 4,
+        "frames": 24
+      },
+      {
+        "iteration": 5,
+        "frames": 24
+      },
+      {
+        "iteration": 6,
+        "frames": 22
+      },
+      {
+        "iteration": 7,
+        "frames": 24
+      },
+      {
+        "iteration": 8,
+        "frames": 24
+      },
+      {
+        "iteration": 9,
+        "frames": 24
+      },
+      {
+        "iteration": 10,
+        "frames": 22
+      }
+    ]
+  },
+  "disclaimer": "Synthetic fixture only; profile script exit 0 confirms measurements and gestures, not performance acceptance. No tokens or credentials included.",
+  "releaseApk": {
+    "entrypoint": "lib/main.dart",
+    "mock": false,
+    "apiBaseUrl": "http://10.0.2.2:18088/api",
+    "sizeBytes": 122909455,
+    "sha256": "338590B39EF4412C8A2FDC0CEC65CB8F78DAB332CEB1DB2DC8FEF1B451888F83",
+    "exitCode": 0,
+    "signing": "existing debug key, internal verification only",
+    "fixtureScan": {
+      "exitCode": 0,
+      "abiLibrariesChecked": 3,
+      "testTokensFound": false,
+      "fixtureTaskIdFound": false
+    }
+  },
+  "openspec": {
+    "command": "openspec.cmd validate --all --strict",
+    "exitCode": 0,
+    "passed": 41,
+    "failed": 0
+  },
+  "profileBeforeOptimization": {
+    "mode": "profile",
+    "device": "emulator-5556 / API37 / swiftshader",
+    "dragCount": 10,
+    "frameCount": 211,
+    "slowFrameCount": 211,
+    "slowFrameRatio": 1,
+    "over100msCount": 0,
+    "maxSpanUs": 47649,
+    "performanceTargetMet": false,
+    "samples": [
+      {
+        "iteration": 1,
+        "frames": 21
+      },
+      {
+        "iteration": 2,
+        "frames": 21
+      },
+      {
+        "iteration": 3,
+        "frames": 21
+      },
+      {
+        "iteration": 4,
+        "frames": 22
+      },
+      {
+        "iteration": 5,
+        "frames": 21
+      },
+      {
+        "iteration": 6,
+        "frames": 21
+      },
+      {
+        "iteration": 7,
+        "frames": 21
+      },
+      {
+        "iteration": 8,
+        "frames": 21
+      },
+      {
+        "iteration": 9,
+        "frames": 21
+      },
+      {
+        "iteration": 10,
+        "frames": 21
+      }
+    ]
+  }
+}
