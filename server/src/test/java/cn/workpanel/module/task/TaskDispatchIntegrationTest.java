@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,10 +27,22 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties={
     // 与全仓端到端测试复用同一个临时数据库时，必须采用同一初始管理员，避免测试顺序导致登录夹具不一致。
     "app.admin-account=integration-admin", "app.admin-password=Initial-test-password-2026",
-    "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.jobs-enabled=false"
+    "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.jobs-enabled=false", "workpanel.calendar.move-enabled=true"
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TaskDispatchIntegrationTest {
+    static final class CalendarTestClock extends Clock {
+        volatile Clock delegate = Clock.systemUTC();
+        public ZoneId getZone() { return delegate.getZone(); }
+        public Clock withZone(ZoneId zone) { return Clock.fixed(instant(), zone); }
+        public Instant instant() { return delegate.instant(); }
+    }
+    @TestConfiguration static class CalendarTestConfig {
+        @Bean CalendarTestClock calendarTestClock() { return new CalendarTestClock(); }
+        @Bean @Primary ScheduleConstraints calendarTestConstraints(CalendarTestClock clock) { return new ScheduleConstraints(true, clock); }
+    }
+    @Autowired CalendarTestClock calendarClock;
+    @Autowired ScheduleConstraints calendarConstraints;
     @LocalServerPort int port;
     @Autowired Db db;
     @Autowired JdbcTemplate jdbc;
@@ -133,7 +148,7 @@ class TaskDispatchIntegrationTest {
         var leaderPage=list(200,"search="+prefix+"&limit=10","leader");
         assertEquals(2,leaderPage.get("total").asInt());
         assertEquals(Set.of(alice,amy),Set.of(leaderPage.get("items").get(0).get("id").asText(),leaderPage.get("items").get(1).get("id").asText()));
-        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label");
+        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label","capabilities");
         for(JsonNode item:leaderPage.get("items")) {
             var names=new HashSet<String>(); item.fieldNames().forEachRemaining(names::add);
             assertEquals(allowed,names);
@@ -456,7 +471,7 @@ class TaskDispatchIntegrationTest {
         assertEquals("TASK_DELETE",rejected.get("kind").asText());
         assertEquals("DISPATCHED",db.one("SELECT phase FROM tasks WHERE id=?",rejectedTask).get("phase"));
         // 申请人不在审核链中，不能给自己的删除申请作决定。
-        assertEquals("FORBIDDEN",call(403,"POST","/reviews/"+rejected.get("id").asText()+"/decision","leader",
+        assertEquals("SELF_REVIEW",call(403,"POST","/reviews/"+rejected.get("id").asText()+"/decision","leader",
                 Map.of("approve",true,"reason","自审"),null).get("code").asText());
         var firstPending=db.rows("SELECT reviewer_id FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position LIMIT 1",rejected.get("id").asText()).getFirst();
         String rejector=id.entrySet().stream().filter(e->e.getValue().equals(firstPending.get("reviewer_id"))).map(Map.Entry::getKey).findFirst().orElseThrow();
@@ -472,7 +487,7 @@ class TaskDispatchIntegrationTest {
         assertEquals(1,count("SELECT count(*) FROM tasks WHERE id=?",approvedTask));
         assertEquals("ARCHIVED",db.one("SELECT phase FROM tasks WHERE id=?",approvedTask).get("phase"));
         assertEquals(2,((Number)db.one("SELECT version FROM tasks WHERE id=?",approvedTask).get("version")).intValue());
-        assertEquals("TASK_DELETED_BY_REVIEW",db.one("SELECT action FROM audit_logs WHERE object_id=? ORDER BY created_at DESC LIMIT 1",approvedTask).get("action"));
+        assertEquals(1,count("SELECT count(*) FROM audit_records WHERE object_id=? AND type='TASK_DELETED_BY_REVIEW'",approvedTask));
 
         String staleTask=dispatch("leader",body("删除版本冲突任务","alice"),key()).get("id").asText();
         var stale=call(200,"POST","/tasks/"+staleTask+"/deletions","leader",
@@ -555,4 +570,241 @@ class TaskDispatchIntegrationTest {
             call(200,"POST","/reviews/"+reviewId+"/decision",who,Map.of("approve",true,"reason","同意"),null);
         }
     }
+    String constraintsRevision() { return "calendar-v1-"+LocalDate.now(ZoneId.of("Asia/Shanghai")).getYear(); }
+    String finalTaskReviewer(String reviewId) throws Exception {
+        while(true) {
+            var pending=db.rows("SELECT reviewer_id FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position",reviewId);
+            String reviewer=pending.getFirst().get("reviewer_id").toString();
+            String who=id.entrySet().stream().filter(entry->entry.getValue().equals(reviewer)).map(Map.Entry::getKey).findFirst().orElseThrow();
+            if(pending.size()==1)return who;
+            call(200,"POST","/reviews/"+reviewId+"/decision",who,Map.of("approve",true,"reason","逐级独立审核"),null);
+        }
+    }
+    HttpResponse<String> move(String task,String who,Object body,String key,String revision) throws Exception {
+        var builder=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/tasks/"+task+"/reschedules"))
+            .timeout(Duration.ofSeconds(15)).header("Authorization","Bearer "+token.get(who)).header("Content-Type","application/json");
+        if(key!=null)builder.header("Idempotency-Key",key);if(revision!=null)builder.header("If-Schedule-Constraints-Match",revision);
+        return http.send(builder.POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString());
+    }
+    @Test void calendarMovePendingThenApproveAndReplayAcrossVersionChange() throws Exception {
+        var b=body("calendar-move-"+run,"alice");b.put("startAt",OffsetDateTime.parse(deadline).minusDays(2).toString());
+        var task=dispatch("leader",b,key());String taskId=task.get("id").asText(),k=key();
+        var before=db.one("SELECT * FROM tasks WHERE id=?",taskId);var command=Map.of("version",1,"moveDays",2,"reason","  项目排期调整  ");
+        var response=move(taskId,"leader",command,k,constraintsRevision());assertEquals(200,response.statusCode(),response.body());
+        var review=JSON.readTree(response.body());String reviewId=review.get("id").asText();
+        assertEquals("PENDING",review.get("status").asText());assertEquals(1,version(taskId,"leader"));
+        assertEquals(before.get("deadline"),db.one("SELECT deadline FROM tasks WHERE id=?",taskId).get("deadline"));
+        assertEquals(403,send("POST","/reviews/"+reviewId+"/decision","leader",Map.of("approve",true),null).statusCode());
+        approveTaskRevision(reviewId);
+        var after=db.one("SELECT * FROM tasks WHERE id=?",taskId);assertEquals(2,((Number)after.get("version")).intValue());
+        assertEquals(((java.sql.Timestamp)before.get("deadline")).toInstant().plus(Duration.ofDays(2)),((java.sql.Timestamp)after.get("deadline")).toInstant());
+        assertEquals(((java.sql.Timestamp)before.get("start_at")).toInstant().plus(Duration.ofDays(2)),((java.sql.Timestamp)after.get("start_at")).toInstant());
+        assertEquals(before.get("phase"),after.get("phase"));assertEquals(before.get("title"),after.get("title"));
+        var replay=move(taskId,"leader",command,k,constraintsRevision());assertEquals(200,replay.statusCode());
+        assertEquals(reviewId,JSON.readTree(replay.body()).get("id").asText());assertEquals("APPROVED",JSON.readTree(replay.body()).get("status").asText());
+        assertEquals(1,count("SELECT count(*) FROM task_reschedule_commands WHERE task_id=?",taskId));
+        assertEquals(1,count("SELECT count(*) FROM task_events WHERE task_id=? AND type='RESCHEDULED'",taskId));
+        assertEquals(2,call(200,"GET","/tasks/"+taskId,"alice",null,null).get("version").asInt());
+    }
+    @Test void calendarNoReviewerStaysPendingAndRejectionKeepsOriginalSchedule() throws Exception {
+        String task=dispatch("leader",body("calendar-no-reviewer","alice"),key()).get("id").asText();
+        var before=db.one("SELECT start_at,deadline,version FROM tasks WHERE id=?",task);
+        String originalKey=key();var command=Map.of("version",1,"moveDays",1,"reason","等待独立审核");
+        String requestId;
+        jdbc.update("UPDATE users SET company_reviewer=false WHERE id=?",id.get("reviewer"));
+        try {
+            var pending=move(task,"leader",command,originalKey,constraintsRevision());
+            assertEquals(200,pending.statusCode(),pending.body());
+            var review=JSON.readTree(pending.body());requestId=review.get("id").asText();
+            assertEquals("PENDING",review.get("status").asText());
+            assertEquals(0,count("SELECT count(*) FROM review_steps WHERE request_id=?",requestId));
+            assertEquals(403,send("POST","/reviews/"+requestId+"/decision","leader",Map.of("approve",true),null).statusCode());
+            assertEquals(before,db.one("SELECT start_at,deadline,version FROM tasks WHERE id=?",task));
+        } finally { jdbc.update("UPDATE users SET company_reviewer=true WHERE id=?",id.get("reviewer")); }
+        call(200,"POST","/reviews/"+requestId+"/reroute","leader",null,null);
+        var step=db.one("SELECT reviewer_id FROM review_steps WHERE request_id=? ORDER BY position LIMIT 1",requestId);
+        String who=id.entrySet().stream().filter(e->e.getValue().equals(step.get("reviewer_id"))).map(Map.Entry::getKey).findFirst().orElseThrow();
+        call(400,"POST","/reviews/"+requestId+"/decision",who,Map.of("approve",false,"reason"," "),null);
+        var rejected=call(200,"POST","/reviews/"+requestId+"/decision",who,Map.of("approve",false,"reason","原排期更合适"),null);
+        assertEquals("REJECTED",rejected.get("status").asText());
+        assertEquals(before,db.one("SELECT start_at,deadline,version FROM tasks WHERE id=?",task));
+        assertEquals(0,count("SELECT count(*) FROM task_events WHERE task_id=? AND type='RESCHEDULED'",task));
+        var replay=move(task,"leader",command,originalKey,constraintsRevision());
+        assertEquals(200,replay.statusCode(),replay.body());
+        assertEquals("REJECTED",JSON.readTree(replay.body()).get("status").asText());
+        assertEquals(requestId,JSON.readTree(replay.body()).get("id").asText());
+        var retry=move(task,"leader",command,key(),constraintsRevision());
+        assertEquals(200,retry.statusCode(),retry.body());
+        assertNotEquals(requestId,JSON.readTree(retry.body()).get("id").asText());
+        assertEquals(before,db.one("SELECT start_at,deadline,version FROM tasks WHERE id=?",task));
+    }
+    @Test void calendarConcurrentKeysAndSameKeyAreSerialized() throws Exception {
+        String task=dispatch("leader",body("calendar-race","alice"),key()).get("id").asText(),k=key();
+        var command=Map.of("version",1,"moveDays",1,"reason","并发移动");var pool=Executors.newFixedThreadPool(3);
+        try {
+            var a=pool.submit(()->move(task,"leader",command,k,constraintsRevision()));
+            var b=pool.submit(()->move(task,"leader",command,k,constraintsRevision()));
+            var ra=a.get(20,TimeUnit.SECONDS);var rb=b.get(20,TimeUnit.SECONDS);
+            assertEquals(200,ra.statusCode(),ra.body());assertEquals(200,rb.statusCode(),rb.body());
+            assertEquals(JSON.readTree(ra.body()).get("id"),JSON.readTree(rb.body()).get("id"));
+            var other=move(task,"leader",command,key(),constraintsRevision());assertEquals(409,other.statusCode());assertEquals("RESCHEDULE_PENDING",JSON.readTree(other.body()).get("code").asText());
+            var conflict=move(task,"leader",Map.of("version",1,"moveDays",2,"reason","并发移动"),k,constraintsRevision());assertEquals(409,conflict.statusCode());
+            assertEquals("IDEMPOTENCY_CONFLICT",JSON.readTree(conflict.body()).get("code").asText());
+        } finally {pool.shutdownNow();}
+        assertEquals(1,count("SELECT count(*) FROM task_reschedule_commands WHERE task_id=?",task));
+    }
+    @Test void calendarRejectsMalformedModesTypesPermissionsAndConstraintChanges() throws Exception {
+        String task=dispatch("leader",body("calendar-invalid","alice"),key()).get("id").asText();
+        var valid=Map.of("version",1,"moveDays",1,"reason","移动");
+        assertEquals(400,move(task,"leader",valid,key(),null).statusCode());
+        assertEquals(409,move(task,"leader",valid,key(),"calendar-v1-2020").statusCode());
+        for(Object days:List.of(0,"1",true,1.0,2147483648L))assertEquals(400,move(task,"leader",Map.of("version",1,"moveDays",days,"reason","移动"),key(),constraintsRevision()).statusCode());
+        assertEquals(400,move(task,"leader",Map.of("version",1,"moveDays",1,"deadline",deadline,"reason","移动"),key(),constraintsRevision()).statusCode());
+        assertEquals(400,move(task,"leader",Map.of("version",1,"moveDays",1,"reason","😀".repeat(1001)),key(),constraintsRevision()).statusCode());
+        for(String who:List.of("alice","pending","muted"))
+            assertEquals(403,move(task,who,valid,key(),constraintsRevision()).statusCode(),who);
+        // Disabled accounts have their session rejected before task authorization.
+        assertEquals(401,move(task,"disabled",valid,key(),constraintsRevision()).statusCode());
+        assertEquals(404,move(task,"outsider",valid,key(),constraintsRevision()).statusCode());
+        assertEquals(0,count("SELECT count(*) FROM task_reschedule_commands WHERE task_id=?",task));
+    }
+    @Test void calendarRangeUsesIntersectionSnapshotAndTerminalCursor() throws Exception {
+        String prefix="calendar-range-"+UUID.randomUUID();var b=body(prefix,"alice");
+        b.put("startAt","2026-10-30T09:00+08:00");b.put("deadline","2026-11-03T18:00+08:00");
+        // 已有归档时间仍可按原创建用例读取；直接组织数据夹具避开创建截止必须未来的规则。
+        String one=Db.id(),two=Db.id();
+        for(String task:List.of(one,two)) {
+            jdbc.update("INSERT INTO tasks(id,company_id,issuer_id,owner_id,title,start_at,deadline,body,phase,version) VALUES (?,?,?,?,?,?::timestamptz,?::timestamptz,?::jsonb,'DISPATCHED',1)",task,company,id.get("leader"),id.get("alice"),prefix,b.get("startAt"),b.get("deadline"),JSON.writeValueAsString(b));
+            jdbc.update("INSERT INTO task_participants(company_id,task_id,user_id) VALUES (?,?,?)",company,task,id.get("alice"));
+        }
+        String query="search="+prefix+"&from=2026-11-01T00:00:00Z&to=2026-12-01T00:00:00Z&limit=1";
+        var first=list(200,query,"leader");assertEquals(2,first.get("total").asInt());assertEquals("1",first.get("nextCursor").asText());
+        String token=first.get("snapshotToken").asText();
+        var last=list(200,query+"&cursor=1&snapshotToken="+token,"leader");assertTrue(last.get("nextCursor").isNull());
+        String firstId=first.get("items").get(0).get("id").asText();
+        jdbc.update("UPDATE tasks SET deadline='2026-11-04T18:00:00+08:00' WHERE id=?",firstId);
+        assertEquals("CALENDAR_SNAPSHOT_CHANGED",list(409,query+"&cursor=1&snapshotToken="+token,"leader").get("code").asText());
+        var reordered=list(200,query,"leader");assertEquals(2,reordered.get("total").asInt());
+        String replacement=Db.id();
+        jdbc.update("UPDATE tasks SET start_at='2027-01-01T09:00:00+08:00',deadline='2027-01-02T18:00:00+08:00' WHERE id=?",firstId);
+        jdbc.update("INSERT INTO tasks(id,company_id,issuer_id,owner_id,title,start_at,deadline,body,phase,version) VALUES (?,?,?,?,?,?::timestamptz,?::timestamptz,?::jsonb,'DISPATCHED',1)",replacement,company,id.get("leader"),id.get("alice"),prefix,b.get("startAt"),b.get("deadline"),JSON.writeValueAsString(b));
+        jdbc.update("INSERT INTO task_participants(company_id,task_id,user_id) VALUES (?,?,?)",company,replacement,id.get("alice"));
+        assertEquals(2,list(200,query,"leader").get("total").asInt());
+        assertEquals("CALENDAR_SNAPSHOT_CHANGED",list(409,query+"&cursor=1&snapshotToken="+reordered.get("snapshotToken").asText(),"leader").get("code").asText());
+        jdbc.update("UPDATE tasks SET version=version+1 WHERE id=?",one);
+        assertEquals("CALENDAR_SNAPSHOT_CHANGED",list(409,query+"&cursor=1&snapshotToken="+token,"leader").get("code").asText());
+        list(400,query+"&date=2026-11-01","leader");list(400,query+"&ownerId="+id.get("alice"),"leader");
+        list(400,"from=2026-11-01&to=2026-12-01","leader");
+    }
+    @Test void calendarCommandInsertFailureRollsBackReviewAndOutbox() throws Exception {
+        String task=dispatch("leader",body("calendar-rollback","alice"),key()).get("id").asText();
+        String function="reject_move_"+UUID.randomUUID().toString().replace("-","");
+        jdbc.execute("CREATE FUNCTION "+function+"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected move failure'; END; $$");
+        jdbc.execute("CREATE TRIGGER "+function+" BEFORE INSERT ON task_reschedule_commands FOR EACH ROW WHEN (NEW.task_id='"+task+"') EXECUTE FUNCTION "+function+"()");
+        try {assertTrue(move(task,"leader",Map.of("version",1,"moveDays",1,"reason","回滚"),key(),constraintsRevision()).statusCode()>=400);}
+        finally {jdbc.execute("DROP TRIGGER "+function+" ON task_reschedule_commands");jdbc.execute("DROP FUNCTION "+function+"()");}
+        assertEquals(0,count("SELECT count(*) FROM review_requests WHERE kind='TASK_RESCHEDULE' AND target_id=?",task));
+        assertEquals(0,count("SELECT count(*) FROM task_reschedule_commands WHERE task_id=?",task));assertEquals(1,version(task,"leader"));
+    }
+
+    @Test void exportRuntimeCalendarOpenApiForDelivery() throws Exception {
+        var response=send("GET","/openapi","leader",null,null);assertEquals(200,response.statusCode());
+        java.nio.file.Files.writeString(java.nio.file.Path.of("target/calendar-openapi.json"),response.body(),StandardCharsets.UTF_8);
+    }
+
+    @Test void calendarOldPendingDoesNotBlockNewVersionAndApprovalAppliesOnce() throws Exception {
+        String task=dispatch("leader",body("calendar-new-version","alice"),key()).get("id").asText();
+        var first=move(task,"leader",Map.of("version",1,"moveDays",1,"reason","原版本"),key(),constraintsRevision());
+        assertEquals(200,first.statusCode(),first.body());
+        String old=JSON.readTree(first.body()).get("id").asText();
+        event(task,"alice","RECEIVED",1,null);
+        var next=move(task,"leader",Map.of("version",2,"moveDays",2,"reason","最新版本"),key(),constraintsRevision());
+        assertEquals(200,next.statusCode(),next.body());
+        String review=JSON.readTree(next.body()).get("id").asText();
+        assertEquals(409,send("POST","/reviews/"+old+"/decision",finalTaskReviewer(old),Map.of("approve",true,"reason","旧申请"),null).statusCode());
+        String finalReviewer=finalTaskReviewer(review);
+        var pool=Executors.newFixedThreadPool(2);
+        try {
+            var a=pool.submit(()->send("POST","/reviews/"+review+"/decision",finalReviewer,Map.of("approve",true,"reason","同意"),null));
+            var b=pool.submit(()->send("POST","/reviews/"+review+"/decision",finalReviewer,Map.of("approve",true,"reason","同意"),null));
+            var ra=a.get(20,TimeUnit.SECONDS);var rb=b.get(20,TimeUnit.SECONDS);
+            assertTrue(ra.statusCode()==200 || rb.statusCode()==200,ra.body()+rb.body());
+            assertTrue(Set.of(200,409).contains(ra.statusCode()),ra.body());
+            assertTrue(Set.of(200,409).contains(rb.statusCode()),rb.body());
+        } finally {pool.shutdownNow();}
+        assertEquals(3,version(task,"leader"));
+        assertEquals(1,count("SELECT count(*) FROM task_events WHERE task_id=? AND type='RESCHEDULED'",task));
+        assertEquals(2,count("SELECT count(*) FROM task_reschedule_commands WHERE task_id=?",task));
+    }
+
+    @Test void calendarRevokedDispatchPreventsReplayAndApproval() throws Exception {
+        String task=dispatch("leader",body("calendar-revoked","alice"),key()).get("id").asText(),key=key();
+        var command=Map.of("version",1,"moveDays",1,"reason","权限复核");
+        var result=move(task,"leader",command,key,constraintsRevision());assertEquals(200,result.statusCode(),result.body());
+        String review=JSON.readTree(result.body()).get("id").asText();
+        String finalReviewer=finalTaskReviewer(review);
+        jdbc.update("UPDATE users SET dispatch_enabled=false WHERE id=?",id.get("leader"));
+        try {
+            assertEquals(403,move(task,"leader",command,key,constraintsRevision()).statusCode());
+            var response=send("POST","/reviews/"+review+"/decision",finalReviewer,Map.of("approve",true,"reason","同意"),null);
+            assertTrue(response.statusCode()>=400,response.body());
+            assertEquals(1,version(task,"leader"));
+            assertEquals(0,count("SELECT count(*) FROM task_events WHERE task_id=? AND type='RESCHEDULED'",task));
+        } finally {jdbc.update("UPDATE users SET dispatch_enabled=true WHERE id=?",id.get("leader"));}
+    }
+
+    @Test void calendarReplayKeepsArchivedConstraintsAcrossNewYear() throws Exception {
+        String task=dispatch("leader",body("calendar-year-replay","alice"),key()).get("id").asText(),key=key();
+        int year=LocalDate.now(ZoneId.of("Asia/Shanghai")).getYear();
+        // Historical fixture at the original inclusive minimum becomes outside the new-year window.
+        String historical=LocalDate.of(year-2,1,1).atTime(18,0).atOffset(ZoneOffset.ofHours(8)).toString();
+        jdbc.update("UPDATE tasks SET start_at=NULL,deadline=?::timestamptz,body=jsonb_set(body,'{deadline}',to_jsonb(?::text)) WHERE id=?",historical,historical,task);
+        calendarClock.delegate=Clock.fixed(LocalDate.of(year,12,31).atTime(23,59).atZone(ZoneId.of("Asia/Shanghai")).toInstant(),ZoneOffset.UTC);
+        try {
+            String originalRevision=calendarConstraints.revision();
+            var command=Map.of("version",1,"moveDays",1,"reason","跨年同键确认");
+            var first=move(task,"leader",command,key,originalRevision);assertEquals(200,first.statusCode(),first.body());
+            String review=JSON.readTree(first.body()).get("id").asText();
+            calendarClock.delegate=Clock.fixed(LocalDate.of(year+1,1,1).atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant(),ZoneOffset.UTC);
+            assertNotEquals(originalRevision,calendarConstraints.revision());
+            var replay=move(task,"leader",command,key,originalRevision);assertEquals(200,replay.statusCode(),replay.body());
+            assertEquals(review,JSON.readTree(replay.body()).get("id").asText());
+            assertEquals("SCHEDULE_CONSTRAINTS_CHANGED",JSON.readTree(move(task,"leader",command,key(),originalRevision).body()).get("code").asText());
+            approveTaskRevision(review);
+            var terminal=move(task,"leader",command,key,originalRevision);assertEquals(200,terminal.statusCode(),terminal.body());
+            assertEquals("APPROVED",JSON.readTree(terminal.body()).get("status").asText());
+            assertEquals(2,version(task,"leader"));
+            assertEquals(1,count("SELECT count(*) FROM task_reschedule_commands WHERE task_id=?",task));
+            assertEquals(1,count("SELECT count(*) FROM task_events WHERE task_id=? AND type='RESCHEDULED'",task));
+        } finally { calendarClock.delegate=Clock.systemUTC(); }
+    }
+
+    @Test void calendarTwoDifferentKeysRaceForOnePendingVersion() throws Exception {
+        String task=dispatch("leader",body("calendar-distinct-race","alice"),key()).get("id").asText();
+        var command=Map.of("version",1,"moveDays",1,"reason","双键争抢");
+        var pool=Executors.newFixedThreadPool(2);var gate=new CountDownLatch(1);
+        try {
+            var a=pool.submit(()->{gate.await();return move(task,"leader",command,key(),constraintsRevision());});
+            var b=pool.submit(()->{gate.await();return move(task,"leader",command,key(),constraintsRevision());});
+            gate.countDown();var ra=a.get(20,TimeUnit.SECONDS);var rb=b.get(20,TimeUnit.SECONDS);
+            assertEquals(Set.of(200,409),Set.of(ra.statusCode(),rb.statusCode()),ra.body()+rb.body());
+            var denied=ra.statusCode()==409?ra:rb;
+            assertEquals("RESCHEDULE_PENDING",JSON.readTree(denied.body()).get("code").asText());
+            assertEquals(1,count("SELECT count(*) FROM task_reschedule_commands WHERE task_id=?",task));
+            assertEquals(1,version(task,"leader"));
+        } finally {pool.shutdownNow();}
+    }
+
+    @Test void calendarDensityLimitAndEmptyTerminalSnapshotAreExplicit() throws Exception {
+        String prefix="calendar-density-"+UUID.randomUUID();
+        String query="search="+prefix+"&from=2026-11-01T00:00:00Z&to=2026-12-01T00:00:00Z&limit=100";
+        var empty=list(200,query,"leader");assertEquals(0,empty.get("total").asInt());assertTrue(empty.get("nextCursor").isNull());
+        jdbc.update("INSERT INTO tasks(id,company_id,issuer_id,owner_id,title,deadline,body,phase,version) SELECT ?||n,?,?,?,?,'2026-11-15T18:00:00+08:00','{}','DISPATCHED',1 FROM generate_series(1,5000) n",prefix,company,id.get("leader"),id.get("alice"),prefix);
+        jdbc.update("INSERT INTO task_participants(company_id,task_id,user_id) SELECT company_id,id,owner_id FROM tasks WHERE title=?",prefix);
+        var first=list(200,query,"leader");assertEquals(5000,first.get("total").asInt());assertEquals(100,first.get("items").size());
+        list(400,query+"&cursor=5000&snapshotToken="+first.get("snapshotToken").asText(),"leader");
+        jdbc.update("INSERT INTO tasks(id,company_id,issuer_id,owner_id,title,deadline,body,phase,version) VALUES (?,?,?,?,?,'2026-11-15T18:00:00+08:00','{}','DISPATCHED',1)",prefix+"extra",company,id.get("leader"),id.get("alice"),prefix);
+        assertEquals("CALENDAR_RANGE_TOO_DENSE",list(422,query,"leader").get("code").asText());
+    }
+
 }

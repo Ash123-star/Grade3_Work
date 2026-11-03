@@ -25,4 +25,9 @@ public interface TaskApi {
 
     /** 提交改期复核申请；通过前不得改变截止时间或任务状态。 */
     Map<String, Object> requestReschedule(ActorContext actor, String taskId, Map<String, Object> command);
+
+    /** 日期平移专用模式；与 HTTP 同用例，同键/同约束版本返回原审核，禁止整份候选。 */
+    default Map<String,Object> requestReschedule(ActorContext actor,String taskId,Map<String,Object> command,String key,String revision) {
+        throw new UnsupportedOperationException("Task movement is unavailable");
+    }
 }

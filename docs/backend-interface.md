@@ -31,9 +31,19 @@
 
 `GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
 
-`GET /tasks?date=YYYY-MM-DD&period=day|week|month` 使用上海业务日期按任务区间相交筛选：`start_at < 范围结束 && deadline >= 范围开始`，并排除开始时间晚于截止时间的无效区间。月范围扩展到该月月历首个可见周一至末个可见周一的右侧边界，以便月初/月末灰色日期格和跨月续段读取到同一任务；组织数据范围与分页权限不变。
+旧查询 GET /tasks?date=YYYY-MM-DD&period=day|week|month 继续按上海周期的截止时刻过滤，保持历史契约。
 
-移动端新月历调用的正式目标形状为 `GET /tasks?from=<inclusive-ISO8601>&to=<exclusive-ISO8601>&ownerId=<optional-id>`；导图接收卡片使用 `GET /tasks/received-card?cursor&limit&search`，返回 `id/title/version/dispatchAt/phase` 和卡片所需的参与人、标签字段。`phase` 必须区分 `DISPATCHED/RECEIVED/FEEDBACK/ACCEPTED/ARCHIVED/WITHDRAWN`，服务端不得让客户端从缺失字段推导完成状态。
+月历 GET /tasks?from=<inclusive-offset-ISO>&to=<exclusive-offset-ISO>&participantId=<optional>：端点同时给出、带时区、严格递增且跨度最多 62 日。相交条件 COALESCE(start_at,deadline)<to AND deadline>=from。不混用显式 date/period，ownerId 返回 400。每页仍做组织/参与人鉴权，排序 deadline,id。范围响应含 snapshotToken，后页须原令牌；同总数的替换/重排/版本变化返回 409 CALENDAR_SNAPSHOT_CHANGED，客户端丢弃本轮并最多整轮重读一次。最多 5000 条，超限 422 CALENDAR_RANGE_TOO_DENSE；末页 nextCursor=null，零结果无后页。旧查询游标不变。
+
+列表页级及详情返回 scheduleConstraints={zone,minDate,maxDate,revision,maxRangeDays,maxRecords,maxPages}。初始窗口按上海年 Y 包含 [Y-2 年 01-01,Y+8 年 01-01]。capabilities.reschedule 为部署及当前角色能力，缺失/false 时禁用新交互。认证公开资料新增 company_id 供本机命令隔离，不能作为请求者自报身份。
+
+POST /tasks/{id}/reschedules 兼容旧 {deadline,version,reason}；新增互斥 MOVE 模式 {"version":7,"moveDays":2,"reason":"项目排期调整"}。必须给 Idempotency-Key 和 If-Schedule-Constraints-Match: calendar-v1-2026。只接受三个字段：正 int32 version、非零 int32 moveDays、去 Unicode 首尾空白后 1–1000 码点原因；拒绝字符串/浮点/布尔数字和其他业务字段。键为 1–128 位可见 ASCII，无空白/控制字符。约束头缺失/无效 400，过期 409 SCHEDULE_CONSTRAINTS_CHANGED。服务端从权威列计算起止，不接收整份候选；空开始保持空，时刻/时长保持，新端点均在包含窗口内。
+
+返回 TASK_RESCHEDULE 审核申请；待审排期/版本不变，独立审核通过才原子更新日期列/正文/版本/事件/outbox。MOVE 保存不可变约束快照，跨年不自动改日，旧候选兼容。每次含重放都检查最新身份/访问/资格。新命令需当前版本，VERSION_EXHAUSTED、VERSION_CONFLICT、RESCHEDULE_PENDING、IDEMPOTENCY_CONFLICT 均 409。同任务同版本最多一条待审 MOVE；冲突不泄露他人申请。同键同摘要先返回原申请，已通过/驳回/跨年/开关关闭仍可查询。命令与审核同事务保存，保留期不短于审核，不按传输超时删除。
+
+月历快捷创建复用 POST /tasks，增加可选 If-Schedule-Constraints-Match：先按原键重放，否则检查约束/起止日期。无头旧调用不追加窗口政策。创建待审仍无正式任务；表单仅首次消费初始日期，具体时间由用户确认，不静默夹日。
+
+导图接收卡片 /tasks/received-card 属于其他活动变更，不因本次范围协议声明已实现。发布和回滚见 [月历发布说明](calendar-task-drag-release.md)。
 
 `POST /tasks/{id}/events` 请求至少包含当前 `version` 和 `type`。事件枚举及附加字段如下：
 

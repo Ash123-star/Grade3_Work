@@ -8,12 +8,6 @@
   "servers" : [ {
     "url" : "/"
   } ],
-  "x-mobile-contract" : {
-    "status" : "PROPOSED",
-    "overlay" : "docs/mobile-openapi-contract.yaml",
-    "mergeStrategy" : "path-and-component-overlay",
-    "description" : "移动端真实 HTTP 调用的补充协议。覆盖文件对列出的 path、operation 和 schema 具有权威定义，补齐任务区间/接收卡片、日志日期范围/成员月状态/24小时正文编辑、多维统计汇总/钻取/导出过滤、个人资料字段及统一分页字段；服务端实现前不得将 PROPOSED 路径报告为已上线。实现后须合并回运行时 SpringDoc 与本快照。"
-  },
   "security" : [ {
     "bearer" : [ ]
   } ],
@@ -816,6 +810,7 @@
     "/api/tasks" : {
       "get" : {
         "tags" : [ "task-controller" ],
+        "summary" : "范围内任务列表",
         "description" : "在服务端组织数据范围内分页查询已生效任务。列表项仅为 TaskListItem，永不返回负责人、协作人、阶段、完成情况、进度、正文或事件。",
         "operationId" : "list",
         "parameters" : [ {
@@ -855,7 +850,6 @@
           "name" : "date",
           "in" : "query",
           "required" : false,
-          "description" : "Asia/Shanghai 业务日期，格式 YYYY-MM-DD；与 period 组合筛选任务区间相交记录。月范围覆盖月历可见周。",
           "schema" : {
             "type" : "string"
           }
@@ -863,10 +857,36 @@
           "name" : "period",
           "in" : "query",
           "required" : false,
-          "description" : "day/week/month；任务 start_at < 范围结束且 deadline >= 范围开始时命中。",
           "schema" : {
-            "type" : "string",
-            "default" : "day"
+            "type" : "string"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "snapshotToken",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "ownerId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -968,6 +988,13 @@
             "type" : "string",
             "maxLength" : 128,
             "minLength" : 1
+          }
+        }, {
+          "name" : "If-Schedule-Constraints-Match",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "requestBody" : {
@@ -1728,12 +1755,27 @@
     "/api/tasks/{id}/reschedules" : {
       "post" : {
         "tags" : [ "task-controller" ],
+        "summary" : "申请任务改期（兼容截止时间或整段移动）",
         "description" : "提交改期复核申请；申请不会立即改期。必须提供带时区、不同于当前值的 deadline。",
         "operationId" : "reschedule",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
           "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Schedule-Constraints-Match",
+          "in" : "header",
+          "required" : false,
           "schema" : {
             "type" : "string"
           }

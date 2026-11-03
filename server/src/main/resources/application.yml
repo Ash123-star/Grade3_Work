@@ -55,3 +55,8 @@ springdoc:
     path: /api/openapi
   swagger-ui:
     path: /api/docs
+
+# 全部审核消费者兼容 MOVE 候选后才在部署配置中启用。
+workpanel:
+  calendar:
+    move-enabled: ${CALENDAR_MOVE_ENABLED:false}
