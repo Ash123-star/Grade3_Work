@@ -66,7 +66,7 @@ profile 模式可在本模拟器运行，不能再记为“不支持”。10 次
 - B/D/E 的人工确认、线上审核消费者兼容状态及非作者审阅未取得。代码接入契约见 implementation.md；1.2、6.4 保留未勾选。
 - HTTP release APK：mobile/build/app/outputs/flutter-apk/app-release.apk，SHA256 338590B39EF4412C8A2FDC0CEC65CB8F78DAB332CEB1DB2DC8FEF1B451888F83。首次 --no-pub 构建因 drive 留下的集成插件注册元数据失败（calendar-release-stale-registry.log），去掉 --no-pub 让 Flutter 刷新插件注册后成功；未修改生成 Java 文件或生产依赖。
 - HTTP release 模式 APK 仅供模拟器内部联调，地址为 10.0.2.2:18088；仓库仍采用既有 debug signingConfig，不是商店发布包。构建入口为 lib/main.dart，未传测试 token defines；已扫描 APK 内三个 ABI 的 libapp.so，未发现该合成夹具的两个 token 或 taskId，检查退出 0。
-- 用户已明确授权先推送草稿 PR；提交/推送/PR 结果须以实际远程回执为准。全仓失败、性能及人工门槛继续阻止合并/上线/归档；后续修复后只重跑受影响检查。
+- 按用户明确授权，已推送 feature/58-calendar-task-drag 并创建[草稿 PR #59](https://github.com/Ash123-star/Grade3_Work/pull/59)，另发布[中文工作清单评论](https://github.com/Ash123-star/Grade3_Work/pull/59#issuecomment-6596996618)。后端 de12afe、移动端 0148d8c、提案/证据 760907c 三笔提交均已得到远程回执；本记录随后的状态提交用于同步交付事实。全仓失败、性能及人工门槛继续阻止合并/上线/归档；后续修复后只重跑受影响检查。
 
 ## 非功能结果与复现
 

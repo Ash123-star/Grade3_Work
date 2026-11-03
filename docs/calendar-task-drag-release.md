@@ -23,4 +23,4 @@ HTTP release 模式 APK 位于 mobile/build/app/outputs/flutter-apk/app-release.
 
 从 flutter drive 切回 release 时不要跳过插件元数据刷新：本次直接 --no-pub 构建曾留下 integration_test 注册引用而失败，正常 flutter build（允许 pub 阶段）重新生成注册后退出 0。不手改 GeneratedPluginRegistrant.java，不把 integration_test 移为生产依赖。
 
-真实跨月改期/独立审批/快捷创建链路、Docker 范围专项、最终 Flutter 分析及 OpenSpec strict 已通过。全仓仍有失败；模拟器 10 次 profile 手势成功但 最终 233/233 帧超过 16.7ms，性能目标未达到，TalkBack/完整人工矩阵与跨组确认/审阅未完成。默认新模式保持关闭；按用户 2026-11-03 明确授权提前推送草稿 PR 并用中文评论列举工作，尚不满足合并/上线/归档门槛；全部证据与未完成项见 openspec/changes/calendar-task-drag-quick-create/verification.md。
+真实跨月改期/独立审批/快捷创建链路、Docker 范围专项、最终 Flutter 分析及 OpenSpec strict 已通过。全仓仍有失败；模拟器 10 次 profile 手势成功但 最终 233/233 帧超过 16.7ms，性能目标未达到，TalkBack/完整人工矩阵与跨组确认/审阅未完成。默认新模式保持关闭；按用户 2026-11-03 明确授权已推送[草稿 PR #59](https://github.com/Ash123-star/Grade3_Work/pull/59)并发布[中文工作清单评论](https://github.com/Ash123-star/Grade3_Work/pull/59#issuecomment-6596996618)，尚不满足合并/上线/归档门槛；全部证据与未完成项见 openspec/changes/calendar-task-drag-quick-create/verification.md。

@@ -163,5 +163,21 @@
         "frames": 21
       }
     ]
+  },
+  "pullRequest": {
+    "number": 59,
+    "url": "https://github.com/Ash123-star/Grade3_Work/pull/59",
+    "draft": true,
+    "base": "codex/ai-work-assistant",
+    "head": "feature/58-calendar-task-drag",
+    "baseCommit": "19db6f3071f60bb0cff9fbb85701dd8faf279941",
+    "implementationCommits": [
+      "de12afe",
+      "0148d8c",
+      "760907c"
+    ],
+    "commentUrl": "https://github.com/Ash123-star/Grade3_Work/pull/59#issuecomment-6596996618",
+    "explicitEarlyPushAuthorized": true,
+    "mergeReleaseArchiveApproved": false
   }
 }
