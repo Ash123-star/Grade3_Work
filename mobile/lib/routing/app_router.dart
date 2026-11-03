@@ -340,6 +340,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                 key: ValueKey(s.uri.toString()),
                 id: s.uri.queryParameters['id'],
                 source: s.uri.queryParameters['source'],
+                initialBusinessDate: s.uri.queryParameters['initialBusinessDate'],
+                scheduleConstraints: s.uri.queryParameters.containsKey('initialBusinessDate') ? {
+                  'zone':'Asia/Shanghai',
+                  'minDate':s.uri.queryParameters['calendarMinDate'],
+                  'maxDate':s.uri.queryParameters['calendarMaxDate'],
+                  'revision':s.uri.queryParameters['calendarRevision'],
+                } : null,
                 version:
                     int.tryParse(s.uri.queryParameters['version'] ?? '') ?? 1,
                 restoreDiaryDraft:

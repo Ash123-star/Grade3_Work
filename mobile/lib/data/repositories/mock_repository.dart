@@ -1,3 +1,5 @@
+import '../../features/calendar/calendar_schedule.dart';
+import '../local/calendar_command_store.dart';
 import 'dart:convert';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:dio/dio.dart';
@@ -351,6 +353,8 @@ const demoAccounts = <DemoAccount>[
 class DemoStore {
   final Map<String, List<Record>> records = {};
   final Map<String, Record> responses = {};
+  final Map<String,String> calendarHashes = {};
+  final Map<String,String> calendarReviews = {};
   final Map<String, SelectedAttachment> attachments = {};
 }
 
@@ -1071,7 +1075,7 @@ class MockRepository implements Repository {
   @override
   Future<PageResult> list(String resource, Query query) async {
     await _check(resource);
-    if (scenario == DemoScenario.empty) return const PageResult([]);
+    if (scenario == DemoScenario.empty) return PageResult(const [],snapshotToken:resource=='tasks'&&query.from!=null?'empty':null,scheduleConstraints:_calendarConstraints.toJson());
     if (query.ownerId != null &&
         query.ownerId != session.id &&
         !session.manager) {
@@ -1233,7 +1237,15 @@ class MockRepository implements Repository {
         ),
       );
     }
-    return PageResult(result, total: result.length);
+    if(resource=='tasks'&&query.from!=null&&query.to!=null) {
+      result.sort((a,b){final order=DateTime.parse('${a.fields['deadline']}').compareTo(DateTime.parse('${b.fields['deadline']}'));return order==0?a.id.compareTo(b.id):order;});
+      if(query.to!.difference(query.from!)>const Duration(days:62))throw const ApiFailure(FailureKind.validation,'范围超过 62 日');
+      if(result.length>5000)throw const ApiFailure(FailureKind.validation,'记录超过 5000 条',code:'CALENDAR_RANGE_TOO_DENSE');
+      final token=base64Url.encode(utf8.encode(jsonEncode([session.companyId,session.id,query.from.toString(),query.to.toString(),query.ownerId,query.search,result.map((r)=>[r.id,r.version]).toList()])));
+      if(query.snapshotToken!=null&&query.snapshotToken!=token)throw const ApiFailure(FailureKind.conflict,'日历数据已变化',code:'CALENDAR_SNAPSHOT_CHANGED');
+      return PageResult(result,total:result.length,snapshotToken:token,scheduleConstraints:_calendarConstraints.toJson());
+    }
+    return PageResult(result,total:result.length);
   }
 
   @override
@@ -1832,7 +1844,7 @@ class MockRepository implements Repository {
     if (['logs', 'logs/subordinates', 'tasks', 'reviews'].contains(resource) &&
         !session.manager &&
         item.ownerId != session.id &&
-        !(resource == 'tasks' && taskVisible(item))) {
+        !(resource == 'tasks' && taskVisible(item)) && !(resource=='reviews'&&item.fields['reviewerId']==session.id)) {
       throw const ApiFailure(FailureKind.forbidden, '无权查看其他成员的记录');
     }
     if ([
@@ -1892,7 +1904,13 @@ class MockRepository implements Repository {
     subtitle: item.subtitle,
     ownerId: item.ownerId,
     version: item.version,
-    fields: {...item.fields, ..._taskDisplayFields(item.fields)},
+    fields: {...item.fields, ..._taskDisplayFields(item.fields),
+      'capabilities':{'reschedule':session.canReadBusiness&&session.manager&&session.dispatch&&
+        (session.administrator||item.fields['dispatcherId']==session.id)&&!['已归档','已撤回'].contains(item.fields['status'])},
+      'scheduleConstraints':_calendarConstraints.toJson(),
+      if(item.fields['deadline']!=null)'deadline':_calendarInstant(item.fields['deadline']),
+      if(item.fields['startAt']!=null)'startAt':_calendarInstant(item.fields['startAt']),
+    },
   );
 
   Record copy(
@@ -1996,6 +2014,12 @@ class MockRepository implements Repository {
     if (resource != 'auth') await _check(resource);
     final v = command.values, action = command.action;
     final key = command.idempotencyKey;
+    if(resource=='tasks'&&action=='move-schedule') return _calendarMove(command);
+    if(resource=='tasks'&&action=='create'&&command.scheduleRevision!=null)return _calendarCreate(command);
+    if(resource=='reviews') {
+      final review=rows('reviews').where((r)=>r.id==v['id']&&['MOVE','CREATE'].contains(r.fields['scheduleMode'])).firstOrNull;
+      if(review!=null)return _calendarDecision(review,command);
+    }
     if (key != null && store.responses.containsKey(key)) {
       return store.responses[key]!;
     }
@@ -2660,4 +2684,89 @@ class MockRepository implements Repository {
     if (key != null) store.responses[key] = result;
     return result;
   }
+  CalendarConstraints get _calendarConstraints {
+    final year=shanghaiWallTime(clock()).year;
+    return CalendarConstraints(DateTime(year-2),DateTime(year+8),'calendar-v1-$year');
+  }
+  String _calendarInstant(dynamic value) {
+    final text='$value';
+    return DateTime.parse(RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(text)?text:'$text+08:00').toUtc().toIso8601String();
+  }
+  Record _calendarMove(Command command) {
+    final values=command.values,id='${values['id']}';
+    final task=rows('tasks').where((r)=>r.id==id).firstOrNull;
+    if(task==null||!taskVisible(task))throw const ApiFailure(FailureKind.notFound,'任务不可读');
+    if(!session.canReadBusiness||!session.manager||!session.dispatch||!(session.administrator||task.fields['dispatcherId']==session.id))throw const ApiFailure(FailureKind.forbidden,'无改期资格');
+    final key=command.idempotencyKey;
+    final days=values['moveDays'];final reason='${values['reason']??''}'.trim();
+    if(key==null||!RegExp(r'^[!-~]{1,128}$').hasMatch(key)||command.version==null||command.version!<1||days is! int||days==0||days.abs()>2147483647||reason.isEmpty||reason.runes.length>1000)throw const ApiFailure(FailureKind.validation,'改期参数无效');
+    final scoped='${session.companyId}:${session.id}:$key';
+    final hash=jsonEncode([id,command.version,days,reason,command.scheduleRevision]);
+    if(store.calendarHashes.containsKey(scoped)) {
+      if(store.calendarHashes[scoped]!=hash)throw const ApiFailure(FailureKind.conflict,'同键不同内容',code:'IDEMPOTENCY_CONFLICT');
+      return rows('reviews').firstWhere((r)=>r.id==store.calendarReviews[scoped]);
+    }
+    if(command.scheduleRevision!=_calendarConstraints.revision)throw const ApiFailure(FailureKind.conflict,'排期范围已变化',code:'SCHEDULE_CONSTRAINTS_CHANGED');
+    if(task.version!=command.version)throw const ApiFailure(FailureKind.conflict,'版本已变化');
+    if(task.version==2147483647)throw const ApiFailure(FailureKind.conflict,'版本耗尽',code:'VERSION_EXHAUSTED');
+    if(['已归档','已撤回'].contains(task.fields['status']))throw const ApiFailure(FailureKind.conflict,'当前状态不可改期');
+    if(rows('reviews').any((r)=>r.fields['scheduleMode']=='MOVE'&&r.fields['targetId']==id&&r.fields['baseVersion']==task.version&&r.fields['status']=='PENDING'))throw const ApiFailure(FailureKind.conflict,'已有待审移动',code:'RESCHEDULE_PENDING');
+    final moved=CalendarSchedule.fromRecord(_withTaskDisplay(task)).move(days,_calendarConstraints);
+    final reviewer=demoAccounts.where((a)=>a.companyReviewer&&a.id!=session.id).firstOrNull;
+    final review=Record(id:newCalendarCommandKey(),title:'任务移动申请',ownerId:session.id,fields:{
+      'reviewKind':'TASK_RESCHEDULE','scheduleMode':'MOVE','status':'PENDING','reviewState':'待审',
+      'targetResource':'tasks','targetId':id,'baseVersion':task.version,'reason':reason,
+      'reviewerId':reviewer?.id,'candidate':{'startAt':moved.start?.toIso8601String(),'deadline':moved.end.toIso8601String()},
+    });
+    rows('reviews').insert(0,review);store.calendarHashes[scoped]=hash;store.calendarReviews[scoped]=review.id;return review;
+  }
+  Record _calendarDecision(Record review,Command command) {
+    if(review.ownerId==session.id||review.fields['reviewerId']!=session.id||review.fields['status']!='PENDING')throw const ApiFailure(FailureKind.forbidden,'仅独立指定审核人可审核');
+    final reject=command.action=='reject';
+    if(!reject&&command.action!='approve'||reject&&'${command.values['reason']??command.values['驳回原因']??''}'.trim().isEmpty)throw const ApiFailure(FailureKind.validation,'审核决定或原因无效');
+    final create=review.fields['scheduleMode']=='CREATE';
+    final task=create?null:rows('tasks').firstWhere((t)=>t.id==review.fields['targetId']);
+    if(!reject&&create) {
+      final applicant=demoAccounts.where((a)=>a.id==review.ownerId).firstOrNull;
+      if(applicant==null||!applicant.dispatch)throw const ApiFailure(FailureKind.forbidden,'申请人失权');
+      if(rows('tasks').any((t)=>t.id==review.fields['targetId']))throw const ApiFailure(FailureKind.conflict,'任务已存在');
+      final values=Map<String,dynamic>.from(review.fields['candidate'] as Map);
+      rows('tasks').add(Record(id:'${review.fields['targetId']}',title:'${values['title']}',ownerId:review.ownerId,fields:{...values,'dispatcherId':review.ownerId,'status':'待接收'}));
+    }
+    if(!reject&&!create) {
+      if(task!.version!=review.fields['baseVersion'])throw const ApiFailure(FailureKind.conflict,'任务版本已变化');
+      final applicant=demoAccounts.where((a)=>a.id==review.ownerId).firstOrNull;
+      if(applicant==null||!applicant.dispatch||!(task.fields['dispatcherId']==applicant.id||applicant.role==UserRole.admin))throw const ApiFailure(FailureKind.forbidden,'申请人已失权');
+      final candidate=Map<String,dynamic>.from(review.fields['candidate'] as Map);
+      final pos=rows('tasks').indexWhere((r)=>r.id==task.id);
+      rows('tasks')[pos]=copy(task,{'startAt':candidate['startAt'],'deadline':candidate['deadline']});
+    }
+    final result=copy(review,{'status':reject?'REJECTED':'APPROVED','reviewState':reject?'已驳回':'已通过','rejectionReason':command.values['reason']??command.values['驳回原因']});
+    rows('reviews')[rows('reviews').indexWhere((r)=>r.id==review.id)]=result;return result;
+  }
+
+  Record _calendarCreate(Command command) {
+    if(!session.manager||!session.dispatch)throw const ApiFailure(FailureKind.forbidden,'无派发资格');
+    final values=command.values;
+    final title='${values['title']??values['任务名称']??''}'.trim();
+    final participants=values['participantIds'];
+    if(title.isEmpty||participants is! List||participants.isEmpty||participants.any((p)=>!visiblePeople.contains('$p')))throw const ApiFailure(FailureKind.validation,'标题或参与人无效');
+    final key=command.idempotencyKey;
+    if(key==null||key.isEmpty)throw const ApiFailure(FailureKind.validation,'缺少幂等键');
+    final scoped='create:${session.companyId}:${session.id}:$key',hash=jsonEncode([values,command.scheduleRevision]);
+    if(store.calendarHashes.containsKey(scoped)) {
+      if(store.calendarHashes[scoped]!=hash)throw const ApiFailure(FailureKind.conflict,'同键不同内容',code:'IDEMPOTENCY_CONFLICT');
+      return rows('reviews').firstWhere((r)=>r.id==store.calendarReviews[scoped]);
+    }
+    if(command.scheduleRevision!=_calendarConstraints.revision)throw const ApiFailure(FailureKind.conflict,'排期范围变化',code:'SCHEDULE_CONSTRAINTS_CHANGED');
+    final candidate={...values,'title':title,'deadline':_calendarInstant(values['deadline'])};
+    if(values['startAt']!=null)candidate['startAt']=_calendarInstant(values['startAt']);
+    final schedule=CalendarSchedule.fromRecord(Record(id:'candidate',title:title,fields:candidate));
+    if(!schedule.end.isAfter(clock())||!_calendarConstraints.contains(scheduleWallTime(schedule.end))||schedule.start!=null&&!_calendarConstraints.contains(scheduleWallTime(schedule.start!)))throw const ApiFailure(FailureKind.validation,'创建排期超出范围');
+    final reviewer=demoAccounts.where((a)=>a.companyReviewer&&a.id!=session.id).firstOrNull;
+    final review=Record(id:newCalendarCommandKey(),title:'创建任务申请',ownerId:session.id,fields:{'reviewKind':'TASK_CREATE','scheduleMode':'CREATE',
+      'status':'PENDING','reviewState':'待审','targetResource':'tasks','targetId':newCalendarCommandKey(),'candidate':candidate,'reviewerId':reviewer?.id});
+    rows('reviews').insert(0,review);store.calendarHashes[scoped]=hash;store.calendarReviews[scoped]=review.id;return review;
+  }
+
 }

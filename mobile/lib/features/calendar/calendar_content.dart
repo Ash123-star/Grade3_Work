@@ -1,3 +1,5 @@
+import 'calendar_interaction.dart';
+import 'calendar_schedule.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,12 +23,12 @@ class CalendarEvent {
   final DateTime day;
   final int? start, end;
   final DateTime? spanStart, spanEnd;
-  DateTime get firstDay => DateTime(
+  DateTime get firstDay => DateTime.utc(
     (spanStart ?? day).year,
     (spanStart ?? day).month,
     (spanStart ?? day).day,
   );
-  DateTime get lastDay => DateTime(
+  DateTime get lastDay => DateTime.utc(
     (spanEnd ?? day).year,
     (spanEnd ?? day).month,
     (spanEnd ?? day).day,
@@ -89,18 +91,52 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
         onMonthChanged: (next) {
           ref.read(dateProvider.notifier).state = next;
         },
-        onDayChanged: (next, events) {
+        onDayChanged: (next, events, interaction, constraints) async {
           ref.read(dateProvider.notifier).state = next;
-          showTuantuanFocusSheet<void>(
+          final sheetEpoch = ref.read(sessionEpochProvider);
+          final action = await showTuantuanFocusSheet<Object>(
             context: context,
             title: dayHeading(next),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                _DayAgenda(date: next, events: eventsOnDay(events, next)),
-              ],
+            child: Consumer(
+              builder: (context, sheetRef, _) {
+                if (sheetRef.watch(sessionEpochProvider) != sheetEpoch ||
+                    !sheetRef.watch(sessionProvider).canReadBusiness) {
+                  return const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('账号权限已变化，请关闭后重新查看'),
+                  );
+                }
+                return ListView(
+                  key: const ValueKey('calendar-day-agenda'),
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _DayAgenda(
+                      date: next,
+                      events: eventsOnDay(events, next),
+                      onMove:
+                          interaction == null ||
+                              constraints == null ||
+                              widget.ownerId != null
+                          ? null
+                          : (record) => Navigator.pop(context, record),
+                      onCreate:
+                          interaction == null ||
+                              constraints == null ||
+                              widget.ownerId != null
+                          ? null
+                          : () => Navigator.pop(context, true),
+                    ),
+                  ],
+                );
+              },
             ),
           );
+          if (!mounted || interaction == null || constraints == null) return;
+          if (action is Record) {
+            await interaction.accessible(action, constraints);
+          } else if (action == true) {
+            interaction.create(next, constraints);
+          }
         },
       );
     }
@@ -244,7 +280,8 @@ String dayHeading(DateTime day) =>
 
 int _monthIndex(DateTime date) => date.year * 12 + date.month - 1;
 
-DateTime _monthFromIndex(int index) => DateTime(index ~/ 12, index % 12 + 1);
+DateTime _monthFromIndex(int index) =>
+    DateTime.utc(index ~/ 12, index % 12 + 1);
 
 class _StableMonthPager extends StatefulWidget {
   const _StableMonthPager({
@@ -258,7 +295,13 @@ class _StableMonthPager extends StatefulWidget {
   final String? ownerId;
   final double availableHeight;
   final ValueChanged<DateTime> onMonthChanged;
-  final void Function(DateTime, List<CalendarEvent>) onDayChanged;
+  final void Function(
+    DateTime,
+    List<CalendarEvent>,
+    CalendarInteractionSurfaceState?,
+    CalendarConstraints?,
+  )
+  onDayChanged;
 
   @override
   State<_StableMonthPager> createState() => _StableMonthPagerState();
@@ -266,6 +309,7 @@ class _StableMonthPager extends StatefulWidget {
 
 class _StableMonthPagerState extends State<_StableMonthPager> {
   static const _baseMonth = 2000 * 12;
+  final _interaction = GlobalKey<CalendarInteractionSurfaceState>();
   late final PageController _controller = PageController(
     initialPage: _monthIndex(widget.selectedDate) - _baseMonth,
   );
@@ -278,7 +322,10 @@ class _StableMonthPagerState extends State<_StableMonthPager> {
         oldWidget.selectedDate.month == widget.selectedDate.month) {
       return;
     }
-    if (!_controller.hasClients) return;
+    if (!_controller.hasClients ||
+        _interaction.currentState?.drag.active == true) {
+      return;
+    }
     final target = _monthIndex(widget.selectedDate) - _baseMonth;
     if (_controller.page?.round() == target) return;
     _controller.jumpToPage(target);
@@ -297,25 +344,39 @@ class _StableMonthPagerState extends State<_StableMonthPager> {
         : MediaQuery.sizeOf(context).width * 1.6;
     return SizedBox(
       height: height,
-      child: PageView.builder(
-        key: const ValueKey('calendar-month-timeline'),
-        controller: _controller,
-        scrollDirection: Axis.vertical,
-        physics: const PageScrollPhysics(),
-        onPageChanged: (page) {
-          if (_lastPage == page) return;
-          _lastPage = page;
-          final month = _monthFromIndex(_baseMonth + page);
-          if (_monthIndex(widget.selectedDate) == _monthIndex(month)) return;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) widget.onMonthChanged(month);
-          });
-        },
-        itemBuilder: (context, page) => _StableMonthPage(
-          month: _monthFromIndex(_baseMonth + page),
-          ownerId: widget.ownerId,
-          availableHeight: height,
-          onDayChanged: widget.onDayChanged,
+      child: CalendarInteractionSurface(
+        key: _interaction,
+        scroll: _controller,
+        readOnly: widget.ownerId != null,
+        builder: (context, dragging) => LayoutBuilder(
+          builder: (context, space) => PageView.builder(
+            key: const ValueKey('calendar-month-timeline'),
+            controller: _controller,
+            scrollDirection: Axis.vertical,
+            physics: dragging
+                ? const NeverScrollableScrollPhysics()
+                : const PageScrollPhysics(),
+            pageSnapping: !dragging,
+            allowImplicitScrolling: true,
+            itemCount: 8000 * 12,
+            onPageChanged: (page) {
+              if (_lastPage == page) return;
+              _lastPage = page;
+              final month = _monthFromIndex(_baseMonth + page);
+              if (_monthIndex(widget.selectedDate) == _monthIndex(month)) {
+                return;
+              }
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) widget.onMonthChanged(month);
+              });
+            },
+            itemBuilder: (context, page) => _StableMonthPage(
+              month: _monthFromIndex(_baseMonth + page),
+              ownerId: widget.ownerId,
+              availableHeight: space.maxHeight,
+              onDayChanged: widget.onDayChanged,
+            ),
+          ),
         ),
       ),
     );
@@ -332,7 +393,13 @@ class _StableMonthPage extends ConsumerWidget {
   final DateTime month;
   final String? ownerId;
   final double availableHeight;
-  final void Function(DateTime, List<CalendarEvent>) onDayChanged;
+  final void Function(
+    DateTime,
+    List<CalendarEvent>,
+    CalendarInteractionSurfaceState?,
+    CalendarConstraints?,
+  )
+  onDayChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -351,11 +418,27 @@ class _StableMonthPage extends ConsumerWidget {
       ),
       data: (page) {
         final events = _calendarEvents(page.items);
-        return _MonthGrid(
-          date: month,
-          events: events,
-          onChanged: (day) => onDayChanged(day, events),
-          availableHeight: availableHeight,
+        final interaction = CalendarInteraction.of(context);
+        CalendarConstraints? constraints;
+        try {
+          constraints = CalendarConstraints.parse(page.scheduleConstraints);
+        } on FormatException {
+          /* Read-only legacy server. */
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) interaction?.drag.observe(page.items);
+        });
+        return CalendarLoadedMonth(
+          month: month,
+          constraints: constraints,
+          child: _MonthGrid(
+            date: month,
+            events: events,
+            onChanged: (day) =>
+                onDayChanged(day, events, interaction, constraints),
+            constraints: constraints,
+            availableHeight: availableHeight,
+          ),
         );
       },
     );
@@ -424,8 +507,8 @@ List<CalendarEvent> eventsOnDay(List<CalendarEvent> events, DateTime day) =>
     events
         .where(
           (e) =>
-              !DateTime(day.year, day.month, day.day).isBefore(e.firstDay) &&
-              !DateTime(day.year, day.month, day.day).isAfter(e.lastDay),
+              !dateLabel(day).isBefore(e.firstDay) &&
+              !dateLabel(day).isAfter(e.lastDay),
         )
         .toList()
       ..sort((a, b) {
@@ -436,7 +519,14 @@ List<CalendarEvent> eventsOnDay(List<CalendarEvent> events, DateTime day) =>
       });
 
 class _DayAgenda extends StatelessWidget {
-  const _DayAgenda({required this.date, required this.events});
+  const _DayAgenda({
+    required this.date,
+    required this.events,
+    this.onMove,
+    this.onCreate,
+  });
+  final ValueChanged<Record>? onMove;
+  final VoidCallback? onCreate;
   final DateTime date;
   final List<CalendarEvent> events;
   @override
@@ -459,6 +549,12 @@ class _DayAgenda extends StatelessWidget {
         ],
       ),
       const SizedBox(height: 12),
+      if (onCreate != null)
+        TextButton.icon(
+          onPressed: onCreate,
+          icon: const Icon(Icons.add),
+          label: const Text('在所选日期创建任务'),
+        ),
       if (events.isEmpty)
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 24),
@@ -467,14 +563,15 @@ class _DayAgenda extends StatelessWidget {
       for (final event in events)
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: _EventRow(event),
+          child: _EventRow(event, onMove: onMove),
         ),
     ],
   );
 }
 
 class _EventRow extends StatelessWidget {
-  const _EventRow(this.event);
+  const _EventRow(this.event, {this.onMove});
+  final ValueChanged<Record>? onMove;
   final CalendarEvent event;
   @override
   Widget build(BuildContext context) => PaperSurface(
@@ -515,6 +612,15 @@ class _EventRow extends StatelessWidget {
             ],
           ),
         ),
+        if (onMove != null &&
+            event.record.fields['capabilities'] is Map &&
+            event.record.fields['capabilities']['reschedule'] == true)
+          IconButton(
+            tooltip: '移动到日期',
+            onPressed: () => onMove!(event.record),
+            icon: const Icon(Icons.event_available),
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          ),
         const Icon(Icons.chevron_right, size: 18),
       ],
     ),
@@ -676,19 +782,21 @@ class _MonthGrid extends StatelessWidget {
     required this.events,
     required this.onChanged,
     required this.availableHeight,
+    this.constraints,
   });
   final DateTime date;
   final List<CalendarEvent> events;
   final ValueChanged<DateTime> onChanged;
   final double availableHeight;
+  final CalendarConstraints? constraints;
   @override
   Widget build(BuildContext context) {
-    final first = DateTime(date.year, date.month);
+    final first = DateTime.utc(date.year, date.month);
     final start = first.subtract(Duration(days: first.weekday - 1));
     final weeks =
         ((first.weekday - 1 + DateTime(date.year, date.month + 1, 0).day) / 7)
             .ceil();
-    final gridStart = first.subtract(Duration(days: first.weekday - 1));
+    final last = DateTime.utc(date.year, date.month + 1, 0);
     return PaperSurface(
       key: const ValueKey('calendar-month-grid'),
       decorated: true,
@@ -720,11 +828,11 @@ class _MonthGrid extends StatelessWidget {
               3;
           final capacity = ((cellHeight - recordTop - 2 + 1) / (barHeight + 1))
               .floor()
-              .clamp(0, 5);
+              .clamp(0, 3);
           final lanes = _monthLanes(
             events,
-            gridStart,
-            gridStart.add(Duration(days: weeks * 7 - 1)),
+            first,
+            last,
             capacity,
           );
           return Column(
@@ -769,6 +877,7 @@ class _MonthGrid extends StatelessWidget {
               ),
               for (var week = 0; week < weeks; week++)
                 SizedBox(
+                  width: double.infinity,
                   height: cellHeight,
                   child: Stack(
                     clipBehavior: Clip.hardEdge,
@@ -790,84 +899,90 @@ class _MonthGrid extends StatelessWidget {
                               top: 0,
                               width: cellWidth,
                               height: cellHeight,
-                              child: Semantics(
-                                label: currentMonth
-                                    ? '${dayHeading(day)}${today ? '，今天' : ''}，查看当天全部记录'
+                              child: CalendarDayTarget(
+                                day: day,
+                                constraints: currentMonth
+                                    ? this.constraints
                                     : null,
-                                selected: selected,
-                                child: InkWell(
-                                  key: ValueKey(
-                                    'month-day:${day.year}-${day.month}-${day.day}',
-                                  ),
-                                  onTap: currentMonth
-                                      ? () => onChanged(day)
+                                child: Semantics(
+                                  label: currentMonth
+                                      ? '${dayHeading(day)}${today ? '，今天' : ''}，查看当天全部记录'
                                       : null,
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 1,
-                                      vertical: 2,
+                                  selected: selected,
+                                  child: InkWell(
+                                    key: ValueKey(
+                                      'month-day:${day.year}-${day.month}-${day.day}',
                                     ),
-                                    padding: const EdgeInsets.only(
-                                      left: 3,
-                                      top: 3,
-                                    ),
-                                    alignment: Alignment.topLeft,
-                                    decoration: BoxDecoration(
-                                      color: selected
-                                          ? SunnyPalette.orange.withValues(
-                                              alpha: .18,
+                                    onTap: currentMonth
+                                        ? () => onChanged(day)
+                                        : null,
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 1,
+                                        vertical: 2,
+                                      ),
+                                      padding: const EdgeInsets.only(
+                                        left: 3,
+                                        top: 3,
+                                      ),
+                                      alignment: Alignment.topLeft,
+                                      decoration: BoxDecoration(
+                                        color: selected
+                                            ? SunnyPalette.orange.withValues(
+                                                alpha: .18,
+                                              )
+                                            : null,
+                                        border: Border(
+                                          right: BorderSide(
+                                            color: SunnyPalette.ink.withValues(
+                                              alpha: .08,
+                                            ),
+                                          ),
+                                          bottom: BorderSide(
+                                            color: SunnyPalette.ink.withValues(
+                                              alpha: .08,
+                                            ),
+                                          ),
+                                          top: today
+                                              ? BorderSide(
+                                                  color: SunnyPalette.primary,
+                                                  width: 1.5,
+                                                )
+                                              : BorderSide.none,
+                                        ),
+                                      ),
+                                      child: currentMonth
+                                          ? Stack(
+                                              children: [
+                                                Positioned(
+                                                  left: 3,
+                                                  top: 3,
+                                                  child: Text(
+                                                    '${day.day}',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      height: 1.15,
+                                                      fontWeight:
+                                                          selected || today
+                                                          ? FontWeight.w700
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (today && cellWidth >= 38)
+                                                  const Positioned(
+                                                    top: 1,
+                                                    right: 1,
+                                                    child: DogAvatar(
+                                                      index:
+                                                          DogAssets.todayAvatar,
+                                                      size: 22,
+                                                    ),
+                                                  ),
+                                              ],
                                             )
                                           : null,
-                                      border: Border(
-                                        right: BorderSide(
-                                          color: SunnyPalette.ink.withValues(
-                                            alpha: .08,
-                                          ),
-                                        ),
-                                        bottom: BorderSide(
-                                          color: SunnyPalette.ink.withValues(
-                                            alpha: .08,
-                                          ),
-                                        ),
-                                        top: today
-                                            ? BorderSide(
-                                                color: SunnyPalette.primary,
-                                                width: 1.5,
-                                              )
-                                            : BorderSide.none,
-                                      ),
                                     ),
-                                    child: currentMonth
-                                        ? Stack(
-                                            children: [
-                                              Positioned(
-                                                left: 3,
-                                                top: 3,
-                                                child: Text(
-                                                  '${day.day}',
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    height: 1.15,
-                                                    fontWeight:
-                                                        selected || today
-                                                        ? FontWeight.w700
-                                                        : null,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (today && cellWidth >= 38)
-                                                const Positioned(
-                                                  top: 1,
-                                                  right: 1,
-                                                  child: DogAvatar(
-                                                    index:
-                                                        DogAssets.todayAvatar,
-                                                    size: 22,
-                                                  ),
-                                                ),
-                                            ],
-                                          )
-                                        : null,
                                   ),
                                 ),
                               ),
@@ -878,9 +993,54 @@ class _MonthGrid extends StatelessWidget {
                         context,
                         events,
                         start.add(Duration(days: week * 7)),
+                        first,
+                        last,
                         cellWidth,
                         lanes,
+                        this.constraints,
+                        onChanged,
                       ),
+                      for (var col = 0; col < 7; col++)
+                        Builder(
+                          builder: (context) {
+                            final day = start.add(
+                              Duration(days: week * 7 + col),
+                            );
+                            if (day.month != date.month) return const SizedBox.shrink();
+                            final hidden = eventsOnDay(events, day)
+                                .where((e) => !lanes.containsKey(e.record.id))
+                                .length;
+                            if (hidden == 0) return const SizedBox.shrink();
+                            return Positioned(
+                              left: col * cellWidth + cellWidth * .72,
+                              top: 1,
+                              width: cellWidth * .28,
+                              height: 18,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onLongPress: () {},
+                                onTap: () => onChanged(day),
+                                child: Semantics(
+                                  button: true,
+                                  label:
+                                      '${businessDateText(day)}，另有 $hidden 条任务，查看全部',
+                                  child: Text(
+                                    '+$hidden',
+                                    key: ValueKey(
+                                      'month-overflow:${day.year}-${day.month}-${day.day}',
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.clip,
+                                    style: TextStyle(
+                                      fontSize: _monthRecordFontSize(cellWidth),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                     ],
                   ),
                 ),
@@ -896,8 +1056,12 @@ List<Widget> _monthWeekBars(
   BuildContext context,
   List<CalendarEvent> events,
   DateTime weekStart,
+  DateTime monthStart,
+  DateTime monthEnd,
   double cellWidth,
   Map<String, int> lanes,
+  CalendarConstraints? constraints,
+  ValueChanged<DateTime> onChanged,
 ) {
   final weekEnd = weekStart.add(const Duration(days: 6));
   final candidates =
@@ -912,14 +1076,20 @@ List<Widget> _monthWeekBars(
   for (final event in candidates) {
     final lane = lanes[_calendarEventKey(event)];
     if (lane == null) continue;
-    final from = event.firstDay.isBefore(weekStart)
-        ? weekStart
+    // Adjacent-month blank cells have no date targets. Never paint task handles
+    // over them: each continuation stays inside this month's real dates.
+    final visibleStart = weekStart.isBefore(monthStart) ? monthStart : weekStart;
+    final visibleEnd = weekEnd.isAfter(monthEnd) ? monthEnd : weekEnd;
+    final from = event.firstDay.isBefore(visibleStart)
+        ? visibleStart
         : event.firstDay;
-    final to = event.lastDay.isAfter(weekEnd) ? weekEnd : event.lastDay;
+    final to = event.lastDay.isAfter(visibleEnd) ? visibleEnd : event.lastDay;
+    if (from.isAfter(to)) continue;
     final col = from.difference(weekStart).inDays,
         days = to.difference(from).inDays + 1;
     final starts = sameDay(from, event.firstDay),
-        continuesAtWeekStart = col == 0 && !starts,
+        continuesAtWeekStart =
+            !starts && (col == 0 || sameDay(from, monthStart)),
         ends = sameDay(to, event.lastDay);
     final recordTop = math.max(
       24.0,
@@ -932,7 +1102,7 @@ List<Widget> _monthWeekBars(
     bars.add(
       Positioned(
         key: ValueKey(
-          'month-span:tasks:${event.record.id}:${weekStart.toIso8601String()}',
+          'month-span:tasks:${event.record.id}:${weekStart.toIso8601String().replaceFirst('Z', '')}',
         ),
         left: col * cellWidth + (col == 0 ? 2 : 0),
         top: top,
@@ -941,7 +1111,12 @@ List<Widget> _monthWeekBars(
             (col == 0 ? 2 : 0) -
             (sameDay(to, weekEnd) ? 2 : 0),
         height: barHeight,
-        child: IgnorePointer(
+        child: CalendarTaskHandle(
+          record: event.record,
+          constraints: constraints,
+          onTap: (point) => onChanged(
+            CalendarInteraction.of(context)?.drag.hit(point)?.day ?? from,
+          ),
           child: Material(
             color: event.color,
             borderRadius: BorderRadius.horizontal(
@@ -957,7 +1132,7 @@ List<Widget> _monthWeekBars(
                         padding: const EdgeInsets.symmetric(horizontal: 1),
                         child: Text(
                           key: ValueKey(
-                            'month-span-label:tasks:${event.record.id}:${weekStart.toIso8601String()}',
+                            'month-span-label:tasks:${event.record.id}:${weekStart.toIso8601String().replaceFirst('Z', '')}',
                           ),
                           event.record.title.characters.take(6).toString(),
                           semanticsLabel: event.record.title,

@@ -777,9 +777,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
         if (mounted) setState(() {});
       });
     }
-  bool busy = false;
-  String? error;
-  late final Session initialLogIdentity = ref.read(sessionProvider);
+  }
+
   Timer? windowTimer;
   @override
   void initState() {

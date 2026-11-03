@@ -504,7 +504,7 @@ Future<void> _showFocusCollection(
             onPressed: () async {
               await _showPersonalItem(context, ref);
               if (context.mounted) {
-                ref.invalidate(memberRecordsProvider((resource, ownerId!)));
+                ref.invalidate(memberRecordsProvider((resource, ownerId)));
               }
             },
             child: const Icon(Icons.add_rounded),

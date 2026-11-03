@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/data/repositories/calendar_tasks.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
@@ -37,6 +38,15 @@ final sessionProvider = StateProvider<Session>(
       ? const Session()
       : const Session(active: false, role: UserRole.employee, dispatch: false),
 );
+int _sessionEpoch = 0;
+final sessionEpochProvider = Provider<int>((ref) {
+  ref.watch(sessionProvider);
+  return ++_sessionEpoch;
+});
+final calendarTaskReaderProvider = Provider<CalendarTaskReader>(
+  (ref) => sharedCalendarTaskReader,
+);
+
 final scenarioProvider = StateProvider<DemoScenario>(
   (ref) => DemoScenario.normal,
 );
@@ -154,7 +164,17 @@ Future<void> logoutCurrentSession(WidgetRef ref) async {
       return;
     }
   }
-  ref.read(sessionStorageErrorProvider.notifier).state = null;
+  String? calendarCleanupError;
+  if (before.companyId.isNotEmpty && before.id.isNotEmpty) {
+    final cleanupEpoch = ref.read(sessionEpochProvider);
+    try {
+      await ref.read(calendarCommandStoreProvider).clear(before);
+    } catch (_) {
+      calendarCleanupError = '已退出，改期记录清理失败；重新登录后请先确认旧申请';
+    }
+    if (!ref.context.mounted || ref.read(sessionEpochProvider) != cleanupEpoch) return;
+  }
+  ref.read(sessionStorageErrorProvider.notifier).state = calendarCleanupError;
   ref.read(sessionCheckProvider.notifier).state = null;
   ref.read(sessionProvider.notifier).state = const Session(
     id: '',
@@ -263,6 +283,9 @@ final datedRecordsProvider = FutureProvider.autoDispose
 
 final calendarMonthTasksProvider = FutureProvider.autoDispose
     .family<PageResult, (String?, int)>((ref, key) {
+      if (!ref.watch(sessionProvider).canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '账号权限已变化，请重新登录');
+      }
       var active = true;
       ref.onDispose(() => active = false);
       final monthIndex = key.$2;
@@ -271,16 +294,14 @@ final calendarMonthTasksProvider = FutureProvider.autoDispose
           : (monthIndex - 11) ~/ 12;
       final first = DateTime(year, monthIndex - year * 12 + 1);
       final range = _calendarMonthRange(first);
-      return readCompleteList(
-        ref.watch(repositoryProvider),
-        'tasks',
-        Query(
-          ownerId: key.$1,
-          from: range.from,
-          to: range.to,
-        ),
-        isActive: () => active,
-      );
+      ref.watch(sessionEpochProvider);
+      return ref
+          .read(calendarTaskReaderProvider)
+          .read(
+            ref.watch(repositoryProvider),
+            Query(ownerId: key.$1, from: range.from, to: range.to),
+            isActive: () => active,
+          );
     });
 
 final memberCalendarDateProvider = StateProvider.family<DateTime, String>((
@@ -331,6 +352,7 @@ final memberLogMonthProvider = FutureProvider.autoDispose
 }
 
 void refreshBusiness(WidgetRef ref) {
+  ref.invalidate(calendarMonthTasksProvider);
   ref.invalidate(recordsProvider);
   ref.invalidate(receivedTaskCardProvider);
   ref.invalidate(datedRecordsProvider);

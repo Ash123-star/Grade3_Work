@@ -1,3 +1,4 @@
+import '../../data/local/calendar_command_store.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/local/draft_database.dart';
@@ -25,3 +26,5 @@ final sessionStoreProvider = Provider<SessionStore>(
   (ref) =>
       SessionStore(ref.watch(secureValuesProvider), server: AppConfig.baseUrl),
 );
+
+final calendarCommandStoreProvider = Provider<CalendarCommandStore>((ref) => CalendarCommandStore(ref.watch(draftStoreProvider)));

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:pandora_mobile/data/models/task_display.dart';
@@ -256,6 +257,7 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _query(Query query, {String? resource}) => {
     if (query.cursor != null) 'cursor': query.cursor,
+    if (query.snapshotToken != null) 'snapshotToken': query.snapshotToken,
     if (query.ownerId != null)
       (resource == 'tasks' ? 'participantId' : 'ownerId'): query.ownerId,
     if (query.departmentId != null) 'departmentId': query.departmentId,
@@ -618,6 +620,10 @@ class HttpRepository implements Repository {
           .toList(),
       total: (map['total'] as num?)?.toInt() ?? rawItems.length,
       nextCursor: map['nextCursor']?.toString(),
+      snapshotToken: map['snapshotToken'] as String?,
+      scheduleConstraints: map['scheduleConstraints'] is Map
+          ? Map<String, dynamic>.from(map['scheduleConstraints'])
+          : null,
     );
   }
 
@@ -639,15 +645,34 @@ class HttpRepository implements Repository {
         return _page(response.data ?? <dynamic>[]);
       }
       final parameters = _query(query, resource: resource);
-      if (resource == 'tasks' &&
-          query.from != null &&
-          query.to != null &&
-          query.to!.difference(query.from!).inDays >= 28) {
+      if (resource == 'tasks' && query.from != null && query.to != null) {
         parameters
           ..remove('date')
           ..remove('period')
           ..['from'] = query.from!.toUtc().toIso8601String()
           ..['to'] = query.to!.toUtc().toIso8601String();
+        final budget = query.requestTimeout ?? const Duration(seconds: 15);
+        final cancellation = CancelToken();
+        final timer = Timer(
+          budget,
+          () => cancellation.cancel('Calendar budget exceeded'),
+        );
+        try {
+          final response = await dio.get<Map<String, dynamic>>(
+            '/tasks',
+            queryParameters: parameters,
+            cancelToken: cancellation,
+            options: Options(sendTimeout: budget, receiveTimeout: budget),
+          );
+          return _page(response.data);
+        } on DioException {
+          if (cancellation.isCancelled) {
+            throw const ApiFailure(FailureKind.timeout, '日历读取超出时间预算');
+          }
+          rethrow;
+        } finally {
+          timer.cancel();
+        }
       }
       if (resource == 'logs/subordinates' &&
           query.from != null &&
@@ -688,10 +713,7 @@ class HttpRepository implements Repository {
       if (result.ownerId != ownerId ||
           result.month.year != month.year ||
           result.month.month != month.month) {
-        throw const ApiFailure(
-          FailureKind.unavailable,
-          '成员日志日历响应范围不匹配',
-        );
+        throw const ApiFailure(FailureKind.unavailable, '成员日志日历响应范围不匹配');
       }
       return result;
     } on DioException catch (error) {
@@ -992,11 +1014,20 @@ class HttpRepository implements Repository {
     String path,
     Map<String, dynamic> body, {
     String? idempotencyKey,
+    String? scheduleRevision,
+    bool movement = false,
   }) async {
     final response = await dio.post<Map<String, dynamic>>(
       path,
       data: body,
-      options: Options(headers: {'Idempotency-Key': ?idempotencyKey}),
+      options: Options(
+        sendTimeout: movement ? const Duration(seconds: 15) : null,
+        receiveTimeout: movement ? const Duration(seconds: 15) : null,
+        headers: {
+          'Idempotency-Key': ?idempotencyKey,
+          'If-Schedule-Constraints-Match': ?scheduleRevision,
+        },
+      ),
     );
     return _record(response.data!);
   }
@@ -1037,11 +1068,25 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'tasks') {
+        if (command.action == 'move-schedule') {
+          return await _postRecord(
+            '/tasks/${Uri.encodeComponent(_commandId(command))}/reschedules',
+            {
+              'version': command.version,
+              'moveDays': v['moveDays'],
+              'reason': v['reason'],
+            },
+            idempotencyKey: command.idempotencyKey,
+            scheduleRevision: command.scheduleRevision,
+            movement: true,
+          );
+        }
         if (command.action == 'create') {
           return await _postRecord(
             '/tasks',
             _taskDraft(command),
             idempotencyKey: command.idempotencyKey,
+            scheduleRevision: command.scheduleRevision,
           );
         }
         final id = Uri.encodeComponent(_commandId(command));
@@ -1149,10 +1194,7 @@ class HttpRepository implements Repository {
         if (command.action == 'update-content') {
           final work = '${v['work'] ?? v['今日工作'] ?? ''}'.trim();
           if (work.isEmpty || command.version == null) {
-            throw const ApiFailure(
-              FailureKind.validation,
-              '请填写今日工作并读取当前日志版本',
-            );
+            throw const ApiFailure(FailureKind.validation, '请填写今日工作并读取当前日志版本');
           }
           final response = await dio.put<Map<String, dynamic>>(
             '/logs/${Uri.encodeComponent(_commandId(command))}/content',
@@ -1244,7 +1286,6 @@ class HttpRepository implements Repository {
           {
             'approve': command.action == 'approve',
             'reason': v['reason'] ?? v['驳回原因'] ?? '',
-            'expectedVersion': command.version,
           },
         );
       }

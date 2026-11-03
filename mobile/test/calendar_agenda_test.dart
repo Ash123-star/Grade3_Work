@@ -350,8 +350,15 @@ void main() {
       expect(
         t.getTopLeft(firstWeekSegment).dy -
             t.getTopLeft(find.byKey(const ValueKey('month-day:2026-10-16'))).dy,
-        t.getTopLeft(nextWeekSegment).dy -
-            t.getTopLeft(find.byKey(const ValueKey('month-day:2026-10-19'))).dy,
+        closeTo(
+          t.getTopLeft(nextWeekSegment).dy -
+              t
+                  .getTopLeft(
+                    find.byKey(const ValueKey('month-day:2026-10-19')),
+                  )
+                  .dy,
+          .001,
+        ),
         reason: 'continuation across weeks keeps one horizontal lane',
       );
       expect(
@@ -389,7 +396,14 @@ void main() {
       expect(segmentRect.left, startCell.left);
       expect(segmentRect.right, closeTo(endCell.right - 2, .01));
       expect(
-        t.getRect(find.text('数据结构实训')).right,
+        t
+            .getRect(
+              find.descendant(
+                of: firstWeekSegment,
+                matching: find.text('数据结构实训'),
+              ),
+            )
+            .right,
         lessThanOrEqualTo(startCell.right),
       );
       final material = t.widget<Material>(
@@ -403,7 +417,7 @@ void main() {
       await t.ensureVisible(cell);
       await t.tapAt(t.getTopLeft(cell) + const Offset(8, 8));
       await t.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byKey(const ValueKey('calendar-day-agenda')), findsOneWidget);
       expect(find.text('5 条记录'), findsOneWidget);
       expect(find.text('任务标题5'), findsOneWidget);
       expect(find.text('日志标题'), findsNothing);
@@ -412,7 +426,7 @@ void main() {
       expect(find.text('账号权限已变化，请关闭后重新查看'), findsOneWidget);
       expect(
         find.descendant(
-          of: find.byType(BottomSheet),
+          of: find.byKey(const ValueKey('calendar-day-agenda')),
           matching: find.text('任务标题0'),
         ),
         findsNothing,
