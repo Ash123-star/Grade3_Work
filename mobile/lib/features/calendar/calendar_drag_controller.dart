@@ -23,6 +23,22 @@ class CalendarDragIntent {
   final CalendarConstraints constraints;
 }
 
+/// The immutable candidate actually shown to the user, not a later hit-test.
+class CalendarDropPlacement {
+  const CalendarDropPlacement(this.intent, this.targetDay, this.schedule);
+  final CalendarDragIntent intent;
+  final DateTime targetDay;
+  final CalendarSchedule schedule;
+  int get days => businessDayDelta(intent.anchor, targetDay);
+}
+
+typedef CalendarDragFeedback = ({
+  DateTime? day,
+  bool valid,
+  DateTime? firstDay,
+  DateTime? lastDay,
+});
+
 /// Geometry and preview only: this controller never writes canonical task data.
 class CalendarDragController extends ChangeNotifier {
   CalendarDragController({
@@ -43,15 +59,20 @@ class CalendarDragController extends ChangeNotifier {
   CalendarDayGeometry? target;
   // High-frequency pointer motion only rebuilds the floating preview. Grid
   // cells and source bars listen to these much less frequent value changes.
-  final targetFeedback = ValueNotifier<({DateTime? day, bool valid})>((
+  final targetFeedback = ValueNotifier<CalendarDragFeedback>((
     day: null,
     valid: false,
+    firstDay: null,
+    lastDay: null,
   ));
+  CalendarDropPlacement? _presented;
   final activeTask = ValueNotifier<String?>(null);
   Offset pointer = Offset.zero;
   int generation = 0;
   Duration? _previous, _edgeSince;
   int _edge = 0;
+  int _layoutGeneration = 0;
+  bool _layoutPending = false, _disposed = false;
   bool get active => intent != null;
   Rect? get bounds {
     final box = viewport.currentContext?.findRenderObject();
@@ -112,7 +133,67 @@ class CalendarDragController extends ChangeNotifier {
   }
 
   void _publishTarget() {
-    targetFeedback.value = (day: target?.day, valid: preview != null);
+    final candidate = preview;
+    final feedback = (
+      day: target?.day,
+      valid: candidate != null,
+      firstDay: candidate == null ? null : dateLabel(candidate.firstDay),
+      lastDay: candidate == null
+          ? null
+          : dateLabel(scheduleWallTime(candidate.end)),
+    );
+    if (feedback == targetFeedback.value) return;
+    _preserveTargetPosition();
+    targetFeedback.value = feedback;
+  }
+
+  /// Expanding earlier weeks must not move a different date under a stationary
+  /// finger. Compensate the single timeline scroll after layout, before hit tests.
+  void _preserveTargetPosition() {
+    final day = target;
+    final top = day?.rect?.top;
+    if (day == null || top == null) return;
+    final generation = ++_layoutGeneration;
+    _layoutPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || generation != _layoutGeneration) return;
+      final next = day.rect?.top;
+      if (next != null && scroll.hasClients && (next - top).abs() > .1) {
+        final position = scroll.position;
+        scroll.jumpTo(
+          (position.pixels + next - top).clamp(
+            position.minScrollExtent,
+            position.maxScrollExtent,
+          ),
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_disposed && generation == _layoutGeneration) {
+            _layoutPending = false;
+          }
+        });
+      } else {
+        _layoutPending = false;
+      }
+    });
+  }
+
+  /// Called while building the preview. This must not notify/rebuild the grid.
+  CalendarDropPlacement? present() {
+    final source = intent, day = target, candidate = preview;
+    return _presented = source == null || day == null || candidate == null
+        ? null
+        : CalendarDropPlacement(source, day.day, candidate);
+  }
+
+  CalendarDropPlacement? release(Offset point) {
+    final shown = _presented;
+    // Never resurrect a last valid preview after leaving loaded date targets.
+    final accepted =
+        active && allowed() && hit(point) != null && preview != null
+        ? shown
+        : null;
+    cancel();
+    return accepted;
   }
 
   CalendarSchedule? get preview {
@@ -130,6 +211,10 @@ class CalendarDragController extends ChangeNotifier {
   void _tick(Duration elapsed) {
     if (!active || !allowed()) {
       cancel();
+      return;
+    }
+    if (_layoutPending) {
+      _previous = elapsed;
       return;
     }
     final area = bounds;
@@ -200,11 +285,18 @@ class CalendarDragController extends ChangeNotifier {
   }
 
   void cancel() {
+    if (active) _preserveTargetPosition();
     generation++;
     intent = null;
+    _presented = null;
     target = null;
     activeTask.value = null;
-    targetFeedback.value = (day: null, valid: false);
+    targetFeedback.value = (
+      day: null,
+      valid: false,
+      firstDay: null,
+      lastDay: null,
+    );
     _ticker.stop();
     _edge = 0;
     _edgeSince = null;
@@ -214,6 +306,7 @@ class CalendarDragController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _ticker.dispose();
     targetFeedback.dispose();
     activeTask.dispose();

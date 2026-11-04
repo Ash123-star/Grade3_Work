@@ -55,7 +55,6 @@ final liveNotificationsProvider =
           ref.invalidate(recordsProvider('tasks'));
           ref.invalidate(recordsProvider('organization'));
           ref.invalidate(receivedTaskCardProvider);
-          ref.invalidate(calendarMonthTasksProvider);
           ref.invalidate(datedRecordsProvider);
           ref.invalidate(calendarMonthTasksProvider);
           ref.invalidate(itemProvider);

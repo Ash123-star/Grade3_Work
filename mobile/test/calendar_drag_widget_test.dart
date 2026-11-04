@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -73,7 +72,7 @@ void main() {
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(
             theme: appTheme(),
@@ -136,7 +135,7 @@ void main() {
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: container,
         child: const MaterialApp(
           home: Scaffold(body: CalendarContent(availableHeight: 550)),
@@ -188,7 +187,7 @@ void main() {
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(
             theme: appTheme(),
@@ -301,7 +300,7 @@ void main() {
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(
             theme: appTheme(),
@@ -352,7 +351,7 @@ void main() {
       final container = testContainer();
       addTearDown(container.dispose);
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(
             theme: appTheme(),

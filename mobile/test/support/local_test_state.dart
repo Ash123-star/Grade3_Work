@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/core/state/local_state.dart';
 import 'package:pandora_mobile/data/local/draft_database.dart';
@@ -42,6 +43,33 @@ List<Override> localTestOverrides() {
 
 ProviderContainer testContainer({List<Override> overrides = const []}) =>
     ProviderContainer(overrides: [...localTestOverrides(), ...overrides]);
+
+/// Disposes externally constructed containers when Flutter unmounts the tree,
+/// before it checks for leaked timers (package:test tearDown runs later).
+class OwnedTestProviderScope extends StatefulWidget {
+  const OwnedTestProviderScope({
+    super.key,
+    required this.container,
+    required this.child,
+  });
+  final ProviderContainer container;
+  final Widget child;
+  @override
+  State<OwnedTestProviderScope> createState() => _OwnedTestProviderScopeState();
+}
+
+class _OwnedTestProviderScopeState extends State<OwnedTestProviderScope> {
+  @override
+  Widget build(BuildContext context) => UncontrolledProviderScope(
+    container: widget.container,
+    child: widget.child,
+  );
+  @override
+  void dispose() {
+    widget.container.dispose();
+    super.dispose();
+  }
+}
 
 /// Native SQLite and encryption futures can cross the fake/real test clock.
 Future<void> settleLocalIo(WidgetTester tester) async {

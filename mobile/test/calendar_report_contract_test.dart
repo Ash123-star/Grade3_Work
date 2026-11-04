@@ -106,7 +106,7 @@ HttpRepository repository(CalendarAdapter adapter) {
 }
 
 Widget host(ProviderContainer container, Widget child, {double scale = 1.5}) =>
-    UncontrolledProviderScope(
+    OwnedTestProviderScope(
       container: container,
       child: MaterialApp(
         theme: appTheme(),
@@ -412,7 +412,7 @@ void main() {
       await t.pumpWidget(
         RepaintBoundary(
           key: boundaryKey,
-          child: UncontrolledProviderScope(
+          child: OwnedTestProviderScope(
             container: container,
             child: const PandoraApp(),
           ),

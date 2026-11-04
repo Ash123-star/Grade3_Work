@@ -80,12 +80,14 @@ void main() {
                 .evaluate()
                 .isNotEmpty,
       );
-      final handle = find
+      final handles = find
           .byWidgetPredicate(
             (w) => w is CalendarTaskHandle && w.record.id == taskId,
           )
-          .hitTestable()
-          .first;
+          .hitTestable();
+      // Pick a continuation for a long fixture, so its left edge is not the
+      // whole task's start. The default short fixture retains its original path.
+      final handle = handles.at(handles.evaluate().length > 1 ? 1 : 0);
       final surface = t.state<CalendarInteractionSurfaceState>(
         find.byType(CalendarInteractionSurface),
       );
@@ -103,6 +105,33 @@ void main() {
       expect(sourceHandle.record.fields['capabilities']['reschedule'], isTrue);
       expect(surface.writable, isTrue);
       expect(surface.pending, isNull);
+      for (var attempt = 0; attempt < 8; attempt++) {
+        final repeated = await t.startGesture(t.getCenter(handle));
+        await t.pump(const Duration(milliseconds: 650));
+        final destination = surface.drag.intent!.anchor.add(
+          const Duration(days: 1),
+        );
+        final cell = find
+            .byKey(
+              ValueKey(
+                'month-day:${destination.year}-${destination.month}-${destination.day}',
+              ),
+            )
+            .hitTestable();
+        await repeated.moveTo(t.getCenter(cell));
+        await t.pump(const Duration(milliseconds: 40));
+        final candidate = surface.drag.preview!;
+        await repeated.up();
+        await until(() => find.text('确认移动排期').evaluate().isNotEmpty);
+        expect(find.text('新排期：${candidate.description}'), findsOneWidget);
+        await t.tap(find.text('取消'));
+        await t.pump(const Duration(milliseconds: 300));
+        expect(surface.pending, isNull);
+        expect(
+          find.byKey(const ValueKey('calendar-read-cooldown')),
+          findsNothing,
+        );
+      }
       final gesture = await t.startGesture(t.getCenter(handle));
       await t.pump(const Duration(milliseconds: 650));
       expect(surface.drag.active, isTrue);
@@ -119,6 +148,7 @@ void main() {
       await gesture.moveTo(
         Offset(t.getCenter(lastCell).dx, viewport.bottom - 18),
       );
+      Offset? safeLanding;
       for (var frame = 0; frame < 150; frame++) {
         await t.pump(const Duration(milliseconds: 20));
         if (surface.drag.target == null) {
@@ -126,17 +156,44 @@ void main() {
             Offset(viewport.left + viewport.width * .6, viewport.bottom - 18),
           );
         }
-        if (surface.drag.target?.day.month != start.month &&
-            surface.drag.target != null) {
-          break;
+        for (final day in surface.drag.targets.values) {
+          final rect = day.rect;
+          if (day.day.month != start.month &&
+              rect != null &&
+              rect.bottom < viewport.bottom - 16 &&
+              viewport.deflate(50).contains(rect.center)) {
+            safeLanding = rect.center;
+            break;
+          }
         }
+        if (safeLanding != null) break;
       }
-      expect(surface.drag.target, isNotNull);
+      expect(safeLanding, isNotNull);
+      // Stop edge scrolling before comparing the displayed candidate and dialog.
+      await gesture.moveTo(safeLanding!);
+      await t.pump(const Duration(milliseconds: 40));
       expect(surface.drag.target!.day.month, isNot(start.month));
-      final expected = surface.drag.preview!;
       await capture('preview');
+      final previewRect = t.getRect(
+        find.byKey(const ValueKey('calendar-drag-bar')),
+      );
+      final neighbours = find
+          .byWidgetPredicate(
+            (w) => w is CalendarTaskHandle && w.record.id != taskId,
+          )
+          .hitTestable();
+      for (final element in neighbours.evaluate()) {
+        expect(
+          previewRect.overlaps(t.getRect(find.byWidget(element.widget))),
+          isFalse,
+        );
+      }
+      final expected = surface.drag.preview!;
+      final landingDay = surface.drag.target!.day;
       await gesture.up();
       await until(() => find.text('确认移动排期').evaluate().isNotEmpty);
+      expect(find.text('新排期：${expected.description}'), findsOneWidget);
+      await capture('confirmation');
       // Invalid input must leave both business data and secure command queue alone.
       await t.tap(find.text('提交审核'));
       await t.pump();
@@ -153,6 +210,8 @@ void main() {
         'originalVersion': source.version,
         'beforeStart': original.start?.toIso8601String(),
         'beforeDeadline': original.end.toIso8601String(),
+        'canceledDragCount': 8,
+        'durationHours': original.end.difference(original.start!).inHours,
       });
       final protected = await container
           .read(calendarCommandStoreProvider)
@@ -205,10 +264,66 @@ void main() {
         current.version,
       );
       expect(surface.pending, isNull);
+      final crowded = page.items.where(
+        (r) => r.id.startsWith('$company-busy-'),
+      );
+      if (crowded.isNotEmpty) {
+        expect(crowded.length, 5);
+        container.read(selectedDateProvider.notifier).state = landingDay;
+        final landingCell = find.byKey(
+          ValueKey(
+            'month-day:${landingDay.year}-${landingDay.month}-${landingDay.day}',
+          ),
+        );
+        await until(
+          () =>
+              landingCell.evaluate().isNotEmpty &&
+              find
+                  .byWidgetPredicate(
+                    (w) =>
+                        w is CalendarTaskHandle &&
+                        w.record.id == taskId &&
+                        w.record.version == current.version,
+                  )
+                  .evaluate()
+                  .isNotEmpty,
+        );
+        await t.pump(const Duration(milliseconds: 300));
+        await t.ensureVisible(landingCell);
+        await t.pumpAndSettle();
+        final cellBounds = t.getRect(landingCell);
+        final rowRects = <Rect>[];
+        for (final record in [...crowded, current]) {
+          final segments = find.byWidgetPredicate(
+            (w) => w is CalendarTaskHandle && w.record.id == record.id,
+          );
+          final rects = [
+            for (final node in segments.evaluate())
+              t.getRect(find.byWidget(node.widget)),
+          ];
+          final inWeek = rects.where(
+            (r) => r.top >= cellBounds.top && r.top < cellBounds.bottom,
+          );
+          expect(
+            inWeek,
+            isNotEmpty,
+            reason: 'approved task row must be painted',
+          );
+          final row = inWeek.first;
+          expect(row.bottom, lessThanOrEqualTo(cellBounds.bottom));
+          for (final previous in rowRects) {
+            expect(row.overlaps(previous), isFalse);
+          }
+          rowRects.add(row);
+        }
+        expect(rowRects.length, 6);
+      }
       await capture('approved');
 
       // Long press an actually empty day through the production create route.
-      final createDay = DateTime(month.year, month.month, month.day + 12);
+      final createDay = scheduleWallTime(expected.end).add(
+        const Duration(days: 12),
+      );
       container.read(selectedDateProvider.notifier).state = createDay;
       final cell = find.byKey(
         ValueKey(

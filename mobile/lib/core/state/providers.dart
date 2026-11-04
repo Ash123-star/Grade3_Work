@@ -1,4 +1,5 @@
 import 'package:pandora_mobile/data/repositories/calendar_tasks.dart';
+import 'calendar_month_retention.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
@@ -46,6 +47,12 @@ final sessionEpochProvider = Provider<int>((ref) {
 final calendarTaskReaderProvider = Provider<CalendarTaskReader>(
   (ref) => sharedCalendarTaskReader,
 );
+final calendarMonthRetentionProvider = Provider<CalendarMonthRetention>((ref) {
+  ref.watch(sessionEpochProvider);
+  final retention = CalendarMonthRetention();
+  ref.onDispose(retention.dispose);
+  return retention;
+});
 
 final scenarioProvider = StateProvider<DemoScenario>(
   (ref) => DemoScenario.normal,
@@ -312,6 +319,7 @@ final calendarMonthTasksProvider = FutureProvider.autoDispose
       final first = DateTime(year, monthIndex - year * 12 + 1);
       final range = _calendarMonthRange(first);
       ref.watch(sessionEpochProvider);
+      final retention = ref.watch(calendarMonthRetentionProvider);
       return ref
           .read(calendarTaskReaderProvider)
           .read(
@@ -322,7 +330,13 @@ final calendarMonthTasksProvider = FutureProvider.autoDispose
               to: range.to,
             ),
             isActive: () => active,
-          );
+          ).then((page) {
+            if (active) {
+              final keep = ref.keepAlive();
+              ref.onDispose(retention.retain(key, keep.close));
+            }
+            return page;
+          });
     });
 
 final memberCalendarDateProvider = StateProvider.family<DateTime, String>((
@@ -373,7 +387,6 @@ final memberLogMonthProvider = FutureProvider.autoDispose
 }
 
 void refreshBusiness(WidgetRef ref) {
-  ref.invalidate(calendarMonthTasksProvider);
   ref.invalidate(recordsProvider);
   ref.invalidate(receivedTaskCardProvider);
   ref.invalidate(homePreviewProvider);

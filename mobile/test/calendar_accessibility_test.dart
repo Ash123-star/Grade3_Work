@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -42,7 +41,7 @@ void main() {
             );
             addTearDown(container.dispose);
             await tester.pumpWidget(
-              UncontrolledProviderScope(
+              OwnedTestProviderScope(
                 container: container,
                 child: MaterialApp(
                   theme: appTheme(),

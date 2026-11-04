@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -94,7 +93,7 @@ void main() {
       );
       addTearDown(c.dispose);
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: const MaterialApp(home: CalendarPage()),
         ),
@@ -128,7 +127,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: c,
         child: MaterialApp(
           theme: appTheme(),
@@ -155,7 +154,7 @@ void main() {
       ],
     );
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: c,
         child: const MaterialApp(home: Scaffold(body: DateControls())),
       ),
@@ -238,7 +237,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     c.read(routerProvider).go('/view');
     await settleLocalIo(t);
@@ -288,7 +287,7 @@ void main() {
   });
 
   testWidgets(
-    'bounded month cells open all records and revoke stale sheet data',
+    'expanded month cells display all records and revoke stale sheet data',
     (t) async {
       t.view.physicalSize = const Size(360, 800);
       t.view.devicePixelRatio = 1;
@@ -305,7 +304,7 @@ void main() {
       );
       addTearDown(c.dispose);
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: MaterialApp(
             theme: appTheme(),
@@ -331,14 +330,13 @@ void main() {
         find.byKey(
           const ValueKey('month-span:tasks:t5:2026-10-12T00:00:00.000'),
         ),
-        findsNothing,
-        reason: 'overflow records are represented by the day counter',
+        findsOneWidget,
+        reason: 'all task rows remain visible in the expanded week',
       );
       expect(
         find.byKey(const ValueKey('month-overflow:2026-10-13')),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.textContaining('+'), findsWidgets);
       final firstWeekSegment = find.byKey(
         const ValueKey('month-span:tasks:t6:2026-10-12T00:00:00.000'),
       );
@@ -418,7 +416,13 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('calendar-day-agenda')), findsOneWidget);
       expect(find.text('5 条记录'), findsOneWidget);
-      expect(find.text('任务标题5'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('calendar-day-agenda')),
+          matching: find.text('任务标题5'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('日志标题'), findsNothing);
       c.read(sessionProvider.notifier).state = const Session(active: false);
       await t.pumpAndSettle();
@@ -451,7 +455,7 @@ void main() {
       );
       addTearDown(c.dispose);
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: MaterialApp(
             home: const Scaffold(
