@@ -11,6 +11,7 @@ public final class TaskListView {
     public static Map<String,Object> of(Map<String,Object> task) {
         var result=new LinkedHashMap<String,Object>();
         for(String column:COLUMNS) result.put(column,task.get(column));
+        if(task.containsKey("pinned")) { result.put("pinned",Boolean.TRUE.equals(task.get("pinned"))); result.put("pinnedAt",task.get("pinned_at")); }
         return result;
     }
 

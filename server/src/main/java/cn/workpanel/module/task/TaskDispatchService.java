@@ -59,6 +59,8 @@ public class TaskDispatchService {
 
     public Map<String,Object> read(Actor a,String id) {
         var task=TaskAccess.readable(db,a,id,false);var result=detail(task);
+        var pin=db.rows("SELECT pinned_at FROM task_pins WHERE user_id=? AND task_id=?",a.id(),id);
+        result.put("pinned",!pin.isEmpty()); result.put("pinnedAt",pin.isEmpty()?null:pin.getFirst().get("pinned_at"));
         result.put("capabilities",Map.of("reschedule",constraints.mayMove(a,task)));result.put("scheduleConstraints",constraints.view());return result;
     }
 

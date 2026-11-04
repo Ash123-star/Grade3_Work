@@ -70,7 +70,8 @@
 | `review_requests` | `kind`, `target_id`, `applicant_id` | 被审核对象、对象 ID 和申请人 |
 | `review_requests` | `expected_version`, `before_value`, `candidate` | 版本基线、原值和候选值 |
 | `review_requests` | `reason`, `status` | 变更理由和 `PENDING/APPROVED/REJECTED/SUPERSEDED` 状态 |
-| `review_requests` | `approval_mode`, `decision_source` | V22增加DIRECT_MANAGER/ADMIN_MEMBERSHIP/LEGACY模式和DIRECT_MANAGER/ADMIN_MEMBERSHIP/FOUNDER_EXEMPT决定来源；历史待审迁移不应用候选 |
+| `task_pins` | `user_id`, `task_id`, `company_id`, `pinned_at` | V25个人任务置顶；主键(user_id,task_id)，租户外键随用户/任务级联删除；不影响任务version |
+| `review_requests` | `approval_mode`, `decision_source` | V22增加DIRECT_MANAGER/ADMIN_MEMBERSHIP/LEGACY模式和DIRECT_MANAGER/ADMIN_MEMBERSHIP/FOUNDER_EXEMPT决定来源；V24增加FOUNDER_PEER模式与决定来源，创始人存量待审在公司另有在职创始人时转为互审，失效审核步骤SUPERSEDED并重新分配，仍无审核人写REVIEW_UNASSIGNED；历史待审迁移不应用候选，已决记录不变 |
 | `review_steps` | `request_id`, `applicant_id`, `reviewer_id`, `position` | 审核申请人、审核人和审核顺序；V4 禁止审核人等于申请人 |
 | `review_steps` | `state`, `reason`, `decided_at` | 步骤结果、驳回理由和决定时间 |
 

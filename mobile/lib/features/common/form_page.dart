@@ -1789,7 +1789,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('策略范围'),
             const PaperSurface(
-              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。'),
+              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人的修改由其他在职创始人审核，仅一位创始人时自动批准。'),
             ),
             const SizedBox(height: 16),
           ],
@@ -1898,7 +1898,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('审核方式'),
             const PaperSurface(
-              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。'),
+              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人的修改由其他在职创始人审核，仅一位创始人时自动批准。'),
             ),
           ],
           if (widget.kind == 'register')
