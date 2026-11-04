@@ -94,11 +94,13 @@
 
 - [x] 9.1 实现既有条带稳定、候选按区间选择空行的独立排布，跨周／月分段且不与自身竞争。
 - [x] 9.2 支持周高度临时展开、后续周下移和可变月份滚动；布局补偿保持日期落点，取消恢复。
-- [ ] 9.3 完成碰撞／密集／跨月／恢复验证、Android 链路、分析、APK 和规范检查，更新 Issue／PR 证据。
+- [x] 9.3 完成碰撞／密集／跨月／恢复验证、Android 链路、分析、APK 和规范检查，更新 Issue／PR 证据。
 
 设计与用户确认见 [drag-lane-layout.md](drag-lane-layout.md)。
 
 验证见 [周高度与避让验收](verification-lane-layout.md)：日历专项 76 项、通知 12 项、Android 密集目标跨月拖动与独立审核通过；测试包 0.1.4。PR #67 尚未合并发布。
+
+实现提交 `5220e4b` 已推送并更新 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，[Issue #58 验收回执](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6629907441)已发布；当前任务 45/51，六项历史缺口保留。
 
 ## 当前状态与已知限制
 

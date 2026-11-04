@@ -2,6 +2,8 @@
 
 2026-11-04，Issue #58，接续 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，分支 `fix/58-calendar-drop-consistency`。用户明确确认“向下撑高这一周”。修复尚未合并或部署。
 
+交付回执：实现提交 `5220e4b159ab8d48cea724b434804625575118e4` 已推送，PR #67 标题、范围和截图已更新；[Issue #58](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6629907441)已同步验收结论。当前六项历史验收缺口继续保留。
+
 ## 实现与边界
 
 原正式任务有排布逻辑，但拖动副本在浮层跟随指针，不参与占位，因而覆盖目标条带。现在由 `calendar_preview_lane.dart` 按含端点的完整日期区间选择空行，排除源任务自身；既有条带保持行号。候选跨周、跨月剪裁到真实日期格，浮层仅显示抓取日映射及排期。
