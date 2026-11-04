@@ -46,13 +46,13 @@
 | 兼容 | 旧模式不变 | 影响穿透范围（上级可看下属数据），扩大权限 | 需迁移所有路由 |
 | 结论 | 采用 | 拒绝：会扩大数据范围 | 拒绝：YAGNI |
 
-## 4. 数据与迁移（V24__multi_founder_review.sql）
+## 4. 数据与迁移（V28__multi_founder_review.sql）
 
 1. 扩展 CHECK：`approval_mode` 增加 `FOUNDER_PEER`，`decision_source` 增加 `FOUNDER_PEER`（先按名称 DROP 再 ADD V22 的两个命名约束）。
 2. 审核人是否由申请人指定由 `REVIEW_REVIEWER_CHANGED` 审计记录体现，不新增列。
 3. 历史兼容（任务④）：
    - 已决定（APPROVED/REJECTED/SUPERSEDED）记录不变，含历史 `FOUNDER_EXEMPT`。
-   - 存量 PENDING 且当前审核步骤已失效（审核人非 ACTIVE、must_change 或不再满足其模式规则）的申请：步骤置 `SUPERSEDED`（理由“V24 审核人失效”），并按 §2 重新分配；创始人申请且有其他有效创始人 → `FOUNDER_PEER`；仍无审核人 → 无步骤保持 PENDING，写一条 `REVIEW_UNASSIGNED` outbox（去重键 `review-migration-v24:<id>:<recipient>`）。
+   - 存量 PENDING 且当前审核步骤已失效（审核人非 ACTIVE、must_change 或不再满足其模式规则）的申请：步骤置 `SUPERSEDED`（理由“V28 审核人失效”），并按 §2 重新分配；创始人申请且有其他有效创始人 → `FOUNDER_PEER`；仍无审核人 → 无步骤保持 PENDING，写一条 `REVIEW_UNASSIGNED` outbox（去重键 `review-migration-v24:<id>:<recipient>`）。
    - 迁移**不**自动应用任何历史候选，不把任何 PENDING 改为免审。
    - 有效步骤的存量 PENDING 不动。
 4. 回滚：迁移只新增列和枚举值、修改 PENDING 步骤状态；回滚需手写反向脚本（删除列、恢复约束）且 FOUNDER_PEER 记录须先处理，PR 中注明。
@@ -89,7 +89,7 @@
 
 ## 8. 公共契约协调（任务⑥）
 
-- 迁移编号：开工前再 fetch 一次，如他人已占用 V24 则顺延，PR 合并前再次 rebase 确认。
+- 迁移编号：开工前再 fetch 一次，如他人已占用 V28 则顺延，PR 合并前再次 rebase 确认。
 - 共享文件：`detail_pages.dart`、`repository.dart`、`mock_repository.dart`、`OpenApi.java`、`docs/openapi.json` 改动集中、小块提交；合并冲突在本分支 rebase 解决并在 PR 记录。
 - `docs/openapi.json` 由 `BackendIntegrationTest` 生成，只提交本次相关差异。
 - 完成情况与成员 A（完成情况）、成员 B（多标签契约）口径冲突时，以 `docs/backend-interface.md` 为准，记录在 PR“未完成与风险”。
@@ -104,7 +104,7 @@
   - 停用审核人：管理员停用 B 后 A 的申请自动改派给 C 并通知；只剩 A 时保持 PENDING 并发出 REVIEW_UNASSIGNED，A 显式 reroute 后免审。
   - 员工直属上级被停用 → 无审核人通知，管理员无法决定（403）。
   - MEMBERSHIP 不受影响。
-- 迁移：`MobileP0MigrationUpgradeTest` 风格新增 V24 升级测试——失效步骤被作废与重路由、已决记录不变、历史候选未应用。
+- 迁移：`MobileP0MigrationUpgradeTest` 风格新增 V28 升级测试——失效步骤被作废与重路由、已决记录不变、历史候选未应用。
 - Flutter：审核详情三种模式文案、更换审核人弹窗（成功/空/失败）、REVIEW_UNASSIGNED 跳转。
 - 非功能：安全（越权、自审、管理员无审批权）、可靠性（并发只生效一次、通知去重）。
 

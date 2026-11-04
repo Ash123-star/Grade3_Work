@@ -25,7 +25,7 @@ class AnnualScenarioMultiFounderMigrationTest {
             annualScenario(schema).migrate();
 
             String s = schema + ".";
-            assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM " + s + "users WHERE company_id='annual-cm' AND role='FOUNDER' AND status='ACTIVE'", Integer.class));
+            assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM " + s + "users WHERE company_id='annual-cm' AND role='FOUNDER' AND status='ACTIVE'", Integer.class));
             assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM " + s + "users WHERE id IN ('annual-founder-product','annual-founder-delivery')", Integer.class));
             assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM " + s + "user_roles WHERE user_id IN ('annual-founder-product','annual-founder-delivery') AND role_id='FOUNDER'", Integer.class));
             assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM " + s + "task_participants WHERE task_id='annual-founder-collaboration-task'", Integer.class));

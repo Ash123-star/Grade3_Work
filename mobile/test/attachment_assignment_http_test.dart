@@ -366,7 +366,7 @@ void main() {
     );
     addTearDown(c.dispose);
     c.read(routerProvider).go(route);
-    Widget app = UncontrolledProviderScope(
+    Widget app = OwnedTestProviderScope(
       container: c,
       child: const PandoraApp(),
     );
@@ -561,7 +561,7 @@ void main() {
     (t) async {
       final c = await launch(t, '/form/dispatch');
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: MaterialApp(
             theme: appTheme(),

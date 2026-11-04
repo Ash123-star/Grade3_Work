@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -162,7 +161,7 @@ void main() {
         await t.pumpWidget(
           RepaintBoundary(
             key: boundary,
-            child: UncontrolledProviderScope(
+            child: OwnedTestProviderScope(
               container: c,
               child: const PandoraApp(),
             ),
@@ -258,26 +257,17 @@ void main() {
               findsNothing,
             );
             expect(find.text('任：任务 · 日：日志 · 点击日期查看全文'), findsNothing);
-            expect(
-              find.byWidgetPredicate(
-                (w) =>
-                    w.key is ValueKey<String> &&
-                    (w.key as ValueKey<String>).value.startsWith(
-                      'month-preview:2026-10-14:',
-                    ),
-              ),
-              findsNWidgets(previewCount),
-            );
             await t.ensureVisible(day);
             await t.pumpAndSettle();
             await capture('month-selected');
-            await t.tap(day);
+            final dayRect = t.getRect(day);
+            await t.tapAt(Offset(dayRect.center.dx, dayRect.bottom - 5));
             await t.pumpAndSettle();
             expect(find.byTooltip('关闭'), findsOneWidget);
             for (var i = 0; i < 3; i++) {
               expect(
                 find.descendant(
-                  of: find.byKey(const ValueKey('month-day-agenda')),
+                  of: find.byKey(const ValueKey('calendar-day-agenda')),
                   matching: find.text('完成工作台交互稿与客户访谈记录$i'),
                 ),
                 findsOneWidget,

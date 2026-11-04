@@ -1,6 +1,5 @@
 import 'support/local_test_state.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/app.dart';
@@ -32,10 +31,7 @@ void main() {
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const PandoraApp(),
-        ),
+        OwnedTestProviderScope(container: container, child: const PandoraApp()),
       );
       await tester.pumpAndSettle();
       final router = container.read(routerProvider);

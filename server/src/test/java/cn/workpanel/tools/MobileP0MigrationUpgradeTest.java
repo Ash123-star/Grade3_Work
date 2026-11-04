@@ -176,10 +176,10 @@ class MobileP0MigrationUpgradeTest {
         } finally { drop(schema); }
     }
 
-    @Test void v24MovesFounderPendingToPeerAndReplacesInvalidReviewersWithoutApplying() {
+    @Test void v28MovesFounderPendingToPeerAndReplacesInvalidReviewersWithoutApplying() {
         String schema = schema();
         try {
-            flyway(schema, "23").migrate();
+            flyway(schema, "27").migrate();
             String s = schema + ".";
             jdbc.update("INSERT INTO " + s + "users(id,company_id,account,password_hash,name,role,status,company_reviewer) VALUES "
                     + "('f1','default','v24-f1','hash','创始人一','FOUNDER','ACTIVE',false),"

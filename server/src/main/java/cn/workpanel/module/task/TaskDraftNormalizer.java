@@ -45,6 +45,16 @@ public final class TaskDraftNormalizer {
     /** v2 摘要：基于规范化内容，顺序与重复不影响结果。 */
     public static String hash(Db db,TaskDraft draft) { return Db.hash(db.write(draft.body())); }
 
+    /** Accept the published single-label v2 representation only when it expresses the same draft. */
+    public static boolean matchesHash(Db db,TaskDraft draft,String stored) {
+        if(hash(db,draft).equals(stored)) return true;
+        if(draft.labelIds().size()>1) return false;
+        var previous=new TreeMap<String,Object>(draft.body());
+        previous.remove("labelIds");
+        if(!draft.labelIds().isEmpty()) previous.put("labelId",draft.labelIds().getFirst());
+        return Db.hash(db.write(previous)).equals(stored);
+    }
+
     /** v1 摘要：V4 之前的算法，原始请求补默认紧急度后按键排序。 */
     public static String legacyHash(Db db,Map<String,Object> raw) {
         var c=new LinkedHashMap<>(raw); c.putIfAbsent("urgency","NORMAL"); return Db.hash(db.write(new TreeMap<>(c)));

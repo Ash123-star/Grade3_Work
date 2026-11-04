@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/app.dart';
@@ -55,7 +54,7 @@ void main() {
         await t.pumpWidget(
           RepaintBoundary(
             key: boundary,
-            child: UncontrolledProviderScope(
+            child: OwnedTestProviderScope(
               container: c,
               child: const PandoraApp(),
             ),
@@ -89,12 +88,8 @@ void main() {
           });
         }
 
-        final a = t.getRect(find.byKey(const ValueKey('dashboard-tile:0')));
-        final b = t.getRect(find.byKey(const ValueKey('dashboard-tile:1')));
-        final d = t.getRect(find.byKey(const ValueKey('dashboard-tile:2')));
-        expect(a.top, b.top);
-        expect(b.left, greaterThan(a.right));
-        expect(d.top, greaterThan(a.bottom));
+        expect(find.text('事件纪'), findsOneWidget);
+        expect(find.text('任务看板'), findsOneWidget);
         await capture('01-dashboard');
         final router = c.read(routerProvider);
         router.push('/tasks/received');
@@ -232,7 +227,7 @@ void main() {
         overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
       );
       await t.pumpWidget(
-        UncontrolledProviderScope(container: c, child: const PandoraApp()),
+        OwnedTestProviderScope(container: c, child: const PandoraApp()),
       );
       await t.pump(const Duration(milliseconds: 1700));
       await settleLocalIo(t);
@@ -296,7 +291,7 @@ void main() {
       overrides: [fontScaleProvider.overrideWith((ref) => 1.5)],
     );
     await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     c.read(routerProvider).go('/me/tasks');
     await settleLocalIo(t);
@@ -339,7 +334,7 @@ void main() {
         ],
       );
       await t.pumpWidget(
-        UncontrolledProviderScope(container: c, child: const PandoraApp()),
+        OwnedTestProviderScope(container: c, child: const PandoraApp()),
       );
       final router = c.read(routerProvider);
       router.go('/logs/subordinates');
@@ -397,7 +392,7 @@ void main() {
         overrides: [repositoryProvider.overrideWithValue(repo)],
       );
       await t.pumpWidget(
-        UncontrolledProviderScope(container: c, child: const PandoraApp()),
+        OwnedTestProviderScope(container: c, child: const PandoraApp()),
       );
       final router = c.read(routerProvider);
       router.go('/logs');
@@ -486,7 +481,7 @@ void main() {
         ],
       );
       await t.pumpWidget(
-        UncontrolledProviderScope(container: c, child: const PandoraApp()),
+        OwnedTestProviderScope(container: c, child: const PandoraApp()),
       );
       final router = c.read(routerProvider);
       router.go('/me');

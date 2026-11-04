@@ -218,7 +218,7 @@ Future<ProviderContainer> launchInbox(
   }
   c.read(routerProvider).go(route);
   await t.pumpWidget(
-    UncontrolledProviderScope(container: c, child: const PandoraApp()),
+    OwnedTestProviderScope(container: c, child: const PandoraApp()),
   );
   await settleLocalIo(t);
   return c;
@@ -521,7 +521,10 @@ void main() {
       await settleLocalIo(t);
       expect(find.byType(TextField), findsOneWidget);
       expect(find.textContaining('草稿读取失败'), findsOneWidget);
-      expect(t.widget<TextField>(find.byType(TextField)).controller!.text, '本机未提交工作');
+      expect(
+        t.widget<TextField>(find.byType(TextField)).controller!.text,
+        '本机未提交工作',
+      );
       expect(find.text('提交修订申请'), findsNothing);
     },
   );
@@ -669,7 +672,7 @@ void main() {
       await t.pumpWidget(
         RepaintBoundary(
           key: key,
-          child: UncontrolledProviderScope(
+          child: OwnedTestProviderScope(
             container: c,
             child: const PandoraApp(),
           ),

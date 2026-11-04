@@ -86,6 +86,8 @@ class _MemberAdapter implements HttpClientAdapter {
       };
     } else if (request.path == '/tasks') {
       body = {
+        'snapshotToken': 'member-calendar-fixture',
+        'nextCursor': null,
         'items': [
           {
             'id': 'task-31',
@@ -135,7 +137,7 @@ Future<ProviderContainer> _launch(
   );
   addTearDown(container.dispose);
   await tester.pumpWidget(
-    UncontrolledProviderScope(container: container, child: const PandoraApp()),
+    OwnedTestProviderScope(container: container, child: const PandoraApp()),
   );
   container.read(routerProvider).go(route);
   for (var i = 0; i < 8; i++) {

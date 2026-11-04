@@ -406,9 +406,16 @@ void main() {
         'attachments': ['file'],
         'collaborators': ['person'],
       };
-      expect((await repo.confirm(edited, 0, task, 'stable-key'))['id'], 'task-created');
+      expect(
+        (await repo.confirm(edited, 0, task, 'stable-key'))['id'],
+        'task-created',
+      );
       expect(adapter.requests.last.path, '/ai/jobs/job/confirm-task');
-      expect(adapter.requests.last.data, {'version': 5, 'actionIndex': 0, 'task': task});
+      expect(adapter.requests.last.data, {
+        'version': 5,
+        'actionIndex': 0,
+        'task': task,
+      });
       expect(adapter.requests.last.headers['Idempotency-Key'], 'stable-key');
       await repo.cancel(created.id);
       expect(adapter.requests.last.method, 'DELETE');
@@ -558,7 +565,7 @@ void main() {
       c.read(latestAiJobProvider(user.id).notifier).state = latest;
     }
     c.read(routerProvider).go(route);
-    Widget app = UncontrolledProviderScope(
+    Widget app = OwnedTestProviderScope(
       container: c,
       child: const PandoraApp(),
     );
@@ -834,7 +841,10 @@ void main() {
   );
   Future<void> fillConfirmation(WidgetTester t) async {
     await tapVisible(t, find.text('选择主负责人'));
-    await t.tap(find.text('实际负责人'));
+    await t.enterText(find.byType(TextField).last, '实际负责人');
+    await t.pump(const Duration(milliseconds: 500));
+    await t.pumpAndSettle();
+    await t.tap(find.text('实际负责人').last);
     await t.pumpAndSettle();
     await t.ensureVisible(find.text('选择截止时间'));
     await t.pumpAndSettle();

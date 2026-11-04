@@ -150,7 +150,7 @@ class TaskDispatchIntegrationTest {
         var leaderPage=list(200,"search="+prefix+"&limit=10","leader");
         assertEquals(2,leaderPage.get("total").asInt());
         assertEquals(Set.of(alice,amy),Set.of(leaderPage.get("items").get(0).get("id").asText(),leaderPage.get("items").get(1).get("id").asText()));
-        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label","capabilities","pinned","pinnedAt");
+        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","labels","label","capabilities","pinned","pinnedAt");
         for(JsonNode item:leaderPage.get("items")) {
             var names=new HashSet<String>(); item.fieldNames().forEachRemaining(names::add);
             assertEquals(allowed,names);
@@ -626,7 +626,7 @@ class TaskDispatchIntegrationTest {
         assertEquals(expected,actual);
         Map<String,JsonNode> byId=new HashMap<>(); page.get("items").forEach(item->byId.put(item.get("id").asText(),item));
         var names=new HashSet<String>(); byId.get(first).fieldNames().forEachRemaining(names::add);
-        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","label"),names);
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","labels","label"),names);
         assertEquals(at("2026-10-12T01:00:00Z"),at(byId.get(first).get("dispatchAt").asText()));
         assertEquals("ACCEPTED",byId.get(first).get("phase").asText());
         assertEquals("WITHDRAWN",byId.get(withdrawn).get("phase").asText());

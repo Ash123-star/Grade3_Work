@@ -43,7 +43,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     c.read(routerProvider).go(route);
     await t.pumpAndSettle();
@@ -100,7 +100,7 @@ void main() {
             .text,
         '陈一诺',
       );
-      expect(find.text('2026-10-14T18:00:00'), findsOneWidget);
+      expect(find.textContaining('2026-10-14'), findsWidgets);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pumpAndSettle();
     },

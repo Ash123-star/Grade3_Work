@@ -127,7 +127,7 @@ void main() {
         ],
       );
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(theme: appTheme(), home: const WorkbenchPage()),
         ),
@@ -171,7 +171,7 @@ void main() {
         ],
       );
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(theme: appTheme(), home: const WorkbenchPage()),
         ),
@@ -196,7 +196,7 @@ void main() {
       ],
     );
     await tester.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: container,
         child: MaterialApp(
           theme: appTheme(),
@@ -350,7 +350,7 @@ void main() {
         ],
       );
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(
             theme: appTheme(),
@@ -419,7 +419,7 @@ void main() {
         ],
       );
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(
             theme: appTheme(),
@@ -461,7 +461,7 @@ void main() {
       ],
     );
     await tester.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: container,
         child: MaterialApp(
           theme: appTheme(),
@@ -500,7 +500,7 @@ void main() {
         ],
       );
       await tester.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(
             theme: appTheme(),

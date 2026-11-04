@@ -8,7 +8,7 @@ Could：组内追加两个小需求，由成员 E 负责。
 用户已确认（2026-11-01）：置顶为**个人置顶**，只影响本人列表，不走审核，不改任务版本。
 
 ## What Changes
-- 新增 `task_pins` 表（Flyway，编号在 multi-founder-review 之后顺延，预计 V25）。
+- 新增 `task_pins` 表（Flyway，编号在 multi-founder-review 之后顺延，预计 V29）。
 - 新增 `PUT /api/tasks/{id}/pin`、`DELETE /api/tasks/{id}/pin`；每人最多置顶 10 项，与导图重点一致。
 - `GET /api/tasks` 列表返回 `pinned`、`pinnedAt`，服务端按“置顶优先（置顶时间倒序）→ 截止时间 → id”排序，跨页一致。
 - 任务管理表行与任务详情提供置顶/取消置顶，置顶行显示图钉标记。

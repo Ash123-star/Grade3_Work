@@ -29,7 +29,7 @@ async function decide(approve: boolean) {
   if (!detail.value) return;
   if (!approve && !reason.value.trim()) { error.value = '驳回时请填写原因'; return; }
   busy.value = true; error.value = '';
-  try { await api(`/reviews/${detail.value.id}/decision`, { method: 'POST', body: { approve, reason: reason.value } }); emit('changed'); await load(); }
+  try { await api(`/reviews/${detail.value.id}/decision`, { method: 'POST', body: { approve, reason: reason.value, expectedVersion: detail.value.expected_version } }); emit('changed'); await load(); }
   catch (e) { error.value = errorMessage(e); } finally { busy.value = false; }
 }
 async function reroute() { if (!detail.value) return; busy.value = true; error.value = ''; try { detail.value = await api<Review>(`/reviews/${detail.value.id}/reroute`, { method: 'POST' }); } catch (e) { error.value = errorMessage(e); } finally { busy.value = false; } }

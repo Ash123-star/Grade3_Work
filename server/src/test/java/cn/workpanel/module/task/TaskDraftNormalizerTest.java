@@ -87,4 +87,17 @@ class TaskDraftNormalizerTest {
         var reordered=base(); reordered.put("collaborators",List.of("u-a","u-b"));
         assertNotEquals(TaskDraftNormalizer.legacyHash(DB,raw),TaskDraftNormalizer.legacyHash(DB,reordered));
     }
+
+    @Test void publishedSingleLabelReceiptsReplayWithoutAcceptingDifferentLabels() {
+        for(var labels:List.of(List.<String>of(),List.of("label-a"))) {
+            var draft=TaskDraftNormalizer.normalize(with("labelIds",labels));
+            var published=new TreeMap<String,Object>(draft.body());
+            published.remove("labelIds");
+            if(!labels.isEmpty()) published.put("labelId",labels.getFirst());
+            String stored=Db.hash(DB.write(published));
+            assertTrue(TaskDraftNormalizer.matchesHash(DB,draft,stored));
+            assertFalse(TaskDraftNormalizer.matchesHash(DB,TaskDraftNormalizer.normalize(with("labelIds",List.of("label-b"))),stored));
+            assertFalse(TaskDraftNormalizer.matchesHash(DB,TaskDraftNormalizer.normalize(with("labelIds",List.of("label-a","label-b"))),stored));
+        }
+    }
 }

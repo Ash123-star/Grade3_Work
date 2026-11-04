@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:forui/forui.dart';
@@ -109,7 +108,7 @@ void main() {
         await t.pumpWidget(
           RepaintBoundary(
             key: boundary,
-            child: UncontrolledProviderScope(
+            child: OwnedTestProviderScope(
               container: c,
               child: const PandoraApp(),
             ),

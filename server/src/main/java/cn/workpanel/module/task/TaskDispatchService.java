@@ -33,8 +33,9 @@ public class TaskDispatchService {
         var old=db.rows("SELECT * FROM idempotency_keys WHERE actor_id=? AND key=?",a.id(),key);
         if(!old.isEmpty()) {
             var record=old.getFirst(); int version=((Number)record.get("hash_version")).intValue();
-            String expected=version==1?TaskDraftNormalizer.legacyHash(db,raw):TaskDraftNormalizer.hash(db,d);
-            if(!expected.equals(Db.str(record,"request_hash"))) throw new ApiError(409,"IDEMPOTENCY_CONFLICT","同一幂等键内容不同");
+            String stored=Db.str(record,"request_hash");
+            boolean matches=version==1?TaskDraftNormalizer.legacyHash(db,raw).equals(stored):version==2&&TaskDraftNormalizer.matchesHash(db,d,stored);
+            if(!matches) throw new ApiError(409,"IDEMPOTENCY_CONFLICT","同一幂等键内容不同");
             String reviewId=Db.str(record,"review_id");
             if(!reviewId.isBlank()&&reviews!=null) return reviews.get(a,reviewId);
             return detail(TaskAccess.issued(db,a,Db.str(record,"task_id")));

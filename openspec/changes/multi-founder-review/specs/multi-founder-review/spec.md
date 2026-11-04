@@ -61,7 +61,7 @@ Should：创始人发起的非 `MEMBERSHIP` 关键变更，当同公司存在至
 - **THEN** 审核步骤 MUST 不发生任何改派，通知不写入
 
 ### Requirement: Legacy pending compatibility
-V24 迁移 SHALL 保留所有已决定记录（含历史 `FOUNDER_EXEMPT`），只对审核人已失效的存量 PENDING 申请作废步骤并按新规则重新分配；迁移 MUST NOT 自动应用任何历史候选或把待审改为免审。
+V28 迁移 SHALL 保留所有已决定记录（含历史 `FOUNDER_EXEMPT`），只对审核人已失效的存量 PENDING 申请作废步骤并按新规则重新分配；迁移 MUST NOT 自动应用任何历史候选或把待审改为免审。
 
 #### Scenario: Upgrade with stale pending step
 - **WHEN** 升级前存在审核人已停用的待审申请

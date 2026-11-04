@@ -38,7 +38,7 @@ void main() {
     addTearDown(c.dispose);
     c.read(logDateProvider.notifier).state = logDate ?? DateTime(2025, 2, 3);
     await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     c.read(routerProvider).go(route);
     await t.pumpAndSettle();

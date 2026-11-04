@@ -22,7 +22,7 @@ public class ManagementIntegrationTest extends MemberBHttpSupport {
     @Test void accountCandidateRequiresIndependentReviewAndUpdatesScope()throws Exception{
         var request=call(200,"POST",root+"/accounts/"+employee+"/revisions",admin,Map.of("name","管理页面调整","version",1,"reason","修正姓名"));
         String id=request.get("id").asText();assertEquals(employee,db.one("SELECT name FROM users WHERE id=?",employee).get("name"));
-        call(403,"POST",root+"/reviews/"+id+"/decision",admin,Map.of("approve",true,"reason","自审"));
+        call(403,"POST",root+"/reviews/"+id+"/decision",admin,Map.of("approve",true,"reason","自审","expectedVersion",request.get("expected_version").asInt()));
         approve(id,admin);assertEquals("管理页面调整",db.one("SELECT name FROM users WHERE id=?",employee).get("name"));
         call(409,"POST",root+"/accounts/"+employee+"/revisions",admin,Map.of("name","旧版本","version",1,"reason","冲突"));
         call(400,"POST",root+"/accounts/"+employee+"/revisions",admin,Map.of("version",2,"reason","修改复核权限","companyReviewer",true));
@@ -42,7 +42,7 @@ public class ManagementIntegrationTest extends MemberBHttpSupport {
         for(int n=0;n<10;n++)db.update("INSERT INTO dashboard_items(id,company_id,owner_id,kind,title,body,pinned) VALUES (?,?,?,'COMPANY','置顶','{}'::jsonb,true)",Db.id(),company,admin);
         var request=call(200,"POST",root+"/items/revisions",admin,Map.of("title","第十一项","version",0,"reason","容量测试","pinned",true));String id=request.get("id").asText();
         var detail=call(200,"GET",root+"/reviews/"+id,admin,null);
-        for(var step:detail.get("steps")){boolean last=step.get("position").asInt()==detail.get("steps").size();call(last?400:200,"POST","/reviews/"+id+"/decision",step.get("reviewer_id").asText(),Map.of("approve",true,"reason","复核"));}
+        for(var step:detail.get("steps")){boolean last=step.get("position").asInt()==detail.get("steps").size();call(last?400:200,"POST","/reviews/"+id+"/decision",step.get("reviewer_id").asText(),Map.of("approve",true,"reason","复核","expectedVersion",detail.get("expected_version").asInt()));}
         assertEquals("PENDING",db.one("SELECT status FROM review_requests WHERE id=?",id).get("status"));
         assertEquals(10,db.count("SELECT count(*) FROM dashboard_items WHERE company_id=? AND pinned AND NOT archived",company));
     }

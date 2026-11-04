@@ -168,7 +168,7 @@ Future<ProviderContainer> launchLive(
   addTearDown(c.dispose);
   c.read(routerProvider).go(route);
   await t.pumpWidget(
-    UncontrolledProviderScope(container: c, child: const PandoraApp()),
+    OwnedTestProviderScope(container: c, child: const PandoraApp()),
   );
   await settleLocalIo(t);
   return c;
@@ -521,7 +521,7 @@ void main() {
       await t.pumpWidget(
         RepaintBoundary(
           key: key,
-          child: UncontrolledProviderScope(
+          child: OwnedTestProviderScope(
             container: c,
             child: const PandoraApp(),
           ),

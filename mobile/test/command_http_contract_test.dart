@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/app.dart';
@@ -79,7 +78,15 @@ class CommandAdapter implements HttpClientAdapter {
         status = 409;
       } else {
         draftVersion = draftVersion == 0 ? 9 : draftVersion + 1;
-        body = savedLog = {'id': 'saved-log', 'title': '日报', 'version': draftVersion, 'owner_id':'u1', 'business_date': data['businessDate'], 'submitted':false, 'body':data['body']};
+        body = savedLog = {
+          'id': 'saved-log',
+          'title': '日报',
+          'version': draftVersion,
+          'owner_id': 'u1',
+          'business_date': data['businessDate'],
+          'submitted': false,
+          'body': data['body'],
+        };
       }
     } else if (options.path == '/logs/saved-log' && options.method == 'GET') {
       body = savedLog!;
@@ -123,9 +130,12 @@ void main() {
 
   test('retired and unknown log operations cannot issue requests', () async {
     for (final action in ['withdraw', 'read', 'request-review', 'typo']) {
-      await expectLater(repo.execute('logs', Command(action, {'id':'log-1'},version:5)), throwsA(failure(FailureKind.unavailable)));
+      await expectLater(
+        repo.execute('logs', Command(action, {'id': 'log-1'}, version: 5)),
+        throwsA(failure(FailureKind.unavailable)),
+      );
     }
-    expect(adapter.requests,isEmpty);
+    expect(adapter.requests, isEmpty);
   });
 
   test('diary content update uses the 24h direct-write contract', () async {
@@ -184,11 +194,7 @@ void main() {
           'reviews',
           'reject',
           '/reviews/review-1/decision',
-          {
-            'approve': false,
-            'reason': '补充依据',
-            'expectedVersion': 5,
-          },
+          {'approve': false, 'reason': '补充依据', 'expectedVersion': 5},
         ),
         ('notifications', 'read', '/notifications/message-1/read', null),
       ]) {
@@ -203,8 +209,7 @@ void main() {
           Command(action, {
             'id': id,
             if (resource == 'logs/comments') '评语': '已核对',
-            if (resource == 'reviews' && action == 'reject')
-              '驳回原因': '补充依据',
+            if (resource == 'reviews' && action == 'reject') '驳回原因': '补充依据',
           }, version: 5),
         );
         expect(adapter.requests.last.path, path);
@@ -213,27 +218,24 @@ void main() {
     },
   );
 
-  test(
-    'missing IDs and missing return version issue no mutation',
-    () async {
-      for (final (resource, action) in [
-        ('tasks', 'receive'),
-        ('logs/comments', 'comment'),
-        ('reviews', 'approve'),
-        ('notifications', 'read'),
-      ]) {
-        await expectLater(
-          repo.execute(resource, Command(action, const {})),
-          throwsA(failure(FailureKind.validation)),
-        );
-      }
+  test('missing IDs and missing return version issue no mutation', () async {
+    for (final (resource, action) in [
+      ('tasks', 'receive'),
+      ('logs/comments', 'comment'),
+      ('reviews', 'approve'),
+      ('notifications', 'read'),
+    ]) {
       await expectLater(
-        repo.execute('tasks', const Command('return', {'id': 'task-1'})),
+        repo.execute(resource, Command(action, const {})),
         throwsA(failure(FailureKind.validation)),
       );
-      expect(adapter.requests, isEmpty);
-    },
-  );
+    }
+    await expectLater(
+      repo.execute('tasks', const Command('return', {'id': 'task-1'})),
+      throwsA(failure(FailureKind.validation)),
+    );
+    expect(adapter.requests, isEmpty);
+  });
 
   test(
     'unregistered list/detail resources fail before HTTP requests',
@@ -255,10 +257,16 @@ void main() {
   test(
     'submitted log update never writes through the draft endpoint',
     () async {
-      await repo.execute('logs',const Command('update',{'id':'submitted-log','work':'修订内容'},version:3));
-      expect(adapter.requests.single.path,'/logs/submitted-log/content');
-      expect(adapter.requests.single.method,'PUT');
-      expect(adapter.requests.single.data,{'work':'修订内容','version':3});
+      await repo.execute(
+        'logs',
+        const Command('update', {
+          'id': 'submitted-log',
+          'work': '修订内容',
+        }, version: 3),
+      );
+      expect(adapter.requests.single.path, '/logs/submitted-log/content');
+      expect(adapter.requests.single.method, 'PUT');
+      expect(adapter.requests.single.data, {'work': '修订内容', 'version': 3});
     },
   );
 
@@ -544,7 +552,7 @@ void main() {
         ('notifications', 'read', {'id': 'message-1'}),
       ]) {
         await expectLater(
-          repo.execute(resource, Command(action, values,version:5)),
+          repo.execute(resource, Command(action, values, version: 5)),
           throwsA(failure(FailureKind.conflict)),
         );
       }
@@ -567,7 +575,7 @@ void main() {
       );
       addTearDown(c.dispose);
       await t.pumpWidget(
-        UncontrolledProviderScope(container: c, child: const PandoraApp()),
+        OwnedTestProviderScope(container: c, child: const PandoraApp()),
       );
       c.read(routerProvider).go('/form/log-edit');
       await t.runAsync(
@@ -577,14 +585,11 @@ void main() {
       await t.enterText(find.byType(TextField).first, '不能丢失的工作正文');
       adapter.submitStatus = 503;
       await t.tap(find.text('提交'));
-      await waitForLocalState(t,find.text('无法连接企业服务，请确认后端已启动及连接地址正确'));
+      await waitForLocalState(t, find.text('无法连接企业服务，请确认后端已启动及连接地址正确'));
       await t.pumpAndSettle();
       expect(find.text('无法连接企业服务，请确认后端已启动及连接地址正确'), findsOneWidget);
       expect(
-        t
-            .widget<TextField>(find.byType(TextField).first)
-            .controller!
-            .text,
+        t.widget<TextField>(find.byType(TextField).first).controller!.text,
         '不能丢失的工作正文',
       );
       // Recreate the editor: the next PUT must use the confirmed server version
@@ -593,13 +598,10 @@ void main() {
       await settleLocalIo(t);
       await t.pumpAndSettle();
       c.read(routerProvider).go('/form/log-edit?draftSource=diary');
-      await waitForLocalState(t,find.text('不能丢失的工作正文'));
+      await waitForLocalState(t, find.text('不能丢失的工作正文'));
       await t.pumpAndSettle();
       expect(
-        t
-            .widget<TextField>(find.byType(TextField).first)
-            .controller!
-            .text,
+        t.widget<TextField>(find.byType(TextField).first).controller!.text,
         '不能丢失的工作正文',
       );
       adapter.submitStatus = 200;

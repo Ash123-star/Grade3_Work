@@ -381,7 +381,7 @@ void main() {
     addTearDown(c.dispose);
     c.read(routerProvider).go(route);
     await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     await settleHttp(t);
     return c;

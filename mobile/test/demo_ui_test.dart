@@ -19,10 +19,7 @@ void main() {
     container.read(periodProvider.notifier).state = '月';
     container.read(logFilterDateProvider.notifier).state = null;
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const PandoraApp(),
-      ),
+      OwnedTestProviderScope(container: container, child: const PandoraApp()),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('日志').last);
@@ -110,10 +107,7 @@ void main() {
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const PandoraApp(),
-        ),
+        OwnedTestProviderScope(container: container, child: const PandoraApp()),
       );
       await tester.pumpAndSettle();
       expect(
@@ -150,10 +144,7 @@ void main() {
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const PandoraApp(),
-      ),
+      OwnedTestProviderScope(container: container, child: const PandoraApp()),
     );
     await tester.pumpAndSettle();
     container.read(routerProvider).go('/form/ai-draft?source=1');

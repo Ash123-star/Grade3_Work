@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -26,10 +25,7 @@ void main() {
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const PandoraApp(),
-      ),
+      OwnedTestProviderScope(container: container, child: const PandoraApp()),
     );
     container.read(routerProvider).go('/me');
     await settleLocalIo(tester);

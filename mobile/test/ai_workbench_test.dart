@@ -195,7 +195,7 @@ void main() {
         ],
       );
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(theme: appTheme(), home: const ProcedurePage()),
         ),
@@ -232,7 +232,7 @@ void main() {
         ],
       );
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: container,
           child: MaterialApp(theme: appTheme(), home: const ProcedurePage()),
         ),
@@ -383,7 +383,7 @@ void main() {
       ],
     );
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: container,
         child: MaterialApp(
           theme: appTheme(),
@@ -414,7 +414,7 @@ void main() {
       ],
     );
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: container,
         child: MaterialApp(theme: appTheme(), home: const WorkSettingsPage()),
       ),
@@ -518,7 +518,7 @@ void main() {
       await t.pumpWidget(
         RepaintBoundary(
           key: boundary,
-          child: UncontrolledProviderScope(
+          child: OwnedTestProviderScope(
             container: container,
             child: const PandoraApp(),
           ),
@@ -527,7 +527,7 @@ void main() {
       container.read(routerProvider).go('/ai');
       await settleLocalIo(t);
       expect(find.text('把事情交给我'), findsOneWidget);
-      for (final label in ['导图', '视图', '日志', 'AI地图', '我的']) {
+      for (final label in ['首页', '公司', '日志', 'AI地图', '我的']) {
         expect(find.text(label), findsWidgets);
       }
       Future<void> capture(String phase) async {

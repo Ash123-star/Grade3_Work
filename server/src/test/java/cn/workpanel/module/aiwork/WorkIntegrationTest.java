@@ -602,6 +602,8 @@ class WorkIntegrationTest {
         });return id;
     }
     @Test void dependencyFailuresPropagateTransitivelyAndPreserveSuccessfulReceipts(){
+        org.springframework.test.util.ReflectionTestUtils.setField(workService,"enabled",false);
+        try {
         String partial=Db.id(),failed=Db.id();
         for(String id:List.of(partial,failed))db.update("INSERT INTO ai_work_items(id,company_id,owner_id,state,plan_version) VALUES (?,?,?,'EXECUTING',1)",id,company,ids.get("leader"));
         seedDependencyChain(partial);
@@ -618,6 +620,7 @@ class WorkIntegrationTest {
         db.update("UPDATE ai_work_items SET state='EXECUTING' WHERE id=?",partial);
         workExecutor.propagateDependencyFailures();
         assertEquals("PARTIAL",db.one("SELECT state FROM ai_work_items WHERE id=?",partial).get("state"));
+        } finally { org.springframework.test.util.ReflectionTestUtils.setField(workService,"enabled",true); }
     }
     @Test void successfulActionReceiptIsReusedOnceAndNeedsMaterialIsNeverReused(){
         String reusable=Db.id(),needsMaterial=Db.id();var payload=Map.<String,Object>of("title","重复任务","ownerId",ids.get("alice"),"deadline","2099-10-23T17:00:00+08:00");
