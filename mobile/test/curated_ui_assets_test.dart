@@ -161,7 +161,7 @@ void main() {
                     find.byType(NavigationDestination),
                   )
                   .map((d) => d.label),
-              ['导图', '视图', '日志', 'AI地图', '我的'],
+              ['首页', '公司', '日志', 'AI地图', '我的'],
             );
           }
           if (name == 'profile') {

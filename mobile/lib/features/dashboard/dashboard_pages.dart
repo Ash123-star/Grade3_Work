@@ -47,7 +47,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final user = ref.watch(sessionProvider);
     final period = ref.watch(periodProvider);
     final page = PageFrame(
-      title: '视图',
+      title: '公司',
       showTitle: false,
       fab: user.manager && user.dispatch
           ? FloatingActionButton(

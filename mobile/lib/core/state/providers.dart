@@ -196,6 +196,17 @@ final receivedTaskCardProvider = FutureProvider.autoDispose<PageResult>((ref) {
     isActive: () => active,
   );
 });
+/// Home reads bounded previews; full task board loads pages on demand.
+final homePreviewProvider = FutureProvider.autoDispose.family<PageResult,String>((ref,resource) {
+  final session=ref.watch(sessionProvider);
+  if(!session.canReadBusiness) throw const ApiFailure(FailureKind.forbidden,'请先确认账号业务访问权限');
+  return ref.watch(repositoryProvider).list(resource,const Query(limit:2));
+});
+final receivedTaskPageProvider = FutureProvider.autoDispose.family<PageResult,String>((ref,cursor) {
+  final session=ref.watch(sessionProvider);
+  if(!session.canReadBusiness) throw const ApiFailure(FailureKind.forbidden,'请先确认账号业务访问权限');
+  return ref.watch(repositoryProvider).list('tasks/received-card',Query(cursor:cursor));
+});
 final itemProvider = FutureProvider.autoDispose
     .family<Record, (String, String)>(
       (ref, key) => ref.watch(repositoryProvider).detail(key.$1, key.$2),
@@ -338,6 +349,8 @@ final memberLogMonthProvider = FutureProvider.autoDispose
 void refreshBusiness(WidgetRef ref) {
   ref.invalidate(recordsProvider);
   ref.invalidate(receivedTaskCardProvider);
+  ref.invalidate(homePreviewProvider);
+  ref.invalidate(receivedTaskPageProvider);
   ref.invalidate(datedRecordsProvider);
   ref.invalidate(calendarMonthTasksProvider);
   ref.invalidate(itemProvider);

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
-import 'dart:async';
+import '../home/home_summary_card.dart';
+import '../personal_todos/presentation/daily_todos_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,364 +10,98 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
-import 'task_management_page.dart';
-import 'diary_composer_sheet.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(sessionProvider);
-    final draft = ref.watch(todayDraftProvider(user.id));
-    final unread = ref
-        .watch(recordsProvider('notifications'))
-        .valueOrNull
-        ?.items
-        .where((r) => r.fields['read'] != true)
-        .length;
-    final scale = MediaQuery.textScalerOf(context).scale(1);
-    const specs = [
-      ('公司重点', 'dashboard/company', 'mindmap', 'blue', SunnyPalette.blue),
-      ('公司任务', 'tasks', 'task', 'warm', SunnyPalette.orange),
-      ('个人重点', 'dashboard/personal', 'ai', 'lavender', SunnyPalette.purple),
-      ('个人日志', 'logs', 'log', 'warm', SunnyPalette.primaryContainer),
-    ];
+    final canDispatch = user.canReadBusiness && user.manager && user.dispatch;
     return PageFrame(
-      title: '导图',
+      title: '首页',
       showTitle: false,
-      child: LayoutBuilder(
-        builder: (context, viewport) {
-          final tileHeight = math.max(
-            240 * scale,
-            (viewport.maxHeight - 134) / 2,
-          );
-          Widget tile(int index) {
-            final spec = specs[index];
-            final resource = index == 1 ? 'tasks/received-card' : spec.$2;
-            final state = index >= 2
-                ? ref.watch(memberRecordsProvider((spec.$2, user.id)))
-                : index == 1
-                ? ref.watch(receivedTaskCardProvider)
-                : ref.watch(recordsProvider(resource));
-            void open() => index == 3
-                ? context.go('/logs')
-                : index == 1
-                ? context.push('/tasks/received')
-                : openList(context, spec.$2);
-            void continueDiary() => unawaited(
-              showDiaryComposer(context, ref, date: DateTime.now()),
-            );
-            return SizedBox(
-              height: tileHeight,
-              child: PaperSurface(
-                key: ValueKey('dashboard-tile:$index'),
-                skin: TuantuanAssets.surfaces[spec.$4],
-                decorated: true,
-                padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
-                onTap: index == 0 || index == 2
-                    ? () => _showFocusCollection(
-                        context,
-                        ref,
-                        title: spec.$1,
-                        resource: spec.$2,
-                        ownerId: index == 2 ? user.id : null,
-                      )
-                    : index == 3 && draft.valueOrNull != null
-                    ? continueDiary
-                    : open,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    DogBackground(
-                      index: const [2, 3, 6, 7][index],
-                      opacity: 1,
-                      fit: BoxFit.contain,
-                    ),
-                    Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: spec.$5.withValues(alpha: .28),
-                          ),
-                          child: DogAvatar(
-                            index: const [0, 7, 10, 15][index],
-                            size: 37,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            spec.$1,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: state.when(
-                        loading: () =>
-                            const Center(child: SunnyLoadingIndicator()),
-                        error: (_, _) => TextButton(
-                          onPressed: () => index == 1
-                              ? ref.invalidate(receivedTaskCardProvider)
-                              : ref.invalidate(recordsProvider(resource)),
-                          child: const Text('加载失败，重试'),
-                        ),
-                        data: (page) {
-                          final items = (index == 1
-                              ? page.items.where(
-                                  (r) => isReceivedTask(r, user.id),
-                                )
-                              : page.items).toList();
-                          if (index == 1) {
-                            items.sort((a, b) {
-                              final aTime = DateTime.tryParse(
-                                '${a.fields['dispatchAt'] ?? ''}',
-                              );
-                              final bTime = DateTime.tryParse(
-                                '${b.fields['dispatchAt'] ?? ''}',
-                              );
-                              if (aTime == null || bTime == null) {
-                                if (aTime == null && bTime != null) return 1;
-                                if (bTime == null && aTime != null) return -1;
-                                return a.id.compareTo(b.id);
-                              }
-                              final byDispatch = bTime.compareTo(aTime);
-                              return byDispatch != 0
-                                  ? byDispatch
-                                  : a.id.compareTo(b.id);
-                            });
-                            if (items.length > 10) {
-                              items.removeRange(10, items.length);
-                            }
-                          }
-                          final titles = [
-                            if (index == 3 && draft.valueOrNull != null)
-                              '本机草稿 · 继续写',
-                            ...items.map((r) => r.title),
-                          ];
-                          if (titles.isEmpty) {
-                            return Text(
-                              draft.hasError && index == 3
-                                  ? '草稿暂不可用，请重试'
-                                  : index == 1
-                                  ? '暂无任务记录'
-                                  : '暂无记录',
-                            );
-                          }
-                          return LayoutBuilder(
-                            builder: (context, space) {
-                              final count = math.max(
-                                1,
-                                ((space.maxHeight + 8 * scale) /
-                                        (50 * scale))
-                                    .floor(),
-                              );
-                              final visibleTitles = titles.take(count).toList();
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  for (var i = 0; i < visibleTitles.length; i++) ...[
-                                    if (i > 0) const SizedBox(height: 8),
-                                    SizedBox(
-                                      height: 42 * scale,
-                                      child: index != 3
-                                          ? InkWell(
-                                              borderRadius: BorderRadius.circular(12),
-                                              onTap: () => index == 1
-                                                  ? open()
-                                                  : index == 0
-                                                  ? _showCompanyItem(context, ref, items[i])
-                                                  : _showFocusDetail(context, items[i]),
-                                              onLongPress: index == 2
-                                                  ? () => _showPersonalItemActions(
-                                                      context,
-                                                      ref,
-                                                      items[i],
-                                                    )
-                                                  : null,
-                                              child: _FocusPreviewRow(
-                                                title: visibleTitles[i],
-                                                scale: scale,
-                                                completed: index == 1 &&
-                                                    _isCompletedTask(items[i]),
-                                              ),
-                                            )
-                                          : _FocusPreviewRow(
-                                              title: visibleTitles[i],
-                                              scale: scale,
-                                            ),
-                                    ),
-                                  ],
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton(
-                              onPressed: index == 0 || index == 2
-                                  ? () => _showFocusCollection(
-                                      context,
-                                      ref,
-                                      title: spec.$1,
-                                      resource: spec.$2,
-                                      ownerId: index == 2 ? user.id : null,
-                                    )
-                                  : open,
-                              child: const Text('查看全部 →'),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          return PageBody(
-            bottomPadding: 12,
+      fab: canDispatch
+          ? FloatingActionButton(
+              tooltip: '派发任务',
+              onPressed: () => openForm(context, 'dispatch'),
+              child: const Icon(Icons.add),
+            )
+          : null,
+      child: PageBody(
+        bottomPadding: canDispatch ? 88 : 24,
+        children: [
+          Row(
             children: [
-              PaperSurface(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                color: DogBrandPalette.surface,
-                borderColor: DogBrandPalette.line,
-                child: Row(
-                  children: [
-                    const DogPose(index: DogAssets.sitting, size: 64),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '你好，${user.name}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(color: DogBrandPalette.ink),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '把今天的事情，慢慢理清。',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: DogBrandPalette.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: '消息 ${unread ?? '—'}',
-                      onPressed: () => openList(context, 'notifications'),
-                      icon: Badge(
-                        isLabelVisible: unread != null && unread > 0,
-                        label: Text('${unread ?? 0}'),
-                        child: const Icon(Icons.notifications_none_rounded),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              for (var row = 0; row < 2; row++) ...[
-                Row(
+              const DogAvatar(index: 0, size: 48),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: tile(row * 2)),
-                    const SizedBox(width: 12),
-                    Expanded(child: tile(row * 2 + 1)),
+                    Text(
+                      '你好，${user.name}',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('把今天的事情，慢慢理清。'),
                   ],
                 ),
-                if (row == 0) const SizedBox(height: 12),
-              ],
-              const DemoLabel(),
+              ),
+              IconButton(
+                tooltip: '消息',
+                onPressed: () => openList(context, 'notifications'),
+                icon: const Icon(Icons.notifications_none_rounded),
+              ),
             ],
-          );
-        },
+          ),
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, size) {
+              final cards = [
+                HomeSummaryCard(
+                  title: '事件纪',
+                  resource: 'dashboard/company',
+                  icon: 'mindmap',
+                  onAll: () => _showFocusCollection(
+                    context,
+                    ref,
+                    title: '事件纪',
+                    resource: 'dashboard/company',
+                  ),
+                  onItem: (item) => _showCompanyItem(context, ref, item),
+                ),
+                HomeSummaryCard(
+                  title: '任务看板',
+                  resource: 'tasks/received-card',
+                  icon: 'task',
+                  onAll: () => context.push('/tasks/received'),
+                  onItem: (item) => openItem(context, 'tasks', item.id),
+                ),
+              ];
+              if (size.maxWidth < 320 ||
+                  MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                return Column(
+                  children: [cards[0], const SizedBox(height: 12), cards[1]],
+                );
+              }
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: cards[0]),
+                    const SizedBox(width: 12),
+                    Expanded(child: cards[1]),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+          if (user.canReadBusiness) DailyTodosSection(key: ObjectKey(user)),
+        ],
       ),
     );
   }
-}
-
-class _FocusPreviewRow extends StatelessWidget {
-  const _FocusPreviewRow({
-    required this.title,
-    required this.scale,
-    this.completed = false,
-  });
-  final String title;
-  final double scale;
-  final bool completed;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 4),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: completed
-                ? Theme.of(context).colorScheme.onSurfaceVariant
-                : Theme.of(context).colorScheme.primary,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: completed
-                  ? Theme.of(context).colorScheme.onSurfaceVariant
-                  : null,
-              decoration: completed ? TextDecoration.lineThrough : null,
-              decorationColor: completed
-                  ? Theme.of(context).colorScheme.onSurfaceVariant
-                  : null,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-bool _isCompletedTask(Record item) {
-  const completed = {'已验收', '已归档', 'ACCEPTED', 'ARCHIVED'};
-  return completed.contains('${item.fields['status']}'.toUpperCase()) ||
-      completed.contains('${item.fields['phase']}'.toUpperCase());
 }
 
 Future<void> _showCompanyItem(

@@ -21,6 +21,15 @@ String taskTagLabel(Map<String, dynamic> fields) {
           : '标签名称未提供');
 }
 
+/// Forward-compatible display for optional multi-label responses; legacy label remains valid.
+List<String> taskTagNames(Map<String,dynamic> fields) {
+  final labels=fields['labels'];
+  if(labels is List) {
+    return labels.whereType<Map>().map((label)=>'${label['name']??''}'.trim()).where((name)=>name.isNotEmpty).toSet().toList();
+  }
+  return [taskTagLabel(fields)];
+}
+
 /// Names are display data, never a substitute for participant IDs or authority.
 List<String> taskParticipantNames(
   Map<String, dynamic> fields, {

@@ -28,6 +28,7 @@ Future<PageResult> readCompleteList(
         from: query.from,
         to: query.to,
         cursor: cursor,
+        limit: query.limit,
       ),
     );
     if (isActive?.call() == false) {
