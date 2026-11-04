@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:pandora_mobile/data/models/task_display.dart';
@@ -261,6 +262,7 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _query(Query query, {String? resource}) => {
     if (query.cursor != null) 'cursor': query.cursor,
+    if (query.snapshotToken != null) 'snapshotToken': query.snapshotToken,
     if (query.ownerId != null)
       (resource == 'tasks' ? 'participantId' : 'ownerId'): query.ownerId,
     if (query.departmentId != null) 'departmentId': query.departmentId,
@@ -330,7 +332,9 @@ class HttpRepository implements Repository {
     } else if (raw['department'] != null) {
       fields['departmentName'] = raw['department'];
     }
-    if (raw['department_name'] != null) fields['departmentName'] = raw['department_name'];
+    if (raw['department_name'] != null) {
+      fields['departmentName'] = raw['department_name'];
+    }
     if (raw['team'] is Map) {
       fields['teamName'] = raw['team']['name'];
       fields['teamId'] = raw['team']['id'];
@@ -567,10 +571,12 @@ class HttpRepository implements Repository {
       ];
       fields['applicantId'] = raw['applicant_id'];
       fields['applicantName'] =
-          raw['applicant_name'] ?? (raw['applicant'] is Map ? raw['applicant']['name'] : null);
+          raw['applicant_name'] ??
+          (raw['applicant'] is Map ? raw['applicant']['name'] : null);
       fields['reviewerId'] = raw['reviewer_id'];
       fields['reviewerName'] =
-          raw['reviewer_name'] ?? (raw['reviewer'] is Map ? raw['reviewer']['name'] : null);
+          raw['reviewer_name'] ??
+          (raw['reviewer'] is Map ? raw['reviewer']['name'] : null);
       fields['reviewerConfigured'] = raw.containsKey('reviewer_configured')
           ? raw['reviewer_configured'] == true
           : fields['reviewerId'] != null;
@@ -632,6 +638,10 @@ class HttpRepository implements Repository {
           .toList(),
       total: (map['total'] as num?)?.toInt() ?? rawItems.length,
       nextCursor: map['nextCursor']?.toString(),
+      snapshotToken: map['snapshotToken'] as String?,
+      scheduleConstraints: map['scheduleConstraints'] is Map
+          ? Map<String, dynamic>.from(map['scheduleConstraints'])
+          : null,
     );
   }
 
@@ -653,14 +663,34 @@ class HttpRepository implements Repository {
         return _page(response.data ?? <dynamic>[]);
       }
       final parameters = _query(query, resource: resource);
-      if (resource == 'tasks' &&
-          query.from != null &&
-          query.to != null) {
+      if (resource == 'tasks' && query.from != null && query.to != null) {
         parameters
           ..remove('date')
           ..remove('period')
           ..['from'] = query.from!.toUtc().toIso8601String()
           ..['to'] = query.to!.toUtc().toIso8601String();
+        final budget = query.requestTimeout ?? const Duration(seconds: 15);
+        final cancellation = CancelToken();
+        final timer = Timer(
+          budget,
+          () => cancellation.cancel('Calendar budget exceeded'),
+        );
+        try {
+          final response = await dio.get<Map<String, dynamic>>(
+            '/tasks',
+            queryParameters: parameters,
+            cancelToken: cancellation,
+            options: Options(sendTimeout: budget, receiveTimeout: budget),
+          );
+          return _page(response.data);
+        } on DioException {
+          if (cancellation.isCancelled) {
+            throw const ApiFailure(FailureKind.timeout, '日历读取超出时间预算');
+          }
+          rethrow;
+        } finally {
+          timer.cancel();
+        }
       }
       if (resource == 'logs/subordinates' &&
           query.from != null &&
@@ -701,10 +731,7 @@ class HttpRepository implements Repository {
       if (result.ownerId != ownerId ||
           result.month.year != month.year ||
           result.month.month != month.month) {
-        throw const ApiFailure(
-          FailureKind.unavailable,
-          '成员日志日历响应范围不匹配',
-        );
+        throw const ApiFailure(FailureKind.unavailable, '成员日志日历响应范围不匹配');
       }
       return result;
     } on DioException catch (error) {
@@ -1008,11 +1035,20 @@ class HttpRepository implements Repository {
     String path,
     Map<String, dynamic> body, {
     String? idempotencyKey,
+    String? scheduleRevision,
+    bool movement = false,
   }) async {
     final response = await dio.post<Map<String, dynamic>>(
       path,
       data: body,
-      options: Options(headers: {'Idempotency-Key': ?idempotencyKey}),
+      options: Options(
+        sendTimeout: movement ? const Duration(seconds: 15) : null,
+        receiveTimeout: movement ? const Duration(seconds: 15) : null,
+        headers: {
+          'Idempotency-Key': ?idempotencyKey,
+          'If-Schedule-Constraints-Match': ?scheduleRevision,
+        },
+      ),
     );
     return _record(response.data!);
   }
@@ -1053,11 +1089,25 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'tasks') {
+        if (command.action == 'move-schedule') {
+          return await _postRecord(
+            '/tasks/${Uri.encodeComponent(_commandId(command))}/reschedules',
+            {
+              'version': command.version,
+              'moveDays': v['moveDays'],
+              'reason': v['reason'],
+            },
+            idempotencyKey: command.idempotencyKey,
+            scheduleRevision: command.scheduleRevision,
+            movement: true,
+          );
+        }
         if (command.action == 'create') {
           return await _postRecord(
             '/tasks',
             _taskDraft(command),
             idempotencyKey: command.idempotencyKey,
+            scheduleRevision: command.scheduleRevision,
           );
         }
         final id = Uri.encodeComponent(_commandId(command));
@@ -1128,7 +1178,8 @@ class HttpRepository implements Repository {
         return await _postRecord('/tasks/$id/events', {
           'type': event,
           'version': command.version,
-          if (command.action == 'feedback') 'attachments': v['attachments'] ?? [],
+          if (command.action == 'feedback')
+            'attachments': v['attachments'] ?? [],
           if (v['成果说明'] != null)
             'text':
                 '${v['成果说明']}${'${v['遇到的阻碍'] ?? ''}'.trim().isEmpty ? '' : '\n\n遇到的阻碍：${v['遇到的阻碍']}'}',
@@ -1137,8 +1188,13 @@ class HttpRepository implements Repository {
         });
       }
       if (resource == 'tasks/comments') {
-        if (command.idempotencyKey == null || command.idempotencyKey!.trim().isEmpty) {
-          throw const ApiFailure(FailureKind.validation, '评论需要幂等键', code: 'IDEMPOTENCY_REQUIRED');
+        if (command.idempotencyKey == null ||
+            command.idempotencyKey!.trim().isEmpty) {
+          throw const ApiFailure(
+            FailureKind.validation,
+            '评论需要幂等键',
+            code: 'IDEMPOTENCY_REQUIRED',
+          );
         }
         final text = '${v['text'] ?? v['评语'] ?? ''}'.trim();
         if (text.isEmpty) {
@@ -1167,16 +1223,21 @@ class HttpRepository implements Repository {
         throw const ApiFailure(FailureKind.unavailable, '后端未提供该标签操作');
       }
       if (resource == 'logs') {
-        if (!const {'update-content', 'update', 'submit', 'save-draft'}.contains(command.action)) {
-          throw const ApiFailure(FailureKind.unavailable, '不支持该日志操作，请使用当前日志编辑入口');
+        if (!const {
+          'update-content',
+          'update',
+          'submit',
+          'save-draft',
+        }.contains(command.action)) {
+          throw const ApiFailure(
+            FailureKind.unavailable,
+            '不支持该日志操作，请使用当前日志编辑入口',
+          );
         }
         if (command.action == 'update-content' || command.action == 'update') {
           final work = '${v['work'] ?? v['今日工作'] ?? ''}'.trim();
           if (work.isEmpty || command.version == null) {
-            throw const ApiFailure(
-              FailureKind.validation,
-              '请填写今日工作并读取当前日志版本',
-            );
+            throw const ApiFailure(FailureKind.validation, '请填写今日工作并读取当前日志版本');
           }
           final response = await dio.put<Map<String, dynamic>>(
             '/logs/${Uri.encodeComponent(_commandId(command))}/content',
@@ -1296,11 +1357,17 @@ class HttpRepository implements Repository {
         return await _putRecord('/profiles/me', {
           if (v.containsKey('个人介绍')) 'introduction': v['个人介绍'],
           if (v.containsKey('手机号'))
-            'phone': v['手机号'] == null || '${v['手机号']}'.trim().isEmpty ? null : v['手机号'],
+            'phone': v['手机号'] == null || '${v['手机号']}'.trim().isEmpty
+                ? null
+                : v['手机号'],
           if (v.containsKey('邮箱'))
-            'email': v['邮箱'] == null || '${v['邮箱']}'.trim().isEmpty ? null : v['邮箱'],
+            'email': v['邮箱'] == null || '${v['邮箱']}'.trim().isEmpty
+                ? null
+                : v['邮箱'],
           if (v.containsKey('性别'))
-            'gender': v['性别'] == null || '${v['性别']}'.trim().isEmpty ? null : v['性别'],
+            'gender': v['性别'] == null || '${v['性别']}'.trim().isEmpty
+                ? null
+                : v['性别'],
           if (v.containsKey('年龄')) 'age': v['年龄'],
           if (v.containsKey('avatarAttachmentId'))
             'avatarAttachmentId': v['avatarAttachmentId'],

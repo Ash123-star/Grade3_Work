@@ -12,9 +12,18 @@ enum FailureKind {
 }
 
 class ApiFailure implements Exception {
-  const ApiFailure(this.kind, this.message, {this.traceId, this.code});
+  const ApiFailure(
+    this.kind,
+    this.message, {
+    this.traceId,
+    this.code,
+    this.statusCode,
+    this.retryAfter,
+  });
   final FailureKind kind;
   final String message;
+  final int? statusCode;
+  final Duration? retryAfter;
   final String? traceId;
   final String? code;
   factory ApiFailure.fromDio(DioException e) {
@@ -69,6 +78,13 @@ class ApiFailure implements Exception {
       'INVALID_EMAIL' => '请填写有效邮箱',
       'INVALID_AGE' => '年龄须为非负整数',
       'EXPORT_TOO_LARGE' => '记录超过导出上限，请缩小日期或组织范围',
+      'RESCHEDULE_PENDING' => '当前任务版本已有待审移动，请先查看申请',
+      'SCHEDULE_CONSTRAINTS_CHANGED' => '排期范围已更新，请刷新后重新选择日期',
+      'CALENDAR_SNAPSHOT_CHANGED' => '日历数据已变化，请重试',
+      'CALENDAR_RANGE_TOO_DENSE' => '记录过多，请缩小范围或打开任务列表',
+      'CALENDAR_MOVE_DISABLED' => '日历移动暂未开放',
+      'IDEMPOTENCY_CONFLICT' => '提交内容与原命令不一致，请查看原申请',
+      'VERSION_EXHAUSTED' => '任务版本已达上限，不能再移动',
       'RATE_LIMITED' => '请求过于频繁，请稍后再试',
       _ => switch (kind) {
         FailureKind.unauthorized => '登录已失效，请重新登录',
@@ -86,8 +102,16 @@ class ApiFailure implements Exception {
       message,
       traceId: e.response?.headers.value('x-trace-id'),
       code: code,
+      statusCode: e.response?.statusCode,
+      retryAfter: _retryAfter(e.response?.headers.value('retry-after')),
     );
   }
+  static Duration? _retryAfter(String? value) {
+    final seconds = int.tryParse(value ?? '');
+    if (seconds != null && seconds >= 0) return Duration(seconds: seconds);
+    return null;
+  }
+
   @override
   String toString() => message;
 }

@@ -7,6 +7,7 @@ extension RoleLabel on UserRole {
 class Session {
   const Session({
     this.id = 'u1',
+    this.companyId = 'demo',
     this.name = '林小满',
     this.role = UserRole.leader,
     this.dispatch = true,
@@ -19,7 +20,7 @@ class Session {
     this.departmentId,
     this.teamId,
   });
-  final String id, name;
+  final String id, name, companyId;
   final UserRole role;
   final bool dispatch, active;
   final String? token;
@@ -36,6 +37,7 @@ class Session {
     bool expired = false,
   }) => Session(
     id: id,
+    companyId: companyId,
     name: name,
     role: role,
     dispatch: dispatch,
@@ -59,6 +61,7 @@ class Session {
     final state = '${f['status'] ?? 'UNKNOWN'}';
     return Session(
       id: record.id,
+      companyId: '${f['company_id'] ?? f['companyId'] ?? ''}',
       name: record.title,
       role: switch ('${f['role']}'.toUpperCase()) {
         'ADMIN' => UserRole.admin,
@@ -119,10 +122,17 @@ class PrivateNoteTarget {
 }
 
 class PageResult {
-  const PageResult(this.items, {this.total = 0, this.nextCursor});
+  const PageResult(
+    this.items, {
+    this.total = 0,
+    this.nextCursor,
+    this.snapshotToken,
+    this.scheduleConstraints,
+  });
   final List<Record> items;
   final int total;
-  final String? nextCursor;
+  final String? nextCursor, snapshotToken;
+  final Map<String, dynamic>? scheduleConstraints;
 }
 
 enum MemberLogDayStatus { submitted, missing, future, unknown }
@@ -156,9 +166,8 @@ class MemberLogMonth {
     final rawMonth = '${json['month'] ?? ''}';
     return MemberLogMonth(
       ownerId: '${json['ownerId'] ?? ''}',
-      month: DateTime.tryParse(
-            rawMonth.length == 7 ? '$rawMonth-01' : rawMonth,
-          ) ??
+      month:
+          DateTime.tryParse(rawMonth.length == 7 ? '$rawMonth-01' : rawMonth) ??
           DateTime.now(),
       employmentStartDate: DateTime.tryParse(
         '${json['employmentStartDate'] ?? ''}',
@@ -172,6 +181,8 @@ class Query {
   const Query({
     this.limit = 30,
     this.search = '',
+    this.snapshotToken,
+    this.requestTimeout,
     this.departmentId,
     this.cursor,
     this.ownerId,
@@ -180,10 +191,14 @@ class Query {
   });
   final String search;
   final int limit;
-  final String? cursor, ownerId, departmentId;
+  final String? cursor, ownerId, departmentId, snapshotToken;
+
+  /// Local transport budget; never serialized as a server query parameter.
+  final Duration? requestTimeout;
   final DateTime? from, to;
   Map<String, dynamic> toJson() => {
     'search': search,
+    if (snapshotToken != null) 'snapshotToken': snapshotToken,
     'limit': limit,
     if (cursor != null) 'cursor': cursor,
     if (ownerId != null) 'ownerId': ownerId,
@@ -254,7 +269,12 @@ class AnalyticsFilters {
     this.ownerId = '',
     this.groupBy = 'department',
     this.visibleMetrics = const [
-      'dispatched', 'received', 'feedback', 'accepted', 'overdue', 'diarySubmitted',
+      'dispatched',
+      'received',
+      'feedback',
+      'accepted',
+      'overdue',
+      'diarySubmitted',
     ],
   });
   final String departmentId, teamId, ownerId;
@@ -276,11 +296,17 @@ class AnalyticsFilters {
 }
 
 class Command {
-  const Command(this.action, this.values, {this.version, this.idempotencyKey});
+  const Command(
+    this.action,
+    this.values, {
+    this.version,
+    this.idempotencyKey,
+    this.scheduleRevision,
+  });
   final String action;
   final Map<String, dynamic> values;
   final int? version;
-  final String? idempotencyKey;
+  final String? idempotencyKey, scheduleRevision;
   Map<String, dynamic> toJson() => {
     'action': action,
     'values': values,

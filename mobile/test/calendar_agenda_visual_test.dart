@@ -147,11 +147,14 @@ void main() {
       c.read(routerProvider).go('/view');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      final month = find.byKey(const ValueKey('calendar-month-grid'));
-      final lastDay = find.byKey(const ValueKey('month-day:2026-11-30'));
-      final timeline = find.byKey(
-        const ValueKey('calendar-month-timeline'),
+      final month = find
+          .byKey(const ValueKey('calendar-month-grid'))
+          .hitTestable();
+      final lastDay = find.descendant(
+        of: month,
+        matching: find.byKey(const ValueKey('month-day:2026-11-30')),
       );
+      final timeline = find.byKey(const ValueKey('calendar-month-timeline'));
       expect(timeline, findsOneWidget);
       expect(find.text('月底汇总验收'), findsOneWidget);
       final previews = t.widgetList<Text>(

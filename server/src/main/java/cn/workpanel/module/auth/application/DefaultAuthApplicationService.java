@@ -108,7 +108,7 @@ public class DefaultAuthApplicationService implements AuthApplicationService {
     }
     public static Map<String, Object> publicUser(Map<String, Object> user) {
         var result = new LinkedHashMap<String, Object>();
-        for (String key : List.of("id", "name", "department_id", "team_id", "role", "status", "version", "must_change_password", "dispatch_enabled", "company_reviewer"))
+        for (String key : List.of("id", "company_id", "name", "department_id", "team_id", "role", "status", "version", "must_change_password", "dispatch_enabled", "company_reviewer"))
             result.put(key, user.get(key));
         return result;
     }

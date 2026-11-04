@@ -12,6 +12,7 @@ import java.util.*;
 /** AI 等跨模块调用的实际任务应用适配，始终复用普通任务校验并加入调用方事务。 */
 @Service
 public class DefaultTaskApplicationService implements TaskApplicationService {
+    private final TaskMovementApplication movements;
     private final CurrentActors actors;
     private final Db db;
     private final TaskDispatchService dispatch;
@@ -19,12 +20,13 @@ public class DefaultTaskApplicationService implements TaskApplicationService {
     private final TaskRevisionService revisions;
     private final TaskQueryService queries;
     private final ReviewApplicationService reviews;
-    public DefaultTaskApplicationService(CurrentActors actors,Db db,TaskDispatchService dispatch,TaskLifecycleService lifecycle,TaskRevisionService revisions,TaskQueryService queries,ReviewApplicationService reviews) {
+    public DefaultTaskApplicationService(CurrentActors actors,Db db,TaskDispatchService dispatch,TaskLifecycleService lifecycle,TaskRevisionService revisions,TaskQueryService queries,ReviewApplicationService reviews,TaskMovementApplication movements) {
+        this.movements=movements;
         this.actors=actors;this.db=db;this.dispatch=dispatch;this.lifecycle=lifecycle;this.revisions=revisions;this.queries=queries;this.reviews=reviews;
     }
     public Map<String,Object> list(ActorContext actor,Map<String,Object> q) {
-        Db.fields(q,"cursor","limit","search","ownerId","date","period");
-        return queries.list(actors.fresh(actor),new TaskQueryService.Query(integer(q,"cursor",0),integer(q,"limit",30),Db.str(q,"search"),optional(q,"ownerId"),optional(q,"date"),q.containsKey("period")?Db.str(q,"period"):"day"));
+        Db.fields(q,"cursor","limit","search","ownerId","participantId","date","period","from","to","snapshotToken");
+        return queries.list(actors.fresh(actor),new TaskQueryService.Query(integer(q,"cursor",0),integer(q,"limit",30),Db.str(q,"search"),optional(q,"participantId"),optional(q,"date"),optional(q,"period"),optional(q,"from"),optional(q,"to"),optional(q,"snapshotToken"),optional(q,"ownerId")));
     }
     private static String optional(Map<String,Object> q,String name){String value=Db.str(q,name);return value.isBlank()?null:value;}
     private static int integer(Map<String,Object> q,String name,int fallback){if(!q.containsKey(name))return fallback;try{return Integer.parseInt(String.valueOf(q.get(name)));}catch(NumberFormatException e){throw ApiError.bad("INVALID_PAGE","分页参数无效");}}
@@ -44,7 +46,9 @@ public class DefaultTaskApplicationService implements TaskApplicationService {
         return reviews.create(a,"TASK_REASSIGN",id,r.version(),r.before(),r.candidate(),Db.required(b,"reason"));
     }
     @Transactional public Map<String,Object> requestReschedule(ActorContext context,String id,Map<String,Object> b) {
-        Actor a=actors.fresh(context); var r=revisions.prepareReschedule(a,id,b);
-        return reviews.create(a,"TASK_RESCHEDULE",id,r.version(),r.before(),r.candidate(),Db.required(b,"reason"));
+        return movements.request(actors.fresh(context),id,b,null,null);
+    }
+    @Override @Transactional public Map<String,Object> requestReschedule(ActorContext context,String id,Map<String,Object> b,String key,String revision) {
+        return movements.request(actors.fresh(context),id,b,key,revision);
     }
 }

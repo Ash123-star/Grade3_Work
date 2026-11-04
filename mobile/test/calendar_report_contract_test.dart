@@ -80,7 +80,11 @@ class CalendarAdapter implements HttpClientAdapter {
           : later && failure == 'changed'
           ? 32
           : 31,
-      if (failure != 'missing') 'nextCursor': failure == 'repeat' ? '0' : '30',
+      if (tasks) ...{
+        'snapshotToken': 'calendar-fixture',
+        'nextCursor': null,
+      } else if (failure != 'missing')
+        'nextCursor': failure == 'repeat' ? '0' : '30',
     };
     return ResponseBody.fromString(
       jsonEncode(body),

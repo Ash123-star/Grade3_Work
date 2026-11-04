@@ -52,7 +52,7 @@ class TaskQueryServiceTest {
         when(db.rows(startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at"),any(Object[].class))).thenReturn(List.of(row()));
         var result=service.list(LEADER,new TaskQueryService.Query(0,20,"查询",null,null,null));
         @SuppressWarnings("unchecked") var item=((List<Map<String,Object>>)result.get("items")).getFirst();
-        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label"),item.keySet());
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label","capabilities"),item.keySet());
         for(String hidden:List.of("phase","status","completion","progress","done","body","events")) assertFalse(item.containsKey(hidden),hidden);
         verify(db).count(contains("FROM tasks t WHERE"),any(Object[].class));
         verify(db).rows(startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at"),any(Object[].class));
@@ -60,6 +60,7 @@ class TaskQueryServiceTest {
 
     @Test void explicitFromToSerializesHalfOpenIntersection() {
         record();
+        when(db.write(any())).thenAnswer(call -> new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(call.getArgument(0)));
         service.list(LEADER,new TaskQueryService.Query(0,20,"",null,null,null,"2026-10-01T00:00:00+08:00","2026-11-01T00:00:00+08:00"));
         String countSql=sql.getFirst(); assertTrue(countSql.contains("COALESCE(t.start_at,t.deadline)<?::timestamptz"),countSql);
         assertTrue(countSql.contains("t.deadline>=?::timestamptz"),countSql);
