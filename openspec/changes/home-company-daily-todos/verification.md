@@ -2,6 +2,8 @@
 
 日期：2026-11-04。实现分支 `feature/63-home-daily-todos`，检查基线 `05d6c25`。用户已批准实施，功能代码不依赖未合并的 #55/#57/#59/#61/#62。本记录区分本批定向通过与整库发布验收；不宣称已部署、已合并或整库全绿。
 
+交付：功能提交 `e5dfff8` 已推送，[草稿 PR #64](https://github.com/Ash123-star/Grade3_Work/pull/64) 已创建，关联 [Issue #63](https://github.com/Ash123-star/Grade3_Work/issues/63)。
+
 ## 已实现
 
 - 底栏首页/公司更名，保留 `/dashboard`、`/view` 路由及旧个人重点/日志数据；首页只保留事件纪、任务看板摘要和每日事项。

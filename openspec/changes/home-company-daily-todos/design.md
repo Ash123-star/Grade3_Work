@@ -1,6 +1,6 @@
 ## Context
 
-2026-11-04 已 fetch 并将 `origin/main`（05d6c25）检出到独立工作区。原目录分支 `chore/public-backend-address` 在 19db6f3，含连接配置、详情页等未提交修改；未 stash、reset、覆盖或在原目录 pull。本轮是源码/PR 检查与设计，不代表真实服务验收。
+2026-11-04 规划阶段已 fetch 并将 `origin/main`（05d6c25）检出到独立工作区。原目录分支 `chore/public-backend-address` 在 19db6f3，含连接配置、详情页等未提交修改；未 stash、reset、覆盖或在原目录 pull。以下PR表为规划时检查快照；用户批准后的实施、真实服务验收与仍未解决的阻塞见 verification.md。
 
 ### 远程 PR 状态与合并前置条件
 

@@ -41,5 +41,5 @@
 - [ ] 5.3 实际Android→HTTP→PostgreSQL：两名执行人读取任务；创建事项、重登读取、完成/恢复、跨日编辑、删除；拒绝另一账号读取/修改，跑通正向和异常链路。
 - [ ] 5.4 非功能一：安全/隐私测试上级、管理员、跨公司、会话切换、计数和AI/导出排除；非功能二：可靠性测试响应丢失重试/并发版本冲突；同时记录布局、TalkBack及月查询请求数证据。
 - [x] 5.5 更新SpringDoc并重新导出docs/openapi.json，同步backend-interface/mobile-openapi-contract、数据库迁移与回滚说明；在本变更记录验证结果及未完成项。
-- [ ] 5.6 运行 `openspec.cmd validate --all --strict` 与diff检查；在纯净工作分支提交/推送/创建或更新PR，正文含Issue、影响、验证、验收步骤、截图、迁移和风险。
+- [x] 5.6 运行 `openspec.cmd validate --all --strict` 与diff检查；在纯净工作分支提交/推送/创建或更新PR，正文含Issue、影响、验证、验收步骤、截图、迁移和风险。草稿PR #64，功能提交 e5dfff8。
 - [ ] 5.7 非作者审阅与验收通过后按授权合并；功能真实一致后同步主规格再归档。外部PR、整库回归和Android设备验收尚未通过，保持开放。
