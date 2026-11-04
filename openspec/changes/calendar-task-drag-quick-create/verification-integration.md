@@ -2,6 +2,8 @@
 
 关联 Issue #58。本报告针对 `feature/58-calendar-drag-integration`，基线为已发布 `main` 的 `c058214a6c3db79f4b14b4ae763c4dd04b75fd78`。`verification.md`、旧截图和旧 PR #59 的历史结果不能替代本批验收。没有操作云服务器，没有启用线上移动能力。
 
+实现提交 `4674f5e` 已推送，交付为[草稿 PR #65](https://github.com/Ash123-star/Grade3_Work/pull/65)；[Issue 进展](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6625043331)已同步。该状态仅表示可审阅，不代表已满足所有验收／发布条件。
+
 ## 原因与实现
 
 - 已发布主干任务条原先处于 `IgnorePointer` 下，没有长按拖动入口；旧 PR #59 尚未合并，且其 V22 迁移与当前主干冲突。
