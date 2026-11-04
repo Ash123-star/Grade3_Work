@@ -100,7 +100,7 @@ void main() {
     expect(request.path, '/tasks');
     expect(request.method, 'POST');
     expect(request.headers['Idempotency-Key'], 'create-demo-1');
-    expect((request.data as Map)['labelId'], 'current-label-id');
+    expect((request.data as Map)['labelIds'], ['current-label-id']);
   });
 
   test('creation review decision sends expected version zero', () async {

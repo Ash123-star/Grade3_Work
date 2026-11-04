@@ -294,7 +294,7 @@ void main() {
           'group': '发布',
           'content': '核对接口',
           'urgency': 'LOW',
-          'labelId': 'label-1',
+          'labelIds': ['label-1'],
           'attachments': ['attachment-1'],
         });
         expect(result.id, 'review-task');
@@ -330,7 +330,7 @@ void main() {
         'deadline': '2027-10-15T10:00:00+08:00',
         'content': '审核后生效',
         'urgency': 'NORMAL',
-        'labelId': 'label-1',
+        'labelIds': ['label-1'],
         'attachments': [],
       });
       expect((sent.data as Map).containsKey('ownerId'), isFalse);

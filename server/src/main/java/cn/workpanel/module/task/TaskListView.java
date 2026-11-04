@@ -17,6 +17,6 @@ public final class TaskListView {
 
     public static Map<String,Object> of(Db db,Map<String,Object> task) {
         var result=of(task); String id=Db.str(task,"id");
-        result.put("participants",TaskParticipants.list(db,id)); result.put("label",TaskLabels.find(db,id)); return result;
+        result.put("participants",TaskParticipants.list(db,id)); result.put("labels",TaskLabels.list(db,id)); result.put("label",TaskLabels.find(db,id)); return result;
     }
 }

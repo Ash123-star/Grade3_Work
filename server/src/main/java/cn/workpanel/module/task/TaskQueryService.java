@@ -96,6 +96,7 @@ public class TaskQueryService {
                 for(String column:List.of("id","issuer_id","title","start_at","deadline","version","phase","created_at")) item.put(column,task.get(column));
                 item.put("dispatchAt",task.get("dispatch_at"));
                 item.put("participants",TaskParticipants.list(db,Db.str(task,"id")));
+                item.put("labels",TaskLabels.list(db,Db.str(task,"id")));
                 item.put("label",TaskLabels.find(db,Db.str(task,"id")));
                 return item;
             }).toList();

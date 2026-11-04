@@ -12,6 +12,7 @@ public final class TaskView {
         var result=new LinkedHashMap<String,Object>(); for(String k:COLUMNS) result.put(k,task.get(k));
         result.put("fields",db.read(task.get("body")));
         result.put("participants",TaskParticipants.list(db,Db.str(task,"id")));
+        result.put("labels",TaskLabels.list(db,Db.str(task,"id")));
         result.put("label",TaskLabels.find(db,Db.str(task,"id")));
         if(events!=null) result.put("events",events);
         return result;

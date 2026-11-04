@@ -24,9 +24,9 @@ public class OrganizationRepository {
     }
     public Map<String, Object> people(Actor actor, String search, boolean dispatch, int cursor, int limit) {
         var args = new ArrayList<Object>(List.of(actor.company())); args.addAll(Arrays.asList(actor.scopeArgs()));
-        args.add("%" + search + "%"); args.add("%" + search + "%");
-        String where = "u.company_id=? AND (" + actor.userScope("u") + ") AND " + (dispatch ? "u.status='ACTIVE'" : "u.status<>'DISABLED'") + " AND (u.name ILIKE ? OR d.name ILIKE ?)";
-        long total = db.count("SELECT count(*) FROM users u LEFT JOIN departments d ON d.id=u.department_id WHERE " + where, args.toArray());
+        args.add("%" + search + "%"); args.add("%" + search + "%"); args.add("%" + search + "%");
+        String where = "u.company_id=? AND (" + actor.userScope("u") + ") AND " + (dispatch ? "u.status='ACTIVE'" : "u.status<>'DISABLED'") + " AND (u.name ILIKE ? OR d.name ILIKE ? OR tm.name ILIKE ?)";
+        long total = db.count("SELECT count(*) FROM users u LEFT JOIN departments d ON d.id=u.department_id AND d.company_id=u.company_id LEFT JOIN teams tm ON tm.id=u.team_id AND tm.company_id=u.company_id WHERE " + where, args.toArray());
         // The aggregation joins valid same-company participants already. Global readers need
         // no second correlated participant scan; restricted readers keep TaskAccess verbatim.
         var taskScope=actor.global()?new Business.Clause("t.company_id=?",List.of(actor.company())):Business.taskScope(actor);
@@ -35,6 +35,8 @@ public class OrganizationRepository {
         // 在同一请求的数据库快照中聚合，避免移动端逐人请求及重复参与记录放大计数。
         // 他人草稿不参与状态计算；所有任务同时受请求者的TaskAccess范围约束。
         String sql="WITH participant_summary AS MATERIALIZED (SELECT p.user_id,count(*) AS participating_count,count(*) FILTER (WHERE t.phase NOT IN ('ACCEPTED','ARCHIVED','WITHDRAWN')) AS active_count FROM tasks t JOIN task_participants p ON p.task_id=t.id AND p.company_id=t.company_id WHERE "+taskScope.sql()+" GROUP BY p.user_id) SELECT u.id,u.name,u.role,u.status,u.department_id,u.team_id,u.version,d.name AS department,tm.name AS team_name,"
+            +"u.department_id AS \"departmentId\",u.team_id AS \"teamId\",d.name AS \"departmentName\",tm.name AS \"teamName\","
+            +"(u.status='ACTIVE') AS \"taskSelectable\",CASE WHEN d.id IS NULL THEN '[]'::jsonb WHEN tm.id IS NULL THEN jsonb_build_array(jsonb_build_object('id',d.id,'name',d.name,'kind','DEPARTMENT')) ELSE jsonb_build_array(jsonb_build_object('id',d.id,'name',d.name,'kind','DEPARTMENT'),jsonb_build_object('id',tm.id,'name',tm.name,'kind','TEAM')) END AS \"organizationPath\","
             +"COALESCE(summary.participating_count,0) AS \"participatingTaskCount\",COALESCE(summary.active_count,0) AS \"activeTaskCount\","
             +"(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date AS \"summaryDate\","
             +"CASE WHEN u.status<>'ACTIVE' THEN 'UNKNOWN' WHEN EXISTS (SELECT 1 FROM daily_logs l WHERE l.company_id=u.company_id AND l.owner_id=u.id AND l.submitted AND l.business_date=(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date) THEN 'SUBMITTED' ELSE 'MISSING' END AS \"todayLogStatus\" "

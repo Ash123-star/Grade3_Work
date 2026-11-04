@@ -44,6 +44,28 @@ public class OrganizationIntegrationTest extends MemberBHttpSupport {
         } while (cursor < 113);
         assertEquals(113, ids.size()); assertFalse(ids.contains(foreign));
     }
+    @Test void peoplePickerSearchReturnsOrganizationPathAndSelectionEligibility() throws Exception {
+        var byPerson = call(200, "GET", "/organization/people?dispatch=true&search=" + employee, leader, null);
+        assertEquals(1, byPerson.get("total").asInt());
+        var selected = byPerson.get("items").get(0);
+        assertEquals(employee, selected.get("id").asText());
+        assertEquals(department, selected.get("departmentId").asText());
+        assertEquals(team, selected.get("teamId").asText());
+        assertEquals("本部门", selected.get("departmentName").asText());
+        assertEquals("本团队", selected.get("teamName").asText());
+        assertTrue(selected.get("taskSelectable").asBoolean());
+        assertEquals(2, selected.get("organizationPath").size());
+        assertEquals(team, selected.at("/organizationPath/1/id").asText());
+
+        var byTeam = call(200, "GET", "/organization/people?dispatch=true&search=%E6%9C%AC%E5%9B%A2%E9%98%9F", leader, null);
+        assertTrue(byTeam.get("items").size() >= 3);
+        assertFalse(byTeam.get("items").toString().contains(outside));
+
+        db.update("UPDATE users SET status='PENDING' WHERE id=?", colleague);
+        assertEquals(0, call(200, "GET", "/organization/people?dispatch=true&search=" + colleague, leader, null).get("total").asInt());
+        var pending = call(200, "GET", "/organization/people?search=" + colleague, leader, null).get("items").get(0);
+        assertFalse(pending.get("taskSelectable").asBoolean());
+    }
     @Test void invalidFieldsHierarchyAndReportingCycleDoNotCreateCandidates() throws Exception {
         for (var change : List.of(Map.of("role", "ROOT"), Map.of("role", "LEADER", "teamId", ""), Map.of("teamId", otherTeam), Map.of("managerId", employee), Map.of("dispatchEnabled", "true"))) {
             var body = new LinkedHashMap<String, Object>(change); body.put("version", 1); body.put("reason", "无效候选");

@@ -415,6 +415,23 @@ class HttpRepository implements Repository {
       fields['tagCategory'] = label['category'];
       fields['tagColor'] = label['color'];
     }
+    if (raw['labels'] is List) {
+      final labels = (raw['labels'] as List)
+          .whereType<Map>()
+          .map((label) => Map<String, dynamic>.from(label))
+          .toList();
+      fields['labels'] = labels;
+      fields['labelIds'] = [
+        for (final label in labels)
+          if ('${label['id'] ?? ''}'.trim().isNotEmpty) '${label['id']}',
+      ];
+      if (labels.isNotEmpty) {
+        final first = labels.first;
+        fields['tagId'] = first['id'];
+        fields['tagName'] = first['name'];
+        fields['tagColor'] = first['color'];
+      }
+    }
     if (raw['participant_ids'] is List) {
       fields['participantIds'] = raw['participant_ids'];
     }
@@ -997,7 +1014,16 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _taskDraft(Command command) {
     final v = _values(command);
-    final labelId = '${v['tagId'] ?? v['labelId'] ?? v['标签'] ?? ''}'.trim();
+    final suppliedLabelIds = v['labelIds'] ?? v['labels'];
+    final labelIds = <String>{
+      if (suppliedLabelIds is List)
+        for (final value in suppliedLabelIds)
+          if ('$value'.trim().isNotEmpty) '$value'.trim(),
+      if (suppliedLabelIds is! List &&
+          '${v['tagId'] ?? v['labelId'] ?? v['标签'] ?? ''}'.trim().isNotEmpty)
+        '${v['tagId'] ?? v['labelId'] ?? v['标签']}'.trim(),
+    }.toList()
+      ..sort();
     final participantValues =
         v['participantIds'] ?? v['participants'] ?? v['参与人'];
     final participants = participantValues is List
@@ -1022,7 +1048,7 @@ class HttpRepository implements Repository {
         '不紧急' || 'LOW' => 'LOW',
         _ => 'NORMAL',
       },
-      if (labelId.isNotEmpty) 'labelId': labelId,
+      'labelIds': labelIds,
       'attachments': v['attachments'] ?? const <String>[],
     }..removeWhere((key, value) => value == null);
   }
