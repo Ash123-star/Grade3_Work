@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('single development map shows authorized analysis and evidence', async ({ page }, testInfo) => {
   test.skip(!process.env.PREVIEW_ACCOUNT || !process.env.PREVIEW_PASSWORD, 'Set preview credentials for live API checks');
-  await page.goto('/');
+  await page.goto('/legacy');
   await page.getByLabel('账号').fill(process.env.PREVIEW_ACCOUNT!);
   await page.getByLabel('密码', { exact: true }).fill(process.env.PREVIEW_PASSWORD!);
   await page.getByRole('button', { name: '登录', exact: true }).click();
@@ -56,7 +56,7 @@ test('knowledge status and forget job reach a clear terminal state', async ({ pa
     await route.fulfill({status, contentType: 'application/json', body: JSON.stringify(body)});
   });
 
-  await page.goto('/');
+  await page.goto('/legacy');
   await page.getByRole('button', {name: '成长分析'}).click();
   await expect(page.getByText('有效记忆 1 条 · 已索引 0 条 · 更新中 1 条 · 待确认 1 条')).toBeVisible();
   await page.getByRole('button', {name: '管理记忆'}).click();
@@ -93,7 +93,7 @@ test('analysis failures and missing evidence never reveal a sample conclusion', 
     else throw new Error(`Unexpected API request: ${path}`);
     await route.fulfill({status, contentType: 'application/json', body: JSON.stringify(body)});
   });
-  await page.goto('/');
+  await page.goto('/legacy');
   await page.getByRole('button', {name: '成长分析'}).click();
   await expect(page.getByText('本次没有检索到相关有效证据')).toBeVisible();
   await expect(page.getByText('图谱暂不可用，使用文本证据')).toBeVisible();

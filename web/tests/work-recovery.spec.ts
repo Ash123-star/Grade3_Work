@@ -44,7 +44,7 @@ test('live work keeps newest state, ignores replay and clears all content on str
     else if(path==='/api/admin/workspace/ai/work-items/work-live'){gets++;data=workFixture(item);}
     await route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   });
-  await page.goto('/');await page.getByRole('button',{name:/交付事项/}).click();
+  await page.goto('/legacy');await page.getByRole('button',{name:/交付事项/}).click();
   await expect.poll(()=>gets).toBeGreaterThanOrEqual(2);
   await expect(page.getByText('请补充日期',{exact:true})).toBeVisible();
   const headers=await page.evaluate(()=>(window as any).workStreams[0]);
@@ -85,7 +85,7 @@ test('logout fences a delayed private response before the next account signs in'
     else if(path==='/api/admin/workspace/ai/work-items/work-live'){if(hold){pending=true;await gate;}data=workFixture({...base,result:{summary:'旧账号的延迟响应'}});}
     await route.fulfill({contentType:'application/json',body:JSON.stringify(data)}).catch(()=>{});
   });
-  await page.goto('/');await page.getByRole('button',{name:/交付事项/}).click();
+  await page.goto('/legacy');await page.getByRole('button',{name:/交付事项/}).click();
   await expect(page.getByText('私人材料内容')).toBeVisible();
   hold=true;await emit(page,'id: 20\nevent: change\ndata: {"version":7}\n\n');await expect.poll(()=>pending).toBe(true);
   await page.getByRole('button',{name:'退出',exact:true}).click();
