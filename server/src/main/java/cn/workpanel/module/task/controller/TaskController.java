@@ -12,21 +12,21 @@ import java.util.*;
 @RequestMapping("/api/tasks")
 /** 任务接口。列表隐藏完成情况字段，生命周期通过详情 events 表达。 */
 public class TaskController {
+    final cn.workpanel.module.task.application.TaskMovementApplication movements;
     final Business business; final Db db; final ReviewApplicationService reviews; final cn.workpanel.module.task.TaskLifecycleService lifecycle; final cn.workpanel.module.task.TaskRevisionService revisions; final cn.workpanel.module.task.TaskQueryService queries;
-    public TaskController(Business business, Db db, ReviewApplicationService reviews, cn.workpanel.module.task.TaskLifecycleService lifecycle, cn.workpanel.module.task.TaskRevisionService revisions, cn.workpanel.module.task.TaskQueryService queries) { this.business=business; this.db=db; this.reviews=reviews; this.lifecycle=lifecycle; this.revisions=revisions; this.queries=queries; }
-    /**
-     * 分页查询范围内任务。支持 date/period 或带时区 from/to、search、participantId（ownerId 为兼容别名）、cursor/limit。
-     * from/to 必须成对出现、带时区且 to 晚于 from，不能与 date/period 混用；查询区间左闭右开，
-     * 与任务区间 [start_at, deadline] 相交即命中。两个参与人别名同时出现且不同返回 400，
-     * 越权参与人返回 403/404，非法区间返回 400。只读 GET 无版本要求、无幂等键。
-     */
-    @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(defaultValue="") String search,@RequestParam(required=false) String participantId,@RequestParam(required=false) String ownerId,@RequestParam(required=false) String date,@RequestParam(required=false) String period,@RequestParam(required=false) String from,@RequestParam(required=false) String to) {
+    public TaskController(Business business, Db db, ReviewApplicationService reviews, cn.workpanel.module.task.TaskLifecycleService lifecycle, cn.workpanel.module.task.TaskRevisionService revisions, cn.workpanel.module.task.TaskQueryService queries, cn.workpanel.module.task.application.TaskMovementApplication movements) { this.movements=movements; this.business=business; this.db=db; this.reviews=reviews; this.lifecycle=lifecycle; this.revisions=revisions; this.queries=queries; }
+    /** 分页查询范围内任务。支持 search、participantId、date、period、cursor、limit；越权参与人筛选返回 403。 */
+    @io.swagger.v3.oas.annotations.Operation(summary="范围内任务列表",description="date/period 和 from/to 均按任务区间相交。新 from/to 为带时区 [from,to)，最多 62 日，COALESCE(start_at,deadline)<to AND deadline>=from。不得混用 date/period；ownerId 为 participantId 兼容别名，两者不同返回 400；参与人须经授权。范围响应含 snapshotToken、scheduleConstraints，后页须原 token；变化 409 CALENDAR_SNAPSHOT_CHANGED，超过 5000 条 422 CALENDAR_RANGE_TOO_DENSE；末页 nextCursor 为 null。列表 capabilities.reschedule 为当前部署及角色能力，不含业务状态列。")
+    @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(defaultValue="") String search,@RequestParam(required=false) String participantId,@RequestParam(required=false) String date,@RequestParam(required=false) String period,
+            @RequestParam(required=false) String from,@RequestParam(required=false) String to,@RequestParam(required=false) String snapshotToken,@RequestParam(required=false) String ownerId) {
         String canonical=text(participantId),alias=text(ownerId);
         if(canonical!=null&&alias!=null&&!canonical.equals(alias)) throw ApiError.bad("INVALID_PARTICIPANT_FILTER","ownerId 与 participantId 必须相同");
-        String participant=canonical!=null?canonical:alias;
-        return queries.list(Actor.current(r),new cn.workpanel.module.task.TaskQueryService.Query(cursor,limit,search,participant,date,period,text(from),text(to)));
+        return queries.list(Actor.current(r),new cn.workpanel.module.task.TaskQueryService.Query(cursor,limit,search,canonical!=null?canonical:alias,text(date),text(period),text(from),text(to),text(snapshotToken),null));
     }
-
+    /** 旧内部调用签名保留；非 HTTP 路由，兼容既有分析导出适配。 */
+    public Map<String,Object> list(HttpServletRequest r,int cursor,int limit,String search,String participantId,String date,String period) {
+        return queries.list(Actor.current(r),new cn.workpanel.module.task.TaskQueryService.Query(cursor,limit,search,participantId,date,period));
+    }
     /** 空白参数按未提供处理，避免 `ownerId=` 之类的空值被当成筛选值或区间端点。 */
     private static String text(String value) { return value==null||value.isBlank()?null:value.trim(); }
     /**
@@ -58,12 +58,16 @@ public class TaskController {
     }
     /**
      * 提交改期复核申请。仅派发人或管理员可申请；请求须含带时区 deadline、version、reason。
-     * 复核通过前截止时间与状态均保持不变；同一截止时间返回 INVALID_DEADLINE。
+     * 兼容 deadline 模式；MOVE 仅接受正 int32 version、非零 int32 moveDays、1–1000 码点 reason。
+     * MOVE 必须携带 Idempotency-Key / If-Schedule-Constraints-Match；返回原审核申请，正式起止时间不变。
+     * 403/404 遵循现有权限；409 区分版本、键内容、待审占用、约束变化与版本耗尽。
      */
+    @io.swagger.v3.oas.annotations.Operation(summary="申请任务改期（兼容截止时间或整段移动）",description="旧模式：deadline/version/reason。MOVE 模式：version 为正 int32，moveDays 为非零 int32，reason 为去 Unicode 空白后 1–1000 码点；只允许这三个字段，必须给 Idempotency-Key（1–128 可见 ASCII，无空白）和 If-Schedule-Constraints-Match。返回审核申请；待审不改生效日期。同键相同内容返回原申请；同键不同内容、版本冲突、当前版本已待审、约束过期、版本耗尽返回 409。权限每次重检；关闭新模式仍可重放原申请。")
     @PostMapping("/{id}/reschedules") @Transactional
-    public Map<String,Object> reschedule(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b) {
-        Actor a=Actor.current(r); var request=revisions.prepareReschedule(a,id,b);
-        return reviews.create(a,"TASK_RESCHEDULE",id,request.version(),request.before(),request.candidate(),Db.required(b,"reason"));
+    public Map<String,Object> reschedule(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> b,
+            @RequestHeader(value="Idempotency-Key",required=false) String key,
+            @RequestHeader(value="If-Schedule-Constraints-Match",required=false) String constraints) {
+        return movements.request(Actor.current(r),id,b,key,constraints);
     }
     /** 提交已发布任务的通用修订。需 version 和 reason；参与人、标签和时间在审核通过后统一生效。 */
     @PostMapping("/{id}/revisions") @Transactional

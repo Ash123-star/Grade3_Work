@@ -77,6 +77,8 @@ class _MemberAdapter implements HttpClientAdapter {
       };
     } else if (request.path == '/tasks') {
       body = {
+        'snapshotToken': 'member-calendar-fixture',
+        'nextCursor': null,
         'items': [
           {
             'id': 'task-31',
@@ -94,7 +96,9 @@ class _MemberAdapter implements HttpClientAdapter {
     return ResponseBody.fromString(
       jsonEncode(body),
       status,
-      headers: {Headers.contentTypeHeader: ['application/json']},
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
     );
   }
 
@@ -125,9 +129,12 @@ Future<ProviderContainer> _launch(
     UncontrolledProviderScope(container: container, child: const PandoraApp()),
   );
   container.read(routerProvider).go(route);
+  await settleLocalIo(tester);
   for (var i = 0; i < 8; i++) {
     await tester.pump(const Duration(milliseconds: 80));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
   }
   await tester.pumpAndSettle();
   return container;
@@ -159,7 +166,8 @@ void main() {
       ),
       isTrue,
     );
-  });
+    },
+  );
 
   testWidgets('submitted dates open matching log and missing dates show an empty state', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -170,28 +178,39 @@ void main() {
     await tester.tap(find.bySemanticsLabel('2026年1月31日，已提交日志'));
     await tester.pumpAndSettle();
     expect(find.text('已完成的真实工作'), findsOneWidget);
-    expect(adapter.requests.any((request) => request.path == '/logs/log-31'), isTrue);
+      expect(
+        adapter.requests.any((request) => request.path == '/logs/log-31'),
+        isTrue,
+      );
 
-    final container = ProviderScope.containerOf(tester.element(find.text('已完成的真实工作')));
+      final container = ProviderScope.containerOf(
+        tester.element(find.text('已完成的真实工作')),
+      );
     container.read(routerProvider).go('/me/team/u2/logs?date=2026-01-31');
     await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel('2026年1月30日，未提交日志'));
     await tester.pumpAndSettle();
     expect(find.text('当日未提交日志'), findsOneWidget);
-  });
+    },
+  );
 
   testWidgets('task calendar queries the selected member and displays their task', (tester) async {
     final adapter = _MemberAdapter();
     await _launch(tester, adapter, '/me/team/u2/tasks?date=2026-01-31');
 
     expect(find.text('成员日历任务'), findsOneWidget);
-    final request = adapter.requests.lastWhere((item) => item.path == '/tasks');
-    expect(request.queryParameters['ownerId'], 'u2');
+      final request = adapter.requests.lastWhere(
+        (item) => item.path == '/tasks',
+      );
+      expect(request.queryParameters['participantId'], 'u2');
     expect(request.queryParameters['from'], isNotNull);
     expect(request.queryParameters['to'], isNotNull);
-  });
+    },
+  );
 
-  testWidgets('revoked member scope clears protected contact details', (tester) async {
+  testWidgets('revoked member scope clears protected contact details', (
+    tester,
+  ) async {
     final adapter = _MemberAdapter();
     final container = await _launch(tester, adapter, '/me/team/u2/logs');
     await tester.ensureVisible(find.text('chen@example.invalid'));

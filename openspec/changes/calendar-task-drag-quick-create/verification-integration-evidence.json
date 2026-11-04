@@ -1,0 +1,86 @@
+{
+  "baseline": "c058214a6c3db79f4b14b4ae763c4dd04b75fd78",
+  "date": "2026-11-04",
+  "flutterCalendarTests": {
+    "passed": 59,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "backendAffectedTests": {
+    "passed": 107,
+    "failed": 1,
+    "exitCode": 1,
+    "failure": "Unchanged TaskComponentsTest.timelineOrderedBySequence expects ORDER BY sequence, actual ORDER BY e.sequence"
+  },
+  "androidLive": {
+    "taskId": "calendar-8a434d57ed-task",
+    "moveReviewId": "8c312028-66ec-480e-abce-2b717c293c4c",
+    "originalVersion": 1,
+    "beforeStart": "2026-12-29T01:00:00.000Z",
+    "beforeDeadline": "2026-12-31T10:00:00.000Z",
+    "approvedVersion": 2,
+    "afterStart": "2026-12-31T01:00:00.000Z",
+    "afterDeadline": "2027-01-02T10:00:00.000Z",
+    "createReviewId": "46f9d353-39fb-4c56-a61a-e4de4c9b871d",
+    "createdTaskId": "114e58e6-164a-4594-8207-adae2277a4f2"
+  },
+  "profile": {
+    "mode": "profile",
+    "device": "emulator-5556 / API37 / swiftshader",
+    "dragCount": 10,
+    "frameCount": 236,
+    "slowFrameCount": 236,
+    "slowFrameRatio": 1.0,
+    "over100msCount": 2,
+    "maxSpanUs": 209951,
+    "performanceTargetMet": false,
+    "samples": [
+      {
+        "iteration": 1,
+        "frames": 19
+      },
+      {
+        "iteration": 2,
+        "frames": 25
+      },
+      {
+        "iteration": 3,
+        "frames": 24
+      },
+      {
+        "iteration": 4,
+        "frames": 24
+      },
+      {
+        "iteration": 5,
+        "frames": 24
+      },
+      {
+        "iteration": 6,
+        "frames": 24
+      },
+      {
+        "iteration": 7,
+        "frames": 24
+      },
+      {
+        "iteration": 8,
+        "frames": 24
+      },
+      {
+        "iteration": 9,
+        "frames": 24
+      },
+      {
+        "iteration": 10,
+        "frames": 24
+      }
+    ]
+  },
+  "limitations": [
+    "Full suites have failures",
+    "Profile performance target not met",
+    "Physical device and TalkBack pending",
+    "Not deployed; server capability defaults off"
+  ]
+}

@@ -1,3 +1,4 @@
+import '../calendar/calendar_schedule.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,11 +33,15 @@ class FormPage extends ConsumerStatefulWidget {
     this.source,
     this.version = 1,
     this.restoreDiaryDraft = false,
+    this.initialBusinessDate,
+    this.scheduleConstraints,
   });
   final String kind;
   final String? id, source;
   final int version;
   final bool restoreDiaryDraft;
+  final String? initialBusinessDate;
+  final Map<String, dynamic>? scheduleConstraints;
   @override
   ConsumerState<FormPage> createState() => _FormPageState();
 }
@@ -65,6 +70,10 @@ class _FormPageState extends ConsumerState<FormPage> {
   final participants = <String, Record>{};
   List<UploadedAttachment> uploadedAttachments = [];
   bool attachmentsReady = true;
+  DateTime? calendarSeed;
+  CalendarConstraints? calendarConstraints;
+  String? calendarSeedError;
+  late final int calendarEpoch;
   DateTime? deadline;
   DateTime? startAt;
   int? loadedVersion;
@@ -89,6 +98,23 @@ class _FormPageState extends ConsumerState<FormPage> {
     spec = screens[widget.kind]!;
     businessDate = ref.read(logDateProvider);
     accountId = ref.read(sessionProvider).id;
+    calendarEpoch = ref.read(sessionEpochProvider);
+    if (widget.initialBusinessDate != null) {
+      try {
+        if (widget.kind != 'dispatch' || widget.id != null) {
+          throw const FormatException('日期只用于新建任务');
+        }
+        calendarSeed = parseBusinessDate(widget.initialBusinessDate!);
+        calendarConstraints = CalendarConstraints.parse(
+          widget.scheduleConstraints,
+        );
+        if (!calendarConstraints!.contains(calendarSeed!)) {
+          throw const FormatException('所选日期超出排期范围，请返回月历刷新');
+        }
+      } catch (e) {
+        calendarSeedError = '$e';
+      }
+    }
     if (document) draftStore = ref.read(draftStoreProvider);
     for (final field in spec.fields) {
       controllers[field] = TextEditingController();
@@ -392,7 +418,9 @@ class _FormPageState extends ConsumerState<FormPage> {
     super.dispose();
   }
 
-  bool requiredField(String field) => [
+  bool requiredField(String field) =>
+      !(widget.kind == 'dispatch' && field == '开始时间') &&
+      [
     '任务名称',
     '标题',
     '账号',
@@ -506,28 +534,55 @@ class _FormPageState extends ConsumerState<FormPage> {
 
   Future<void> pickTaskDate(String label) async {
     final current = label == '开始时间' ? startAt : deadline;
+    final calendar = widget.initialBusinessDate != null;
+    if (calendarSeedError != null) {
+      setState(() => error = calendarSeedError);
+      return;
+    }
+    final seed = calendar
+        ? (current == null ? calendarSeed! : shanghaiWallTime(current))
+        : current ?? DateTime.now().add(const Duration(days: 1));
+    if (calendar && !calendarConstraints!.contains(seed)) {
+      setState(() => error = '所选日期已超出范围，请返回月历刷新');
+      return;
+    }
     final picked = await showPremiumDateTimePicker(
       context,
-      initial: current ?? DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      initial: seed,
+      firstDate: calendar
+          ? calendarConstraints!.min
+          : DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: calendar ? calendarConstraints!.max : null,
       title: label,
     );
-    if (picked == null || !mounted) return;
-    final date = picked;
-    final time = TimeOfDay.fromDateTime(picked);
+    if (picked == null ||
+        !mounted ||
+        calendar && ref.read(sessionEpochProvider) != calendarEpoch) {
+      return;
+    }
+    final value = calendar
+        ? DateTime.utc(
+            picked.year,
+            picked.month,
+            picked.day,
+            picked.hour,
+            picked.minute,
+          ).subtract(const Duration(hours: 8))
+        : picked;
     setState(() {
       if (label == '开始时间') {
-        startAt = picked;
+        startAt = value;
       } else {
-        deadline = picked;
+        deadline = value;
       }
       controllers[label]!.text =
-          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${time.format(context)}';
+          '${businessDateText(picked)} ${TimeOfDay.fromDateTime(picked).format(context)}';
     });
   }
 
   Widget _taskRow(String label, Widget value, {bool topAligned = false}) =>
       Padding(
+        key: ValueKey('dispatch-field:$label'),
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           crossAxisAlignment: topAligned
@@ -1029,6 +1084,12 @@ class _FormPageState extends ConsumerState<FormPage> {
         !attachmentsReady) {
       return;
     }
+    if (widget.initialBusinessDate != null &&
+        (calendarSeedError != null ||
+            ref.read(sessionEpochProvider) != calendarEpoch)) {
+      setState(() => error = calendarSeedError ?? '会话已变化，请重新进入月历创建');
+      return;
+    }
     if (!windowOpen) {
       setState(() => error = '日志提交已满24小时，已锁定');
       return;
@@ -1120,9 +1181,15 @@ class _FormPageState extends ConsumerState<FormPage> {
                   ? null
                   : (loadedVersion ?? widget.version),
               idempotencyKey: idem,
+              scheduleRevision: calendarConstraints?.revision,
             ),
           );
-      if (!mounted || ref.read(sessionProvider).id != accountId) return;
+      if (!mounted ||
+          ref.read(sessionProvider).id != accountId ||
+          widget.initialBusinessDate != null &&
+              ref.read(sessionEpochProvider) != calendarEpoch) {
+        return;
+      }
       refreshBusiness(ref);
       ref.invalidate(todayDraftProvider(accountId));
       ref.invalidate(recordsProvider(spec.resource));
@@ -1206,7 +1273,11 @@ class _FormPageState extends ConsumerState<FormPage> {
       } else {
         notice(
           context,
-          widget.kind == 'log-revise'
+          widget.kind == 'dispatch' &&
+                  (result.fields['status'] == 'PENDING' ||
+                      result.fields['reviewState'] == '待审')
+              ? '创建申请待审，审核通过后任务进入月历'
+              : widget.kind == 'log-revise'
               ? '修订申请已提交，审核通过后生效'
               : AppConfig.mock
               ? '已保存'
@@ -1470,6 +1541,12 @@ class _FormPageState extends ConsumerState<FormPage> {
             ),
       child: PageBody(
         children: [
+          if (widget.initialBusinessDate != null)
+            Text(
+              calendarSeedError ??
+                  '月历所选日期：${businessDateText(calendarSeed!)}（上海）。请选择具体截止时间。',
+              key: const ValueKey('calendar-create-date'),
+            ),
           if (auth) ...[
             const SizedBox(height: 8),
             Container(

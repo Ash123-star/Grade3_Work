@@ -150,3 +150,13 @@ GET /api/reviews/{id} 在现有审核读取权限校验之后追加 `display_ref
 
 ### 组织团队名称与操作反馈（Issue #52）
 GET /organization/people沿用原组织数据范围，追加可空team_name，按teams.id及company_id联合关联；无团队或名称不存在时返回null。客户端将team_name/嵌套team.name归一化为teamName；统计筛选优先取当前授权组织树teams名称，不将team_id当显示名称。无需数据库迁移，旧客户端可忽略新增字段。任务和组织查询权限保持现有规则。
+
+
+## 公司月历整段移动（Issue #58，V27）
+
+- `GET /tasks?from=<ISO带时区>&to=<ISO带时区>` 返回区间相交的完整范围分页；窗口≤62日、记录≤5000。新响应含 `snapshotToken`、`scheduleConstraints`、`capabilities.reschedule`；末页 `nextCursor=null`。新月历后续页带原快照，变化返回409 `CALENDAR_SNAPSHOT_CHANGED`。旧客户端无快照仍可分页；参与人 `ownerId`/`participantId` 别名及当前 `date/period` 相交规则不变。
+- `POST /tasks/{id}/reschedules` 新模式仅接受 `{version,moveDays,reason}`：version正int32，moveDays非零int32，reason去空白后1–1000码点。头部 `Idempotency-Key` 为1–128可见ASCII字符；`If-Schedule-Constraints-Match` 使用服务端约束版本。服务端按上海业务日同时移动开始/截止时间，保持时长及其他业务字段。
+- 仅有当前派发资格的原派发人或管理员可申请；客户端能力是提示，服务端每次重验。提交返回审核记录，待审原排期不变。审核继续使用 `expectedVersion`；权限变化/版本冲突拒绝，禁止自审，采用现有审核策略。
+- 相同键相同内容返回同一审核结果；不同内容409 `IDEMPOTENCY_CONFLICT`，同任务同版本不同键待审409 `RESCHEDULE_PENDING`。旧版仅 `deadline/version/reason` 请求保持兼容。关闭移动开关后仍可重放已有命令。
+- `scheduleConstraints` 定义上海业务年Y的日期窗口 `[Y-2年01-01,Y+8年01-01]`；头过期409 `SCHEDULE_CONSTRAINTS_CHANGED`。快捷创建沿用 `/tasks`，带约束头时校验窗口，不带头的既有创建不新增限制。
+- V27只新增改期命令表和索引；已发布迁移不变。部署全部MOVE审核消费者后设置 `CALENDAR_MOVE_ENABLED=true`；存在待审MOVE时禁止回滚至不理解MOVE的旧服务端。

@@ -114,6 +114,7 @@ public class OpenApi {
         reviewDetail.addProperty("display_references",references.description("已授权审核快照引用的同公司ID到当前名称映射；名称非历史快照，缺失引用不返回"));
         reviewDetail.additionalProperties(true); c.addSchemas("ReviewDetail",reviewDetail);
         MobileP0OpenApi.register(c);
+        CalendarOpenApi.register(c);
         return new OpenAPI().servers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/"))).info(new Info().title("企业协作智能面板 API").version("1.0.0").description("UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表不提供完成情况。分页 cursor 是非负偏移量。" )).components(c).addSecurityItem(new SecurityRequirement().addList("bearer"));
     }
     @Bean OpenApiCustomizer requestModels() {
@@ -149,7 +150,7 @@ public class OpenApi {
             if(dispatch!=null&&dispatch.getGet()!=null) dispatch.getGet().setDescription("在服务端组织数据范围内分页查询已生效任务。列表项仅为 TaskListItem，永不返回负责人、协作人、阶段、完成情况、进度、正文或事件。");
             var taskEvents=api.getPaths().get("/api/tasks/{id}/events"); if(taskEvents!=null&&taskEvents.getPost()!=null) taskEvents.getPost().setDescription("生命周期动作。非法状态转换返回 409 INVALID_TRANSITION；旧版本返回 409 VERSION_CONFLICT；未知动作返回 400 INVALID_EVENT。反馈、退回、撤回必须提供 text。");
             var reassignment=api.getPaths().get("/api/tasks/{id}/reassignments"); if(reassignment!=null&&reassignment.getPost()!=null) reassignment.getPost().setDescription("提交转派复核申请；申请不会立即更换负责人。新旧负责人相同返回 400 SAME_OWNER，终态返回 409 INVALID_TRANSITION。");
-            var reschedule=api.getPaths().get("/api/tasks/{id}/reschedules"); if(reschedule!=null&&reschedule.getPost()!=null) reschedule.getPost().setDescription("提交改期复核申请；申请不会立即改期。必须提供带时区、不同于当前值的 deadline。");
+            var reschedule=api.getPaths().get("/api/tasks/{id}/reschedules"); if(reschedule!=null&&reschedule.getPost()!=null) reschedule.getPost().setDescription("提交改期复核申请，返回审核 ID 和实际审核状态。旧模式 deadline/version/reason 仅改截止时间；MOVE 模式仅接受 version/moveDays/reason，必须携带 Idempotency-Key 和 If-Schedule-Constraints-Match。MOVE 保持时长、非日期字段及旧排期直到审核生效。相同键和内容重放原申请；版本、内容、约束或同版本待审冲突返回409。模式关闭仍允许同键确认已存在申请。");
             var deletion=api.getPaths().get("/api/tasks/{id}/deletions"); if(deletion!=null&&deletion.getPost()!=null) deletion.getPost().setDescription("提交任务删除审核申请。批准后仅归档，保留原任务摘要、申请、审核、理由和时间审计；不得物理删除。");
             var comments=api.getPaths().get("/api/tasks/{taskId}/comments"); if(comments!=null&&comments.getPost()!=null) comments.getPost().setDescription("公开任务评论与回复。要求 Idempotency-Key；空评论400、错误父评论400、重复键409、范围外任务404。评论、审计和 outbox 通知同一事务写入，评论不可编辑删除。");
             var logDraft=api.getPaths().get("/api/logs/draft"); if(logDraft!=null&&logDraft.getPut()!=null) logDraft.getPut().setDescription("保存本人每日唯一日报草稿。草稿仅本人可读；version过期返回409，已提交日报须使用content直接更新。");

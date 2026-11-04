@@ -943,6 +943,7 @@
         "tags": [
           "task-controller"
         ],
+        "summary": "范围内任务列表",
         "description": "在服务端组织数据范围内分页查询已生效任务。列表项仅为 TaskListItem，永不返回负责人、协作人、阶段、完成情况、进度、正文或事件。",
         "operationId": "list",
         "parameters": [
@@ -984,14 +985,6 @@
             }
           },
           {
-            "name": "ownerId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "date",
             "in": "query",
             "required": false,
@@ -1017,6 +1010,22 @@
           },
           {
             "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshotToken",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerId",
             "in": "query",
             "required": false,
             "schema": {
@@ -1913,13 +1922,30 @@
         "tags": [
           "task-controller"
         ],
-        "description": "提交改期复核申请；申请不会立即改期。必须提供带时区、不同于当前值的 deadline。",
+        "summary": "申请任务改期（兼容截止时间或整段移动）",
+        "description": "提交改期复核申请，返回审核 ID 和实际审核状态。旧模式 deadline/version/reason 仅改截止时间；MOVE 模式仅接受 version/moveDays/reason，必须携带 Idempotency-Key 和 If-Schedule-Constraints-Match。MOVE 保持时长、非日期字段及旧排期直到审核生效。相同键和内容重放原申请；版本、内容、约束或同版本待审冲突返回409。模式关闭仍允许同键确认已存在申请。",
         "operationId": "reschedule",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Schedule-Constraints-Match",
+            "in": "header",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -19674,6 +19700,18 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "capabilities": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "reschedule": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "reschedule"
+            ]
           }
         },
         "required": [
@@ -19776,29 +19814,13 @@
         ]
       },
       "TaskReschedule": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "deadline": {
-            "type": "string",
-            "format": "date-time",
-            "description": "带时区的 ISO-8601 时间，且不得与当前截止时间相同"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TaskDeadlineReschedule"
           },
-          "version": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 20000,
-            "minLength": 1
+          {
+            "$ref": "#/components/schemas/TaskMoveReschedule"
           }
-        },
-        "required": [
-          "deadline",
-          "reason",
-          "version"
         ]
       },
       "TaskDeletion": {
@@ -21533,7 +21555,16 @@
             "format": "int64"
           },
           "nextCursor": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 20000
+          },
+          "snapshotToken": {
+            "type": "string",
+            "description": "范围查询快照；新版月历后续页必须原样带回",
+            "maxLength": 20000
+          },
+          "scheduleConstraints": {
+            "$ref": "#/components/schemas/ScheduleConstraints"
           }
         },
         "required": [
@@ -22501,6 +22532,106 @@
             "format": "int32"
           }
         }
+      },
+      "TaskDeadlineReschedule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "description": "带时区的 ISO-8601 时间，且不得与当前截止时间相同"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1
+          }
+        },
+        "required": [
+          "deadline",
+          "reason",
+          "version"
+        ]
+      },
+      "TaskMoveReschedule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": 0
+          },
+          "moveDays": {
+            "type": "integer",
+            "format": "int32",
+            "description": "非零整数日差；按上海业务日同时平移起止时间，保持时长",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1
+          }
+        },
+        "required": [
+          "moveDays",
+          "reason",
+          "version"
+        ]
+      },
+      "ScheduleConstraints": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "zone": {
+            "type": "string",
+            "enum": [
+              "Asia/Shanghai"
+            ]
+          },
+          "minDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "maxDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "maxRangeDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxRecords": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "maxDate",
+          "maxPages",
+          "maxRangeDays",
+          "maxRecords",
+          "minDate",
+          "revision",
+          "zone"
+        ]
       }
     },
     "securitySchemes": {
