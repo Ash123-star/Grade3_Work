@@ -35,3 +35,5 @@
 验收步骤：公司月视图选择同一周已有至少五条任务的范围，检查五条全部展示且该周比空周高；拖入任务应进入第六行、后续周下移；取消保留五条正式任务；提交并独立审核后六条正式任务继续全部显示。查看月底任务时可纵向滚动，不能强制压回固定月高。
 
 本轮未重新运行后端全套、通知专项和 profile 矩阵。历史全仓、性能、真实手机/TalkBack 和非作者审阅缺口保留。PR 尚未合并或部署。
+
+`openspec.cmd validate --all --strict`：47/47，退出 0，见 `output/calendar-all-rows-openspec.log`。提交 `60ba430fac3801747b1c0303cbbc5ccec2fa8c0e` 已推送，PR #67 与 [Issue 验收回执](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6630392455)已更新。
