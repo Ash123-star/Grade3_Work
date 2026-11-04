@@ -76,8 +76,8 @@ void main() {
     expect(request.fields['reviewerConfigured'], isFalse);
   });
 
-  test('founder authorized revision applies immediately with exemption record', () async {
-    final store = DemoStore()
+  test('single founder authorized revision applies immediately with exemption record', () async {
+    final store = DemoStore(founderIds: {'u-founder'})
       ..records['dashboard/company'] = [
         const Record(
           id: 'focus-founder',

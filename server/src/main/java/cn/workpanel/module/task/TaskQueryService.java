@@ -11,7 +11,9 @@ import java.util.*;
 /** 列表保持旧日期模式；日历范围读取在单个一致性快照内绑定授权、总数、顺序和版本。 */
 @Service
 public class TaskQueryService {
-    private static final String LIST_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at";
+    private static final String LIST_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at,(tp.task_id IS NOT NULL) AS pinned,tp.pinned_at";
+    /** 当前用户的个人置顶；只影响本人排序。 */
+    private static final String PIN_JOIN=" LEFT JOIN task_pins tp ON tp.task_id=t.id AND tp.user_id=?";
     private static final String CARD_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.phase,t.version,t.created_at";
     /** 最早真实 DISPATCHED 事件时间；缺失时为 NULL，不推测。 */
     private static final String DISPATCH_LATERAL=" LEFT JOIN LATERAL (SELECT min(e.created_at) AS dispatch_at FROM task_events e WHERE e.company_id=t.company_id AND e.task_id=t.id AND e.type='DISPATCHED') dispatched ON true";
@@ -52,7 +54,8 @@ public class TaskQueryService {
             where+=" AND (t.start_at IS NULL OR t.start_at<=t.deadline) AND COALESCE(t.start_at,t.deadline)<?::timestamptz AND t.deadline>=?::timestamptz";
             args.add(bounds[1].toInstant().toString());args.add(bounds[0].toInstant().toString());
             // 有界读取同时给出摘要、总数与页，避免 count/page 跨快照及旧游标的假终点。
-            var rows=db.rows("SELECT "+LIST_COLUMNS+",t.phase FROM tasks t WHERE "+where+" ORDER BY t.deadline,t.id LIMIT 5001",args.toArray());
+            var calendarArgs=new ArrayList<Object>(args);calendarArgs.add(0,actor.id());
+            var rows=db.rows("SELECT "+LIST_COLUMNS+",t.phase FROM tasks t"+PIN_JOIN+" WHERE "+where+" ORDER BY t.deadline,t.id LIMIT 5001",calendarArgs.toArray());
             if(rows.size()>5000)throw new ApiError(422,"CALENDAR_RANGE_TOO_DENSE","日历范围超过 5000 条，请缩小范围或使用任务列表");
             var ordered=rows.stream().map(t->List.of(t.get("id"),t.get("version"))).toList();
             String fingerprint=actors==null?actor.toString():actors.fingerprint(actor);
@@ -67,8 +70,8 @@ public class TaskQueryService {
             result.put("nextCursor",end<rows.size()?String.valueOf(end):null);result.put("snapshotToken",token);result.put("scheduleConstraints",constraints.view());return result;
         }
         if(range!=null) { where+=" AND (t.start_at IS NULL OR t.start_at<=t.deadline) AND COALESCE(t.start_at,t.deadline)<?::timestamptz AND t.deadline>=?::timestamptz";args.add(range.to().toString());args.add(range.from().toString()); }
-        long total=db.count("SELECT count(*) FROM tasks t WHERE "+where,args.toArray());args.add(query.limit());args.add(query.cursor());
-        var items=db.rows("SELECT "+LIST_COLUMNS+",t.phase FROM tasks t WHERE "+where+" ORDER BY t.deadline,t.id LIMIT ? OFFSET ?",args.toArray()).stream().map(t->project(actor,t)).toList();
+        long total=db.count("SELECT count(*) FROM tasks t WHERE "+where,args.toArray());args.add(0,actor.id());args.add(query.limit());args.add(query.cursor());
+        var items=db.rows("SELECT "+LIST_COLUMNS+",t.phase FROM tasks t"+PIN_JOIN+" WHERE "+where+" ORDER BY (tp.task_id IS NOT NULL) DESC,tp.pinned_at DESC,t.deadline,t.id LIMIT ? OFFSET ?",args.toArray()).stream().map(t->project(actor,t)).toList();
         return Map.of("items",items,"total",total,"nextCursor",String.valueOf((long)query.cursor()+query.limit()),"scheduleConstraints",constraints.view());
     }
     /**
@@ -93,6 +96,7 @@ public class TaskQueryService {
                 for(String column:List.of("id","issuer_id","title","start_at","deadline","version","phase","created_at")) item.put(column,task.get(column));
                 item.put("dispatchAt",task.get("dispatch_at"));
                 item.put("participants",TaskParticipants.list(db,Db.str(task,"id")));
+                item.put("labels",TaskLabels.list(db,Db.str(task,"id")));
                 item.put("label",TaskLabels.find(db,Db.str(task,"id")));
                 return item;
             }).toList();

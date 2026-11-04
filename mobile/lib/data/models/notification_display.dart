@@ -20,6 +20,7 @@ String notificationTitle(Object? type) => switch (type) {
   'REVIEW_PENDING' => '有申请待审核',
   'REVIEW_APPROVED' => '申请已通过',
   'REVIEW_REJECTED' => '申请已驳回',
+  'REVIEW_UNASSIGNED' => '有申请缺少审核人',
   'AI_READY' => 'AI 分析已完成',
   'AI_WORK_UPDATED' => 'AI 工作状态更新',
   'DELIVERY_CHECKED' => '任务交付检查已完成',
@@ -37,7 +38,10 @@ String? notificationResource(Object? type) => switch (type) {
   'DEADLINE' ||
   'DELIVERY_CHECKED' => 'tasks',
   'LOG_SUBMITTED' || 'LOG_UPDATED' || 'LOG_COMMENT' => 'logs',
-  'REVIEW_PENDING' || 'REVIEW_APPROVED' || 'REVIEW_REJECTED' => 'reviews',
+  'REVIEW_PENDING' ||
+  'REVIEW_APPROVED' ||
+  'REVIEW_REJECTED' ||
+  'REVIEW_UNASSIGNED' => 'reviews',
   'AI_READY' => 'ai-jobs',
   'AI_WORK_UPDATED' => 'ai-work',
   _ => null,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -26,21 +25,18 @@ void main() {
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const PandoraApp(),
-      ),
+      OwnedTestProviderScope(container: container, child: const PandoraApp()),
     );
     container.read(routerProvider).go('/me');
     await settleLocalIo(tester);
     await tester.pumpAndSettle();
     expect(find.byType(ProtectedAvatar), findsOneWidget);
-    expect(find.text('任务管理'), findsNothing);
+    expect(find.text('派发任务'), findsNothing);
     container.read(routerProvider).go('/view');
     await settleLocalIo(tester);
     await tester.pumpAndSettle();
-    expect(find.text('任务管理'), findsOneWidget);
-    await tester.tap(find.text('任务管理'));
+    expect(find.text('派发任务'), findsOneWidget);
+    await tester.tap(find.text('派发任务'));
     await settleLocalIo(tester);
     expect(find.byType(TaskManagementPage), findsOneWidget);
     expect(find.text('任务名称'), findsOneWidget);

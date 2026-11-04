@@ -1,4 +1,3 @@
-
 ## 2026-10-29 数据库与统一验收更新（取代此前本批未执行验收的状态）
 
 用户已授权最终编译测试，且明确无需同步其他实际开发数据库。独立本地 PostgreSQL 已执行 server Flyway V1–V23；升级、资料列、历史数据保留、确认回执约束及核心 HTTP 契约得到运行验证。V22/V23 满足当前实现的数据存储需要，无需新增重复字段。最终后端定向 41 项通过、移动端定向 35 项通过，后端打包、Flutter analyze、正式接口模式 Android APK、Web build 均退出 0；运行服务已重新导出 docs/openapi.json。
@@ -46,14 +45,14 @@ V22、V23迁移文件已新增但均未执行，实际数据库尚未更新。�
 
 ### 下一步：修复前后端接口连接
 
-本批由 DeepSeek 按一个阶段一份交付的方式实施，Codex 每阶段先做差异/权限/架构/测试覆盖审查，通过后再进入下一阶段；所有实现完成后再集中跑自动化验收。接口、文件、动作与案例级验收见 [`deepseek-p0-implementation-plan.md`](docs/deepseek-p0-implementation-plan.md)，OpenSpec 勾选状态见 [`openspec/changes/mobile-page-experience-refresh/tasks.md`](../openspec/changes/mobile-page-experience-refresh/tasks.md)。
+本批由 DeepSeek 按一个阶段一份交付的方式实施，Codex 每阶段先做差异/权限/架构/测试覆盖审查，通过后再进入下一阶段；所有实现完成后再集中跑自动化验收。接口、文件、动作与案例级验收见 [`deepseek-p0-implementation-plan.md`](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/docs/deepseek-p0-implementation-plan.md)，OpenSpec 勾选状态见 [`openspec/changes/mobile-page-experience-refresh/tasks.md`](../openspec/changes/mobile-page-experience-refresh/tasks.md)。
 
 实施顺序固定为：①核对并修复当前未验证草案；②迁移与成员生命周期；③任务区间/接收卡片；④下属日志/月状态；⑤日志24小时直改；⑥资料读写；⑦#17审核与历史待审；⑧统计汇总/钻取；⑨同范围CSV；⑩双端映射、运行时OpenAPI与文档同步；⑪集中自动化和真实PostgreSQL验收。阶段审查不等于最终验收；只有真实服务、自动化测试和OpenSpec严格校验的明确结果才能勾任务。
 
 ## 当前结论
 
 - 用户 #1–#17 的移动端页面、交互、Mock 与 HTTP 适配均已接入；按点实施记录见 [`openspec/changes/mobile-page-experience-refresh/tasks.md`](../openspec/changes/mobile-page-experience-refresh/tasks.md)。这表示代码路径已建立，不表示每项已经验收。
-- 本地 P0 服务端改动已有部分代码草案，但仍属未验证；执行情况、每阶段边界及验收案例以 [`mobile/docs/deepseek-p0-implementation-plan.md`](docs/deepseek-p0-implementation-plan.md) 为准。不得把接口已写入 Controller、OpenAPI 草案或 Mock 响应报告为功能完成。
+- 本地 P0 服务端改动已有部分代码草案，但仍属未验证；执行情况、每阶段边界及验收案例以 [历史文件](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/docs/deepseek-p0-implementation-plan.md) 为准。不得把接口已写入 Controller、OpenAPI 草案或 Mock 响应报告为功能完成。
 - 2026-10-24 历史验收记录：`openspec.cmd validate --all --strict` 38 项通过、0 项失败，退出码 0；`D:\flutter\bin\flutter.bat analyze --no-pub` 无问题，退出码 0；Mock release APK 构建退出码 0。此结果不代表 2026-10-29 当前代码已重新验收。
 - 完整 `flutter test --no-pub` 的 2026-10-24 历史结果：267 项通过、31 项失败、2 项跳过，退出码 1。失败覆盖 AI 工作台、Demo/路由、日志流程、月历、下属工作台和 HTTP 契约测试；明细见 [`openspec/changes/mobile-page-experience-refresh/verification.md`](../openspec/changes/mobile-page-experience-refresh/verification.md)。这是历史快照，当前代码尚未在本次接口审计中重跑；所有功能验收 task 仍未勾选。
 - 月历定向测试确认 Mock 月查询包含 `t6`，但 UI 未渲染所期待的跨周片段（`calendar_agenda_test.dart:310`）；缺陷定位在数据读取之后，具体轨道/布局原因尚未确定。

@@ -222,8 +222,13 @@ class _FormPageState extends ConsumerState<FormPage> {
         }
       }
       if (controllers.containsKey('标签')) {
-        controllers['标签']!.text =
-            '${item.fields['tagId'] ?? item.fields['tag_id'] ?? item.fields['标签'] ?? ''}';
+        final rawLabels = item.fields['labelIds'] ?? item.fields['label_ids'];
+        if (rawLabels is List) {
+          controllers['标签']!.text = rawLabels.map((id) => '$id').join(',');
+        } else {
+          controllers['标签']!.text =
+              '${item.fields['tagId'] ?? item.fields['tag_id'] ?? item.fields['标签'] ?? ''}';
+        }
       }
       startAt = DateTime.tryParse(
         '${item.fields['startAt'] ?? item.fields['start_at']}',
@@ -430,7 +435,6 @@ class _FormPageState extends ConsumerState<FormPage> {
     '参与人',
     '开始时间',
     '截止时间',
-    '标签',
     '今日工作',
     '成果说明',
     '问题描述',
@@ -580,6 +584,31 @@ class _FormPageState extends ConsumerState<FormPage> {
     });
   }
 
+  /// 市面通用写法：必填字段在名称前加红色星号，未标注即为选填。
+  Widget _taskLabel(String label) {
+    final required = requiredField(label);
+    return Text.rich(
+      TextSpan(
+        children: [
+          if (required)
+            TextSpan(
+              text: '* ',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          TextSpan(text: label),
+        ],
+      ),
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: SunnyPalette.ink,
+      ),
+    );
+  }
+
   Widget _taskRow(String label, Widget value, {bool topAligned = false}) =>
       Padding(
         key: ValueKey('dispatch-field:$label'),
@@ -599,17 +628,7 @@ class _FormPageState extends ConsumerState<FormPage> {
               size: 38,
             ),
             const SizedBox(width: 12),
-            SizedBox(
-              width: 72,
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: SunnyPalette.ink,
-                ),
-              ),
-            ),
+            SizedBox(width: 72, child: _taskLabel(label)),
             const SizedBox(width: 8),
             Expanded(child: value),
           ],
@@ -1147,9 +1166,13 @@ class _FormPageState extends ConsumerState<FormPage> {
         'attachments': uploadedAttachments.map((f) => f.id).toList(),
       if (widget.kind == 'dispatch')
         'participantIds': participants.keys.toList(),
-      if (widget.kind == 'dispatch' &&
-          controllers['标签']!.text.trim().isNotEmpty)
-        'tagId': controllers['标签']!.text.trim(),
+      if (widget.kind == 'dispatch')
+        'labelIds': controllers['标签']!.text
+            .split(',')
+            .map((id) => id.trim())
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList(),
       if (widget.id == null ||
           controllers.containsKey('任务名称') ||
           controllers.containsKey('标题'))
@@ -1511,10 +1534,9 @@ class _FormPageState extends ConsumerState<FormPage> {
     return PageFrame(
       title: document ? (log ? '写日志' : '修改日志') : spec.title,
       showTitle: !auth,
-      feedback: error == null ? null : KeyedSubtree(
-        key: ValueKey(error),
-        child: failure(),
-      ),
+      feedback: error == null
+          ? null
+          : KeyedSubtree(key: ValueKey(error), child: failure()),
       bottom: widget.kind == 'policy'
           ? null
           : Column(
@@ -1789,7 +1811,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('策略范围'),
             const PaperSurface(
-              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。'),
+              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人的修改由其他在职创始人审核，仅一位创始人时自动批准。'),
             ),
             const SizedBox(height: 16),
           ],
@@ -1898,7 +1920,7 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('审核方式'),
             const PaperSurface(
-              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人已获授权的操作自动批准。'),
+              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人的修改由其他在职创始人审核，仅一位创始人时自动批准。'),
             ),
           ],
           if (widget.kind == 'register')
@@ -1980,12 +2002,15 @@ class PersonPicker extends ConsumerStatefulWidget {
 class _PersonPickerState extends ConsumerState<PersonPicker> {
   final items = <Record>[];
   final scroll = ScrollController();
+  final searchController = TextEditingController();
   Timer? debounce;
   String search = '';
   String? cursor;
   bool loading = true, more = false, exhausted = false;
   Object? error;
   int generation = 0;
+  String? selectedDepartment;
+  String? selectedTeam;
   late final String account = ref.read(sessionProvider).id;
   @override
   void initState() {
@@ -2024,7 +2049,9 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
         final rawLength = items.length + page.items.length;
         for (final p in page.items) {
           if (seen.add(p.id) &&
-              (!widget.dispatch || p.fields['status'] == 'ACTIVE')) {
+              (!widget.dispatch ||
+                  (p.fields['status'] == 'ACTIVE' &&
+                      p.fields['taskSelectable'] != false))) {
             items.add(p);
           }
         }
@@ -2063,7 +2090,188 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
     generation++;
     debounce?.cancel();
     scroll.dispose();
+    searchController.dispose();
     super.dispose();
+  }
+
+  Map<String, Map<String, List<Record>>> _groupedPeople() {
+    final departments = <String, Map<String, List<Record>>>{};
+    for (final person in items) {
+      final department = _departmentOf(person);
+      final team = _teamOf(person);
+      departments
+          .putIfAbsent(department, () => <String, List<Record>>{})
+          .putIfAbsent(team, () => <Record>[])
+          .add(person);
+    }
+    return departments;
+  }
+
+  String _departmentOf(Record person) {
+    final department =
+        '${person.fields['departmentName'] ?? person.subtitle ?? '未分配部门'}'
+            .trim();
+    return department.isEmpty ? '未分配部门' : department;
+  }
+
+  String _teamOf(Record person) {
+    final team = '${person.fields['teamName'] ?? '未分配团队'}'.trim();
+    return team.isEmpty ? '未分配团队' : team;
+  }
+
+  bool get _searching => search.trim().isNotEmpty;
+
+  bool get _canGoBack => _searching || selectedDepartment != null;
+
+  void _goBack() {
+    if (_searching) {
+      _clearSearch();
+    } else if (selectedTeam != null) {
+      setState(() => selectedTeam = null);
+    } else if (selectedDepartment != null) {
+      setState(() => selectedDepartment = null);
+    }
+  }
+
+  void _clearSearch() {
+    searchController.clear();
+    search = '';
+    debounce?.cancel();
+    generation++;
+    setState(() {
+      items.clear();
+      loading = true;
+      error = null;
+    });
+    load(reset: true);
+  }
+
+  void _openBranch(String department, String? team) {
+    selectedDepartment = department;
+    selectedTeam = team;
+    _clearSearch();
+  }
+
+  List<Widget> _pickerRows(
+    Map<String, Map<String, List<Record>>> departments,
+    String? department,
+    String? team,
+  ) {
+    if (_searching) return _searchRows(departments);
+    if (department == null) {
+      return [
+        for (final name in departments.keys)
+          _nodeTile(
+            name,
+            key: ValueKey('picker-department-$name'),
+            onTap: () => setState(() {
+              selectedDepartment = name;
+              selectedTeam = null;
+            }),
+          ),
+      ];
+    }
+    final teams = departments[department]!;
+    if (team == null) {
+      return [
+        for (final name in teams.keys)
+          _nodeTile(
+            name,
+            key: ValueKey('picker-team-$department-$name'),
+            onTap: () => setState(() => selectedTeam = name),
+          ),
+      ];
+    }
+    return [for (final person in teams[team]!) _personTile(person)];
+  }
+
+  /// 搜索命中按真实组织路径展示部门 / 团队节点；点击节点进入对应分支。
+  List<Widget> _searchRows(
+    Map<String, Map<String, List<Record>>> departments,
+  ) => [
+    for (final department in departments.entries) ...[
+      _searchHeader(
+        department.key,
+        depth: 0,
+        onTap: () => _openBranch(department.key, null),
+      ),
+      for (final team in department.value.entries) ...[
+        _searchHeader(
+          team.key,
+          depth: 1,
+          onTap: () => _openBranch(department.key, team.key),
+        ),
+        for (final person in team.value)
+          _personTile(person, indent: 32, showPath: false),
+      ],
+    ],
+  ];
+
+  Widget _searchHeader(
+    String name, {
+    required int depth,
+    required VoidCallback onTap,
+  }) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(4 + depth * 16, 10, 4, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: depth == 0 ? FontWeight.w700 : FontWeight.w600,
+                color: depth == 0 ? SunnyPalette.ink : CuteTokens.muted,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 16,
+            color: CuteTokens.muted,
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _nodeTile(
+    String name, {
+    required Key key,
+    required VoidCallback onTap,
+  }) => ListTile(
+    key: key,
+    title: Text(name),
+    trailing: const Icon(
+      Icons.chevron_right_rounded,
+      size: 20,
+      color: CuteTokens.muted,
+    ),
+    onTap: onTap,
+  );
+
+  Widget _personTile(
+    Record person, {
+    double indent = 16,
+    bool showPath = true,
+  }) {
+    final role = '${person.fields['role'] ?? ''}'.trim();
+    final path = '${_departmentOf(person)} / ${_teamOf(person)}';
+    final subtitle = [
+      role,
+      if (showPath && person.fields['organizationPath'] is List) path,
+    ].where((value) => value.isNotEmpty).join(' · ');
+    return ListTile(
+      contentPadding: EdgeInsets.only(left: indent, right: 16),
+      title: Text(person.title),
+      subtitle: subtitle.isEmpty ? null : Text(subtitle),
+      onTap: () => Navigator.pop(context, person),
+    );
   }
 
   @override
@@ -2074,6 +2282,24 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
         child: EmptyIllustration(showCharacter: false, title: '账号状态已变化，请重新选择'),
       );
     }
+    final departments = _groupedPeople();
+    final department =
+        !_searching && departments.containsKey(selectedDepartment)
+        ? selectedDepartment
+        : null;
+    final teams = department == null ? null : departments[department]!;
+    final team =
+        !_searching &&
+            selectedTeam != null &&
+            teams != null &&
+            teams.containsKey(selectedTeam)
+        ? selectedTeam
+        : null;
+    final title = _searching
+        ? '搜索结果'
+        : team != null
+        ? '$department / $team'
+        : department ?? '选择部门';
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.sizeOf(context).height * .75,
@@ -2086,14 +2312,29 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
           ),
           child: Column(
             children: [
-              Text(
-                widget.dispatch ? '选择可派发的在职人员' : '选择授权成员',
-                style: Theme.of(context).textTheme.titleLarge,
+              Row(
+                children: [
+                  if (_canGoBack)
+                    IconButton(
+                      onPressed: _goBack,
+                      tooltip: '返回上一级',
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               TextField(
+                controller: searchController,
                 decoration: const InputDecoration(
-                  labelText: '搜索姓名或部门',
+                  labelText: '搜索姓名、部门或团队',
                   prefixIcon: Icon(Icons.search),
                 ),
                 onChanged: (v) {
@@ -2125,14 +2366,8 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
                         title: '暂无匹配成员',
                         subtitle: '可以更换姓名或部门',
                       ),
-                    for (final p in items)
-                      ListTile(
-                        title: Text(p.title),
-                        subtitle: Text(
-                          '${p.fields['departmentName'] ?? p.subtitle}',
-                        ),
-                        onTap: () => Navigator.pop(context, p),
-                      ),
+                    if (!loading && error == null && items.isNotEmpty)
+                      ..._pickerRows(departments, department, team),
                     if (!loading && !exhausted)
                       TextButton(
                         onPressed: more ? null : () => load(),

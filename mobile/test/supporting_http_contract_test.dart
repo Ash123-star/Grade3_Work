@@ -231,7 +231,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     c.read(routerProvider).go(route);
     // Dio's asynchronous adapter runs outside the fake timer zone.

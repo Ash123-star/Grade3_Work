@@ -1,3 +1,4 @@
+import 'holiday_data.dart';
 import 'calendar_interaction.dart';
 import 'calendar_schedule.dart';
 import 'calendar_month_timeline.dart';
@@ -322,9 +323,10 @@ class _StableMonthPagerState extends State<_StableMonthPager> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
     final height = widget.availableHeight > 0
         ? widget.availableHeight
-        : MediaQuery.sizeOf(context).width * 1.6;
+        : (width > 0 && width.isFinite ? width : 320.0) * 1.6;
     return SizedBox(
       height: height,
       child: CalendarInteractionSurface(
@@ -391,6 +393,7 @@ class _StableMonthPageState extends ConsumerState<_StableMonthPage> {
     final state = ref.watch(
       calendarMonthTasksProvider((ownerId, _monthIndex(month))),
     );
+    final holidays = ref.watch(holidayCalendarProvider(month.year));
     if (state is AsyncData<PageResult>) _lastComplete = state.value;
     Widget render(PageResult page, {bool readOnly = false}) {
       final events = _calendarEvents(page.items);
@@ -417,6 +420,7 @@ class _StableMonthPageState extends ConsumerState<_StableMonthPage> {
         constraints: constraints,
         child: _MonthGrid(
           date: month,
+          holidays: holidays.valueOrNull,
           events: events,
           onChanged: (day) =>
               widget.onDayChanged(day, events, interaction, constraints),
@@ -811,7 +815,9 @@ class _MonthGrid extends StatelessWidget {
     required this.onChanged,
     required this.availableHeight,
     this.constraints,
+    this.holidays,
   });
+  final HolidayCalendar? holidays;
   final DateTime date;
   final List<CalendarEvent> events;
   final ValueChanged<DateTime> onChanged;
@@ -867,10 +873,12 @@ class _MonthGrid extends StatelessWidget {
             0.0,
             (height - 16 - weekdayHeight) / weeks,
           );
-          final recordTop = math.max(
-            24.0,
-            MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
-          );
+          final recordTop =
+              math.max(
+                24.0,
+                MediaQuery.textScalerOf(context).scale(13) * 1.15 + 6,
+              ) +
+              MediaQuery.textScalerOf(context).scale(10) * 1.3;
           final barHeight =
               MediaQuery.textScalerOf(context).scale(_monthRecordFontSize) *
                   1.15 +
@@ -988,6 +996,7 @@ class _MonthGrid extends StatelessWidget {
                                   day,
                                   shanghaiWallTime(DateTime.now()),
                                 );
+                            final holiday = holidays?.days[holidayDateKey(day)];
                             final currentMonth = day.month == date.month;
                             return Positioned(
                               left: col * cellWidth,
@@ -1008,9 +1017,7 @@ class _MonthGrid extends StatelessWidget {
                                     key: ValueKey(
                                       'month-day:${day.year}-${day.month}-${day.day}',
                                     ),
-                                    onTap: currentMonth
-                                        ? () => onChanged(day)
-                                        : null,
+                                    onTap: () => onChanged(day),
                                     child: Container(
                                       margin: const EdgeInsets.symmetric(
                                         horizontal: 1,
@@ -1046,40 +1053,74 @@ class _MonthGrid extends StatelessWidget {
                                               : BorderSide.none,
                                         ),
                                       ),
-                                      child: currentMonth
-                                          ? Stack(
-                                              children: [
-                                                Positioned(
-                                                  left: 3,
-                                                  top: 3,
-                                                  child: Text(
-                                                    '${day.day}',
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      height: 1.15,
-                                                      fontWeight:
-                                                          selected || today
-                                                          ? FontWeight.w700
-                                                          : null,
-                                                    ),
-                                                  ),
+                                      child: Stack(
+                                        children: [
+                                          Positioned(
+                                            left: 3,
+                                            top: 3,
+                                            child: Text(
+                                              '${day.day}',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                height: 1.15,
+                                                fontWeight: selected || today
+                                                    ? FontWeight.w700
+                                                    : null,
+                                              ),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            left: 0,
+                                            right: 0,
+                                            top:
+                                                math.max(
+                                                  24.0,
+                                                  MediaQuery.textScalerOf(
+                                                            context,
+                                                          ).scale(13) *
+                                                          1.15 +
+                                                      6,
+                                                ) -
+                                                3,
+                                            child: Tooltip(
+                                              message:
+                                                  holiday?.label ??
+                                                  holidays?.warning ??
+                                                  '',
+                                              child: Text(
+                                                holiday?.label ??
+                                                    ((holidays
+                                                                ?.warning
+                                                                .isNotEmpty ??
+                                                            false)
+                                                        ? '假期待更新'
+                                                        : ''),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  height: 1.3,
                                                 ),
-                                                if (today && cellWidth >= 38 &&
-                                                    eventsOnDay(events, day).every(
-                                                      (event) => lanes.containsKey(event.record.id),
-                                                    ))
-                                                  const Positioned(
-                                                    top: 1,
-                                                    right: 1,
-                                                    child: DogAvatar(
-                                                      index:
-                                                          DogAssets.todayAvatar,
-                                                      size: 22,
-                                                    ),
-                                                  ),
-                                              ],
-                                            )
-                                          : null,
+                                              ),
+                                            ),
+                                          ),
+                                          if (today &&
+                                              cellWidth >= 38 &&
+                                              eventsOnDay(events, day).every(
+                                                (event) => lanes.containsKey(
+                                                  event.record.id,
+                                                ),
+                                              ))
+                                            const Positioned(
+                                              top: 1,
+                                              right: 1,
+                                              child: DogAvatar(
+                                                index: DogAssets.todayAvatar,
+                                                size: 22,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1171,7 +1212,10 @@ List<Widget> _monthWeekBars(
     final fontSize = _monthRecordFontSize;
     final barHeight =
         MediaQuery.textScalerOf(context).scale(fontSize) * 1.15 + 3;
-    final top = recordTop + lane * (barHeight + 1);
+    final top =
+        recordTop +
+        MediaQuery.textScalerOf(context).scale(10) * 1.3 +
+        lane * (barHeight + 1);
     final content = Material(
       key:
           previewDay != null &&

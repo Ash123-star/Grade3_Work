@@ -13,6 +13,15 @@ void main() {
       'department-design',
     );
     expect(taskTagLabel({'tagId': 'custom'}), '标签名称未提供');
+    expect(
+      taskTagLabel({
+        'labels': [
+          {'id': 'a', 'name': '客户'},
+          {'id': 'b', 'name': '紧急'},
+        ],
+      }),
+      '客户、紧急',
+    );
   });
 
   test(

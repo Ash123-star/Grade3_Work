@@ -50,7 +50,10 @@ void main() {
       state.ref.invalidate(calendarMonthTasksProvider);
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      final continuation = find.byType(CalendarTaskHandle).hitTestable().at(1);
+      final continuation = find
+          .byType(CalendarTaskHandle)
+          .hitTestable(at: const Alignment(0, .9))
+          .at(1);
       final point = Offset(
         t.getCenter(dayCell(11, 11)).dx,
         t.getCenter(continuation).dy,

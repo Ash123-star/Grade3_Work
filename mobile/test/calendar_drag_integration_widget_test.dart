@@ -55,9 +55,13 @@ Future<(CalendarInteractionSurfaceState, DemoStore)> mountCalendar(
   return (await readyInteraction(t), store);
 }
 
-Finder taskBar() => find.byType(CalendarTaskHandle).hitTestable().first;
-Finder dayCell(int month, int day) =>
-    find.byKey(ValueKey('month-day:2026-$month-$day')).hitTestable();
+Finder taskBar() => find
+    .byType(CalendarTaskHandle)
+    .hitTestable(at: const Alignment(0, .9))
+    .first;
+Finder dayCell(int month, int day) => find
+    .byKey(ValueKey('month-day:2026-$month-$day'))
+    .hitTestable(at: const Alignment(0, .9));
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -190,11 +194,14 @@ void main() {
       pager.jumpTo(pager.offset + state.drag.bounds!.height * 4);
       await settleLocalIo(t);
       await t.pump(const Duration(milliseconds: 100));
-      expect(find.byType(CalendarTaskHandle).hitTestable(), findsNothing);
+      expect(
+        find.byType(CalendarTaskHandle).hitTestable(at: const Alignment(0, .9)),
+        findsNothing,
+      );
       expect(state.drag.active, isTrue);
       final target = find
           .byKey(const ValueKey('month-day:2027-3-10'))
-          .hitTestable();
+          .hitTestable(at: const Alignment(0, .9));
       await gesture.moveTo(t.getCenter(target));
       await t.pump();
       expect(state.drag.target!.day, DateTime.utc(2027, 3, 10));

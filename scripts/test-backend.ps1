@@ -40,9 +40,13 @@ try {
             $env:REDIS_HOST = 'host.docker.internal'
             $env:NEO4J_URI = "bolt://host.docker.internal:$neoPort"
             $mavenCache = Join-Path $env:USERPROFILE '.m2'
+            # PowerShell 5 的 NativeCommandError 不代表进程失败；以 Maven 退出码为准。
+            $ErrorActionPreference = 'Continue'
             docker run --rm --memory 1g --cpus 2 --volume "${repoRoot}:/workspace" --volume "${mavenCache}:/root/.m2" --workdir /workspace --env DB_URL --env DB_USER --env DB_PASSWORD --env REDIS_HOST --env REDIS_PORT --env REDIS_PASSWORD --env NEO4J_URI --env NEO4J_PASSWORD --env MAVEN_OPTS maven:3.9.9-eclipse-temurin-21 mvn -B -f server/pom.xml clean verify
-        } else { & cmd.exe /d /c 'mvn.cmd -B -f server/pom.xml clean verify 2>&1' }
-        if ($LASTEXITCODE -ne 0) { throw '后端验证失败，见 server/target/surefire-reports' }
+            $mavenExit = $LASTEXITCODE
+            $ErrorActionPreference = 'Stop'
+        } else { & cmd.exe /d /c 'mvn.cmd -B -f server/pom.xml clean verify 2>&1'; $mavenExit = $LASTEXITCODE }
+        if ($mavenExit -ne 0) { throw '后端验证失败，见 server/target/surefire-reports' }
     } finally { Pop-Location }
 } finally {
     foreach ($name in $variables) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }

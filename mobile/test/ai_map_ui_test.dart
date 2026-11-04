@@ -81,7 +81,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await tester.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     c.read(routerProvider).go('/ai');
     await tester.pumpAndSettle();
@@ -100,7 +100,7 @@ void main() {
         tester.getBottomLeft(find.text('发送')).dy,
         lessThan(tester.getTopLeft(find.byType(NavigationBar)).dy),
       );
-      for (final name in ['导图', '视图', '日志', 'AI地图', '我的']) {
+      for (final name in ['首页', '公司', '日志', 'AI地图', '我的']) {
         expect(find.text(name), findsWidgets);
       }
       expect(tester.takeException(), isNull);

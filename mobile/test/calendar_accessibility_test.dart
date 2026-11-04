@@ -66,7 +66,7 @@ void main() {
                 .byWidgetPredicate(
                   (w) => w is CalendarTaskHandle && w.record.id == 'move-task',
                 )
-                .hitTestable()
+                .hitTestable(at: const Alignment(0, .9))
                 .first;
             final node = tester.getSemantics(handle);
             final actions = node.getSemanticsData().customSemanticsActionIds!;
@@ -81,12 +81,14 @@ void main() {
             await tester.pumpAndSettle();
             expect(state.message, isNull);
             expect(find.text('移动到日期（上海）'), findsOneWidget);
-            await tester.tap(find.text('取消').hitTestable().last);
+            await tester.tap(
+              find.text('取消').hitTestable(at: const Alignment(0, .9)).last,
+            );
             await tester.pumpAndSettle();
             expect(state.pending, isNull);
             final day = find
                 .byKey(const ValueKey('month-day:2026-11-2'))
-                .hitTestable();
+                .hitTestable(at: const Alignment(0, .9));
             final rect = tester.getRect(day);
             await tester.tapAt(Offset(rect.center.dx, rect.bottom - 5));
             await tester.pumpAndSettle();
@@ -97,7 +99,9 @@ void main() {
             await tester.tap(button);
             await tester.pumpAndSettle();
             expect(find.text('移动到日期（上海）'), findsOneWidget);
-            await tester.tap(find.text('取消').hitTestable().last);
+            await tester.tap(
+              find.text('取消').hitTestable(at: const Alignment(0, .9)).last,
+            );
             await tester.pumpAndSettle();
             expect(store.records['reviews'], isEmpty);
             expect(tester.takeException(), isNull);

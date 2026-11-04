@@ -56,6 +56,16 @@ class TaskDraftNormalizerTest {
         many.removeLast(); assertEquals(100,TaskDraftNormalizer.normalize(with("attachments",many)).attachments().size());
     }
 
+    @Test void labelsAreOptionalDeduplicatedAndRejectConflictingLegacyField() {
+        assertEquals(List.of(),TaskDraftNormalizer.normalize(base()).labelIds());
+        var multi=with("labelIds",List.of("l-b","l-a","l-b"));
+        assertEquals(List.of("l-a","l-b"),TaskDraftNormalizer.normalize(multi).labelIds());
+        multi.put("labelId","l-a");
+        assertEquals("LABEL_CONTRACT_CONFLICT",code(multi));
+        var compatible=with("labelIds",List.of("l-a")); compatible.put("labelId","l-a");
+        assertEquals(List.of("l-a"),TaskDraftNormalizer.normalize(compatible).labelIds());
+    }
+
     @Test void hashIgnoresOrderAndDuplicates() {
         var a=base(); a.put("participants",List.of("u-owner","u-a","u-b")); a.put("attachments",List.of("f1","f2"));
         var b=base(); b.put("participants",List.of("u-b","u-owner","u-a","u-a")); b.put("attachments",List.of("f2","f1")); b.put("urgency","NORMAL");
@@ -76,5 +86,18 @@ class TaskDraftNormalizerTest {
         assertEquals(Db.hash(DB.write(new TreeMap<>(c))),TaskDraftNormalizer.legacyHash(DB,raw));
         var reordered=base(); reordered.put("collaborators",List.of("u-a","u-b"));
         assertNotEquals(TaskDraftNormalizer.legacyHash(DB,raw),TaskDraftNormalizer.legacyHash(DB,reordered));
+    }
+
+    @Test void publishedSingleLabelReceiptsReplayWithoutAcceptingDifferentLabels() {
+        for(var labels:List.of(List.<String>of(),List.of("label-a"))) {
+            var draft=TaskDraftNormalizer.normalize(with("labelIds",labels));
+            var published=new TreeMap<String,Object>(draft.body());
+            published.remove("labelIds");
+            if(!labels.isEmpty()) published.put("labelId",labels.getFirst());
+            String stored=Db.hash(DB.write(published));
+            assertTrue(TaskDraftNormalizer.matchesHash(DB,draft,stored));
+            assertFalse(TaskDraftNormalizer.matchesHash(DB,TaskDraftNormalizer.normalize(with("labelIds",List.of("label-b"))),stored));
+            assertFalse(TaskDraftNormalizer.matchesHash(DB,TaskDraftNormalizer.normalize(with("labelIds",List.of("label-a","label-b"))),stored));
+        }
     }
 }

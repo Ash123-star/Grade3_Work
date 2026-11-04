@@ -168,7 +168,7 @@ void main() {
     expect(requests, hasLength(1));
   });
 
-  test('主线新任务契约将HCJ字段映射为participants和labelId并保留审核响应', () async {
+  test('主线新任务契约将HCJ字段映射为participants和labelIds并保留审核响应', () async {
     response = {
       'id': 'review-1',
       'status': 'PENDING',
@@ -189,7 +189,7 @@ void main() {
     );
     final body = requests.single.data as Map;
     expect(body['participants'], ['u', 'v']);
-    expect(body['labelId'], 'label-1');
+    expect(body['labelIds'], ['label-1']);
     expect(body['startAt'], '2026-10-23T09:00:00+08:00');
     expect(body.containsKey('participantIds'), false);
     expect(body.containsKey('ownerId'), false);

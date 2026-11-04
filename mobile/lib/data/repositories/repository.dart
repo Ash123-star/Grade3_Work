@@ -415,6 +415,23 @@ class HttpRepository implements Repository {
       fields['tagCategory'] = label['category'];
       fields['tagColor'] = label['color'];
     }
+    if (raw['labels'] is List) {
+      final labels = (raw['labels'] as List)
+          .whereType<Map>()
+          .map((label) => Map<String, dynamic>.from(label))
+          .toList();
+      fields['labels'] = labels;
+      fields['labelIds'] = [
+        for (final label in labels)
+          if ('${label['id'] ?? ''}'.trim().isNotEmpty) '${label['id']}',
+      ];
+      if (labels.isNotEmpty) {
+        final first = labels.first;
+        fields['tagId'] = first['id'];
+        fields['tagName'] = first['name'];
+        fields['tagColor'] = first['color'];
+      }
+    }
     if (raw['participant_ids'] is List) {
       fields['participantIds'] = raw['participant_ids'];
     }
@@ -581,6 +598,7 @@ class HttpRepository implements Repository {
           ? raw['reviewer_configured'] == true
           : fields['reviewerId'] != null;
       fields['approvalMode'] = raw['approval_mode'] ?? 'DIRECT_MANAGER';
+      fields['reviewerSelectable'] = raw['reviewer_selectable'] == true;
       fields['decisionSource'] = raw['decision_source'];
     }
     if (raw['read'] == null && raw.containsKey('read_at')) {
@@ -589,6 +607,7 @@ class HttpRepository implements Repository {
     if (raw.containsKey('is_read')) fields['read'] = raw['is_read'] == true;
     if (raw.containsKey('recipient_id')) {
       fields['type'] = notificationTitle(raw['type']);
+      fields['notificationType'] = raw['type'];
       final target = notificationResource(raw['type']);
       if (target != null && raw['object_id'] != null) {
         fields['targetResource'] = target;
@@ -661,6 +680,13 @@ class HttpRepository implements Repository {
           '/auth/departments',
         );
         return _page(response.data ?? <dynamic>[]);
+      }
+      if (resource == 'reviews/reviewer-candidates') {
+        // ownerId 承载审核申请 ID；仅创始人互审申请人可读取。
+        final response = await _getWithRetry<Map<String, dynamic>>(
+          '/reviews/${Uri.encodeComponent(query.ownerId ?? '')}/reviewer-candidates',
+        );
+        return _page(response.data);
       }
       final parameters = _query(query, resource: resource);
       if (resource == 'tasks' && query.from != null && query.to != null) {
@@ -988,7 +1014,16 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _taskDraft(Command command) {
     final v = _values(command);
-    final labelId = '${v['tagId'] ?? v['labelId'] ?? v['标签'] ?? ''}'.trim();
+    final suppliedLabelIds = v['labelIds'] ?? v['labels'];
+    final labelIds = <String>{
+      if (suppliedLabelIds is List)
+        for (final value in suppliedLabelIds)
+          if ('$value'.trim().isNotEmpty) '$value'.trim(),
+      if (suppliedLabelIds is! List &&
+          '${v['tagId'] ?? v['labelId'] ?? v['标签'] ?? ''}'.trim().isNotEmpty)
+        '${v['tagId'] ?? v['labelId'] ?? v['标签']}'.trim(),
+    }.toList()
+      ..sort();
     final participantValues =
         v['participantIds'] ?? v['participants'] ?? v['参与人'];
     final participants = participantValues is List
@@ -1013,7 +1048,7 @@ class HttpRepository implements Repository {
         '不紧急' || 'LOW' => 'LOW',
         _ => 'NORMAL',
       },
-      if (labelId.isNotEmpty) 'labelId': labelId,
+      'labelIds': labelIds,
       'attachments': v['attachments'] ?? const <String>[],
     }..removeWhere((key, value) => value == null);
   }
@@ -1087,6 +1122,15 @@ class HttpRepository implements Repository {
           'owner_id': user['id'],
           'fields': {'accessToken': data['token'], ...user, ...data},
         });
+      }
+      if (resource == 'tasks/pin') {
+        // 个人置顶：仅影响本人列表排序，不携带任务版本。
+        final path = '/tasks/${Uri.encodeComponent(_commandId(command))}/pin';
+        final response = command.action == 'unpin'
+            ? await dio.delete<Map<String, dynamic>>(path)
+            : await dio.put<Map<String, dynamic>>(path);
+        final data = response.data ?? <String, dynamic>{};
+        return _record({...data, 'id': data['taskId'] ?? _commandId(command)});
       }
       if (resource == 'tasks') {
         if (command.action == 'move-schedule') {
@@ -1301,6 +1345,15 @@ class HttpRepository implements Repository {
           return await _postRecord(
             '/reviews/${Uri.encodeComponent(_commandId(command))}/reroute',
             const <String, dynamic>{},
+          );
+        }
+        if (command.action == 'select-reviewer') {
+          return await _postRecord(
+            '/reviews/${Uri.encodeComponent(_commandId(command))}/reviewer',
+            {
+              'reviewerId': v['reviewerId'],
+              'expectedVersion': v['expectedVersion'] ?? command.version,
+            },
           );
         }
         if (!['approve', 'reject'].contains(command.action)) {

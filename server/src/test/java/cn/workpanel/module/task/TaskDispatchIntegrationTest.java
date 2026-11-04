@@ -150,7 +150,7 @@ class TaskDispatchIntegrationTest {
         var leaderPage=list(200,"search="+prefix+"&limit=10","leader");
         assertEquals(2,leaderPage.get("total").asInt());
         assertEquals(Set.of(alice,amy),Set.of(leaderPage.get("items").get(0).get("id").asText(),leaderPage.get("items").get(1).get("id").asText()));
-        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label","capabilities");
+        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","labels","label","capabilities","pinned","pinnedAt");
         for(JsonNode item:leaderPage.get("items")) {
             var names=new HashSet<String>(); item.fieldNames().forEachRemaining(names::add);
             assertEquals(allowed,names);
@@ -385,24 +385,29 @@ class TaskDispatchIntegrationTest {
         assertEquals(tasks,companyTasks());
     }
 
-    /** 标签由创始人维护；任务仅保存一个活动且可见标签，并返回服务端颜色。 */
-    @Test void labelsEnforceFounderScopeSingleLinkAndVersion() throws Exception {
+    /** 标签由创始人维护；任务可不选或保存去重的多个活动且可见标签，并返回服务端颜色。 */
+    @Test void labelsEnforceFounderScopeMultiLinkAndVersion() throws Exception {
         var label=call(200,"POST","/task-labels","founder",Map.of("name","紧急事项","category","业务","color","#2A7FFF"),null);
         String labelId=label.get("id").asText();
         assertEquals("#2A7FFF",label.get("color").asText());
         assertEquals("FORBIDDEN",call(403,"POST","/task-labels","leader",Map.of("name","越权","category","业务","color","#2A7FFF"),null).get("code").asText());
 
-        var taskBody=body("标签任务","alice"); taskBody.put("labelId",labelId);
+        var second=call(200,"POST","/task-labels","founder",Map.of("name","客户","category","业务","color","#22AA77"),null);
+        String secondId=second.get("id").asText();
+        var taskBody=body("标签任务","alice"); taskBody.put("labelIds",List.of(labelId,secondId,labelId));
         var task=dispatch("leader",taskBody,key());
-        assertEquals(labelId,task.get("label").get("id").asText());
-        assertEquals("#2A7FFF",task.get("label").get("color").asText());
-        assertEquals(1,count("SELECT count(*) FROM task_label_links WHERE task_id=?",task.get("id").asText()));
+        assertEquals(secondId,task.get("label").get("id").asText());
+        assertEquals("#22AA77",task.get("label").get("color").asText());
+        assertEquals(2,task.get("labels").size());
+        assertEquals(2,count("SELECT count(*) FROM task_label_links WHERE task_id=?",task.get("id").asText()));
+        var noLabel=dispatch("leader",body("无标签任务","alice"),key());
+        assertEquals(0,noLabel.get("labels").size());
 
         var stale=new LinkedHashMap<String,Object>(Map.of("name","紧急事项","category","业务","color","#2A7FFF","status","DISABLED","version",0));
         assertEquals("VERSION_CONFLICT",call(409,"PUT","/task-labels/"+labelId,"founder",stale,null).get("code").asText());
         stale.put("version",1);
         assertEquals("DISABLED",call(200,"PUT","/task-labels/"+labelId,"founder",stale,null).get("status").asText());
-        var disabled=body("停用标签","alice"); disabled.put("labelId",labelId);
+        var disabled=body("停用标签","alice"); disabled.put("labelIds",List.of(labelId));
         assertEquals("INVALID_LABEL",error(400,"leader",disabled,key()));
     }
 
@@ -621,7 +626,7 @@ class TaskDispatchIntegrationTest {
         assertEquals(expected,actual);
         Map<String,JsonNode> byId=new HashMap<>(); page.get("items").forEach(item->byId.put(item.get("id").asText(),item));
         var names=new HashSet<String>(); byId.get(first).fieldNames().forEachRemaining(names::add);
-        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","label"),names);
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","labels","label"),names);
         assertEquals(at("2026-10-12T01:00:00Z"),at(byId.get(first).get("dispatchAt").asText()));
         assertEquals("ACCEPTED",byId.get(first).get("phase").asText());
         assertEquals("WITHDRAWN",byId.get(withdrawn).get("phase").asText());

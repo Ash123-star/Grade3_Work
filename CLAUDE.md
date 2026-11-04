@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 常用命令（Windows / PowerShell）
 
 ```powershell
-# 规范校验（规划阶段和归档前必跑）
+# 规范校验（需要 OpenSpec 的规划阶段和归档前必跑；简单修改按 AGENTS.md 直接处理）
 openspec.cmd validate --all --strict
 
 # 后端编译

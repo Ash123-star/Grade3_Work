@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/tenure.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
@@ -336,6 +337,8 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
       ('邮箱', value.fields['email'] ?? value.fields['邮箱'], Icons.mail_outline_rounded),
       ('性别', value.fields['gender'] ?? value.fields['性别'], Icons.wc_outlined),
       ('年龄', value.fields['age'] ?? value.fields['年龄'], Icons.cake_outlined),
+      ('入职日期', employmentDateLabel(value.fields['employmentStartDate']), Icons.event_outlined),
+      ('工龄', tenureLabel(parseEmploymentDate(value.fields['employmentStartDate']), shanghaiWallTime(DateTime.now())), Icons.work_history_outlined),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -594,6 +597,16 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                               child: infoField(
                                 '年龄',
                                 value.fields['age'] ?? value.fields['年龄'],
+                              ),
+                            ),
+                            SizedBox(
+                              width: 150,
+                              child: infoField(
+                                '工龄',
+                                tenureLabel(
+                                  parseEmploymentDate(value.fields['employmentStartDate']),
+                                  shanghaiWallTime(DateTime.now()),
+                                ),
                               ),
                             ),
                           ],

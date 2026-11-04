@@ -26,6 +26,8 @@ Windows 使用 .cmd 避免 PowerShell 脚本执行策略影响。若找不到命
 
 ## 一次业务变更
 
+先按复杂度判断是否需要 OpenSpec。新能力或涉及架构、权限/数据范围、数据库、公共接口、跨模块契约、重要业务状态变化的复杂变更按以下流程处理。简单文案/样式、小范围且不改变契约的修复、文档/规则维护、无行为变化的配置整理及仓库清理直接修改，在现有 Issue/PR 记录范围与验证，不强制新建 change 或文档；影响已有规格时同步相关内容。
+
 1. 确定需求、范围、异常和权限，建立 Issue/看板任务，记录 Sprint 和负责人；检查现有规格和活动变更。
 2. 在工作分支创建变更；优先复用适合的现有 change，避免重复启动同一项工作。
 3. 完成 proposal.md、design.md、specs/<capability>/spec.md、tasks.md，再进行实现。
@@ -46,7 +48,7 @@ openspec.cmd validate --all --strict
 
 可直接向助手说“openspec propose 描述需求”“openspec apply 变更名”“openspec archive 变更名”。仓库已有相关技能；创建提案不等于实施完成，归档不应提前执行。
 
-纯配置/文档维护没有产品行为变更时，使用 .openspec.yaml 中的 skip_specs: true，避免虚构产品规格；仍保留 proposal、design、tasks 和验证记录。
+没有产品行为变化的简单配置/文档维护无需 OpenSpec，不必为使用 `skip_specs` 额外创建 proposal、design、tasks。相关记录优先追加到现有通用主题文档或 Issue/PR，避免重复材料；已有活动变更仍按实际范围维护。
 
 ## 当前 B 工作入口与限制
 

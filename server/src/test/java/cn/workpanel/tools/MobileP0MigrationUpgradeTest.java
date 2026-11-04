@@ -176,6 +176,51 @@ class MobileP0MigrationUpgradeTest {
         } finally { drop(schema); }
     }
 
+    @Test void v28MovesFounderPendingToPeerAndReplacesInvalidReviewersWithoutApplying() {
+        String schema = schema();
+        try {
+            flyway(schema, "27").migrate();
+            String s = schema + ".";
+            jdbc.update("INSERT INTO " + s + "users(id,company_id,account,password_hash,name,role,status,company_reviewer) VALUES "
+                    + "('f1','default','v24-f1','hash','创始人一','FOUNDER','ACTIVE',false),"
+                    + "('f2','default','v24-f2','hash','创始人二','FOUNDER','ACTIVE',false),"
+                    + "('admin','default','v24-admin','hash','管理员','ADMIN','ACTIVE',true),"
+                    + "('old-manager','default','v24-old','hash','停用上级','LEADER','DISABLED',false),"
+                    + "('manager','default','v24-manager','hash','上级','LEADER','ACTIVE',false),"
+                    + "('employee','default','v24-employee','hash','员工','EMPLOYEE','ACTIVE',false),"
+                    + "('kept','default','v24-kept','hash','有效员工','EMPLOYEE','ACTIVE',false)");
+            jdbc.update("INSERT INTO " + s + "reporting_relations(employee_id,manager_id,company_id) VALUES ('employee','old-manager','default'),('kept','manager','default')");
+            String request = "INSERT INTO " + s + "review_requests(id,company_id,applicant_id,kind,target_id,expected_version,before_value,candidate,reason,status,approval_mode,decision_source) VALUES (?,'default',?,?,?,1,'{}'::jsonb,'{\"name\":\"候选\"}'::jsonb,'迁移测试',?,?,?)";
+            jdbc.update(request, "founder-pending", "f1", "TASK", "task-1", "PENDING", "DIRECT_MANAGER", null);
+            jdbc.update(request, "founder-done", "f1", "TASK", "task-2", "APPROVED", "LEGACY", "FOUNDER_EXEMPT");
+            jdbc.update(request, "stale", "employee", "USER", "employee", "PENDING", "DIRECT_MANAGER", null);
+            jdbc.update(request, "valid", "kept", "USER", "kept", "PENDING", "DIRECT_MANAGER", null);
+            String step = "INSERT INTO " + s + "review_steps(request_id,reviewer_id,applicant_id,position,company_id,state) VALUES (?,?,?,1,'default','PENDING')";
+            jdbc.update(step, "stale", "old-manager", "employee");
+            jdbc.update(step, "valid", "manager", "kept");
+
+            flyway(schema, null).migrate();
+            flyway(schema, null).validate();
+
+            assertEquals("FOUNDER_PEER", jdbc.queryForObject("SELECT approval_mode FROM " + s + "review_requests WHERE id='founder-pending'", String.class));
+            assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM " + s + "review_requests WHERE id='founder-pending'", String.class));
+            assertEquals("f2", jdbc.queryForObject("SELECT reviewer_id FROM " + s + "review_steps WHERE request_id='founder-pending' AND state='PENDING'", String.class));
+            assertEquals("FOUNDER_EXEMPT", jdbc.queryForObject("SELECT decision_source FROM " + s + "review_requests WHERE id='founder-done'", String.class));
+            assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM " + s + "review_requests WHERE id='founder-done'", String.class));
+
+            assertEquals("SUPERSEDED", jdbc.queryForObject("SELECT state FROM " + s + "review_steps WHERE request_id='stale' AND reviewer_id='old-manager'", String.class));
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_steps WHERE request_id='stale' AND state='PENDING'", Integer.class));
+            assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM " + s + "review_requests WHERE id='stale'", String.class));
+            assertEquals(List.of("admin", "employee"), jdbc.queryForList("SELECT recipient_id FROM " + s + "outbox_events WHERE type='REVIEW_UNASSIGNED' AND object_id='stale' ORDER BY recipient_id", String.class));
+
+            assertEquals("manager", jdbc.queryForObject("SELECT reviewer_id FROM " + s + "review_steps WHERE request_id='valid' AND state='PENDING'", String.class));
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_steps WHERE request_id='valid'", Integer.class));
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + s + "outbox_events WHERE object_id='valid'", Integer.class));
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + s + "outbox_events WHERE type='REVIEW_PENDING' AND object_id='founder-pending' AND recipient_id='f2'", Integer.class));
+            assertEquals("员工", jdbc.queryForObject("SELECT name FROM " + s + "users WHERE id='employee'", String.class));
+        } finally { drop(schema); }
+    }
+
     @Test void aiReceiptMigrationKeepsJobsAndEnforcesOwnerAndReplayKey() {
         String schema=schema();
         try {

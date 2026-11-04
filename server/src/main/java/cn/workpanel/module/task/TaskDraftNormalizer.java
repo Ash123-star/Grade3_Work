@@ -9,7 +9,7 @@ import java.util.*;
 /** 派发请求的字段白名单、服务端字段拒绝、默认值与去重排序；纯函数，不访问数据库。 */
 public final class TaskDraftNormalizer {
     private TaskDraftNormalizer() {}
-    static final Set<String> ALLOWED=Set.of("title","participants","startAt","deadline","group","content","urgency","labelId","attachments","acceptanceChecklist","ownerId","collaborators","progressNote");
+    static final Set<String> ALLOWED=Set.of("title","participants","startAt","deadline","group","content","urgency","labelId","labelIds","attachments","acceptanceChecklist","ownerId","collaborators","progressNote");
     static final Set<String> SERVER_MANAGED=Set.of("id","issuerId","phase","status","state","version","completion","completed","progress","createdAt");
     static final Set<String> URGENCY=Set.of("URGENT","NORMAL","LOW");
     static final int MAX_REFERENCES=100;
@@ -31,13 +31,29 @@ public final class TaskDraftNormalizer {
         String content=text(raw,"content");
         String legacyProgress=text(raw,"progressNote");
         if(legacyProgress!=null) content=(content==null?"":content)+(content==null||content.isEmpty()?"":"\n\n")+legacyProgress;
-        String labelId=text(raw,"labelId");
-        return new TaskDraft(title,List.copyOf(participants),startAt,deadline,urgency,text(raw,"group"),content,labelId,
+        var labelIds=new TreeSet<>(ids(raw,"labelIds"));
+        String legacyLabelId=text(raw,"labelId");
+        if(legacyLabelId!=null) {
+            if(!labelIds.isEmpty() && !(labelIds.size()==1 && labelIds.contains(legacyLabelId)))
+                throw ApiError.bad("LABEL_CONTRACT_CONFLICT","labelId 与 labelIds 不能同时表示不同标签");
+            labelIds.add(legacyLabelId);
+        }
+        return new TaskDraft(title,List.copyOf(participants),startAt,deadline,urgency,text(raw,"group"),content,List.copyOf(labelIds),
                 List.copyOf(new TreeSet<>(ids(raw,"attachments"))),AcceptanceChecklist.normalize(raw.get("acceptanceChecklist")));
     }
 
     /** v2 摘要：基于规范化内容，顺序与重复不影响结果。 */
     public static String hash(Db db,TaskDraft draft) { return Db.hash(db.write(draft.body())); }
+
+    /** Accept the published single-label v2 representation only when it expresses the same draft. */
+    public static boolean matchesHash(Db db,TaskDraft draft,String stored) {
+        if(hash(db,draft).equals(stored)) return true;
+        if(draft.labelIds().size()>1) return false;
+        var previous=new TreeMap<String,Object>(draft.body());
+        previous.remove("labelIds");
+        if(!draft.labelIds().isEmpty()) previous.put("labelId",draft.labelIds().getFirst());
+        return Db.hash(db.write(previous)).equals(stored);
+    }
 
     /** v1 摘要：V4 之前的算法，原始请求补默认紧急度后按键排序。 */
     public static String legacyHash(Db db,Map<String,Object> raw) {

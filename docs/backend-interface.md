@@ -73,7 +73,9 @@
 
 ## 审核 `/reviews`
 
-`GET /reviews`、`GET /reviews/{id}` 返回申请人或当前仍有权的分配审核人可见内容，包含尚有当前权限的已决历史，SUPERSEDED步骤不提供读取权限。`POST /reviews/{id}/decision` 请求 `{approve,reason,expectedVersion}`，驳回须理由，禁止自审并复核目标版本及当前直属关系。除 `MEMBERSHIP` 管理员确认外，使用 `DIRECT_MANAGER` 单级审核；有效创始人权限内新操作自动批准并记录 `FOUNDER_EXEMPT`，管理员不免审。无审核人保持待审。`POST /reviews/{id}/reroute` 仅申请人继续PENDING申请，保留已决历史、替代待审步骤；有效创始人明确继续本人非MEMBERSHIP申请时，才按当前业务权限和目标版本免审应用，重复已免审请求返回原结果。迁移不会自动应用任何历史候选。
+`PUT /tasks/{id}/pin`、`DELETE /tasks/{id}/pin` 为个人置顶：调用者须能读取该任务（范围外404），只影响本人 `GET /tasks` 排序（置顶优先、最近置顶在前，其后按截止时间），列表项增加 `pinned`/`pinnedAt`；不改变任务 version、不走审核、不写通知。每人最多10项（仅计仍可见任务），超出409 `PIN_LIMIT`；重复置顶返回原 `pinnedAt`，取消未置顶任务也返回成功。日历、导图公司任务卡和已接收任务卡不受置顶影响。
+
+`GET /reviews`、`GET /reviews/{id}` 返回申请人或当前仍有权的分配审核人可见内容，包含尚有当前权限的已决历史，SUPERSEDED步骤不提供读取权限。`POST /reviews/{id}/decision` 请求 `{approve,reason,expectedVersion}`，驳回须理由，禁止自审并复核目标版本及当前直属关系。除 `MEMBERSHIP` 管理员确认外，使用 `DIRECT_MANAGER` 单级审核；创始人发起时，若同公司另有在职创始人则使用 `FOUNDER_PEER`：默认分配直属上级（若为在职创始人）或 id 最小的其他在职创始人，决定时复核审核人仍为在职创始人，成功记录 `decision_source=FOUNDER_PEER`；公司仅一位在职创始人时，其权限内新操作自动批准并记录 `FOUNDER_EXEMPT`。管理员不免审，也不因任何兜底获得审批权。无审核人保持待审，并向申请人和在职管理员发送去重的 `REVIEW_UNASSIGNED`。决定与改派均锁定申请行并以 `PENDING` 条件更新，重复或并发决定只生效一次，其余返回409。详情增加 `reviewer_selectable`（仅本人 PENDING 的 FOUNDER_PEER 为 true）。`GET /reviews/{id}/reviewer-candidates` 仅申请人可读，返回 `{items:[{id,name,current}]}`；`POST /reviews/{id}/reviewer` 请求 `{reviewerId,expectedVersion}`，非在职其他创始人400 `INVALID_REVIEWER`，非申请人403，已决/版本不符409，非 FOUNDER_PEER 409 `REVIEWER_SELECTION_UNSUPPORTED`，重复选择当前审核人返回原详情；原步骤SUPERSEDED并记录 `REVIEW_REVIEWER_CHANGED`。组织 `USER`（停用、改角色、改直属上级）或 `REVIEWER` 变更生效时，同一事务内复核本公司其他待审申请：审核人失效则作废并按当前规则重新分配，记录 `REVIEW_AUTO_REROUTED`；正被其他事务锁定的申请跳过，由该事务按最新关系校验。仅剩一位创始人时不自动免审，需申请人显式 reroute。`POST /reviews/{id}/reroute` 仅申请人继续PENDING申请，保留已决历史、替代待审步骤；有效创始人明确继续本人非MEMBERSHIP申请时，才按当前业务权限和目标版本免审应用，重复已免审请求返回原结果。迁移不会自动应用任何历史候选。
 
 ## 仪表盘、通知、分析和附件
 
@@ -137,7 +139,7 @@ Content-Type: application/json
 - 当前后端任务契约仍接受 `ownerId`、`deadline`、`group`、`content`、`urgency`、`progressNote`、`collaborators`、`attachments`；详情以 `fields` 保存扩展内容。它没有 `startAt`、`participantIds`、`tagId`、标签分类/颜色权限和任务说明追加版本契约。因此移动端不能将这些 HCJ 字段伪装成已接入，也不能把静态标签映射视为服务端标签。真实任务新字段联调待后端提供契约后完成。
 - 日志评论回复使用 `parentId`，客户端接受 HCJ 的 `parentCommentId` 并转换；读取保留 `id`、`authorName`、`parentCommentId`、`time` 和原始响应字段。日志评论发布没有幂等键，网络超时后客户端不得自动重放 POST；跨日志回复由服务端拒绝。任务评论接口仍未提供。
 - `docs/openapi.json` 保持与当前 Spring 后端一致，不能用 HCJ 预期覆盖现有运行时契约。API 改变后应从后端 OpenAPI 重新生成并核对。
-- 当前验证结果见 `docs/zhw-week6-validation.md`。新增 `withdraw` 操作使用 version/reason 调用独立撤回接口；未知直接编辑语义不转换成审核成功。任务新字段和任务评论调用在 HTTP 写入前明确失败。
+- 当前验证结果见 [历史文件](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/docs/zhw-week6-validation.md)。新增 `withdraw` 操作使用 version/reason 调用独立撤回接口；未知直接编辑语义不转换成审核成功。任务新字段和任务评论调用在 HTTP 写入前明确失败。
 - `GET /api/admin/workspace/organization/task-audit`（公共同权限入口`/api/organization/task-audit`）：仅ADMIN，taskId可选（最多100字）、cursor>=0、limit为1至100。返回items/total/nextCursor；条目包含审计原字段及actor_name/task_id。过滤任务直接事件、任务审核申请/决定及最终生效；数据库按公司过滤后计数分页。无权/未知taskId均空，非法分页400、非ADMIN403。无版本及幂等键，只读；Web任务审计入口支持翻页与前后值展示。
 - 新增V15 `log_comment_replies`，旧评论parent_id为null，通过复合外键禁止跨日志回复。不修改旧迁移，不回删历史评论。
 - 用户确认：标签模型与权限实际接入、C的新任务增删改审核联调等待C提供分支或契约。现有任务审计展示不代表新任务增删改闭环已经完成。
@@ -160,3 +162,18 @@ GET /organization/people沿用原组织数据范围，追加可空team_name，�
 - 相同键相同内容返回同一审核结果；不同内容409 `IDEMPOTENCY_CONFLICT`，同任务同版本不同键待审409 `RESCHEDULE_PENDING`。旧版仅 `deadline/version/reason` 请求保持兼容。关闭移动开关后仍可重放已有命令。
 - `scheduleConstraints` 定义上海业务年Y的日期窗口 `[Y-2年01-01,Y+8年01-01]`；头过期409 `SCHEDULE_CONSTRAINTS_CHANGED`。快捷创建沿用 `/tasks`，带约束头时校验窗口，不带头的既有创建不新增限制。
 - V27只新增改期命令表和索引；已发布迁移不变。部署全部MOVE审核消费者后设置 `CALENDAR_MOVE_ENABLED=true`；存在待审MOVE时禁止回滚至不理解MOVE的旧服务端。
+
+### 统一集成兼容约定（2026-11-04）
+
+正式迁移顺序为 V27 日历、V28 创始人互审、V29 个人置顶、V30 多标签；旧 PR 的 V24/V25 为未发布编号。任务创建可以省略 labelIds 或传空集合；旧 labelId 与相同单元素集合兼容，双字段冲突返回 400 LABEL_CONTRACT_CONFLICT。列表和详情增加 labels、保留旧 label。升级前零/单标签请求的原幂等键仍可重放；增加或更换标签不得复用原键。
+
+管理后台 POST /admin/workspace/management/reviews/{id}/decision 采用 {approve,reason,expectedVersion}，与公共审核使用同一版本和独立审核校验；缺失版本400、版本冲突409、自审或非分配审核人403。
+
+### 中国大陆节假日月历（成员 D）
+`GET /api/calendar/holidays?year=2026`：已登录、已确认且无需强制改密的账号可读；沿用公共认证规则。year为2007至2100，越界400 `INVALID_YEAR`；缺失/格式错误400；未登录401、无业务访问权限403。只读幂等，无写入版本及分页。返回 `{year,days:[{date,name,isOffDay}],papers,status,fetchedAt}`；date为中国大陆业务日期，isOffDay=false表示公告指定的调休上班日。status为FRESH、STALE或UNAVAILABLE；fetchedAt为最后成功获取的UTC时间，无成功记录为空字符串。
+固定来源为 NateScarlet/holiday-cn 的 GitHub contents API（raw JSON Accept），保留国务院公告链接。缓存24小时；失败5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。客户端查询相邻公告年份处理跨年网格；数据故障不阻塞任务。服务端响应上限256 KiB、完整请求6秒超时；无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。
+
+
+
+
+

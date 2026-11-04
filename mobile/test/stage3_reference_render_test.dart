@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/app.dart';
@@ -28,11 +27,7 @@ void main() {
     final icons = FontLoader('MaterialIcons')
       ..addFont(
         Future.value(
-          ByteData.sublistView(
-            File(
-              materialIconsFontPath,
-            ).readAsBytesSync(),
-          ),
+          ByteData.sublistView(File(materialIconsFontPath).readAsBytesSync()),
         ),
       );
     await icons.load();
@@ -166,10 +161,7 @@ void main() {
     await tester.pumpWidget(
       RepaintBoundary(
         key: boundary,
-        child: UncontrolledProviderScope(
-          container: c,
-          child: const PandoraApp(),
-        ),
+        child: OwnedTestProviderScope(container: c, child: const PandoraApp()),
       ),
     );
     final screens = [

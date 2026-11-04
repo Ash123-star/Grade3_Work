@@ -33,8 +33,9 @@ public class TaskDispatchService {
         var old=db.rows("SELECT * FROM idempotency_keys WHERE actor_id=? AND key=?",a.id(),key);
         if(!old.isEmpty()) {
             var record=old.getFirst(); int version=((Number)record.get("hash_version")).intValue();
-            String expected=version==1?TaskDraftNormalizer.legacyHash(db,raw):TaskDraftNormalizer.hash(db,d);
-            if(!expected.equals(Db.str(record,"request_hash"))) throw new ApiError(409,"IDEMPOTENCY_CONFLICT","同一幂等键内容不同");
+            String stored=Db.str(record,"request_hash");
+            boolean matches=version==1?TaskDraftNormalizer.legacyHash(db,raw).equals(stored):version==2&&TaskDraftNormalizer.matchesHash(db,d,stored);
+            if(!matches) throw new ApiError(409,"IDEMPOTENCY_CONFLICT","同一幂等键内容不同");
             String reviewId=Db.str(record,"review_id");
             if(!reviewId.isBlank()&&reviews!=null) return reviews.get(a,reviewId);
             return detail(TaskAccess.issued(db,a,Db.str(record,"task_id")));
@@ -59,6 +60,8 @@ public class TaskDispatchService {
 
     public Map<String,Object> read(Actor a,String id) {
         var task=TaskAccess.readable(db,a,id,false);var result=detail(task);
+        var pin=db.rows("SELECT pinned_at FROM task_pins WHERE user_id=? AND task_id=?",a.id(),id);
+        result.put("pinned",!pin.isEmpty()); result.put("pinnedAt",pin.isEmpty()?null:pin.getFirst().get("pinned_at"));
         result.put("capabilities",Map.of("reschedule",constraints.mayMove(a,task)));result.put("scheduleConstraints",constraints.view());return result;
     }
 
