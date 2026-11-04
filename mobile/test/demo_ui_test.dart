@@ -123,9 +123,9 @@ void main() {
             )
             .map((w) => w.label)
             .toList(),
-        ['导图', '视图', '日志', 'AI地图', '我的'],
+        ['首页', '公司', '日志', 'AI地图', '我的'],
       );
-      await tester.tap(find.text('视图').last);
+      await tester.tap(find.text('公司').last);
       await tester.pumpAndSettle();
       for (final period in ['周', '月']) {
         await tester.tap(find.text(period));

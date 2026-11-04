@@ -1304,6 +1304,13 @@ class MockRepository implements Repository {
         ),
       );
     }
+    if (resource == 'tasks/received-card' || resource == 'dashboard/company') {
+      final offset = int.tryParse(query.cursor ?? '0') ?? 0;
+      final items = result.skip(offset).take(query.limit).toList();
+      final next = offset + items.length;
+      return PageResult(items, total: result.length,
+          nextCursor: next < result.length ? '$next' : null);
+    }
     return PageResult(result, total: result.length);
   }
 

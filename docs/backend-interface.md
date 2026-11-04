@@ -4,7 +4,7 @@
 
 实现事实以 SpringDoc 运行时文档 `GET /api/openapi` 为准；提交到仓库的 `docs/openapi.json` 是同一份契约快照，本文件只解释调用规则。三者必须同步更新，客户端不得根据旧版本猜测字段。
 
-2026-10-29 本批状态：六组 P0 及 #17 的代码/运行时 schema 正在接入，尚未测试、编译、启动服务或执行迁移。`docs/openapi.json` 仍为旧运行时快照，须在最终统一验收时重新生成；以下新增契约不是运行成功证明。
+2026-11-04：`docs/openapi.json` 已从 Issue #63 隔离运行服务重新导出，包含每日事项契约。每日事项与任务看板的定向测试通过，整库回归仍有失败；详细范围与限制见 [验收记录](../openspec/changes/home-company-daily-todos/verification.md)。历史 P0 的状态另见各自记录，不因快照刷新而认定全部验收通过。
 
 根路径为 `/api`。除公开登录、注册和健康检查外均需 `Authorization: Bearer <session-token>`。每个响应带 `X-Trace-Id`；错误体为 `{code,message,traceId}`。列表使用 `{items,total,nextCursor}`，`cursor` 为偏移量，`limit` 范围 1–100。时间使用 UTC ISO-8601，业务日期按 `Asia/Shanghai` 且周一为周首。
 
@@ -13,6 +13,8 @@
 移动端与服务端的逐项缺口、当前实现状态和后端接手验收要求见 [`mobile/docs/backend-contract-gaps-mobile-page-experience-refresh.md`](../mobile/docs/backend-contract-gaps-mobile-page-experience-refresh.md)。其中“缺失/不匹配”只表示协议或运行端点尚未兑现，不表示移动端 Mock 已替代服务端业务。
 
 写请求只接受文档列出的字段。更新请求携带 `version`；创建请求可携带 `Idempotency-Key`。版本冲突返回 `409`，越权对象通常返回 `404`，明确的人员筛选越权返回 `403`。
+
+每日事项与首页任务看板新增契约见 [personal-todos-interface.md](personal-todos-interface.md)（Issue #63）。事项仅本人可见，所有写请求必须有幂等键；该约束比下文通用创建规则更严格。
 
 ## 认证 `/auth`
 

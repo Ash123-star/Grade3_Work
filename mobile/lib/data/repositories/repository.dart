@@ -264,7 +264,7 @@ class HttpRepository implements Repository {
     if (query.ownerId != null)
       (resource == 'tasks' ? 'participantId' : 'ownerId'): query.ownerId,
     if (query.departmentId != null) 'departmentId': query.departmentId,
-    'limit': 30,
+    'limit': query.limit,
     if (query.search.isNotEmpty) 'search': query.search,
     if (query.from != null) 'date': _date(query),
     if (query.from != null) 'period': _period(query),
@@ -403,6 +403,7 @@ class HttpRepository implements Repository {
     }
     if (raw.containsKey('tag_color')) fields['tagColor'] = raw['tag_color'];
     if (raw.containsKey('tagColor')) fields['tagColor'] = raw['tagColor'];
+    if (raw['labels'] is List) fields['labels'] = raw['labels'];
     if (raw['label'] is Map) {
       final label = Map<String, dynamic>.from(raw['label'] as Map);
       fields['tagId'] = label['id'];

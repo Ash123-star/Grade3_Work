@@ -170,6 +170,7 @@ class MemberLogMonth {
 
 class Query {
   const Query({
+    this.limit = 30,
     this.search = '',
     this.departmentId,
     this.cursor,
@@ -178,11 +179,12 @@ class Query {
     this.to,
   });
   final String search;
+  final int limit;
   final String? cursor, ownerId, departmentId;
   final DateTime? from, to;
   Map<String, dynamic> toJson() => {
     'search': search,
-    'limit': 30,
+    'limit': limit,
     if (cursor != null) 'cursor': cursor,
     if (ownerId != null) 'ownerId': ownerId,
     if (departmentId != null) 'departmentId': departmentId,

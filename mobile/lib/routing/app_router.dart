@@ -132,12 +132,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                         NavigationDestination(
                           icon: TuantuanIcon('mindmap', size: 26),
                           selectedIcon: TuantuanIcon('mindmap', size: 26),
-                          label: '导图',
+                          label: '首页',
                         ),
                         NavigationDestination(
                           icon: TuantuanIcon('calendar', size: 26),
                           selectedIcon: TuantuanIcon('calendar', size: 26),
-                          label: '视图',
+                          label: '公司',
                         ),
                         NavigationDestination(
                           icon: TuantuanIcon('log', size: 26),

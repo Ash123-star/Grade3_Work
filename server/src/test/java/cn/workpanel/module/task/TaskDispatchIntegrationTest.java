@@ -623,6 +623,21 @@ class TaskDispatchIntegrationTest {
         assertEquals("INVALID_PAGE",call(400,"GET","/tasks/received-card?limit=101","leader",null,null).get("code").asText());
     }
 
+    @Test void homeBoardAllParticipantsSeeMoreThanTenTasks() throws Exception {
+        String prefix="home-board-"+UUID.randomUUID();
+        for(int i=0;i<12;i++) {
+            String task=scheduledTask(prefix+"-"+i,null,"2026-11-20T00:00:00Z","DISPATCHED");
+            jdbc.update("INSERT INTO task_participants(task_id,user_id,company_id) VALUES (?,?,?)",task,id.get("leader"),company);
+        }
+        for(String who:List.of("leader","alice")) {
+            var first=call(200,"GET","/tasks/received-card?search="+prefix+"&limit=10",who,null,null);
+            assertEquals(12,first.get("total").asInt());assertEquals(10,first.get("items").size());
+            var second=call(200,"GET","/tasks/received-card?search="+prefix+"&limit=10&cursor=10",who,null,null);
+            assertEquals(2,second.get("items").size());
+        }
+        assertEquals(0,call(200,"GET","/tasks/received-card?search="+prefix,"outsider",null,null).get("total").asInt());
+    }
+
     private void approveTaskRevision(String reviewId) throws Exception {
         while(true) {
             var pending=db.rows("SELECT reviewer_id FROM review_steps WHERE request_id=? AND state='PENDING' ORDER BY position LIMIT 1",reviewId);
