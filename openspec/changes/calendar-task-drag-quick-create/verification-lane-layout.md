@@ -1,5 +1,7 @@
 # C-09 拖动避让与周高度验收
 
+当前发布状态见 [PR #67 发布记录](deployment-calendar-fixes-20261104.md)：已合并部署 0.1.5；本报告为 0.1.4 历史验收。
+
 后续用户反馈发现正式任务三行限制仍在：本报告及 0.1.4 仅验证三条已有任务的拖动候选，不能证明任意正式行可见。正式第四行及以后补正以 [完整行验收](verification-all-rows.md) 为准。
 
 2026-11-04，Issue #58，接续 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，分支 `fix/58-calendar-drop-consistency`。用户明确确认“向下撑高这一周”。修复尚未合并或部署。

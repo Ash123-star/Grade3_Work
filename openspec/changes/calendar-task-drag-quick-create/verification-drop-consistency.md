@@ -1,5 +1,7 @@
 # C-08 长任务落点与月历读取修复验收
 
+当前发布状态见 [PR #67 发布记录](deployment-calendar-fixes-20261104.md)：已合并部署 0.1.5；下文为开发期历史验收。
+
 日期：2026-11-04。基线 `origin/main`（PR #65 功能及 #66 部署记录之后），分支 `fix/58-calendar-drop-consistency`，关联 [Issue #58 补充需求](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6626728435)。本修复为客户端变更，尚未合并或部署；原全仓／性能／实机限制继续有效。
 
 交付：[PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，实现提交 `48556d4d50cacbc1be6482f7097447f9551d4fb3`。Git HTTPS 两次连接超时后通过 GitHub Git Data API 上传，29 个文件 blob、完整 tree 和 commit SHA 均与本地精确一致，回执 `output/calendar-api-push-receipt.json`。后续仅补充交付记录。
