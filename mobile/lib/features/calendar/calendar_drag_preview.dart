@@ -2,35 +2,20 @@ import 'package:flutter/material.dart';
 import 'calendar_drag_controller.dart';
 import 'calendar_schedule.dart';
 
-/// A visual snapshot of the picked-up segment. The domain intent stays in the
-/// controller; neither this replica nor its position can modify task data.
-class CalendarDragAppearance {
-  const CalendarDragAppearance({
-    required this.rect,
-    required this.grabOffset,
-    required this.child,
-  });
-  final Rect rect;
-  final Offset grabOffset;
-  final Widget child;
-}
-
+/// Date feedback only. Candidate bars are laid out in the month's free lanes.
 class CalendarDragPreview extends StatelessWidget {
   const CalendarDragPreview({
     super.key,
     required this.drag,
-    required this.appearance,
     required this.overlayOrigin,
   });
   final CalendarDragController drag;
-  final CalendarDragAppearance appearance;
   final Offset overlayOrigin;
 
   @override
   Widget build(BuildContext context) {
     final area = drag.bounds!;
     final colors = Theme.of(context).colorScheme;
-    final position = drag.pointer - appearance.grabOffset - overlayOrigin;
     final width = (area.width - 16).clamp(0.0, 320.0);
     final hintLeft = (drag.pointer.dx - width / 2).clamp(
       area.left + 8,
@@ -45,21 +30,6 @@ class CalendarDragPreview extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Positioned(
-                left: position.dx,
-                top: position.dy - 8,
-                width: appearance.rect.width,
-                height: appearance.rect.height,
-                child: RepaintBoundary(
-                  child: Material(
-                    key: const ValueKey('calendar-drag-bar'),
-                    elevation: 8,
-                    shadowColor: colors.shadow.withValues(alpha: .3),
-                    borderRadius: BorderRadius.circular(4),
-                    child: appearance.child,
-                  ),
-                ),
-              ),
               Positioned(
                 left: hintLeft - overlayOrigin.dx,
                 top:

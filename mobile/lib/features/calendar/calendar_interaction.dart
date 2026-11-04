@@ -53,7 +53,6 @@ class CalendarInteractionSurfaceState
   late final CalendarDragController drag;
   late int epoch;
   OverlayEntry? overlay;
-  CalendarDragAppearance? appearance;
   int? _primaryPointer;
   CalendarMoveCommand? pending;
   bool foreground = true,
@@ -193,27 +192,17 @@ class CalendarInteractionSurfaceState
   }
 
   Widget _overlay(BuildContext overlayContext) {
-    final visual = appearance;
     final box = Overlay.of(overlayContext).context.findRenderObject();
-    if (visual == null ||
-        drag.bounds == null ||
-        drag.intent == null ||
-        box is! RenderBox) {
+    if (drag.bounds == null || drag.intent == null || box is! RenderBox) {
       return const SizedBox.shrink();
     }
     return CalendarDragPreview(
       drag: drag,
-      appearance: visual,
       overlayOrigin: box.localToGlobal(Offset.zero),
     );
   }
 
-  void begin(
-    Record record,
-    Offset point,
-    CalendarConstraints constraints, {
-    CalendarDragAppearance? visual,
-  }) {
+  void begin(Record record, Offset point, CalendarConstraints constraints) {
     if (!writable) return;
     if (_readingPaused()) return;
     if (restoring ||
@@ -225,7 +214,6 @@ class CalendarInteractionSurfaceState
       if (pending != null) notice(context, '请先确认上一条改期申请的结果');
       return;
     }
-    appearance = visual;
     if (drag.begin(record, point, constraints)) {
       unawaited(HapticFeedback.selectionClick());
     } else {
@@ -751,19 +739,7 @@ class CalendarTaskHandle extends StatelessWidget {
           // A task bar is never blank space, even without move permission.
           // Consume its long press so the day cannot open quick-create.
           if (!enabled) return;
-          final box = context.findRenderObject();
-          if (box is! RenderBox || !box.hasSize) return;
-          final rect = box.localToGlobal(Offset.zero) & box.size;
-          state.begin(
-            record,
-            details.globalPosition,
-            bounds,
-            visual: CalendarDragAppearance(
-              rect: rect,
-              grabOffset: details.globalPosition - rect.topLeft,
-              child: child,
-            ),
-          );
+          state.begin(record, details.globalPosition, bounds);
         },
         child: ValueListenableBuilder<String?>(
           valueListenable:

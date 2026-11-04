@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$FlutterSdk='D:/flutter',[string]$Device='emulator-5554',[int]$Port=18088,[switch]$SkipBuild,[switch]$KeepEnvironment,[string]$ApiContainer,[string]$DataContainer,[ValidateRange(1,60)][int]$TaskDays=3)
+param([string]$FlutterSdk='D:/flutter',[string]$Device='emulator-5554',[int]$Port=18088,[switch]$SkipBuild,[switch]$KeepEnvironment,[string]$ApiContainer,[string]$DataContainer,[ValidateRange(1,60)][int]$TaskDays=3,[switch]$CrowdedTarget)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $suffix=[Guid]::NewGuid().ToString('N').Substring(0,10)
@@ -72,6 +72,15 @@ INSERT INTO tasks(id,company_id,owner_id,issuer_id,title,start_at,deadline,body,
 ('$task','$company','$participant','$issuer','Android calendar task','$startAt','$deadline','{"title":"Android calendar task","participants":["$participant","$reviewer","$issuer"],"startAt":"$startAt","deadline":"$deadline","urgency":"NORMAL","attachments":[]}','DISPATCHED',1);
 INSERT INTO task_participants(company_id,task_id,user_id) VALUES ('$company','$task','$participant'),('$company','$task','$reviewer'),('$company','$task','$issuer');
 "@
+    if($CrowdedTarget){
+        $busyStart=$last.AddDays(1).ToString('yyyy-MM-dd')+'T09:00:00+08:00'
+        $busyEnd=$last.AddDays(10).ToString('yyyy-MM-dd')+'T18:00:00+08:00'
+        for($i=0;$i -lt 3;$i++){
+            $busyId="$company-busy-$i"
+            $sql+="`nINSERT INTO tasks(id,company_id,owner_id,issuer_id,title,start_at,deadline,body,phase,version) VALUES ('$busyId','$company','$participant','$issuer','Occupied row $i','$busyStart','$busyEnd','{`"title`":`"Occupied row $i`",`"participants`":[`"$participant`",`"$reviewer`",`"$issuer`"],`"startAt`":`"$busyStart`",`"deadline`":`"$busyEnd`",`"urgency`":`"NORMAL`",`"attachments`":[]}','DISPATCHED',1);"
+            $sql+="`nINSERT INTO task_participants(company_id,task_id,user_id) VALUES ('$company','$busyId','$participant'),('$company','$busyId','$reviewer'),('$company','$busyId','$issuer');"
+        }
+    }
     [IO.File]::WriteAllText("$dir/fixture.sql",$sql,(New-Object Text.UTF8Encoding($false)))
     docker cp "$dir/fixture.sql" "${container}:/tmp/calendar-fixture.sql" | Out-Null
     docker exec $container psql -U workpanel -d workpanel -v ON_ERROR_STOP=1 -f /tmp/calendar-fixture.sql *> "$dir/fixture.log"

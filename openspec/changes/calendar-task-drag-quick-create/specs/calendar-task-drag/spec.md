@@ -1,5 +1,17 @@
 ## ADDED Requirements
 
+### Requirement: Drag candidates occupy a separate row and expand crowded weeks
+
+故事 C-09；P0。候选任务 SHALL 与目标日期范围内已有条带分行，保持正式任务位置；不足一行空间时 SHALL 向下增高该周并推移后续周，不能裁切候选或月底。
+
+#### Scenario: A candidate intersects occupied rows
+- **WHEN** 拖入任务的任意日期与已有条带同一行重叠
+- **THEN** 候选 SHALL 进入下一条可用行，跨周／跨月片段保持完整日期与时长，源任务不与自身竞争
+
+#### Scenario: Expansion while hovering and cancellation
+- **WHEN** 手指停留时周高度发生变化，随后松手或取消
+- **THEN** 布局变化 MUST NOT 自行改变业务日期，确认 SHALL 与最后展示日期一致；取消 SHALL 恢复原排布且不提交改期
+
 ### Requirement: Released placement matches the displayed candidate and reads remain bounded
 
 故事 C-08；优先级 P0；范围为长条移动的一致性及月历读取。客户端 SHALL 用同一不可变落点候选呈现完整日期区间并进入确认；月历读取 SHALL 复用短时成功结果并遵守服务端限流，不扩大改期权限或更改抓取日语义。

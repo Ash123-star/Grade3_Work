@@ -85,9 +85,7 @@ void main() {
       final samples = <Map<String, Object>>[];
       for (var iteration = 0; iteration < 10; iteration++) {
         // Reset only the viewport; the gesture itself uses the production recognizer.
-        (state.drag.scroll as PageController).jumpToPage(
-          source.year * 12 + source.month - 1 - 2000 * 12,
-        );
+        state.drag.scroll.jumpTo(0);
         await tester.pumpAndSettle();
         final handle = find
             .byWidgetPredicate(

@@ -160,6 +160,7 @@ void main() {
           final rect = day.rect;
           if (day.day.month != start.month &&
               rect != null &&
+              rect.bottom < viewport.bottom - 16 &&
               viewport.deflate(50).contains(rect.center)) {
             safeLanding = rect.center;
             break;
@@ -173,6 +174,20 @@ void main() {
       await t.pump(const Duration(milliseconds: 40));
       expect(surface.drag.target!.day.month, isNot(start.month));
       await capture('preview');
+      final previewRect = t.getRect(
+        find.byKey(const ValueKey('calendar-drag-bar')),
+      );
+      final neighbours = find
+          .byWidgetPredicate(
+            (w) => w is CalendarTaskHandle && w.record.id != taskId,
+          )
+          .hitTestable();
+      for (final element in neighbours.evaluate()) {
+        expect(
+          previewRect.overlaps(t.getRect(find.byWidget(element.widget))),
+          isFalse,
+        );
+      }
       final expected = surface.drag.preview!;
       await gesture.up();
       await until(() => find.text('确认移动排期').evaluate().isNotEmpty);

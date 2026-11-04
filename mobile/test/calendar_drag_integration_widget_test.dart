@@ -12,13 +12,16 @@ import 'calendar_drag_widget_test.dart' show dragStore, readyInteraction;
 import 'support/local_test_state.dart';
 
 Future<(CalendarInteractionSurfaceState, DemoStore)> mountCalendar(
-  WidgetTester t,
-) async {
+  WidgetTester t, {
+  DemoStore? fixture,
+  double height = 650,
+  double textScale = 1,
+}) async {
   t.view.physicalSize = const Size(390, 900);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.resetPhysicalSize);
   addTearDown(t.view.resetDevicePixelRatio);
-  final store = dragStore();
+  final store = fixture ?? dragStore();
   final container = testContainer(
     overrides: [
       repositoryProvider.overrideWithValue(
@@ -37,7 +40,13 @@ Future<(CalendarInteractionSurfaceState, DemoStore)> mountCalendar(
       container: container,
       child: MaterialApp(
         theme: appTheme(),
-        home: const Scaffold(body: CalendarContent(availableHeight: 650)),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: Scaffold(body: CalendarContent(availableHeight: height)),
       ),
     ),
   );
@@ -177,8 +186,8 @@ void main() {
       final gesture = await t.startGesture(t.getCenter(taskBar()));
       await t.pump(const Duration(milliseconds: 600));
       expect(state.drag.active, isTrue);
-      final pager = state.widget.scroll as PageController;
-      pager.jumpToPage(pager.page!.round() + 4);
+      final pager = state.widget.scroll;
+      pager.jumpTo(pager.offset + state.drag.bounds!.height * 4);
       await settleLocalIo(t);
       await t.pump(const Duration(milliseconds: 100));
       expect(find.byType(CalendarTaskHandle).hitTestable(), findsNothing);

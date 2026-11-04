@@ -90,6 +90,16 @@
 
 修复提交 `48556d4` 已推送并创建 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，测试 APK 0.1.3 已构建并验证签名。PR 待审，尚未合并或部署，原未完成任务不变。
 
+## 9. C-09 拖动避让与周高度展开
+
+- [x] 9.1 实现既有条带稳定、候选按区间选择空行的独立排布，跨周／月分段且不与自身竞争。
+- [x] 9.2 支持周高度临时展开、后续周下移和可变月份滚动；布局补偿保持日期落点，取消恢复。
+- [ ] 9.3 完成碰撞／密集／跨月／恢复验证、Android 链路、分析、APK 和规范检查，更新 Issue／PR 证据。
+
+设计与用户确认见 [drag-lane-layout.md](drag-lane-layout.md)。
+
+验证见 [周高度与避让验收](verification-lane-layout.md)：日历专项 76 项、通知 12 项、Android 密集目标跨月拖动与独立审核通过；测试包 0.1.4。PR #67 尚未合并发布。
+
 ## 当前状态与已知限制
 
 - 2026-11-04 当前主干整合结果以 [verification-integration.md](verification-integration.md) 为准：日历专项最终 59 项通过；后端专项 107/108，唯一失败为未改动的时间线断言；两轮 Android→HTTP→PostgreSQL 链路通过。模拟器 profile 十次手势成功但性能未达标，全仓仍未通过，7.4 与实机／审阅项保留未完成。以下为旧分支历史记录。

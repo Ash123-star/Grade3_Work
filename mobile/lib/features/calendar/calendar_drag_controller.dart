@@ -71,6 +71,8 @@ class CalendarDragController extends ChangeNotifier {
   int generation = 0;
   Duration? _previous, _edgeSince;
   int _edge = 0;
+  int _layoutGeneration = 0;
+  bool _layoutPending = false, _disposed = false;
   bool get active => intent != null;
   Rect? get bounds {
     final box = viewport.currentContext?.findRenderObject();
@@ -132,7 +134,7 @@ class CalendarDragController extends ChangeNotifier {
 
   void _publishTarget() {
     final candidate = preview;
-    targetFeedback.value = (
+    final feedback = (
       day: target?.day,
       valid: candidate != null,
       firstDay: candidate == null ? null : dateLabel(candidate.firstDay),
@@ -140,6 +142,39 @@ class CalendarDragController extends ChangeNotifier {
           ? null
           : dateLabel(scheduleWallTime(candidate.end)),
     );
+    if (feedback == targetFeedback.value) return;
+    _preserveTargetPosition();
+    targetFeedback.value = feedback;
+  }
+
+  /// Expanding earlier weeks must not move a different date under a stationary
+  /// finger. Compensate the single timeline scroll after layout, before hit tests.
+  void _preserveTargetPosition() {
+    final day = target;
+    final top = day?.rect?.top;
+    if (day == null || top == null) return;
+    final generation = ++_layoutGeneration;
+    _layoutPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || generation != _layoutGeneration) return;
+      final next = day.rect?.top;
+      if (next != null && scroll.hasClients && (next - top).abs() > .1) {
+        final position = scroll.position;
+        scroll.jumpTo(
+          (position.pixels + next - top).clamp(
+            position.minScrollExtent,
+            position.maxScrollExtent,
+          ),
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_disposed && generation == _layoutGeneration) {
+            _layoutPending = false;
+          }
+        });
+      } else {
+        _layoutPending = false;
+      }
+    });
   }
 
   /// Called while building the preview. This must not notify/rebuild the grid.
@@ -176,6 +211,10 @@ class CalendarDragController extends ChangeNotifier {
   void _tick(Duration elapsed) {
     if (!active || !allowed()) {
       cancel();
+      return;
+    }
+    if (_layoutPending) {
+      _previous = elapsed;
       return;
     }
     final area = bounds;
@@ -246,6 +285,7 @@ class CalendarDragController extends ChangeNotifier {
   }
 
   void cancel() {
+    if (active) _preserveTargetPosition();
     generation++;
     intent = null;
     _presented = null;
@@ -266,6 +306,7 @@ class CalendarDragController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _ticker.dispose();
     targetFeedback.dispose();
     activeTask.dispose();
