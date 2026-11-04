@@ -1,5 +1,7 @@
 import 'calendar_interaction.dart';
 import 'calendar_schedule.dart';
+import 'calendar_read_status.dart';
+import '../../core/errors/api_failure.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -383,7 +385,7 @@ class _StableMonthPagerState extends State<_StableMonthPager> {
   }
 }
 
-class _StableMonthPage extends ConsumerWidget {
+class _StableMonthPage extends ConsumerStatefulWidget {
   const _StableMonthPage({
     required this.month,
     required this.ownerId,
@@ -402,10 +404,86 @@ class _StableMonthPage extends ConsumerWidget {
   onDayChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_StableMonthPage> createState() => _StableMonthPageState();
+}
+
+class _StableMonthPageState extends ConsumerState<_StableMonthPage> {
+  (int, String?, int)? _scope;
+  PageResult? _lastComplete;
+
+  @override
+  Widget build(BuildContext context) {
+    final month = widget.month, ownerId = widget.ownerId;
+    final scope = (
+      ref.watch(sessionEpochProvider),
+      ownerId,
+      _monthIndex(month),
+    );
+    if (_scope != scope) {
+      _scope = scope;
+      _lastComplete = null;
+    }
     final state = ref.watch(
       calendarMonthTasksProvider((ownerId, _monthIndex(month))),
     );
+    if (state is AsyncData<PageResult>) _lastComplete = state.value;
+    Widget render(PageResult page, {bool readOnly = false}) {
+      final events = _calendarEvents(page.items);
+      final interaction = CalendarInteraction.of(context);
+      CalendarConstraints? constraints;
+      try {
+        if (!readOnly) {
+          constraints = CalendarConstraints.parse(page.scheduleConstraints);
+        }
+      } on FormatException {
+        /* Read-only legacy server. */
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          if (readOnly && interaction?.drag.active == true) {
+            interaction!.drag.cancel();
+          } else {
+            interaction?.drag.observe(page.items);
+          }
+        }
+      });
+      return CalendarLoadedMonth(
+        month: month,
+        constraints: constraints,
+        child: _MonthGrid(
+          date: month,
+          events: events,
+          onChanged: (day) =>
+              widget.onDayChanged(day, events, interaction, constraints),
+          constraints: constraints,
+          availableHeight: widget.availableHeight,
+        ),
+      );
+    }
+
+    final failure = state.error;
+    if (failure is ApiFailure &&
+        (failure.statusCode == 429 || failure.code == 'RATE_LIMITED')) {
+      final previous = _lastComplete;
+      return Stack(
+        children: [
+          if (previous != null)
+            Positioned.fill(child: render(previous, readOnly: true)),
+          Align(
+            alignment: previous == null
+                ? Alignment.center
+                : Alignment.topCenter,
+            child: CalendarReadStatus(
+              failure: failure,
+              onRetry: () => ref.invalidate(
+                calendarMonthTasksProvider((ownerId, _monthIndex(month))),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    if (state.hasError) _lastComplete = null;
     return state.when(
       loading: () => const Center(child: SunnyLoadingIndicator()),
       error: (error, _) => Center(
@@ -416,31 +494,7 @@ class _StableMonthPage extends ConsumerWidget {
           ),
         ),
       ),
-      data: (page) {
-        final events = _calendarEvents(page.items);
-        final interaction = CalendarInteraction.of(context);
-        CalendarConstraints? constraints;
-        try {
-          constraints = CalendarConstraints.parse(page.scheduleConstraints);
-        } on FormatException {
-          /* Read-only legacy server. */
-        }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) interaction?.drag.observe(page.items);
-        });
-        return CalendarLoadedMonth(
-          month: month,
-          constraints: constraints,
-          child: _MonthGrid(
-            date: month,
-            events: events,
-            onChanged: (day) =>
-                onDayChanged(day, events, interaction, constraints),
-            constraints: constraints,
-            availableHeight: availableHeight,
-          ),
-        );
-      },
+      data: render,
     );
   }
 }

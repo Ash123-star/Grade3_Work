@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/app.dart';
@@ -35,7 +34,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: c,
         child: MaterialApp(
           theme: appTheme(),
@@ -138,7 +137,7 @@ void main() {
       await t.pumpWidget(
         RepaintBoundary(
           key: boundary,
-          child: UncontrolledProviderScope(
+          child: OwnedTestProviderScope(
             container: c,
             child: const PandoraApp(),
           ),
@@ -247,7 +246,7 @@ void main() {
         await t.pumpWidget(
           RepaintBoundary(
             key: boundary,
-            child: UncontrolledProviderScope(
+            child: OwnedTestProviderScope(
               container: c,
               child: const PandoraApp(),
             ),

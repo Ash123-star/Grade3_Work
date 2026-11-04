@@ -43,7 +43,7 @@ void main() {
         if (changeAccount) store.barrier = Completer<void>();
         var finished = false;
         await tester.pumpWidget(
-          UncontrolledProviderScope(
+          OwnedTestProviderScope(
             container: container,
             child: MaterialApp(
               home: Consumer(

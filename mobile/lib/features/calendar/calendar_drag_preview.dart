@@ -36,8 +36,9 @@ class CalendarDragPreview extends StatelessWidget {
       area.left + 8,
       area.right - width - 8,
     );
+    final shown = drag.present();
     final target = drag.target;
-    final preview = drag.preview;
+    final preview = shown?.schedule;
     return Positioned.fill(
       child: IgnorePointer(
         child: ExcludeSemantics(
@@ -83,7 +84,7 @@ class CalendarDragPreview extends StatelessWidget {
                         Text(
                           target == null
                               ? '移到已加载日期内'
-                              : '目标日期 ${businessDateText(target.day)}',
+                              : '抓取处 ${businessDateText(drag.intent!.anchor)} → ${businessDateText(target.day)}',
                           style: Theme.of(context).textTheme.labelLarge
                               ?.copyWith(
                                 color: preview == null

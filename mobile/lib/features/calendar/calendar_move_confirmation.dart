@@ -8,8 +8,11 @@ class CalendarMoveConfirmation extends StatefulWidget {
     super.key,
     required this.before,
     required this.after,
+    this.anchor,
+    this.target,
   });
   final CalendarSchedule before, after;
+  final DateTime? anchor, target;
   @override
   State<CalendarMoveConfirmation> createState() =>
       _CalendarMoveConfirmationState();
@@ -34,6 +37,12 @@ class _CalendarMoveConfirmationState extends State<CalendarMoveConfirmation> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.anchor != null && widget.target != null) ...[
+              Text(
+                '抓取处：${businessDateText(widget.anchor!)} → ${businessDateText(widget.target!)}',
+              ),
+              const SizedBox(height: 12),
+            ],
             Text('原排期：${widget.before.description}'),
             const SizedBox(height: 12),
             Text('新排期：${widget.after.description}'),

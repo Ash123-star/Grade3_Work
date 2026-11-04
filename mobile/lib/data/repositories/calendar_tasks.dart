@@ -7,6 +7,54 @@ final sharedCalendarTaskReader = CalendarTaskReader();
 
 /// Task-only bounded reader. Partial data is never returned as success.
 class CalendarTaskReader {
+  CalendarTaskReader({DateTime Function()? now}) : _now = now ?? DateTime.now;
+  final DateTime Function() _now;
+  final _cooldowns = Expando<DateTime>();
+
+  Duration cooldown(Repository repository) {
+    final until = _cooldowns[repository];
+    if (until == null || !until.isAfter(_now())) return Duration.zero;
+    return until.difference(_now());
+  }
+
+  void recordRateLimit(Repository repository, ApiFailure failure) {
+    if (failure.statusCode != 429 && failure.code != 'RATE_LIMITED') return;
+    final delay = failure.retryAfter ?? const Duration(seconds: 60);
+    final until = _now().add(delay);
+    final previous = _cooldowns[repository];
+    if (previous == null || previous.isBefore(until)) {
+      _cooldowns[repository] = until;
+    }
+  }
+
+  void _checkCooldown(Repository repository) {
+    final until = _cooldowns[repository];
+    if (until != null && until.isAfter(_now())) {
+      throw ApiFailure(
+        FailureKind.unavailable,
+        '请求较多，月历暂停刷新，请稍后重试',
+        code: 'RATE_LIMITED',
+        statusCode: 429,
+        retryAfter: until.difference(_now()),
+      );
+    }
+  }
+
+  Future<PageResult> _page(
+    Repository repository,
+    Query query,
+    Duration remaining,
+  ) async {
+    // A different active month can hit 429 while this month is paginating.
+    _checkCooldown(repository);
+    try {
+      return await repository.list('tasks', query).timeout(remaining);
+    } on ApiFailure catch (error) {
+      recordRateLimit(repository, error);
+      rethrow;
+    }
+  }
+
   int _running = 0;
   final _queue = <Completer<void>>[];
   Future<void> _acquire() async {
@@ -41,6 +89,7 @@ class CalendarTaskReader {
     final clock = Stopwatch()..start();
     await _acquire();
     try {
+      _checkCooldown(repository);
       for (var restart = 0; restart < 2; restart++) {
         final items = <Record>[], ids = <String>{}, cursors = <String>{};
         String? cursor, token;
@@ -55,22 +104,22 @@ class CalendarTaskReader {
             if (remaining <= Duration.zero) {
               throw const ApiFailure(FailureKind.timeout, '日历读取超出时间预算');
             }
-            final result = await repository
-                .list(
-                  'tasks',
-                  Query(
-                    search: query.search,
-                    ownerId: query.ownerId,
-                    from: query.from,
-                    to: query.to,
-                    cursor: cursor,
-                    snapshotToken: token,
-                    requestTimeout: remaining < const Duration(seconds: 15)
-                        ? remaining
-                        : const Duration(seconds: 15),
-                  ),
-                )
-                .timeout(remaining);
+            final result = await _page(
+              repository,
+              Query(
+                limit: 100,
+                search: query.search,
+                ownerId: query.ownerId,
+                from: query.from,
+                to: query.to,
+                cursor: cursor,
+                snapshotToken: token,
+                requestTimeout: remaining < const Duration(seconds: 15)
+                    ? remaining
+                    : const Duration(seconds: 15),
+              ),
+              remaining,
+            );
             if (!isActive()) {
               throw const ApiFailure(FailureKind.unavailable, '日历读取已停止');
             }
@@ -121,6 +170,12 @@ class CalendarTaskReader {
         }
       }
       throw StateError('Unreachable calendar read');
+    } on ApiFailure catch (e) {
+      if (e.statusCode == 429 || e.code == 'RATE_LIMITED') {
+        // Preserve the server's original deadline on repeated local attempts.
+        _checkCooldown(repository);
+      }
+      rethrow;
     } on TimeoutException {
       throw const ApiFailure(FailureKind.timeout, '日历读取超出时间预算');
     } finally {

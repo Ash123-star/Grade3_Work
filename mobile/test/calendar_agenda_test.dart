@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -94,7 +93,7 @@ void main() {
       );
       addTearDown(c.dispose);
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: const MaterialApp(home: CalendarPage()),
         ),
@@ -128,7 +127,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: c,
         child: MaterialApp(
           theme: appTheme(),
@@ -155,7 +154,7 @@ void main() {
       ],
     );
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: c,
         child: const MaterialApp(home: Scaffold(body: DateControls())),
       ),
@@ -238,7 +237,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     c.read(routerProvider).go('/view');
     await settleLocalIo(t);
@@ -305,7 +304,7 @@ void main() {
       );
       addTearDown(c.dispose);
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: MaterialApp(
             theme: appTheme(),
@@ -451,7 +450,7 @@ void main() {
       );
       addTearDown(c.dispose);
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: MaterialApp(
             home: const Scaffold(

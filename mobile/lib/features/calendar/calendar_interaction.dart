@@ -62,6 +62,7 @@ class CalendarInteractionSurfaceState
       confirming = false,
       multiTouch = false;
   String? message;
+  Timer? _reviewRefresh;
   int operation = 0, pointers = 0;
   Size? _size;
   double? _scale;
@@ -87,6 +88,25 @@ class CalendarInteractionSurfaceState
       allowed: () => writable && !busy && !confirming,
     )..addListener(_previewChanged);
     WidgetsBinding.instance.addObserver(this);
+    // A stable subscription avoids disconnect/reconnect on every drag rebuild
+    // when this surface is the last notification consumer.
+    ref.listenManual(
+      liveNotificationsProvider.select((state) => state.sequence),
+      (previous, next) {
+        if (previous != next && current) {
+          drag.cancel();
+          // The common notification controller owns business invalidation.
+          _reviewRefresh?.cancel();
+          if (pending?.reviewId != null) {
+            _reviewRefresh = Timer(const Duration(milliseconds: 250), () {
+              if (current && writable && pending?.reviewId != null) {
+                unawaited(confirmPending());
+              }
+            });
+          }
+        }
+      },
+    );
     unawaited(_restore());
   }
 
@@ -109,6 +129,7 @@ class CalendarInteractionSurfaceState
   void didChangeAppLifecycleState(AppLifecycleState state) {
     foreground = state == AppLifecycleState.resumed;
     if (!foreground) {
+      _reviewRefresh?.cancel();
       drag.cancel();
       return;
     }
@@ -193,6 +214,8 @@ class CalendarInteractionSurfaceState
     CalendarConstraints constraints, {
     CalendarDragAppearance? visual,
   }) {
+    if (!writable) return;
+    if (_readingPaused()) return;
     if (restoring ||
         busy ||
         pending != null ||
@@ -210,20 +233,25 @@ class CalendarInteractionSurfaceState
     }
   }
 
-  void drop() {
-    final intent = drag.intent, target = drag.target, preview = drag.preview;
-    drag.cancel();
-    if (intent == null || target == null || preview == null || !writable) {
-      return;
-    }
-    final delta = businessDayDelta(intent.anchor, target.day);
-    if (delta != 0) unawaited(move(intent.record, delta, intent.constraints));
+  void drop(Offset point) {
+    final placement = drag.release(point);
+    if (placement == null || !writable || placement.days == 0) return;
+    unawaited(
+      move(
+        placement.intent.record,
+        placement.days,
+        placement.intent.constraints,
+        placement: placement,
+      ),
+    );
   }
 
   Future<void> accessible(
     Record record,
     CalendarConstraints constraints,
   ) async {
+    if (!writable) return;
+    if (_readingPaused()) return;
     if (!writable || busy || restoring || confirming || pending != null) return;
     final generation = operation;
     try {
@@ -250,8 +278,11 @@ class CalendarInteractionSurfaceState
   Future<void> move(
     Record record,
     int days,
-    CalendarConstraints constraints,
-  ) async {
+    CalendarConstraints constraints, {
+    CalendarDropPlacement? placement,
+  }) async {
+    if (!writable) return;
+    if (_readingPaused()) return;
     if (!writable || busy || confirming || pending != null) return;
     final generation = ++operation;
     final repository = ref.read(repositoryProvider);
@@ -265,11 +296,21 @@ class CalendarInteractionSurfaceState
           source.fields['capabilities']['reschedule'] != true) {
         throw const FormatException('任务版本或权限已变化，请刷新后重新移动');
       }
-      final before = CalendarSchedule.fromRecord(source),
-          after = CalendarSchedule.fromRecord(source).move(days, constraints);
+      final before = CalendarSchedule.fromRecord(source);
+      final after = before.move(days, constraints);
+      if (placement != null &&
+          (after.start != placement.schedule.start ||
+              after.end != placement.schedule.end)) {
+        throw const FormatException('任务排期已变化，原移动已取消，请刷新');
+      }
       final reason = await showDialog<String>(
         context: context,
-        builder: (_) => CalendarMoveConfirmation(before: before, after: after),
+        builder: (_) => CalendarMoveConfirmation(
+          before: before,
+          after: after,
+          anchor: placement?.intent.anchor,
+          target: placement?.targetDay,
+        ),
       );
       if (reason == null || !valid()) return;
       // Confirm the authoritative source again after an arbitrarily long dialog.
@@ -293,8 +334,9 @@ class CalendarInteractionSurfaceState
       await confirmPending();
     } catch (e) {
       if (valid()) {
+        _recordRateLimit(e);
         setState(() => message = '$e');
-        refreshBusiness(ref);
+        if (!_rateLimited(e)) refreshBusiness(ref);
       }
     } finally {
       if (mounted && operation == generation) {
@@ -306,6 +348,7 @@ class CalendarInteractionSurfaceState
   Future<void> confirmPending() async {
     final command = pending;
     if (command == null || busy || !writable) return;
+    if (_readingPaused()) return;
     final generation = operation, session = ref.read(sessionProvider);
     setState(() {
       busy = true;
@@ -345,6 +388,7 @@ class CalendarInteractionSurfaceState
       );
     } catch (e) {
       if (current && operation == generation) {
+        _recordRateLimit(e);
         CalendarMoveCommand? restored;
         try {
           restored = await ref.read(calendarCommandStoreProvider).read(session);
@@ -367,7 +411,7 @@ class CalendarInteractionSurfaceState
           pending = rejected ? null : restored ?? command;
           message = '$e';
         });
-        refreshBusiness(ref);
+        if (!_rateLimited(e)) refreshBusiness(ref);
       }
     } finally {
       if (mounted && operation == generation) setState(() => busy = false);
@@ -399,9 +443,30 @@ class CalendarInteractionSurfaceState
     );
   }
 
+  bool _readingPaused() {
+    final remaining = ref
+        .read(calendarTaskReaderProvider)
+        .cooldown(ref.read(repositoryProvider));
+    if (remaining <= Duration.zero) return false;
+    setState(
+      () =>
+          message = '请求较多，请 ${(remaining.inMilliseconds / 1000).ceil()} 秒后再移动',
+    );
+    return true;
+  }
+
+  void _recordRateLimit(Object error) {
+    if (_rateLimited(error)) {
+      ref
+          .read(calendarTaskReaderProvider)
+          .recordRateLimit(ref.read(repositoryProvider), error as ApiFailure);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(sessionEpochProvider, (_, next) {
+      _reviewRefresh?.cancel();
       epoch = next;
       operation++;
       drag.cancel();
@@ -410,16 +475,6 @@ class CalendarInteractionSurfaceState
       message = null;
       restoring = true;
       unawaited(_restore());
-    });
-    ref.listen(liveNotificationsProvider.select((state) => state.sequence), (
-      previous,
-      next,
-    ) {
-      if (previous != next && current) {
-        drag.cancel();
-        refreshBusiness(ref);
-        unawaited(_restore(queryKnown: true));
-      }
     });
     return CalendarInteraction(
       state: this,
@@ -446,8 +501,7 @@ class CalendarInteractionSurfaceState
           },
           onPointerUp: (event) {
             if (event.pointer == _primaryPointer && drag.active) {
-              drag.update(event.position);
-              drop();
+              drop(event.position);
             }
             pointers = (pointers - 1).clamp(0, 10);
             if (pointers == 0) {
@@ -505,6 +559,7 @@ class CalendarInteractionSurfaceState
   @override
   void dispose() {
     operation++;
+    _reviewRefresh?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     drag.removeListener(_previewChanged);
     drag.dispose();
@@ -603,23 +658,45 @@ class _CalendarDayTargetState extends State<CalendarDayTarget> {
         onLongPress: state == null || constraints == null
             ? null
             : () => state.create(widget.day, constraints),
-        child: ValueListenableBuilder<({DateTime? day, bool valid})>(
+        child: ValueListenableBuilder<CalendarDragFeedback>(
           valueListenable:
               state?.drag.targetFeedback ??
-              const AlwaysStoppedAnimation((day: null, valid: false)),
-          builder: (context, feedback, child) => DecoratedBox(
-            decoration: BoxDecoration(
-              border: constraints != null && feedback.day == widget.day
-                  ? Border.all(
-                      color: feedback.valid
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.error,
-                      width: 2,
+              const AlwaysStoppedAnimation((
+                day: null,
+                valid: false,
+                firstDay: null,
+                lastDay: null,
+              )),
+          builder: (context, feedback, child) {
+            final inRange =
+                constraints != null &&
+                feedback.firstDay != null &&
+                !widget.day.isBefore(feedback.firstDay!) &&
+                !widget.day.isAfter(feedback.lastDay!);
+            return DecoratedBox(
+              key: inRange
+                  ? ValueKey(
+                      'calendar-candidate:${businessDateText(widget.day)}',
                     )
                   : null,
-            ),
-            child: child,
-          ),
+              decoration: BoxDecoration(
+                color: inRange
+                    ? Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: .13)
+                    : null,
+                border: constraints != null && feedback.day == widget.day
+                    ? Border.all(
+                        color: feedback.valid
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.error,
+                        width: 2,
+                      )
+                    : null,
+              ),
+              child: child,
+            );
+          },
           child: widget.child,
         ),
       ),
@@ -632,6 +709,10 @@ class _CalendarDayTargetState extends State<CalendarDayTarget> {
     super.dispose();
   }
 }
+
+bool _rateLimited(Object error) =>
+    error is ApiFailure &&
+    (error.statusCode == 429 || error.code == 'RATE_LIMITED');
 
 class CalendarTaskHandle extends StatelessWidget {
   const CalendarTaskHandle({

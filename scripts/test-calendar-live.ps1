@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$FlutterSdk='D:/flutter',[string]$Device='emulator-5554',[int]$Port=18088,[switch]$SkipBuild,[switch]$KeepEnvironment,[string]$ApiContainer,[string]$DataContainer)
+param([string]$FlutterSdk='D:/flutter',[string]$Device='emulator-5554',[int]$Port=18088,[switch]$SkipBuild,[switch]$KeepEnvironment,[string]$ApiContainer,[string]$DataContainer,[ValidateRange(1,60)][int]$TaskDays=3)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $suffix=[Guid]::NewGuid().ToString('N').Substring(0,10)
@@ -55,7 +55,7 @@ try {
     $sha=[Security.Cryptography.SHA256]::Create()
     $issuerHash=([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($issuerToken)))).Replace('-','').ToLowerInvariant()
     $reviewerHash=([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($reviewerToken)))).Replace('-','').ToLowerInvariant();$sha.Dispose()
-    $first=(Get-Date -Day 1).Date.AddMonths(1);$last=$first.AddMonths(1).AddDays(-1);$begin=$last.AddDays(-2)
+    $first=(Get-Date -Day 1).Date.AddMonths(1);$last=$first.AddMonths(1).AddDays(-1);$begin=$last.AddDays(1-$TaskDays)
     $startAt=$begin.ToString('yyyy-MM-dd')+'T09:00:00+08:00';$deadline=$last.ToString('yyyy-MM-dd')+'T18:00:00+08:00'
     $sql=@"
 INSERT INTO companies(id,name) VALUES ('$company','Calendar device fixture');

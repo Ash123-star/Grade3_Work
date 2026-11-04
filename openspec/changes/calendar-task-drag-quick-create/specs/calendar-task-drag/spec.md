@@ -1,5 +1,21 @@
 ## ADDED Requirements
 
+### Requirement: Released placement matches the displayed candidate and reads remain bounded
+
+故事 C-08；优先级 P0；范围为长条移动的一致性及月历读取。客户端 SHALL 用同一不可变落点候选呈现完整日期区间并进入确认；月历读取 SHALL 复用短时成功结果并遵守服务端限流，不扩大改期权限或更改抓取日语义。
+
+#### Scenario: A continuation is released between frames
+- **WHEN** 用户从长任务中间日或续段拖到另一周／月，随后在下一次预览绘制前松手
+- **THEN** 确认框 SHALL 使用最后已显示的抓取日映射及完整候选区间，不根据松手重新命中而静默替换日期，任务时长保持不变
+
+#### Scenario: Repeated navigation and notification bursts
+- **WHEN** 用户多次拖动或来回访问刚加载的月份，期间有一批通知到达
+- **THEN** 同一月份 SHALL 在有界短时保留期复用完整读取结果，通知 SHALL 由统一去抖入口刷新，月历界面不得再次全局刷新
+
+#### Scenario: A calendar read is rate limited
+- **WHEN** 服务端返回 429，且用户继续重试或翻动月份
+- **THEN** 客户端 SHALL 在 Retry-After 指定时长或缺省 60 秒冷却内停止新的月历请求，提供冷却提示及之后的恢复入口；既有完整数据只可保留只读展示，鉴权失败 MUST NOT 沿用旧数据
+
 ### Requirement: Long press picks up an authorized calendar task
 
 故事 C-01；优先级 P0；范围为“视图→月”的可见任务条。作为有改期资格的用户，我希望长按任务进入拖动，以便直接在月历调整排期。月历 SHALL 在长按达到阈值后显示浮动任务预览，并给出可用的触觉及视觉反馈；短按 SHALL 保持现有点击行为。已知不允许改期、能力标志缺失或只读场景 MUST NOT 启动写入交互。
