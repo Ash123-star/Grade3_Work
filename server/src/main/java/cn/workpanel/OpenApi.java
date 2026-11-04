@@ -18,7 +18,7 @@ public class OpenApi {
     static IntegerSchema version() { var s=new IntegerSchema(); s.setMinimum(java.math.BigDecimal.ZERO); return s; }
     static ArraySchema ids() { var s=new ArraySchema(); s.setItems(new StringSchema()); s.setMaxItems(100); s.setUniqueItems(true); return s; }
     static ObjectSchema revision(String content,String key) { var s=object("version","reason",key); s.addProperty("version",version()); s.addProperty("reason",text().minLength(1)); s.addProperty(key,ref(content)); return s; }
-    @Bean OpenAPI contract() {
+    OpenAPI contract() {
         var c=new Components().addSecuritySchemes("bearer",new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").description("登录获取的不透明会话；改密或停用后撤销"));
         var registration=object("account","password","phone","name","departmentId");
         registration.addProperty("account",new StringSchema().pattern("^[a-zA-Z0-9_.-]{3,64}$")); registration.addProperty("password",text().minLength(12).description("UTF-8 编码不超过 72 字节")); registration.addProperty("phone",new StringSchema().pattern("^1[3-9][0-9]{9}$")); registration.addProperty("name",text().minLength(1)); registration.addProperty("departmentId",text().minLength(1)); c.addSchemas("Registration",registration);
@@ -103,6 +103,20 @@ public class OpenApi {
         var indexRetry=object("id","type","state");indexRetry.addProperty("id",text());indexRetry.addProperty("type",new StringSchema()._enum(List.of("KNOWLEDGE_INDEX")));indexRetry.addProperty("state",new StringSchema()._enum(List.of("QUEUED")));c.addSchemas("KnowledgeIndexRetry",indexRetry);
         var forgetJob=object("id","state");forgetJob.addProperty("id",text());forgetJob.addProperty("state",new StringSchema()._enum(List.of("PENDING","SUCCEEDED","FAILED")));forgetJob.addProperty("error",text());forgetJob.addProperty("message",text());c.addSchemas("MemoryForgetJob",forgetJob);
         var error=object("code","message","traceId"); for(String field:List.of("code","message","traceId")) error.addProperty(field,text()); c.addSchemas("Error",error);
+        MobileP0OpenApi.register(c);
+        CalendarOpenApi.register(c);
+        return new OpenAPI().servers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/"))).info(new Info().title("企业协作智能面板 API").version("1.0.0").description("UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表不提供完成情况。分页 cursor 是非负偏移量。" )).components(c).addSecurityItem(new SecurityRequirement().addList("bearer"));
+    }
+    @Bean OpenAPI initialContract() {
+        var api=contract();
+        // Register typed maps after springdoc's plain-Jackson clone.
+        api.getComponents().setSchemas(new LinkedHashMap<>());
+        return api;
+    }
+    @Bean OpenApiCustomizer reviewDetailContract() {
+        return api -> {
+        var c=api.getComponents();
+        contract().getComponents().getSchemas().forEach(c::addSchemas);
         var reviewDetail=object("id","kind","status","expected_version","before_value","candidate","display_references");
         for(String field:List.of("id","kind","status")) reviewDetail.addProperty(field,text());
         reviewDetail.addProperty("expected_version",new IntegerSchema().minimum(java.math.BigDecimal.ZERO));
@@ -110,12 +124,10 @@ public class OpenApi {
         reviewDetail.addProperty("candidate",new ObjectSchema().additionalProperties(true));
         var references=new ObjectSchema();
         for(String category:List.of("people","labels","departments","teams"))
-            references.addProperty(category,new ObjectSchema().additionalProperties(text()));
+            references.addProperty(category,new MapSchema().additionalProperties(text()));
         reviewDetail.addProperty("display_references",references.description("已授权审核快照引用的同公司ID到当前名称映射；名称非历史快照，缺失引用不返回"));
         reviewDetail.additionalProperties(true); c.addSchemas("ReviewDetail",reviewDetail);
-        MobileP0OpenApi.register(c);
-        CalendarOpenApi.register(c);
-        return new OpenAPI().servers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/"))).info(new Info().title("企业协作智能面板 API").version("1.0.0").description("UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表不提供完成情况。分页 cursor 是非负偏移量。" )).components(c).addSecurityItem(new SecurityRequirement().addList("bearer"));
+        };
     }
     @Bean OpenApiCustomizer requestModels() {
         return api->{

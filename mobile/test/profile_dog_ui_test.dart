@@ -35,12 +35,12 @@ void main() {
     await settleLocalIo(tester);
     await tester.pumpAndSettle();
     expect(find.byType(ProtectedAvatar), findsOneWidget);
-    expect(find.text('任务管理'), findsNothing);
+    expect(find.text('派发任务'), findsNothing);
     container.read(routerProvider).go('/view');
     await settleLocalIo(tester);
     await tester.pumpAndSettle();
-    expect(find.text('任务管理'), findsOneWidget);
-    await tester.tap(find.text('任务管理'));
+    expect(find.text('派发任务'), findsOneWidget);
+    await tester.tap(find.text('派发任务'));
     await settleLocalIo(tester);
     expect(find.byType(TaskManagementPage), findsOneWidget);
     expect(find.text('任务名称'), findsOneWidget);

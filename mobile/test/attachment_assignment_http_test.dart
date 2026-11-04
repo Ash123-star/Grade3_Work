@@ -584,8 +584,8 @@ void main() {
       expect(find.text('下载并保存附件'), findsOneWidget);
       c.read(routerProvider).go('/form/feedback?id=task&version=3');
       await settle(t);
-      expect(find.text('附件关联暂不可用'), findsOneWidget);
-      expect(find.text('选择并上传附件'), findsNothing);
+      expect(find.text('附件关联暂不可用'), findsNothing);
+      expect(find.text('选择并上传附件'), findsOneWidget);
       await close(t);
     },
   );

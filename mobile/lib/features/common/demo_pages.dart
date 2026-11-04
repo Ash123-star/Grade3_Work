@@ -487,10 +487,7 @@ class _HelpPageState extends State<HelpPage> {
 
   final articles = const [
     ('员工 · 如何填写日志', '进入日志，选择日期，点击写日志。输入今日工作、问题与下一步计划，草稿自动保存，提交后可查看详情。'),
-    (
-      '员工 · 如何处理任务',
-      '打开任务详情，按当前权限接收任务并提交成果反馈，由派发者查看成果后验收。需要补充信息时，可先在任务评论中沟通。',
-    ),
+    ('员工 · 如何处理任务', '打开任务详情，按当前权限接收任务并提交成果反馈，由派发者查看成果后验收。需要补充信息时，可先在任务评论中沟通。'),
     ('管理者 · 派发任务与查看下属', '在导图右下角派发任务，选择主负责人。进入日志 → 下属日志，选择成员查看已提交内容。'),
     ('管理者 · 审核规则', '在我的 → 审批中心查看修改前后内容，由组织中配置的直属上级单级审核；驳回时须填写理由。不能审核本人申请。'),
     ('管理员 · 组织与权限', '在我的 → 组织与权限设置维护部门、人员归属和角色。关键变更由配置的直属上级单级审核，审核通过前原配置继续生效。'),
@@ -784,7 +781,10 @@ class DiaryVersionPage extends ConsumerWidget {
                   );
             return PageBody(
               children: [
-                Text(r.title, style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  '${r.fields['businessDate'] ?? ''} 工作日志',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   '${r.fields['businessDate'] ?? '未标记日期'} · ${current ? '当前生效' : '历史只读'} · v$version',

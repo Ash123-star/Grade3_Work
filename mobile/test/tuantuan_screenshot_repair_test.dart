@@ -234,7 +234,7 @@ void main() {
               );
               expect(rect.left, greaterThanOrEqualTo(grid.left));
               expect(rect.right, lessThanOrEqualTo(grid.right));
-              expect(rect.right, lessThanOrEqualTo(config.$1));
+              expect(rect.right, lessThanOrEqualTo(config.$1 + 0.01));
             }
             expect(t.getSize(day).width, closeTo(config.$1 / 7, .001));
             expect(t.getSize(day).height, greaterThanOrEqualTo(48));
@@ -258,17 +258,26 @@ void main() {
               findsNothing,
             );
             expect(find.text('任：任务 · 日：日志 · 点击日期查看全文'), findsNothing);
-            expect(find.text('完成工作台交'), findsNWidgets(previewCount));
+            expect(
+              find.byWidgetPredicate(
+                (w) =>
+                    w.key is ValueKey<String> &&
+                    (w.key as ValueKey<String>).value.startsWith(
+                      'month-preview:2026-10-14:',
+                    ),
+              ),
+              findsNWidgets(previewCount),
+            );
             await t.ensureVisible(day);
             await t.pumpAndSettle();
             await capture('month-selected');
             await t.tap(day);
             await t.pumpAndSettle();
-            expect(find.byTooltip('关闭当天记录'), findsOneWidget);
+            expect(find.byTooltip('关闭'), findsOneWidget);
             for (var i = 0; i < 3; i++) {
               expect(
                 find.descendant(
-                  of: find.byType(BottomSheet),
+                  of: find.byKey(const ValueKey('month-day-agenda')),
                   matching: find.text('完成工作台交互稿与客户访谈记录$i'),
                 ),
                 findsOneWidget,

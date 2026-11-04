@@ -160,3 +160,7 @@ GET /organization/people沿用原组织数据范围，追加可空team_name，�
 - 相同键相同内容返回同一审核结果；不同内容409 `IDEMPOTENCY_CONFLICT`，同任务同版本不同键待审409 `RESCHEDULE_PENDING`。旧版仅 `deadline/version/reason` 请求保持兼容。关闭移动开关后仍可重放已有命令。
 - `scheduleConstraints` 定义上海业务年Y的日期窗口 `[Y-2年01-01,Y+8年01-01]`；头过期409 `SCHEDULE_CONSTRAINTS_CHANGED`。快捷创建沿用 `/tasks`，带约束头时校验窗口，不带头的既有创建不新增限制。
 - V27只新增改期命令表和索引；已发布迁移不变。部署全部MOVE审核消费者后设置 `CALENDAR_MOVE_ENABLED=true`；存在待审MOVE时禁止回滚至不理解MOVE的旧服务端。
+
+### 中国大陆节假日月历（成员 D）
+`GET /api/calendar/holidays?year=2026`：已登录、已确认且无需强制改密的账号可读；沿用公共认证规则。year为2007至2100，越界400 `INVALID_YEAR`；缺失/格式错误400；未登录401、无业务访问权限403。只读幂等，无写入版本及分页。返回 `{year,days:[{date,name,isOffDay}],papers,status,fetchedAt}`；date为中国大陆业务日期，isOffDay=false表示公告指定的调休上班日。status为FRESH、STALE或UNAVAILABLE；fetchedAt为最后成功获取的UTC时间，无成功记录为空字符串。
+固定来源为 NateScarlet/holiday-cn 的 GitHub contents API（raw JSON Accept），保留国务院公告链接。缓存24小时；失败5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。客户端查询相邻公告年份处理跨年网格；数据故障不阻塞任务。服务端响应上限256 KiB、完整请求6秒超时；无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。

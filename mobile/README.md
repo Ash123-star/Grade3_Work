@@ -41,3 +41,5 @@ powershell -ExecutionPolicy Bypass -File scripts/prepare-flutter-sqlite.ps1
 后续开发按 [仓库流程](../docs/development-workflow.md) 集中验收，常用命令为 `flutter analyze` 和 `flutter test --dart-define=USE_MOCK=true`。真实服务专项需按各自测试文件的环境要求显式启用，不可对业务数据库盲目运行写入测试。
 
 截图、命令日志、临时原型和诊断结果统一放仓库根目录 `output/`（Git 忽略），或本地 `.diagnostics/`。仓库只保留必要的结论、命令、环境、退出码和未解决问题；旧截图和阶段交付记录从 Git 历史查询。最新联调结果见 [2026-10-30 记录](../docs/frontend-backend-integration-validation-2026-10-30.md)，其中失败和待验收项仍需处理。本次仓库清理没有执行功能测试。
+
+?????`powershell -ExecutionPolicy Bypass -File ../scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat`?HTTP?Mock????????

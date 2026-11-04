@@ -127,15 +127,17 @@ void main() {
         find.byKey(const ValueKey('task-label-selected')),
       );
       expect((chip.decoration as BoxDecoration).color, const Color(0xFFCFE5FF));
-      await repository.execute(
-        'tasks',
-        Command('create', {
-          'title': '门店核验',
-          'participantIds': ['member-1'],
-          'tagId': controller.text,
-          'startAt': '2026-11-02T09:00:00+08:00',
-          'deadline': '2026-11-03T18:00:00+08:00',
-        }, idempotencyKey: 'label-contract'),
+      await t.runAsync(
+        () => repository.execute(
+          'tasks',
+          Command('create', {
+            'title': '门店核验',
+            'participantIds': ['member-1'],
+            'tagId': controller.text,
+            'startAt': '2026-11-02T09:00:00+08:00',
+            'deadline': '2026-11-03T18:00:00+08:00',
+          }, idempotencyKey: 'label-contract'),
+        ),
       );
       final post = adapter.requests.last;
       expect(post.path, '/tasks');
@@ -201,6 +203,8 @@ void main() {
     expect(form.currentState!.validate(), isTrue);
     adapter.labels.clear();
     container.invalidate(recordsProvider('task-labels'));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 100));
     await t.pumpAndSettle();
     expect(form.currentState!.validate(), isFalse);
     expect(find.byKey(const ValueKey('task-label-selected')), findsNothing);

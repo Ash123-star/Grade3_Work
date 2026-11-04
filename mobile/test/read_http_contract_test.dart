@@ -98,6 +98,7 @@ class ReadAdapter implements HttpClientAdapter {
         {
           'id': 'comment-1',
           'text': '服务端实际评语',
+          'author_name': '评语作者',
           'actor_id': 'u2',
           'created_at': '2026-10-12T12:00:00Z',
         },
@@ -336,19 +337,22 @@ void main() {
     },
   );
 
-  test('review HTTP fields expose the configured direct reviewer only', () async {
-    final review = await repo.detail('reviews', 'review-1');
-    expect(review.fields['reviewState'], '待审');
-    expect(review.fields['applicantId'], 'u2');
-    expect(review.fields['reviewerId'], 'u1');
-    expect(review.fields['reviewerName'], '直属主管');
-    expect(review.fields['reviewerConfigured'], isTrue);
-    expect(review.fields['approvalMode'], 'DIRECT_MANAGER');
-    expect(review.fields['baseVersion'], 3);
-    expect(review.fields['steps'], [
-      {'reviewer_id': 'historical-reviewer', 'status': 'APPROVED'},
-    ]);
-  });
+  test(
+    'review HTTP fields expose the configured direct reviewer only',
+    () async {
+      final review = await repo.detail('reviews', 'review-1');
+      expect(review.fields['reviewState'], '待审');
+      expect(review.fields['applicantId'], 'u2');
+      expect(review.fields['reviewerId'], 'u1');
+      expect(review.fields['reviewerName'], '直属主管');
+      expect(review.fields['reviewerConfigured'], isTrue);
+      expect(review.fields['approvalMode'], 'DIRECT_MANAGER');
+      expect(review.fields['baseVersion'], 3);
+      expect(review.fields['steps'], [
+        {'reviewer_id': 'historical-reviewer', 'status': 'APPROVED'},
+      ]);
+    },
+  );
 
   Future<void> settleHttp(WidgetTester t) async {
     await t.pump();
@@ -388,23 +392,22 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  testWidgets(
-    'diary direct edit locks when its server deadline passes',
-    (t) async {
-      adapter.editDeadline = DateTime.now().add(const Duration(seconds: 3));
-      await launch(t, '/item/logs/log-1');
-      expect(find.text('编辑日志'), findsOneWidget);
-      await t.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 3100)),
-      );
-      await t.pump(const Duration(seconds: 4));
-      await t.pumpAndSettle();
-      expect(find.text('编辑日志'), findsNothing);
-      expect(find.text('已满24小时 · 日志已锁定'),findsOneWidget);
-      expect(adapter.requests.any((r) => r.method == 'PUT'), false);
-      await closeUi(t);
-    },
-  );
+  testWidgets('diary direct edit locks when its server deadline passes', (
+    t,
+  ) async {
+    adapter.editDeadline = DateTime.now().add(const Duration(seconds: 3));
+    await launch(t, '/item/logs/log-1');
+    expect(find.text('编辑日志'), findsOneWidget);
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 3100)),
+    );
+    await t.pump(const Duration(seconds: 4));
+    await t.pumpAndSettle();
+    expect(find.text('编辑日志'), findsNothing);
+    expect(find.text('已满24小时 · 日志已锁定'), findsOneWidget);
+    expect(adapter.requests.any((r) => r.method == 'PUT'), false);
+    await closeUi(t);
+  });
 
   testWidgets(
     'historical document displays HTTP version body rather than current content',
@@ -424,7 +427,7 @@ void main() {
       );
       await t.pumpAndSettle();
       expect(find.text('服务端实际评语', findRichText: true), findsOneWidget);
-      expect(find.textContaining('u2'), findsWidgets);
+      expect(find.textContaining('评语作者'), findsWidgets);
       await closeUi(t);
     },
   );

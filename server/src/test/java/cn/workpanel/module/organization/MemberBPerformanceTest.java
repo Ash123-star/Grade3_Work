@@ -18,9 +18,13 @@ class MemberBPerformanceTest extends MemberBHttpSupport {
         db.update("INSERT INTO daily_logs(id,company_id,owner_id,business_date,body) SELECT 'perf-log-'||?||'-'||g,?,'perf-user-'||?||'-'||(g%1000+1),CURRENT_DATE-(g/1000+1),'{}' FROM generate_series(0,99999) g", company, company, company);
         db.update("INSERT INTO tasks(id,company_id,owner_id,issuer_id,title,deadline,body) SELECT 'perf-task-'||?||'-'||g,?,'perf-user-'||?||'-'||(g%1000+1),?,'性能任务'||g,now()+interval '1 day',jsonb_build_object('title','性能任务'||g,'ownerId','perf-user-'||?||'-'||(g%1000+1),'deadline',now()+interval '1 day','urgency','NORMAL','content','性能背景数据','collaborators','[]'::jsonb) FROM generate_series(0,9999) g", company, company, company, leader, company);
         db.update("INSERT INTO task_assignees(task_id,user_id,kind,company_id) SELECT id,owner_id,'PRIMARY',company_id FROM tasks WHERE company_id=?", company);
+        db.update("INSERT INTO task_participants(task_id,user_id,company_id) SELECT id,owner_id,company_id FROM tasks WHERE company_id=?", company);
+        assertEquals(10000, db.count("SELECT count(*) FROM task_participants WHERE company_id=?",company));
         assertEquals(100000, db.count("SELECT count(*) FROM daily_logs WHERE company_id=?", company));
         assertEquals(10000, db.count("SELECT count(*) FROM tasks WHERE company_id=?", company));
         revision(employee, Map.of("name", "性能候选"));
+        // Bulk-loaded synthetic data needs current planner statistics before timed requests.
+        for(String table:List.of("users","tasks","task_participants","daily_logs")) db.update("ANALYZE "+table);
         for (int i = 0; i < 5; i++) { call(200, "GET", "/organization", admin, null); call(200, "GET", "/reviews", admin, null); }
         List<Sample> samples = Collections.synchronizedList(new ArrayList<>());
         var barrier = new CyclicBarrier(20);
