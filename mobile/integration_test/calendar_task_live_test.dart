@@ -189,6 +189,7 @@ void main() {
         );
       }
       final expected = surface.drag.preview!;
+      final landingDay = surface.drag.target!.day;
       await gesture.up();
       await until(() => find.text('确认移动排期').evaluate().isNotEmpty);
       expect(find.text('新排期：${expected.description}'), findsOneWidget);
@@ -263,10 +264,66 @@ void main() {
         current.version,
       );
       expect(surface.pending, isNull);
+      final crowded = page.items.where(
+        (r) => r.id.startsWith('$company-busy-'),
+      );
+      if (crowded.isNotEmpty) {
+        expect(crowded.length, 5);
+        container.read(selectedDateProvider.notifier).state = landingDay;
+        final landingCell = find.byKey(
+          ValueKey(
+            'month-day:${landingDay.year}-${landingDay.month}-${landingDay.day}',
+          ),
+        );
+        await until(
+          () =>
+              landingCell.evaluate().isNotEmpty &&
+              find
+                  .byWidgetPredicate(
+                    (w) =>
+                        w is CalendarTaskHandle &&
+                        w.record.id == taskId &&
+                        w.record.version == current.version,
+                  )
+                  .evaluate()
+                  .isNotEmpty,
+        );
+        await t.pump(const Duration(milliseconds: 300));
+        await t.ensureVisible(landingCell);
+        await t.pumpAndSettle();
+        final cellBounds = t.getRect(landingCell);
+        final rowRects = <Rect>[];
+        for (final record in [...crowded, current]) {
+          final segments = find.byWidgetPredicate(
+            (w) => w is CalendarTaskHandle && w.record.id == record.id,
+          );
+          final rects = [
+            for (final node in segments.evaluate())
+              t.getRect(find.byWidget(node.widget)),
+          ];
+          final inWeek = rects.where(
+            (r) => r.top >= cellBounds.top && r.top < cellBounds.bottom,
+          );
+          expect(
+            inWeek,
+            isNotEmpty,
+            reason: 'approved task row must be painted',
+          );
+          final row = inWeek.first;
+          expect(row.bottom, lessThanOrEqualTo(cellBounds.bottom));
+          for (final previous in rowRects) {
+            expect(row.overlaps(previous), isFalse);
+          }
+          rowRects.add(row);
+        }
+        expect(rowRects.length, 6);
+      }
       await capture('approved');
 
       // Long press an actually empty day through the production create route.
-      final createDay = DateTime(month.year, month.month, month.day + 12);
+      final createDay = scheduleWallTime(expected.end).add(
+        const Duration(days: 12),
+      );
       container.read(selectedDateProvider.notifier).state = createDay;
       final cell = find.byKey(
         ValueKey(

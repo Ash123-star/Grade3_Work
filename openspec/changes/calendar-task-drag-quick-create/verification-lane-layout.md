@@ -1,5 +1,7 @@
 # C-09 拖动避让与周高度验收
 
+后续用户反馈发现正式任务三行限制仍在：本报告及 0.1.4 仅验证三条已有任务的拖动候选，不能证明任意正式行可见。正式第四行及以后补正以 [完整行验收](verification-all-rows.md) 为准。
+
 2026-11-04，Issue #58，接续 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，分支 `fix/58-calendar-drop-consistency`。用户明确确认“向下撑高这一周”。修复尚未合并或部署。
 
 交付回执：实现提交 `5220e4b159ab8d48cea724b434804625575118e4` 已推送，PR #67 标题、范围和截图已更新；[Issue #58](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6629907441)已同步验收结论。当前六项历史验收缺口继续保留。

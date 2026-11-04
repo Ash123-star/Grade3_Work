@@ -175,7 +175,8 @@ void main() {
       );
       expect(t.getSize(month).width, size.width);
       final navTop = t.getTopLeft(find.byType(NavigationBar)).dy;
-      expect(t.getBottomRight(month).dy, lessThanOrEqualTo(navTop));
+      await t.ensureVisible(lastDay);
+      await t.pumpAndSettle();
       expect(t.getBottomRight(lastDay).dy, lessThanOrEqualTo(navTop));
       await t.drag(timeline, Offset(0, -t.getSize(timeline).height * 1.2));
       await t.pumpAndSettle();

@@ -2,7 +2,11 @@
 
 ### Requirement: Drag candidates occupy a separate row and expand crowded weeks
 
-故事 C-09；P0。候选任务 SHALL 与目标日期范围内已有条带分行，保持正式任务位置；不足一行空间时 SHALL 向下增高该周并推移后续周，不能裁切候选或月底。
+故事 C-09；P0。候选任务 SHALL 与目标日期范围内已有条带分行，保持正式任务位置；不足一行空间时 SHALL 向下增高该周并推移后续周，不能裁切候选或月底。正式任务和候选 SHALL 使用完整行数计算高度，不得限制为三行或用更多计数替代第四行及以后的任务条。
+
+#### Scenario: Five existing tasks and a sixth candidate
+- **WHEN** 同一周的日期范围已有五条任务，用户再拖入一条任务
+- **THEN** 五条正式任务全部可见，候选位于第六行，该周自动增高且后续周下移；取消后仍显示全部五条正式任务，独立审核生效后仍显示六条正式任务
 
 #### Scenario: A candidate intersects occupied rows
 - **WHEN** 拖入任务的任意日期与已有条带同一行重叠

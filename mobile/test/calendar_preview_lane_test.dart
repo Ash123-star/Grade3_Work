@@ -63,15 +63,20 @@ void main() {
     },
   );
 
-  for (final (height, scale) in [(650.0, 1.0), (430.0, 1.0), (430.0, 1.5)]) {
+  for (final (height, scale, count) in [
+    (650.0, 1.0, 5),
+    (430.0, 1.0, 5),
+    (430.0, 1.5, 5),
+    (430.0, 1.5, 10),
+  ]) {
     testWidgets(
-      'occupied rows stay separate, week expands and cancellation restores: $height/$scale',
+      'occupied rows stay separate, week expands and cancellation restores: $height/$scale/$count',
       (t) async {
         final store = dragStore();
         final original = store.records['tasks']!.single;
         store.records['tasks']!.addAll(
           List.generate(
-            3,
+            count,
             (i) => Record(
               id: 'busy-$i',
               title: '已有任务$i',
@@ -91,6 +96,23 @@ void main() {
           textScale: scale,
         );
         final beforeHeight = t.getSize(dayCell(11, 10)).height;
+        final emptyHeight = t.getSize(dayCell(11, 2)).height;
+        final existing = find.byWidgetPredicate(
+          (w) => w is CalendarTaskHandle && w.record.id.startsWith('busy-'),
+        );
+        expect(existing, findsNWidgets(count));
+        expect(beforeHeight, greaterThan(emptyHeight));
+        final cellBefore = t.getRect(dayCell(11, 10));
+        final rectangles = [
+          for (final node in existing.evaluate())
+            t.getRect(find.byWidget(node.widget)),
+        ];
+        for (var i = 0; i < rectangles.length; i++) {
+          expect(rectangles[i].bottom, lessThanOrEqualTo(cellBefore.bottom));
+          for (var j = i + 1; j < rectangles.length; j++) {
+            expect(rectangles[i].overlaps(rectangles[j]), isFalse);
+          }
+        }
         final followingTop = t.getTopLeft(dayCell(11, 16)).dy;
         final source = find
             .byWidgetPredicate(
@@ -115,7 +137,7 @@ void main() {
               (w) => w is CalendarTaskHandle && w.record.id.startsWith('busy-'),
             )
             .hitTestable();
-        expect(visible, findsWidgets);
+        expect(visible, findsNWidgets(count));
         for (final node in visible.evaluate()) {
           final rect = t.getRect(find.byWidget(node.widget));
           expect(
@@ -149,6 +171,7 @@ void main() {
         await t.tap(find.text('取消'));
         await t.pumpAndSettle();
         expect(t.getSize(dayCell(11, 10)).height, beforeHeight);
+        expect(existing, findsNWidgets(count));
         expect(store.records['reviews'], isEmpty);
         expect(find.byKey(const ValueKey('calendar-drag-bar')), findsNothing);
         expect(t.takeException(), isNull);

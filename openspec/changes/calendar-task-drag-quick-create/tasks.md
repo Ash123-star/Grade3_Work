@@ -102,6 +102,13 @@
 
 实现提交 `5220e4b` 已推送并更新 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，[Issue #58 验收回执](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6629907441)已发布；当前任务 45/51，六项历史缺口保留。
 
+## 10. C-09 第四行及以后不可见补正
+
+- [x] 10.1 取消正式任务三行容量上限，统一按正式与候选最高行计算每周高度。
+- [ ] 10.2 验证五条正式任务与第六行候选、小屏大字、取消及审核后读回；更新 APK、Issue 和 PR 验收记录。
+
+证据见 [正式任务完整行验收](verification-all-rows.md)。布局受影响回归 15 项、密集与交互 7 项及 Android 五条目标任务的审核后六条正式任务展示均通过；APK 0.1.5 已构建并验证签名，替代 0.1.4。先前三条目标任务的结果不能证明正式任务第四行以上可见。
+
 ## 当前状态与已知限制
 
 - 2026-11-04 当前主干整合结果以 [verification-integration.md](verification-integration.md) 为准：日历专项最终 59 项通过；后端专项 107/108，唯一失败为未改动的时间线断言；两轮 Android→HTTP→PostgreSQL 链路通过。模拟器 profile 十次手势成功但性能未达标，全仓仍未通过，7.4 与实机／审阅项保留未完成。以下为旧分支历史记录。

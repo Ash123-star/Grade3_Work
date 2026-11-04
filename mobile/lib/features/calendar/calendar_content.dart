@@ -875,10 +875,20 @@ class _MonthGrid extends StatelessWidget {
               MediaQuery.textScalerOf(context).scale(_monthRecordFontSize) *
                   1.15 +
               3;
-          final capacity = ((cellHeight - recordTop - 2 + 1) / (barHeight + 1))
-              .floor()
-              .clamp(0, 3);
-          final lanes = _monthLanes(events, first, last, capacity);
+          final lanes = _monthLanes(events, first, last);
+          final weekRows = List.filled(weeks, 0);
+          for (var week = 0; week < weeks; week++) {
+            final weekStart = start.add(Duration(days: week * 7));
+            final weekEnd = weekStart.add(const Duration(days: 6));
+            for (final event in events) {
+              final lane = lanes[event.record.id];
+              if (lane != null &&
+                  !event.lastDay.isBefore(weekStart) &&
+                  !event.firstDay.isAfter(weekEnd)) {
+                weekRows[week] = math.max(weekRows[week], lane + 1);
+              }
+            }
+          }
           final previewLanes = <int, int>{};
           if (moving != null && this.constraints != null) {
             for (var week = 0; week < weeks; week++) {
@@ -912,12 +922,14 @@ class _MonthGrid extends StatelessWidget {
               );
             }
           }
-          double weekHeight(int week) => previewLanes.containsKey(week)
-              ? math.max(
-                  cellHeight,
-                  recordTop + (previewLanes[week]! + 1) * (barHeight + 1) + 2,
-                )
-              : cellHeight;
+          double weekHeight(int week) {
+            final rows = math.max(
+              weekRows[week],
+              previewLanes.containsKey(week) ? previewLanes[week]! + 1 : 0,
+            );
+            return math.max(cellHeight, recordTop + rows * (barHeight + 1) + 2);
+          }
+
           return Column(
             children: [
               SizedBox(
@@ -1099,49 +1111,6 @@ class _MonthGrid extends StatelessWidget {
                           onChanged,
                           previewDay: drag!.target!.day,
                         ),
-                      for (var col = 0; col < 7; col++)
-                        Builder(
-                          builder: (context) {
-                            final day = start.add(
-                              Duration(days: week * 7 + col),
-                            );
-                            if (day.month != date.month) {
-                              return const SizedBox.shrink();
-                            }
-                            final hidden = eventsOnDay(events, day)
-                                .where((e) => !lanes.containsKey(e.record.id))
-                                .length;
-                            if (hidden == 0) return const SizedBox.shrink();
-                            return Positioned(
-                              left: col * cellWidth + cellWidth * .72,
-                              top: 1,
-                              width: cellWidth * .28,
-                              height: 18,
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onLongPress: () {},
-                                onTap: () => onChanged(day),
-                                child: Semantics(
-                                  button: true,
-                                  label:
-                                      '${businessDateText(day)}，另有 $hidden 条任务，查看全部',
-                                  child: Text(
-                                    '+$hidden',
-                                    key: ValueKey(
-                                      'month-overflow:${businessDateText(day)}',
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.clip,
-                                    style: TextStyle(
-                                      fontSize: _monthRecordFontSize,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
                     ],
                   ),
                 ),
@@ -1282,7 +1251,6 @@ Map<String, int> _monthLanes(
   List<CalendarEvent> events,
   DateTime gridStart,
   DateTime gridEnd,
-  int capacity,
 ) {
   final candidates =
       events
@@ -1301,41 +1269,24 @@ Map<String, int> _monthLanes(
               ? duration
               : _calendarEventKey(a).compareTo(_calendarEventKey(b));
         });
-  final laneEvents = List.generate(capacity, (_) => <CalendarEvent>[]);
-  final dailyCounts = <DateTime, int>{};
+  final laneEvents = <List<CalendarEvent>>[];
   final result = <String, int>{};
   for (final event in candidates) {
     final from = event.firstDay.isBefore(gridStart)
         ? gridStart
         : event.firstDay;
     final to = event.lastDay.isAfter(gridEnd) ? gridEnd : event.lastDay;
-    var exceedsDayCapacity = false;
-    for (
-      var day = from;
-      !day.isAfter(to);
-      day = day.add(const Duration(days: 1))
-    ) {
-      if ((dailyCounts[day] ?? 0) >= capacity) {
-        exceedsDayCapacity = true;
-        break;
-      }
-    }
-    if (exceedsDayCapacity) continue;
-    final lane = laneEvents.indexWhere(
+    var lane = laneEvents.indexWhere(
       (items) => items.every(
         (other) => other.lastDay.isBefore(from) || other.firstDay.isAfter(to),
       ),
     );
-    if (lane < 0) continue;
+    if (lane < 0) {
+      lane = laneEvents.length;
+      laneEvents.add(<CalendarEvent>[]);
+    }
     laneEvents[lane].add(event);
     result[_calendarEventKey(event)] = lane;
-    for (
-      var day = from;
-      !day.isAfter(to);
-      day = day.add(const Duration(days: 1))
-    ) {
-      dailyCounts[day] = (dailyCounts[day] ?? 0) + 1;
-    }
   }
   return result;
 }
