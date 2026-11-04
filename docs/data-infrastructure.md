@@ -65,6 +65,6 @@ DeepSeek 密钥仅保存在后续服务端环境，不进入数据库。ai_jobs 
 
 `powershell -ExecutionPolicy Bypass -File scripts/verify-data.ps1` 用于本次新初始化的本地环境：验证默认种子计数、约束、迁移和 Redis 认证。三数据库进程退出联动使用 `scripts/verify-data-lifecycle.ps1`；此命令会短暂中断数据服务。已扩展组织或投入业务使用的环境不应直接使用默认种子计数断言。
 
-实际执行结果见 `docs/data-infrastructure-validation.md`。
+实际执行结果见 [历史文件](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/docs/data-infrastructure-validation.md)。
 
 单容器进程联动验证入口为 `powershell -ExecutionPolicy Bypass -File scripts/verify-data-lifecycle.ps1`。它在本地验收环境分别停止 Redis、PostgreSQL 和 Neo4j，验证容器自动重启、三个服务恢复健康和测试键持久化。

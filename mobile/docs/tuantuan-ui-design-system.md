@@ -137,7 +137,7 @@
 
 每个进入仓库的生成资产都要登记到 `mobile/assets/licenses/generated-ui-sources.json`，至少包含：文件路径、生成日期、模型、提示词文件、参考图、是否含第三方角色、透明检查、文字检查、版权角色检查和产品批准状态。
 
-完整生成提示词见 [image-2.5 素材提示词](image-2.5-ui-asset-generation-prompts.md)。
+当前素材来源、许可及加工清单见 `assets/licenses/generated-ui-sources.json`；生成与裁切工具保留在 `mobile/tool/`。早期生成提示词已退出当前文档入口。
 
 ## 6. 页面设计规则
 
@@ -388,7 +388,7 @@ AI办事结果标题使用真实业务语义：处理结束不一律显示“已
 
 ## 11. 当前文档关系
 
-本文档是当前唯一视觉设计基线。早期“阳光纸张 + 动漫橙”方案文档和风格板已清理；页面业务结构、导航、权限与行为仍以[阶段 3 页面布局与交互](stage-3-page-layout-and-interaction-design.md)为参考，视觉部分以本文档为准。
+本文档维护视觉规范，品牌开屏和任务表格的细节见同目录对应主题文档。页面业务结构、导航、权限与行为以产品方案及相关 OpenSpec 为准；[阶段 3 页面布局与交互历史快照](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/docs/stage-3-page-layout-and-interaction-design.md)仅供追溯，不覆盖后续已确认需求。当前入口见 [文档索引](README.md)。
 
 ## 12. 当前资源落盘和裁剪记录
 
@@ -398,5 +398,4 @@ AI办事结果标题使用真实业务语义：处理结束不一律显示“已
 
 2026-10-20 移动端品牌装饰使用：PNG 原图按 avatars/poses/backgrounds 三类切片，manifest 同时记录格坐标和内容边界。头像用于页面/区块标题、导图四卡和月历星期栏；月历今天使用不同于星期栏的头像。背景切片只用于导图卡片内部，并与原卡片外框叠加；全页面仍使用原卡通背景。三个子目录均需在 `pubspec.yaml` 显式声明。状态组件禁止使用柴犬。
 
-业务图标、困团状态插画、纸张点阵背景和工作台背景分别位于 `generated_ui/icons/`、`generated_ui/mascot/` 和 `generated_ui/backgrounds/`，路径常量集中在 `mobile/lib/shared/generated_assets.dart`。来源、生成模型、裁剪方式、透明检查和第三方角色检查记录在 `mobile/assets/licenses/generated-ui-sources.json`；产品公开发布前仍需完成素材批准复核。
-
+当前业务图标和背景位于 `assets/generated_ui/icons/`、`assets/generated_ui/backgrounds/`，柴犬与皮肤位于 `assets/generated_ui/dog/`、`assets/generated_ui/new_pack/`，路径常量集中在 `mobile/lib/shared/generated_assets.dart`。旧困团状态插画及参考整图已清理。来源、生成模型、裁剪方式、透明检查和第三方角色检查记录在 `mobile/assets/licenses/generated-ui-sources.json`；产品公开发布前仍需完成素材批准复核。

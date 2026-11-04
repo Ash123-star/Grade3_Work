@@ -15,10 +15,12 @@
 
 系统减少动画时为180ms静态淡化。动画期间底层IgnorePointer、ExcludeFocus与ExcludeSemantics防止误操作和重复朗读；结束后解除。SessionBootstrap继续并行恢复，未完成时沿用原加载/重试页，不绕过鉴权，不等待网络播放循环。
 
-Android原生启动使用相同黄底与brand_splash_mark.xml静态矢量；日夜模式系统栏使用对应配色。原生阶段受操作系统控制，不称为Flutter动画；Android12遮罩与原生到Flutter构图衔接尚待设备验收。旧icon_splash和launch_image文件保留，但启动流程不再引用。
+Android原生启动使用相同黄底与brand_splash_mark.xml静态矢量；日夜模式系统栏使用对应配色。原生阶段受操作系统控制，不称为Flutter动画；Android12遮罩与原生到Flutter构图衔接尚待设备验收。旧launch_image及其裁切脚本已清理；icon_splash仍被既有素材解码测试引用，保留至该专项后续维护。启动流程不再使用这些位图。
 
 没有采用旧纸纹卡片和宣传语，因为与新图标不一致且增加视觉噪声；没有采用Lottie/Rive，因为当前单角色轻动效可用原生Flutter完成。项目不存在iOS目录，本批目标为现有Android与Flutter启动流程。
 
 ## 验证范围
 
 遵照既有授权仅执行定向静态分析、XML解析和差异检查；不执行测试、构建或设备，不据静态结果宣称视觉或启动验收通过。具体结果见openspec/changes/mobile-brand-splash/verification.md。
+
+桌面图标更新使用 `python mobile/tool/generate_launcher_icon.py <用户提供的方形PNG>`（在仓库根目录执行），保留完整构图，只生成桌面图标，不改写品牌开屏。
