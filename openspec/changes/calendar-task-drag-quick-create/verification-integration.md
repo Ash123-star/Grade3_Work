@@ -1,8 +1,8 @@
 # 当前主干整合验收（2026-11-04）
 
-关联 Issue #58。本报告针对 `feature/58-calendar-drag-integration`，基线为已发布 `main` 的 `c058214a6c3db79f4b14b4ae763c4dd04b75fd78`。`verification.md`、旧截图和旧 PR #59 的历史结果不能替代本批验收。没有操作云服务器，没有启用线上移动能力。
+关联 Issue #58。本报告针对 `feature/58-calendar-drag-integration`，基线为已发布 `main` 的 `c058214a6c3db79f4b14b4ae763c4dd04b75fd78`。`verification.md`、旧截图和旧 PR #59 的历史结果不能替代本批验收。以下为实现阶段记录；后续用户明确要求发布，PR #65 已合并，云服务器已升级并开启能力，详见 [部署记录](deployment-20261104.md)。
 
-实现提交 `4674f5e` 已推送，交付为[草稿 PR #65](https://github.com/Ash123-star/Grade3_Work/pull/65)；[Issue 进展](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6625043331)已同步。该状态仅表示可审阅，不代表已满足所有验收／发布条件。
+实现提交 `4674f5e` 最初交付为[草稿 PR #65](https://github.com/Ash123-star/Grade3_Work/pull/65)，后按用户明确指令合并为 `70f85af` 并部署；[实现阶段 Issue 进展](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6625043331)保留。合并和部署不代表已满足所有验收条件。
 
 ## 原因与实现
 
@@ -52,9 +52,9 @@
 2. 在边缘停留进入相邻月；松手确认，空原因拒绝，取消不产生申请。无权限任务条长按不创建任务。
 3. 提交后按当前审核规则处理；需要审核的任务留在原日期，独立审批后所有入口读取新版本。失权、冲突、超时分别提示，超时只允许原键确认。
 4. 长按空白日期进入现有派发表单，只预填所选日期；时间、人员和标签仍由用户明确选择。短按、普通滚动和多指取消不得误提交。
-5. 保持 `CALENDAR_MOVE_ENABLED=false` 默认值；所有审核消费者兼容 V27／MOVE 后才能按发布流程启用。此次 APK 对应的云服务器尚未部署本功能，安装 APK 本身不能开启线上拖动。
+5. 保持代码中的 `CALENDAR_MOVE_ENABLED=false` 默认值；所有审核消费者兼容 V27／MOVE 后才能按发布流程启用。后续部署已按该顺序在云服务器开启，实际测试应使用部署记录中的 0.1.2 APK。
 
-整合可供代码审阅；全仓检查、性能、实机／TalkBack 和非作者审阅缺口继续阻止宣称全部验收完成、自动合并或上线。迁移／回滚见 `docs/calendar-task-drag-release.md`。
+全仓检查、性能、实机／TalkBack 和非作者审阅缺口继续保留，不能宣称全部验收完成。此次合并上线依据用户后续明确指令执行，不代表常规门槛已通过；迁移／回滚见 `docs/calendar-task-drag-release.md` 和部署记录。
 
 最终系统链路的任务／审核 ID、两轮测试计数和 profile 指标见 [机器可读证据](verification-integration-evidence.json)。最新截图中的橙色指针标记来自测试触点显示：
 
