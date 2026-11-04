@@ -81,7 +81,7 @@
 ## 当前状态与已知限制
 
 - 2026-11-04 当前主干整合结果以 [verification-integration.md](verification-integration.md) 为准：日历专项最终 59 项通过；后端专项 107/108，唯一失败为未改动的时间线断言；两轮 Android→HTTP→PostgreSQL 链路通过。模拟器 profile 十次手势成功但性能未达标，全仓仍未通过，7.4 与实机／审阅项保留未完成。以下为旧分支历史记录。
-- 本批已推送提交 `4674f5e`，创建以 `main` 为基线的[草稿 PR #65](https://github.com/Ash123-star/Grade3_Work/pull/65)，并同步 [Issue #58 进展](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6625043331)。保持未合并、未部署、未归档。
+- 本批提交 `4674f5e` 最初交付为[草稿 PR #65](https://github.com/Ash123-star/Grade3_Work/pull/65)，随后用户明确要求“合并，并部署”。现已合并为 `70f85af`，2026-11-04 15:46 在 39.96.84.51 完成 V27、后端重启及能力开启；33 项线上 HTTP 检查通过。详见 [部署记录](deployment-20261104.md)。原全仓／性能／实机／审阅缺口不因上线而勾选，保持未归档。
 
 - 2026-11-03：主体已实施，分支 feature/58-calendar-task-drag，Issue #58，负责人 C；原目录用户改动保留。
 - Docker task/迁移 85 项、日历专项 10 项、后续边界 3 项及无审核人/驳回 1 项均有退出 0；Flutter 日历核心聚合 45 项、最终月末/布局/辅助操作 26 项、登出 2 项通过，分析退出 0。各批有重叠，不合并为总测试数。

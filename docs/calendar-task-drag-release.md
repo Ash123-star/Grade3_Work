@@ -28,4 +28,12 @@ HTTP release 模式 APK 位于 mobile/build/app/outputs/flutter-apk/app-release.
 
 2026-11-04 主干整合使用 V27，与已发布 V22/V23/V26 并存；审核消费者沿用当前直属单级审核及创始人权限内免审。上面的 2026-11-03 验收和 APK 只属于旧分支。本轮结果见 `openspec/changes/calendar-task-drag-quick-create/verification-integration.md`。
 
-本轮最终 APK：`output/releases/calendar-drag-integration/pandora-calendar-drag.apk`，SHA256 `2A972561801DC0CEAF0990B8EB424B0C1157444C8F0A49B22F56393C96D872BA`，目标 `http://39.96.84.51/api`。本轮未部署该服务器，因此旧后端不会给出移动 capability；仅安装新 APK 不会启用线上拖拽。日历 59 项、两轮 Android 本地真实链路、分析和打包通过；全仓与性能门槛仍未通过，保持草稿审阅状态。
+实现阶段 APK：`output/releases/calendar-drag-integration/pandora-calendar-drag.apk`，SHA256 `2A972561801DC0CEAF0990B8EB424B0C1157444C8F0A49B22F56393C96D872BA`，当时尚未部署服务器。该旧产物已由以下 0.1.2 包替代。日历 59 项、两轮 Android 本地真实链路、分析和打包通过；全仓与性能门槛仍未通过。
+
+## 当前线上发布（2026-11-04 15:46，Asia/Shanghai）
+
+用户明确要求合并部署后，PR #65 已合并为 `70f85af`，39.96.84.51 的单一后端实例先升级 V27／MOVE 消费者，再开启 `CALENDAR_MOVE_ENABLED=true` 并重启。33 项线上 HTTP 检查通过，原 22 个账号、647 条任务、2 条个人事项及任务日期／版本不变。源码检出中的用户改动保持原样。
+
+当前测试 APK：`output/releases/calendar-drag-70f85af/pandora-calendar-drag-0.1.2.apk`，versionCode `20261105`，SHA256 `7C23AA1EB0871D0AD944A4C86B20FBAD73FC6E0B7265014F60D2FAE747E83B31`；签名与此前 0.1.1 相同，可以覆盖安装。真实 API 为 `http://39.96.84.51/api`。
+
+服务器备份、分阶段启动、验证、已知限制及上线后回滚要求见 [部署记录](../openspec/changes/calendar-task-drag-quick-create/deployment-20261104.md)。发布依照用户明确指令进行；全仓、性能、实机及审阅缺口仍保留，不能把部署结果当作全量验收完成。
