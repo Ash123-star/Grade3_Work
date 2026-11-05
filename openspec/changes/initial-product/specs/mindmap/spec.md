@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Default navigation and quadrants
-Android SHALL 默认打开导图，底栏从右往左依次为导图、视图、日志、AI地图、我的。导图 SHALL 显示左上公司十大重点、右上公司十大任务、左下个人十大重点、右下个人日志。
+Android SHALL 默认打开首页，底栏从左往右依次为首页、公司、日志、AI地图、我的。首页 SHALL 按home-company-daily-todos规格显示事件纪、本人任务看板与独立每日事项月历；原个人重点/日志首页块移除但不删除存量数据和兼容路由。
 
 #### Scenario: Read company cards
 - **WHEN** 任何角色打开上方两个公司区域

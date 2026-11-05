@@ -75,7 +75,7 @@ P0：原生移动端登录成功后 SHALL 默认保存受保护的最小认证�
 #### Scenario: Login followed by application state recreation
 
 - **WHEN** 用户通过当前登录接口登录，随后销毁应用状态并重新打开同一服务地址的应用
-- **THEN** 客户端 SHALL 用保留的 token 调用 auth/me，在同一有效身份确认后进入默认导图，无需再次输入或提交账号密码
+- **THEN** 客户端 SHALL 用保留的 token 调用 auth/me，在同一有效身份确认后进入默认首页，无需再次输入或提交账号密码
 
 #### Scenario: Unconfirmed secure write
 

@@ -20,8 +20,8 @@
 
 ## 当前实现与验收边界
 
-[P0 状态](../../docs/mobile-p0-implementation-status.md) 和 [剩余接口状态](../../docs/mobile-remaining-api-implementation-status.md) 记录日志直改、任务区间、资料、统计、AI scope/确认版本及幂等回执等接入；详细场景保留在相关 OpenSpec 和 [接口缺口](../../docs/backend-interface-gaps.md)。意见反馈已取消，旧日志阅读登记已停用，不应根据历史草案恢复这些接口。
+[统一接口状态](../../docs/backend-interface-gaps.md)集中维护接入与待验收边界，具体契约不在多份状态表重复维护。意见反馈已取消，旧日志阅读登记已停用，不应根据历史草案恢复这些接口。
 
 AI 只能通过企业服务端调用供应商；客户端的 Mock 样例不调用外部模型，也不能证明真实 AI 或数据库链路通过。建议需要人工确认，版本/范围/来源校验按服务端协议执行。
 
-[2026-10-30 联调记录](../../docs/frontend-backend-integration-validation-2026-10-30.md) 包含当前失败与未验收范围。HTTP 夹具通过、Mock 页面通过、编译或旧批次截图都不能替代设备与真实服务验收。
+[统一验证入口](../../docs/backend-validation.md)包含最新已记录自动化结果与未验收范围，2026-10-30记录仅为历史。HTTP 夹具通过、Mock 页面通过、编译或旧批次截图都不能替代设备与真实服务验收。

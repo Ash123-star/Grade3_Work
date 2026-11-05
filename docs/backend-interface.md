@@ -4,13 +4,13 @@
 
 实现事实以 SpringDoc 运行时文档 `GET /api/openapi` 为准；提交到仓库的 `docs/openapi.json` 是同一份契约快照，本文件只解释调用规则。三者必须同步更新，客户端不得根据旧版本猜测字段。
 
-2026-11-04：`docs/openapi.json` 已从 Issue #63 隔离运行服务重新导出，包含每日事项契约。每日事项与任务看板的定向测试通过，整库回归仍有失败；详细范围与限制见 [验收记录](../openspec/changes/home-company-daily-todos/verification.md)。历史 P0 的状态另见各自记录，不因快照刷新而认定全部验收通过。
+`docs/openapi.json`包含每日事项等运行时契约；快照生成和专项测试均有提交/环境范围。最新已记录完整自动化及未验设备/外部依赖统一见 [验证入口](backend-validation.md)，不把旧批次失败或快照刷新等同当前验收结论。
 
 根路径为 `/api`。除公开登录、注册和健康检查外均需 `Authorization: Bearer <session-token>`。每个响应带 `X-Trace-Id`；错误体为 `{code,message,traceId}`。列表使用 `{items,total,nextCursor}`，`cursor` 为偏移量，`limit` 范围 1–100。时间使用 UTC ISO-8601，业务日期按 `Asia/Shanghai` 且周一为周首。
 
-移动端补充协议见 [`mobile-openapi-contract.yaml`](mobile-openapi-contract.yaml)，并由 `docs/openapi.json` 的 `x-mobile-contract` 标记引用。对该覆盖文件列出的 path、operation 和 schema，以覆盖文件为目标契约；当前状态为 `IMPLEMENTED_UNVERIFIED`，对应源码已接入但尚未通过编译、数据库升级和 HTTP 验收。最终统一验收时必须同步 SpringDoc、`docs/openapi.json` 和移动端 HTTP contract tests。逐项源码接入与验收待办见 [`mobile-p0-implementation-status.md`](mobile-p0-implementation-status.md)。
+[移动端补充快照](mobile-openapi-contract.yaml)保存历史补充契约，不覆盖Controller/运行时SpringDoc，也不独立维护完成度。其旧IMPLEMENTED_UNVERIFIED标签与“尚未编译/迁移”的结论已过期；状态统一见 [接口接入与待验收](backend-interface-gaps.md) 及验证入口。接口变化须同步运行时SpringDoc、OpenAPI、调用方和契约测试。
 
-移动端与服务端的逐项缺口、当前实现状态和后端接手验收要求见 [`mobile/docs/backend-contract-gaps-mobile-page-experience-refresh.md`](../mobile/docs/backend-contract-gaps-mobile-page-experience-refresh.md)。其中“缺失/不匹配”只表示协议或运行端点尚未兑现，不表示移动端 Mock 已替代服务端业务。
+移动端与服务端的逐项缺口、当前实现状态和后端接手验收要求见 [`docs/backend-interface-gaps.md`](backend-interface-gaps.md)。其中“缺失/不匹配”只表示协议或运行端点尚未兑现，不表示移动端 Mock 已替代服务端业务。
 
 写请求只接受文档列出的字段。更新请求携带 `version`；创建请求可携带 `Idempotency-Key`。版本冲突返回 `409`，越权对象通常返回 `404`，明确的人员筛选越权返回 `403`。
 
@@ -87,7 +87,7 @@
 
 ## Flutter 接口缺口（待完成）
 
-2026-10-29剩余接口实现状态见 [mobile-remaining-api-implementation-status.md](mobile-remaining-api-implementation-status.md)。任务评论/日志回复和RETURNED后端已存在，本批接通客户端退回及通知映射；成果反馈增加最多5个attachments（仅本人上传同公司可用材料，复用任务读取授权）。`GET /organization/teams`返回当前组织树范围内团队目录。意见反馈已由用户取消，移动端入口/表单/Mock资源移除，旧深链返回帮助页；不新增feedback接口。阅读登记已停用，不新增阅读人员清单。
+2026-10-29剩余接口实现状态见 [统一接入状态](backend-interface-gaps.md)。任务评论/日志回复和RETURNED后端已存在，本批接通客户端退回及通知映射；成果反馈增加最多5个attachments（仅本人上传同公司可用材料，复用任务读取授权）。`GET /organization/teams`返回当前组织树范围内团队目录。意见反馈已由用户取消，移动端入口/表单/Mock资源移除，旧深链返回帮助页；不新增feedback接口。阅读登记已停用，不新增阅读人员清单。
 
 AI作业创建增加 `scope=SELF|AUTHORIZED`（默认AUTHORIZED），服务端权限仍是上限，SELF仅本人日志、参与/派发任务和本人重点，后台执行/重试保留范围。确认请求为 `{version,actionIndex,task}`，必须携带1–128位Idempotency-Key；作业行锁、当前来源及派发权限、版本检查、任务/审核创建和V23确认回执同事务。首次旧版本返回409 VERSION_CONFLICT，同键同规范化命令重放原结果，同键异内容409 IDEMPOTENCY_CONFLICT；重放仍重验当前及原行动来源。返回TASK_CREATE审核对象，客户端跳转审核结果，不能将申请ID当任务ID。上述源码均未编译、测试、启动或迁移；最终统一验收时重新生成运行时快照。
 
@@ -172,8 +172,3 @@ GET /organization/people沿用原组织数据范围，追加可空team_name，�
 ### 中国大陆节假日月历（成员 D）
 `GET /api/calendar/holidays?year=2026`：已登录、已确认且无需强制改密的账号可读；沿用公共认证规则。year为2007至2100，越界400 `INVALID_YEAR`；缺失/格式错误400；未登录401、无业务访问权限403。只读幂等，无写入版本及分页。返回 `{year,days:[{date,name,isOffDay}],papers,status,fetchedAt}`；date为中国大陆业务日期，isOffDay=false表示公告指定的调休上班日。status为FRESH、STALE或UNAVAILABLE；fetchedAt为最后成功获取的UTC时间，无成功记录为空字符串。
 固定来源为 NateScarlet/holiday-cn 的 GitHub contents API（raw JSON Accept），保留国务院公告链接。缓存24小时；失败5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。客户端查询相邻公告年份处理跨年网格；数据故障不阻塞任务。服务端响应上限256 KiB、完整请求6秒超时；无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。
-
-
-
-
-

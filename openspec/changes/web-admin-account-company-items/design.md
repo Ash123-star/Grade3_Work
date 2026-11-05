@@ -9,7 +9,7 @@
 - `/organization/people` 是业务选人接口，默认排除 DISABLED，搜索姓名/部门，字段缺少完整编辑上下文，不能承担完整账号管理。
 - `/organization/users/{id}/revisions` 已支持组织/角色/状态候选，包含汇报循环、团队归属及最后一个有效管理员保护。`MEMBERSHIP` 是员工本人申请，不能伪造员工身份由管理员提交。
 - 公司事项已有读取与候选创建，Controller 仍直接执行部分 SQL，查询排除归档；最终审核应用已锁公司并检查最多十项置顶。新增管理逻辑应分层，不复制现有 Controller SQL。
-- 主规格沿用候选版本、独立复核、跨端一致；活动 week6 变更约束独立 Web 仅 ADMIN。`initial-product/analytics-web` 历史规划默认导图且面向更宽业务范围，本批仅将管理子入口默认设为账号管理，不覆盖未来完整门户要求；实施时同步基线说明。
+- 主规格沿用候选版本、独立复核、跨端一致；活动 week6 变更约束独立 Web 仅 ADMIN。`initial-product/analytics-web` 历史规划默认首页且面向更宽业务范围，本批仅将管理子入口默认设为账号管理，不覆盖未来完整门户要求；实施时同步基线说明。
 
 ## Goals / Non-Goals
 

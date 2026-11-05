@@ -91,7 +91,7 @@ The client SHALL provide original welcome,writing,explaining,success,empty and r
 - **THEN** it SHALL present the matching empty/retry pose or neutral permission icon and a readable reason/recovery path without fabricated records
 
 ### Requirement: Reference-driven main screens
-The mobile client SHALL rebuild the five main screens using the approved eight-screen reference and SHALL preserve 导图、视图、日志、AI地图、我的 navigation order with 导图 as default. Priority is P1; scope is mobile UI only.
+The mobile client SHALL rebuild the five main screens using the approved eight-screen reference and SHALL preserve 首页、公司、日志、AI地图、我的 navigation order with 导图 as default. Priority is P1; scope is mobile UI only.
 
 #### Scenario: Employee opens the workspace
 - **WHEN** an active employee opens each main screen

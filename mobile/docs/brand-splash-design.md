@@ -21,6 +21,10 @@ Android原生启动使用相同黄底与brand_splash_mark.xml静态矢量；日�
 
 ## 验证范围
 
-遵照既有授权仅执行定向静态分析、XML解析和差异检查；不执行测试、构建或设备，不据静态结果宣称视觉或启动验收通过。具体结果见openspec/changes/mobile-brand-splash/verification.md。
+遵照既有授权仅执行定向静态分析、XML解析和差异检查；不执行测试、构建或设备，不据静态结果宣称视觉或启动验收通过。具体结果见openspec/changes/tuantuan-ui-migration/tasks.md。
 
 桌面图标更新使用 `python mobile/tool/generate_launcher_icon.py <用户提供的方形PNG>`（在仓库根目录执行），保留完整构图，只生成桌面图标，不改写品牌开屏。
+
+## 桌面图标资源与验收边界
+
+用户参考PNG通过`mobile/tool/generate_launcher_icon.py`单独生成Android五档48/72/96/144/192px，保留完整构图；Manifest仍引用@mipmap/ic_launcher，不调用会同时覆盖开屏的旧生成流程。2026-10-23资源脚本、尺寸/源字节/Manifest检查退出0，未构建安装或验收实际桌面显示。原生图标变更须重新安装，Hot Reload不能证明已更新。品牌开屏2400ms、减少动画180ms，以当前设计及tuantuan-ui-migration为准，不沿用旧1280ms记录。

@@ -2,12 +2,12 @@
 
 ## ADDED Requirements
 
-### Requirement: 五栏导航与默认导图
-The application SHALL provide five primary destinations ordered left-to-right as 我的、AI 地图、日志、视图、导图, and SHALL open 导图 on first entry.
+### Requirement: 五栏导航与默认首页
+The application SHALL provide five primary destinations ordered left-to-right as 首页、公司、日志、AI地图、我的, and SHALL open 首页 on first entry.
 
 #### Scenario: Open application
 - **WHEN** a local demo user launches the application
-- **THEN** the shell displays the five destinations and selects 导图 without requiring a backend response
+- **THEN** the shell displays the five destinations and selects 首页 without requiring a backend response
 
 ### Requirement: 全页面可访问
 The application SHALL provide non-empty routes for the dashboard, AI map, logs, calendar view, profile, task detail, task dispatch, approvals, notifications, settings, subordinate logs, and log history.

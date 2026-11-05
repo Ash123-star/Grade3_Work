@@ -9,6 +9,8 @@ metadata:
   generatedBy: "1.5.0"
 ---
 
+**Repository gate**: Read root AGENTS.md first. Create a new change only for a concrete substantial feature with an independent user goal and acceptance scope, after checking existing changes. Small fixes, style, configuration and documentation maintenance do not create OpenSpec artifacts; update the existing topic or Issue/PR instead.
+
 Propose a new change - create the change and generate all artifacts in one step.
 
 I'll create a change with artifacts:

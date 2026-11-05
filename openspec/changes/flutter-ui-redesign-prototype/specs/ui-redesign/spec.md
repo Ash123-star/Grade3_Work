@@ -45,7 +45,7 @@ The UI SHALL use an original or appropriately licensed chibi companion consisten
 - **THEN** the UI shows the actual state and recovery path without success celebration or fabricated records.
 
 ### Requirement: Prototype preserves product structure
-The replacement prototype SHALL preview the single confirmed theme with five navigation entries ordered 导图、视图、日志、AI地图、我的 and default 导图. It SHALL preserve the two-by-two company focus/company tasks/personal focus/personal logs structure, preview an editable form and demonstrate at least one failure recovery. Mock content SHALL be visibly identified.
+The replacement prototype SHALL preview the single confirmed theme with five navigation entries ordered 首页、公司、日志、AI地图、我的 and default 导图. It SHALL preserve the two-by-two company focus/company tasks/personal focus/personal logs structure, preview an editable form and demonstrate at least one failure recovery. Mock content SHALL be visibly identified.
 
 #### Scenario: User opens and navigates the prototype
 - **WHEN** the user opens the replacement prototype and selects a main entry

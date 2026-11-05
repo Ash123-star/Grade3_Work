@@ -1,20 +1,10 @@
 # AI办事部署与回滚
 
-2026-10-22 主线协调后的当前镜像为 `workpanel-backend:ai-work-reconciled`（37d43f66bf57）。后端已连接最终恢复副本 `workpanel_ai_upgrade_9ac0fd9b53f5`，正常 Flyway V18 校验/启动、健康 UP、真实登录/事项/任务/日志读取及 Web 管理员工作台通过；原库 `workpanel` 历史保持不变。68 个业务表和数据库序列在转换前后比对一致，独立删除标记已重放，自动写入仍 false。备份、前后摘要与切换回执在忽略目录 `output/ai-work-reconciliation/final-20261022-172125/`、`promotion-result.json`；旧 API `workpanel-ai-api-before-lineage-20261022-172125` 停止保留。下文旧镜像、旧迁移号与混合工作区阻塞均为历史；当前规则与剩余验收限制不变。
-
-上一批镜像 `workpanel-backend:ai-work-delivery-final` 包含 delivery-rules-2 及只读检查空动作修复，此次全部保留。60 场景的真实 OCR/DeepSeek 结果见 OpenSpec 批次验收，仍不满足正式自动写入开放条件，禁止仅凭任务 9.7 已勾选就开启写入。
-
-2026-10-22 本批运行状态优先于下文历史记录：已先执行 pg_dump 并导出删除标记，再更新本地 API 至 `workpanel-backend:ai-work-final`，Flyway 当前 V18，健康 UP，正式自动写入仍 false；数据库、会话和数据卷保留。备份位于忽略目录 `output/ai-work-runtime/backups/20261022-batch/`，旧 API 容器停止保留为 `workpanel-ai-api-before-batch`。新版 APK 已安装到 App_Run_API37。OCR 仍仅内网、只读、2GB/2CPU，已补齐 `on-failure` 重启设置，避免推理硬超时退出后持续不可用。
-
-2026-10-22本地恢复：Docker已恢复，新版`workpanel-ai-api-main`监听127.0.0.1:8080，实际认证/能力查询通过；API通过`workpanel-ai-service`内的`pandora-stage-data-1`使用5432/6379/7687，不再依赖恢复后无法连接的宿主Redis转发端口。数据容器/卷及会话保留，V16无需新迁移。运行镜像包含受验`workpanel-parser-sandbox`并强制`AI_PARSER_SANDBOX_REQUIRED=true`；OCR切到完整锁镜像`workpanel-ocr:locked-acceptance`，只读/2GB/2CPU/禁外网配置保留。执行开关false；仍未达到代表样本/设备/人测发布条件。
-
-本批模板预填与文档提取共用解析沙箱及30秒进程限制。DOCX 支持跨文字段的姓名/部门/日期/事由占位符及表格/页眉页脚，XLSX 只替换字符串单元格；未知占位符、公式和审核字段保留人工核对。产物即时受权下载，不生成公共地址，不改变原模板。子进程终止后等待退出再清理临时目录。未增加数据库迁移。
-
-2026-10-21：本地开发实现，自动写入保持关闭，未达到正式发布条件。证据见 `openspec/changes/ai-work-assistant/validation.md`。
+长期运行、安全、迁移与恢复方式维护在本文，功能和未完成验收见 [tasks](../openspec/changes/ai-work-assistant/tasks.md)，正式契约见 [API](ai-work-assistant-api.md)。历史局部容器健康/镜像标签不代表当前机器状态，部署前须核对实际服务与数据库；自动写入未满足发布门槛时保持关闭。
 
 ## 当前迁移序列与恢复副本升级
 
-统一序列保留主分支已发布的 V1–V15，新增 V16 `ai_work_assistant`、V17 `durable_delivery_checks`、V18 `ai_authorization_policy`。新库和主分支 V15 库走正常 Flyway，不运行协调工具，不设置常驻 outOfOrder。本文下面关于旧 AI V14/V15/V16、日志 V17/V18 及不能升级 main 的文字是协调前的历史记录；当前决定见 [协调与验收](../openspec/changes/ai-work-assistant/reconciliation-2026-10-22.md)。
+统一序列保留主分支已发布的 V1–V15，新增 V16 `ai_work_assistant`、V17 `durable_delivery_checks`、V18 `ai_authorization_policy`。新库和主分支 V15 库走正常 Flyway，不运行协调工具，不设置常驻 outOfOrder。原AI旧编号冲突已通过严格恢复副本转换协调；禁止把旧“main库不能升级”的结论当作当前限制。后续迁移仍按当前server Flyway链向前执行。
 
 仅已经执行旧 AI V14–V16（可含旧日志 V17/V18）的开发库需要恢复副本转换。完成当前后端验收并生成 JAR 后，将数据库密码配置到当前进程 `DB_PASSWORD`，执行：
 
@@ -28,9 +18,7 @@ python scripts/upgrade-ai-work-clone.py --source-container <数据容器> --sour
 
 失败副本和备份保留供检查，不能投入使用；源库保持不变。切换失败时停止新 API，恢复旧镜像及源库连接；切换后如已经产生新的业务写入，不得直接回切丢弃新记录，须先停写并核对增量。禁止重置卷或删除历史业务。
 
-## 迁移与开关（协调前历史记录）
-
-V14新增私人事项/步骤/授权/回执、正式资料/版本、任务清单/报告；V15新增异步检查队列。不修改V1–V13，不删除旧任务/AI作业。附件保留task_id兼容。PROCEDURE是独立复核kind，回退旧后端前停止新申请并处理存量；禁止降级后继续写新表。
+## 能力开关
 
 ```dotenv
 AI_WORKBENCH_ENABLED=true
@@ -39,7 +27,7 @@ AI_OCR_ENABLED=false
 AI_OCR_URL=http://ocr:8000
 ```
 
-DeepSeek复用服务端配置及原预算/限流。客户端、OCR和文档子进程不持有模型密钥。执行器两个槽，交付检查一个槽，PG租约/fence、最多3次尝试；外部处理在业务事务外。入口、写入、OCR独立开关，OCR失败可以补文字，手工任务/日志仍可用。
+DeepSeek仅由服务端配置；客户端、OCR和文档子进程不持有模型密钥。执行器两槽、交付检查一槽，PG租约/fence、最多3次尝试；外部处理在业务事务外。入口、写入、OCR独立开关，OCR失败可补文字，不阻塞手工任务/日志。模板预填使用同一沙箱，未知占位符/公式/审核字段留待人工核对，产物受权下载、不改原模板或生成公共链接。
 
 ## 本地OCR
 
@@ -53,7 +41,7 @@ DeepSeek复用服务端配置及原预算/限流。客户端、OCR和文档子�
 docker compose -f deploy/ocr/compose.yml up -d --build
 ```
 
-本机无compose插件，已用等效方式构建和运行：
+无Compose插件环境可采用等效隔离方式（镜像标签替换为实际验收版本）：
 
 ```powershell
 docker build -t workpanel-ocr:3.0.3 deploy/ocr
@@ -61,11 +49,11 @@ docker network create --internal workpanel-ai-parser
 docker run -d --name workpanel-ai-ocr --restart on-failure --network workpanel-ai-parser --memory 2g --cpus 2 --pids-limit 128 --read-only --tmpfs /tmp:size=128m,mode=1777 --cap-drop ALL --security-opt no-new-privileges:true workpanel-ocr:3.0.3
 ```
 
-镜像 `a8b786cbb172` 已通过ready和真实中文识别。以UID10001运行，只读根目录、128MB临时盘、2CPU/2GB、无特权、内网禁止外连。后端容器加入同一网络，用 `http://workpanel-ai-ocr:8000`；后端通过其正常出站网络访问模型，不给OCR连接外网。
+历史镜像曾通过ready和中文识别；部署时重新核对实际摘要和ready。以UID10001运行，只读根目录、128MB临时盘、2CPU/2GB、无特权、内网禁止外连。后端容器加入同一网络，用 `http://workpanel-ai-ocr:8000`；后端通过其正常出站网络访问模型，不给OCR连接外网。
 
-当前Docker环境internal网络端口不能供Windows宿主访问，`127.0.0.1:58001`不是已验证生产地址。供应商验收脚本临时转发localhost到容器内部HTTP，退出即关闭，只用于隔离验收。配置模板默认OCR关闭。
+internal网络不应对宿主/外网公开OCR；验收转发仅用于隔离测试，配置模板默认OCR关闭。
 
-本机已将后端迁为 `workpanel-ai-api-main` 容器，监听127.0.0.1:8080，同时接入普通服务网络及 `workpanel-ai-parser`，使用上述容器地址访问OCR；OCR只接内网。该本地运行配置OCR开启、自动写入关闭，数据库和现有会话保留。镜像标签 `workpanel-backend:ai-work-assistant`，本机数据库迁移前备份保存在忽略目录 `output/ai-work-runtime/backups/`。此为本地验证部署，正式环境仍需接入运维配置。
+后端同时接普通出站网络与OCR内网，OCR仅接内网；历史本地验证容器名不作为固定配置。正式部署核对镜像、备份与能力开关。
 
 文档使用独立256MB/128MB metaspace/1CPU子JVM，30秒硬终止并清理临时目录。PDF≤50页、图片≤20MP、表格≤50000格、ZIP展开≤100MB。扫描PDF全文件90秒前后检查，单次OCR≤30秒，不把超时保存为成功。后端镜像会编译 `workpanel-parser-sandbox`，用 seccomp 拒绝解析子进程的 socket 系统调用，并限制 CPU 时间、地址空间、单文件大小、文件描述符和 core dump；镜像构建会运行探针确认网络 socket 被拒绝且资源限额生效。Compose 强制 `AI_PARSER_SANDBOX_REQUIRED=true`，缺少可执行沙箱时解析失败关闭。部署环境仍须以实际构建日志和运行镜像核验该探针，不应仅凭源码视为生产验收通过。
 
@@ -75,9 +63,9 @@ docker run -d --name workpanel-ai-ocr --restart on-failure --network workpanel-a
 
 事项实时恢复不新增迁移。反向代理须保留text/event-stream、Authorization和Last-Event-ID，不缓冲SSE；55秒连接正常关闭后客户端自动重连。来源/权限视图改变使用refresh要求重新GET，失权access-lost后停流。部署新版服务端时两端可通过GET与持久事件恢复；正式业务写入开关仍默认关闭。
 
-Flutter恢复补丁要求服务端返回完整v1能力/分页/事项结构（含contractVersion、nextCursor、身份/版本及消息/步骤/回执集合），损坏或不兼容响应会停止当前提交并提示刷新。能力接口刷新失败时保留已输入内容和材料、暂停发送，恢复后可继续；账号切换清理私人输入。取消/续办不删除既有正式结果。本补丁只升级APK，使用当前V16服务，无需重启数据库或修改已发布迁移；回滚客户端不撤销正式任务/交付。
+Flutter恢复补丁要求服务端返回完整v1能力/分页/事项结构（含contractVersion、nextCursor、身份/版本及消息/步骤/回执集合），损坏或不兼容响应会停止当前提交并提示刷新。能力接口刷新失败时保留已输入内容和材料、暂停发送，恢复后可继续；账号切换清理私人输入。取消/续办不删除既有正式结果。客户端恢复补丁本身不要求额外迁移；回滚客户端不撤销正式任务/交付。
 
-V16新增companies.ai_authorization_revision、个人授权policy_revision及检索索引，保留V14/V15不变。AI授权公司限制复用review_policy并经POLICY独立复核；公司生效边界通过共享/排他行锁与在途动作串行。旧授权失效后需本人重新开启，回退应用不得把已失效授权恢复。升级前备份，执行开关仍保持false。
+V18新增companies.ai_authorization_revision、个人授权policy_revision及检索索引，保留已发布迁移不变。AI授权公司限制复用review_policy并经POLICY独立复核；公司生效边界通过共享/排他行锁与在途动作串行。旧授权失效后需本人重新开启，回退应用不得把已失效授权恢复。升级前备份，执行开关仍保持false。
 
 解析缓存7天，完成事项原始私人材料30天，90天无活动先停后隐藏，每小时清理。主动删除立即停止私有读取/新动作，物理清理异步进行。未用于正式交付的私人检查作业/报告90天清理，正式交付引用的报告保留。正式任务/交付/制度附件及头像按用途保留，不级联删除正式业务。AI动作/授权审计365天后清理详情，保留操作者、类型、对象、时间和幂等回执；其他业务审计不受影响。个人授权创建与撤回同事务记录审计，同键重试不重复写入。
 
@@ -91,10 +79,20 @@ python scripts/ai-work-deletion-markers.py export --container workpanel-backend-
 python scripts/ai-work-deletion-markers.py apply --container workpanel-backend-data-1 --database workpanel --api-container workpanel-backend-api-1 --file D:/private-backups/ai-work-deletions.json
 ```
 
-## 发布门槛
+## 已记录验收与发布门槛
 
-2026-10-22 新验收批次和主分支 #23 接入决策见 [批次说明](../openspec/changes/ai-work-assistant/acceptance-batch-2026-10-22.md)。本地已执行 AI V14/V15/V16 保留，日志能力通过 V17/V18 前向接入；已执行 main 日志 V14/V15 的数据库暂不能直接升级到本工作区，不能用 repair 掩盖迁移历史冲突。
+以下是2026-10-22的专项历史结果，基线main dc00e2b，后端/迁移提交5847b47、界面/续办92e6600，Issue #24 / PR #25；未在本次文档整理重跑。2026-11-05全仓自动化更新见 [统一验证入口](backend-validation.md)，不能用其替代供应商或设备专项。
 
-60份合成截图已调用真实本地OCR与DeepSeek：58份形成待确认/追问，2份失败，候选负责人/期限误匹配为0；不能宣布全样本通过。锁镜像中文冒烟11.937秒、全文匹配且内网外连拒绝，尚不能证明OCR P95≤5秒。本地pg_dump/restore删除标记重放已演练，生产部署仍须配置独立标记保存和全副本停机。多页/历史文件/同名等代表样本、服务器20并发完整矩阵、Android真机profile/TalkBack及5位首次使用者仍待验收。正式自动写入保持false。
+| 范围 | 结果与证据 | 限制 |
+| --- | --- | --- |
+| 迁移恢复 | 原15份主线迁移逐份一致；390项旧回归通过，新迁移夹具首轮1失败/1错误，修正隔离schema后4项专项通过，不能写成首轮394全过 | 只转换已知旧历史的恢复副本；错误校验和/缺版本/失败/重复/未知脚本/非隔离目标拒绝 |
+| 数据切换 | 68业务表与全部public序列摘要一致，原库不变，删除标记重放后正常Flyway V18启动；登录/能力/事项/任务/日志HTTP200 | 证据`output/ai-work-reconciliation/final-20261022-172125/`、`promotion-result.json`、`live-api-result.json`；不是当前在线检查 |
+| 故障恢复 | 取消/删除/撤权/部分成功/回滚/模型OCR故障/预算各至少20次；真实JVM20轮40次终止，事件/回执/审计/outbox各一次 | `scripts/verify-ai-work-restarts.py`、`output/ai-work-restarts/result.json`；不把数据库时钟夹具称为进程重启 |
+| 真实OCR/DeepSeek合成60场景 | 完整首轮55/60，退出1；修复后20份交付复验19符合预期，另1缺成本提前追问，补验55返回UNVERIFIABLE、19模糊图安全追问；跨轮次60场景均有预期证据 | 不是单轮60/60；生成器/验证器为scripts/ai-work-acceptance-corpus.py、verify-ai-work-corpus.py；`output/ai-work-corpus-reviewed.json` |
+| 样本指标 | 跨轮次业务字段完成97.06%、提取字段96.81%、定位100%、追问31.67%、关键误写0、正式写入0；最新选定样本68797 tokens，中位14.392秒、P95 27.984秒 | 包含轮询/夹具，非纯OCR；四组82次供应商调用93394 tokens、余额约0.19元非精确账单；合成数据不代表生产准确率 |
+| OCR隔离 | 锁镜像中文冒烟11.937秒、全文匹配/外连拒绝；文档OS沙箱探针与资源限制有证据 | 不证明OCR P95≤5秒，镜像重建须复验 |
+| 客户端与Web | Flutter276通过/1跳过，分析/APK退出0；Web36通过/4失败/4跳过，定位修正后4通过/2跳过，累计40不同用例通过、4凭据依赖未验 | 不重复计数；历史双端创建/补充/恢复/删除为部分链路，不能等同三条完整Web闭环 |
 
-2026-10-22开发环境限制：C盘耗尽曾导致Docker数据文件系统只读；释放本次编译缓存后Docker仍因IPC socket错误无法启动，当前API/OCR容器没有重新运行。最后代码以隔离本机PG18/Redis5和WSL Linux解析沙箱补验，不能据此声称Compose部署成功。先修复Docker Desktop启动环境，再使用已记录的镜像/源文件重建并核验健康；不要删除数据卷或重置Docker来替代恢复。
+历史样本错误、OCR冷推理中断、模型错误引用与空动作的失败日志保留，不能只留下成功轮次。证据位置主要为`output/ai-work-batch-*`、`output/ai-work-corpus-*`及`output/ai-work-reconciliation/`，仅为原执行机器的本地证据，丢失时应从Git/PR核对或重新验收，不能声称本机必然存在。
+
+未完成：真实公司代表材料、多页/历史文件/同名完整矩阵、服务器20并发隔离性能、Android目标设备profile/TalkBack、5位首次使用者、双端真实并发写入/读屏、Web三条完整闭环、Sprint/分工/估算，以及规格同步/归档。保留tasks原复选状态。发布前配置独立删除标记保存与所有副本停写恢复；正式自动写入继续false，不因采样任务已勾选开放。
