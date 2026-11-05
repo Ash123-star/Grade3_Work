@@ -139,8 +139,11 @@ class TaskLabelSelector extends ConsumerWidget {
                                         ),
                                         child: Text(
                                           label.title,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.w700,
+                                            color: _foreground(
+                                              label.fields['color'],
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -187,12 +190,15 @@ class TaskLabelSelector extends ConsumerWidget {
   );
 
   static Color _color(dynamic raw) {
-    final hex = '$raw'.replaceFirst('#', '');
+    final hex = '$raw'.trim().replaceFirst('#', '');
     final value = RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)
         ? int.tryParse(hex, radix: 16)
         : null;
     return value == null ? Colors.grey.shade200 : Color(0xFF000000 | value);
   }
+
+  static Color _foreground(dynamic raw) =>
+      _color(raw).computeLuminance() > .45 ? Colors.black87 : Colors.white;
 }
 
 class _TaskLabelSheet extends StatefulWidget {
@@ -239,7 +245,23 @@ class _TaskLabelSheetState extends State<_TaskLabelSheet> {
             children: [
               for (final label in widget.labels)
                 FilterChip(
+                  key: ValueKey('task-label-option:${label.id}'),
                   label: Text(label.title),
+                  // Material 3 resolves ChipTheme.color before backgroundColor
+                  // and selectedColor, so override every state at this level.
+                  color: WidgetStatePropertyAll(
+                    TaskLabelSelector._color(label.fields['color']),
+                  ),
+                  surfaceTintColor: Colors.transparent,
+                  checkmarkColor: TaskLabelSelector._foreground(
+                    label.fields['color'],
+                  ),
+                  backgroundColor: TaskLabelSelector._color(
+                    label.fields['color'],
+                  ),
+                  labelStyle: TextStyle(
+                    color: TaskLabelSelector._foreground(label.fields['color']),
+                  ),
                   selected: selected.contains(label.id),
                   selectedColor: TaskLabelSelector._color(
                     label.fields['color'],

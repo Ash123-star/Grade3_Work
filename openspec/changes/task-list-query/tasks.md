@@ -4,7 +4,7 @@
 
 ## 2. 查询实现
 
-- [ ] 2.1 实现 `TaskQueryService`、查询参数和值对象及专用 `TaskListView`；只选择和返回白名单字段，不将 `tasks.body`、`phase` 或详情 DTO 用于列表；使既有 `detail=false` 聚合列表复用安全投影
+- [ ] 2.1 实现 `TaskQueryService`、查询参数和值对象及专用 `TaskListView`；按现行完成情况映射选择权威来源，仅返回明确投影，不直接暴露未过滤body或详情DTO；使既有 `detail=false` 聚合列表复用安全投影
 - [ ] 2.2 将 `TaskController.list` 改为只处理 HTTP 参数和身份上下文并委托查询服务；保留现有分页上限、标题搜索和日期范围语义
 - [ ] 2.3 对 `ownerId`、组织范围、跨公司隔离、非法日期/分页参数实现统一错误语义；无权限时不返回数据
 
@@ -15,7 +15,7 @@
 
 ## 4. 集成测试
 
-- [ ] 4.1 扩展 `TaskDispatchIntegrationTest` 或新增任务查询集成测试：创建不同状态、不同参与关系、不同组织和不同公司的任务，验证列表仅包含可见任务且无完成、阶段或替代状态字段
+- [ ] 4.1 扩展 `TaskDispatchIntegrationTest` 或新增任务查询集成测试：创建不同状态、不同参与关系、不同组织和不同公司的任务，按2026-11-05确认验证授权列表真实完成情况及未知值映射，不泄露范围外数据，派发表单仍无完成情况
 - [ ] 4.2 验证范围外同公司 `ownerId` 返回 403、其他公司 `ownerId` 返回 404、非法参数返回 400，且响应不含任务数据
 - [ ] 4.3 验证多页稳定顺序与 `total` 仅统计可见任务；对同一用户调用详情接口仍保持既有 404 范围语义
 
@@ -23,3 +23,9 @@
 
 - [ ] 5.1 运行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1`（资源受限时 `-DockerMaven`），记录任务单元与集成测试实际结果
 - [x] 5.2 在仓库根目录运行 `openspec.cmd validate --all --strict`，确认本变更通过（2026-10-15：14 项通过）
+
+## 6. 2026-11-05完成情况增量
+
+- [x] 6.1 复用Issue #53的只读phase，确定六态/未知值映射与兼容规则，同步Controller、SpringDoc、OpenAPI及调用方；dispatchAt取真实事件且可空。干净隔离后端95项通过，运行时3.1可空契约有断言。
+- [x] 6.2 接入任务管理列表开始时间前的真实完成情况列，保持派发表单无该字段；Flutter任务表/HTTP映射及真实后端流转读回测试通过，证据见[统一验证入口](../../../docs/backend-validation.md)。
+- [ ] 6.3 在实际合并提交和最终匹配后端的APK重验 [APP验收A03/B04/E07](../../../docs/app-requirements-acceptance.md)，完成非作者审阅与人工签收；本地回归不替代此项。

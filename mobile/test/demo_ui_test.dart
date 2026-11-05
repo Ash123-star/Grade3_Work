@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/ai_work.dart';
+import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/ai_work_repository.dart';
 
 void main() {
@@ -28,10 +29,14 @@ void main() {
     expect(find.text('周'), findsNothing);
     expect(find.text('月'), findsNothing);
     expect(find.byTooltip('创建日志'), findsOneWidget);
-    expect(find.text('全部日期'), findsOneWidget);
+    expect(find.text('近三天'), findsOneWidget);
     expect(
       container
-          .read(logDayRecordsProvider(('logs', 'u1')))
+          .read(
+            recentDiaryRecordsProvider(
+              DateUtils.dateOnly(shanghaiWallTime(DateTime.now())),
+            ),
+          )
           .valueOrNull!
           .items
           .length,

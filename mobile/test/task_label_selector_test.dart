@@ -119,7 +119,20 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('旧标签'), findsNothing);
       expect(find.text('重要'), findsNothing);
+      final option = find.byKey(
+        const ValueKey('task-label-option:db-custom-927'),
+      );
+      expect(t.widget<FilterChip>(option).selected, isFalse);
+      expect(
+        t.widget<FilterChip>(option).backgroundColor,
+        const Color(0xFFCFE5FF),
+      );
       await t.tap(find.text('门店质量核验'));
+      await t.pumpAndSettle();
+      expect(
+        t.widget<FilterChip>(option).selectedColor,
+        const Color(0xFFCFE5FF),
+      );
       await t.pumpAndSettle();
       await t.tap(find.text('确定'));
       await t.pumpAndSettle();

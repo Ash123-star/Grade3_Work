@@ -9,6 +9,7 @@
 | 产品与课程依据 | [产品基线](../方案.md)、[实训要求](<2026-2027-1 软件开发与测试综合实训 项目要求.md>)、[原始PRD](Pandora_PRD.docx)；PRD为原始输入，取舍以确认后的产品基线/规格为准 |
 | 核心规则及协作 | [AGENTS](../AGENTS.md)、[开发流程与Git比较](development-workflow.md)、[PR模板](../.github/pull_request_template.md) |
 | 分工与候选范围 | [MVP分工](mvp-team-division.md)、[OpenSpec指南](openspec-guide.md)、[活动变更](../openspec/changes/)、[同步规格](../openspec/specs/) |
+| APP需求验收基准 | [两轮需求、冲突决议与验收用例](app-requirements-acceptance.md)；唯一跨模块验收目标入口，包含合并保真和发版门槛；实际结果仍写统一验证入口及Issue |
 | 客户端入口 | [Flutter运行](../mobile/README.md)、[移动端专题索引](../mobile/docs/README.md) |
 | 脚本 | [脚本索引](../scripts/README.md)；运行参数以脚本为准 |
 
@@ -36,7 +37,7 @@
 
 ## 验证与历史材料
 
-最新仓库已记录的完整自动化结果见 [统一验证入口](backend-validation.md)：2026-11-05后端511项（0失败/0错误/1跳过）、Flutter HTTP50/Mock373通过（5项opt-in跳过），分析/Web构建/strict退出0。日期、提交、命令和环境以该文件为准；真实供应商、设备性能、TalkBack及完整人工矩阵仍有未验收项。本次文档清理未重跑业务测试，也未部署服务。
+当前修复批次和历史完整自动化结果统一见 [验证入口](backend-validation.md)，其中记录完成情况列、五行折叠、同页人员树及todo并发分页的实际复验结果与剩余项；年度场景初始化缺陷见Issue #73。设备性能、TalkBack、合并后安装包签收和人工矩阵仍须按[APP验收基准](app-requirements-acceptance.md)完成，不能用历史通过或源码实现代替。
 
 以下保留独立验收价值，**只适用于所记录提交和环境**，不可当作最新失败数或对当前环境的健康承诺：
 

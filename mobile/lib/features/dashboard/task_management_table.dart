@@ -29,17 +29,23 @@ class _TaskColumn {
 }
 
 final _taskColumns = <_TaskColumn>[
-  _TaskColumn('任务名称', 188, (record) => record.title),
-  _TaskColumn('标签', 112, (record) => taskTagLabel(record.fields)),
+  _TaskColumn('任务名称', 168, (record) => record.title),
+  _TaskColumn(
+    '标签',
+    112,
+    (record) => taskTagNames(record.fields).join('、'),
+    options: (record) => taskTagNames(record.fields),
+  ),
   _TaskColumn(
     '参与人',
-    180,
+    144,
     (record) => taskParticipantNames(record.fields).join('、'),
     options: (record) => taskParticipantNames(record.fields),
   ),
+  _TaskColumn('完成情况', 108, (record) => taskCompletionLabel(record.fields)),
   _TaskColumn(
     '开始时间',
-    128,
+    120,
     (record) =>
         _taskDateText(record.fields['startAt'] ?? record.fields['start_at']),
     dateValue: (record) => businessEventTime(
@@ -48,18 +54,18 @@ final _taskColumns = <_TaskColumn>[
   ),
   _TaskColumn(
     '截止时间',
-    128,
+    120,
     (record) => _taskDateText(record.fields['deadline']),
     dateValue: (record) => businessEventTime(record.fields['deadline']),
   ),
   _TaskColumn(
     '派发时间',
-    128,
+    120,
     (record) => _taskDateText(
-      record.fields['createdAt'] ?? record.fields['created_at'],
+      record.fields['dispatchAt'] ?? record.fields['dispatched_at'],
     ),
     dateValue: (record) => businessEventTime(
-      record.fields['createdAt'] ?? record.fields['created_at'],
+      record.fields['dispatchAt'] ?? record.fields['dispatched_at'],
     ),
   ),
 ];
@@ -78,8 +84,15 @@ String _taskDateText(Object? value) {
       '${date.minute.toString().padLeft(2, '0')}';
 }
 
-Color _taskTagColor(Map<String, dynamic> fields) {
-  final raw = fields['tagColor'] ?? fields['tag_color'];
+Color _taskTagColor(Map<String, dynamic> fields, [String? name]) {
+  final labels = fields['labels'];
+  final label = labels is List
+      ? labels
+            .whereType<Map>()
+            .where((label) => label['name'] == name)
+            .firstOrNull
+      : null;
+  final raw = label?['color'] ?? fields['tagColor'] ?? fields['tag_color'];
   final text = '$raw'.trim();
   if (text.isNotEmpty && text != 'null') {
     final hex = text.replaceFirst('#', '').replaceFirst('0x', '');
@@ -112,10 +125,12 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
     final pinned = record.fields['pinned'] == true;
     setState(() => _pinBusy.add(record.id));
     try {
-      await ref.read(repositoryProvider).execute(
-        'tasks/pin',
-        Command(pinned ? 'unpin' : 'pin', {'id': record.id}),
-      );
+      await ref
+          .read(repositoryProvider)
+          .execute(
+            'tasks/pin',
+            Command(pinned ? 'unpin' : 'pin', {'id': record.id}),
+          );
       ref.invalidate(recordsProvider('tasks'));
       if (mounted) notice(context, pinned ? '已取消置顶' : '已置顶', success: true);
     } catch (error) {
@@ -267,7 +282,7 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                       ),
                     ),
                     Text(
-                      '派发任务',
+                      '任务管理',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
@@ -888,22 +903,43 @@ class _TaskRow extends StatelessWidget {
   final bool pinBusy;
 
   Future<void> _showValue(BuildContext context, int index, String value) async {
+    final entries = _taskColumns[index].options?.call(record).toList();
     await showTuantuanBottomSheet<void>(
       context: context,
       useSafeArea: true,
+      isScrollControlled: true,
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _taskColumns[index].label,
-              style: Theme.of(context).textTheme.titleMedium,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .75,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _taskColumns[index].label,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 10),
+                if (entries != null && entries.isNotEmpty)
+                  for (final entry in entries)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: SelectableText(entry),
+                    )
+                else
+                  SelectableText(value.isEmpty ? '未设置' : value),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('收起'),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            SelectableText(value),
-          ],
+          ),
         ),
       ),
     );
@@ -937,7 +973,7 @@ class _TaskRow extends StatelessWidget {
                             children: [
                               Expanded(child: _valueText(context, index)),
                               SizedBox(
-                                width: 40,
+                                width: 48,
                                 child: IconButton(
                                   key: ValueKey('task-pin-${record.id}'),
                                   tooltip: record.fields['pinned'] == true
@@ -960,6 +996,9 @@ class _TaskRow extends StatelessWidget {
                         ),
                       )
                     : InkWell(
+                        key: ValueKey(
+                          'task-cell:${record.id}:${_taskColumns[index].label}',
+                        ),
                         onTap: () => _showValue(
                           context,
                           index,
@@ -982,11 +1021,42 @@ class _TaskRow extends StatelessWidget {
 
   Widget _valueText(BuildContext context, int index) {
     final value = _taskColumns[index].value(record);
-    if (index == 1) {
-      return AppLabelBadge(
-        value.isEmpty ? '—' : value,
-        color: _taskTagColor(record.fields),
-        compact: true,
+    if (index == 1 || index == 2) {
+      final values = _taskColumns[index].options!.call(record).toList();
+      return Semantics(
+        label: '查看全部${_taskColumns[index].label}，共${values.length}项',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final item in values.take(2))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: index == 1
+                    ? AppLabelBadge(
+                        item,
+                        color: _taskTagColor(record.fields, item),
+                        compact: true,
+                      )
+                    : AppLabelBadge(
+                        item,
+                        color: SunnyPalette.primaryContainer,
+                        compact: true,
+                      ),
+              ),
+            if (values.isEmpty)
+              Text('—', style: Theme.of(context).textTheme.bodySmall),
+            if (values.length > 2)
+              Text(
+                '+${values.length - 2} 展开',
+                key: ValueKey(
+                  'task-expand:${record.id}:${_taskColumns[index].label}',
+                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+          ],
+        ),
       );
     }
     return Text(

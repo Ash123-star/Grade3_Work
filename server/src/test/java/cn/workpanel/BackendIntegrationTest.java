@@ -147,6 +147,14 @@ class BackendIntegrationTest {
         assertEquals("UP",get("/health",null).get("status").asText());
         var contract=get("/openapi",null); assertTrue(contract.has("paths")); assertEquals("#/components/schemas/TaskDraft",contract.at("/paths/~1api~1tasks/post/requestBody/content/application~1json/schema/$ref").asText());
         assertTrue(contract.at("/components/schemas/TaskDraft/properties/title").isObject()); assertEquals("/",contract.at("/servers/0/url").asText());
+        var taskListProperties=contract.at("/components/schemas/TaskListItem/properties");
+        for(String field:List.of("phase","dispatchAt","start_at","pinnedAt")) {
+            var types=taskListProperties.path(field).path("type");
+            assertTrue(types.isArray(),field+" must declare OpenAPI 3.1 nullable types");
+            assertTrue(types.toString().contains("\"string\"")&&types.toString().contains("\"null\""));
+        }
+        assertTrue(taskListProperties.path("phase").path("enum").toString().contains("null"));
+        assertFalse(contract.at("/info/description").asText().contains("任务列表不提供完成情况"));
         assertEquals("#/components/schemas/DevelopmentJob",contract.at("/paths/~1api~1ai-maps~1development~1jobs/post/responses/202/content/application~1json/schema/$ref").asText());
         assertEquals("#/components/schemas/KnowledgeStatus",contract.at("/paths/~1api~1ai-memories~1knowledge-status/get/responses/200/content/application~1json/schema/$ref").asText());
         assertEquals("#/components/schemas/MemoryForgetJob",contract.at("/paths/~1api~1ai-memories~1{id}/delete/responses/202/content/application~1json/schema/$ref").asText());
@@ -221,7 +229,7 @@ class BackendIntegrationTest {
         call(404,"GET","/tasks/"+task,"bob",null,null);
         var candidate=taskBody("产品任务修订","alice"); var revision=post("/tasks/"+task+"/revisions","leader",Map.of("version",1,"reason","调整关键内容","candidate",candidate));
         assertEquals("产品任务",get("/tasks/"+task,"alice").get("title").asText()); approve(revision.get("id").asText(),"leader"); assertEquals("产品任务修订",get("/tasks/"+task,"alice").get("title").asText());
-        var row=get("/tasks","alice").get("items").get(0); assertFalse(row.has("phase")); assertFalse(row.has("status")); assertFalse(row.has("completion")); assertFalse(row.has("events"));
+        var row=get("/tasks","alice").get("items").get(0); assertTrue(row.hasNonNull("phase")); assertFalse(row.has("status")); assertFalse(row.has("completion")); assertFalse(row.has("events"));
         var received=post("/tasks/"+task+"/events","alice",Map.of("type","RECEIVED","version",2));
         call(409,"POST","/tasks/"+task+"/events","alice",Map.of("type","FEEDBACK","text","成果","version",1),null);
         var feedback=post("/tasks/"+task+"/events","alice",Map.of("type","FEEDBACK","text","提交成果","version",received.get("version").asInt()));

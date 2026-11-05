@@ -407,6 +407,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
       ref.invalidate(recordsProvider('logs'));
       ref.invalidate(datedRecordsProvider('logs'));
       ref.invalidate(logDayRecordsProvider);
+      ref.invalidate(recentDiaryRecordsProvider);
       _submitted = true;
       try {
         await ref.read(draftStoreProvider).remove(_location);

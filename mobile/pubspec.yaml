@@ -25,6 +25,7 @@ dependencies:
   path: ^1.9.1
   forui: 0.17.0
   flutter_svg: ^2.3.0
+  lunar: 1.7.8
 dev_dependencies:
   integration_test:
     sdk: flutter

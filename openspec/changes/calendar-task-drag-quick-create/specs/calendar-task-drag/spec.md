@@ -1,16 +1,16 @@
 ## ADDED Requirements
 
-### Requirement: Drag candidates occupy a separate row and expand crowded weeks
+### Requirement: Drag candidates remain identifiable in a folded calendar
 
-故事 C-09；P0。候选任务 SHALL 与目标日期范围内已有条带分行，保持正式任务位置；不足一行空间时 SHALL 向下增高该周并推移后续周，不能裁切候选或月底。正式任务和候选 SHALL 使用完整行数计算高度，不得限制为三行或用更多计数替代第四行及以后的任务条。
+故事 C-09；P0。2026-11-05用户确认公司月历恢复五行折叠，替代完整行增高要求。正式任务超过五项时 SHALL 显示前四项与剩余数量，五项及以下全部显示。候选 SHALL 有可辨认的任务身份与完整目标日期反馈，不与正式任务条带重叠造成误读，也不计入正式剩余数；点击剩余数 SHALL 打开完整日清单，不触发拖动或创建。候选展示不得改变实际抓取日或确认日期。
 
 #### Scenario: Five existing tasks and a sixth candidate
 - **WHEN** 同一周的日期范围已有五条任务，用户再拖入一条任务
-- **THEN** 五条正式任务全部可见，候选位于第六行，该周自动增高且后续周下移；取消后仍显示全部五条正式任务，独立审核生效后仍显示六条正式任务
+- **THEN** 正式计数仍为五，候选身份及新日期清晰可读；取消后恢复原五项，审核生效后按六项显示前四项与“+2”，完整清单可访问六项
 
 #### Scenario: A candidate intersects occupied rows
 - **WHEN** 拖入任务的任意日期与已有条带同一行重叠
-- **THEN** 候选 SHALL 进入下一条可用行，跨周／跨月片段保持完整日期与时长，源任务不与自身竞争
+- **THEN** 候选 SHALL 使用不混淆正式条带的展示位置，跨周／跨月片段保持完整日期与时长，源任务不重复计数，折叠不能导致落点错误
 
 #### Scenario: Expansion while hovering and cancellation
 - **WHEN** 手指停留时周高度发生变化，随后松手或取消

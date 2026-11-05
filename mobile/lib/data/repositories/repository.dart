@@ -514,7 +514,11 @@ class HttpRepository implements Repository {
       };
     }
     final taskResponse = raw.containsKey('issuer_id');
-    if (!taskResponse && raw['phase'] != null) {
+    if (taskResponse && raw.containsKey('phase')) {
+      // Canonical lifecycle is a server-owned read projection, never a draft field.
+      fields['phase'] = raw['phase'];
+      fields['status'] = taskCompletionLabel(fields);
+    } else if (!taskResponse && raw['phase'] != null) {
       fields['status'] = switch ('${raw['phase']}') {
         'DISPATCHED' => '待接收',
         'RECEIVED' => '进行中',

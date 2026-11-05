@@ -11,7 +11,7 @@ import java.util.*;
 /** 列表保持旧日期模式；日历范围读取在单个一致性快照内绑定授权、总数、顺序和版本。 */
 @Service
 public class TaskQueryService {
-    private static final String LIST_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at,(tp.task_id IS NOT NULL) AS pinned,tp.pinned_at";
+    private static final String LIST_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at,(tp.task_id IS NOT NULL) AS pinned,tp.pinned_at,(SELECT min(e.created_at) FROM task_events e WHERE e.company_id=t.company_id AND e.task_id=t.id AND e.type='DISPATCHED') AS dispatch_at";
     /** 当前用户的个人置顶；只影响本人排序。 */
     private static final String PIN_JOIN=" LEFT JOIN task_pins tp ON tp.task_id=t.id AND tp.user_id=?";
     private static final String CARD_COLUMNS="t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.phase,t.version,t.created_at";

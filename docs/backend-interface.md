@@ -39,7 +39,9 @@
 
 2026-10-30（Issue #49）：`GET /tasks/received-card` 仅返回当前用户本人参与的任务（包括本人派发且参与），包含全部生命周期状态，不再返回仅下属参与的授权范围任务。`items/total/nextCursor`使用相同过滤；每项增加`issuer_id`。导图卡片与完整列表共用该资源，管理任务表继续使用`GET /tasks`授权范围查询。
 
-`GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
+`GET /tasks` 使用显式授权投影，不返回主负责人或协作人；参与人使用无角色的 `participants` 集合，标签以本文“统一集成兼容约定”的 `labels` 集合及旧 `label` 兼容规则为准。流转事件在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,labelIds,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
+
+**2026-11-05实现增量（部署与验证状态另见统一验证入口）**：复用Issue #53确认的可选只读 `phase`，任务管理在开始时间前展示完成情况，派发表单仍不显示或接收该字段。映射为 `DISPATCHED` 待接收、`RECEIVED` 进行中、`FEEDBACK` 待验收、`ACCEPTED` 已验收、`ARCHIVED` 已归档、`WITHDRAWN` 已撤回；`RETURNED`是事件，生效后phase为RECEIVED。缺失/未知显示“情况未知”，不从截止时间、备注或任一参与人反馈推断。另返回可空 `dispatchAt`，取同公司同任务最早真实DISPATCHED事件时间，旧数据缺失为null，不能拿created_at伪造派发时间。增量字段向后兼容，旧客户端可忽略，新客户端连接旧服务端时显示未知/未提供；列表授权范围、分页与审核政策不变，不暴露未过滤body/事件。任务状态只读，创建/修订伪造状态仍由服务端拒绝。验收见 [A03](app-requirements-acceptance.md)。
 
 `GET /tasks?date=YYYY-MM-DD&period=day|week|month` 使用上海自然日/周/月按任务区间相交筛选：`COALESCE(start_at,deadline) < 范围结束 && deadline >= 范围开始`，排除反向区间。移动端自行计算月历可见网格并发送成对带时区的 `from/to`；不得与 `date/period` 混用。`participantId` 为正式参与人参数，`ownerId` 是兼容别名，同时出现且不同返回400。
 

@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import '../home/home_summary_card.dart';
+import '../../theme/home_paper_theme.dart';
+import '../../shared/calendar/civil_date.dart';
 import '../personal_todos/presentation/daily_todos_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,91 +16,188 @@ import 'package:pandora_mobile/theme/app_theme.dart';
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
   @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      Theme(data: homePaperTheme(context), child: const _HomeContent());
+}
+
+class _HomeContent extends ConsumerWidget {
+  const _HomeContent();
+  @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(sessionProvider);
-    final canDispatch = user.canReadBusiness && user.manager && user.dispatch;
-    return PageFrame(
-      title: '首页',
-      showTitle: false,
-      fab: canDispatch
-          ? FloatingActionButton(
-              tooltip: '派发任务',
-              onPressed: () => openForm(context, 'dispatch'),
-              child: const Icon(Icons.add),
-            )
-          : null,
-      child: PageBody(
-        bottomPadding: canDispatch ? 88 : 24,
-        children: [
-          Row(
-            children: [
-              const DogAvatar(index: 0, size: 48),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '你好，${user.name}',
-                      style: Theme.of(context).textTheme.titleLarge,
+    final paper = HomePaperTokens.of(context);
+    final date = shanghaiToday();
+    final unread = user.canReadBusiness
+        ? ref
+                  .watch(recordsProvider('notifications'))
+                  .valueOrNull
+                  ?.items
+                  .any((item) => item.fields['read'] != true) ==
+              true
+        : false;
+    return Scaffold(
+      backgroundColor: paper.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: TuantuanPaperBackdrop(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: LayoutBuilder(
+                builder: (context, viewport) {
+                  final narrow = viewport.maxWidth < 375;
+                  final compact = viewport.maxWidth < 340;
+                  final large = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+                  final cards = [
+                    HomeSummaryCard(
+                      title: '事件纪',
+                      resource: 'dashboard/company',
+                      onAll: () => _showFocusCollection(
+                        context,
+                        ref,
+                        title: '事件纪',
+                        resource: 'dashboard/company',
+                      ),
+                      onItem: (item) => _showCompanyItem(context, ref, item),
                     ),
-                    const SizedBox(height: 4),
-                    const Text('把今天的事情，慢慢理清。'),
-                  ],
-                ),
+                    HomeSummaryCard(
+                      title: '任务看板',
+                      resource: 'tasks/received-card',
+                      onAll: () => context.push('/tasks/received'),
+                      onItem: (item) => openItem(context, 'tasks', item.id),
+                    ),
+                  ];
+                  return ListView(
+                    key: const PageStorageKey('home-scroll'),
+                    padding: const EdgeInsets.only(bottom: 24),
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          narrow ? 12 : 16,
+                          24,
+                          narrow ? 12 : 16,
+                          18,
+                        ),
+                        child: Row(
+                          children: [
+                            DogAvatar(
+                              index: DogAssets.friendly,
+                              size: compact ? 44 : 52,
+                            ),
+                            SizedBox(width: compact ? 8 : 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '你好，${user.name}',
+                                    style: paper.heading(
+                                      compact ? 23 : 25,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${date.month}月${date.day}日 · 星期${['一', '二', '三', '四', '五', '六', '日'][date.weekday - 1]}',
+                                    style: paper.body(12, color: paper.muted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Material(
+                              color: HomePaperTokens.messageSurface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(17),
+                                side: const BorderSide(
+                                  color: HomePaperTokens.messageEdge,
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: IconButton(
+                                        tooltip: unread ? '消息，有未读消息' : '消息',
+                                        onPressed: () =>
+                                            openList(context, 'notifications'),
+                                        icon: const TuantuanIcon(
+                                          'notification',
+                                          size: 25,
+                                        ),
+                                      ),
+                                    ),
+                                    if (unread)
+                                      Positioned(
+                                        right: 10,
+                                        top: 9,
+                                        child: IgnorePointer(
+                                          child: Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              color: HomePaperTokens.unread,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: HomePaperTokens
+                                                    .messageSurface,
+                                                width: 2,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (user.canReadBusiness)
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: narrow ? 10 : 16,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (compact || large)
+                                Column(
+                                  children: [
+                                    cards[0],
+                                    const SizedBox(height: 10),
+                                    cards[1],
+                                  ],
+                                )
+                              else
+                                IntrinsicHeight(
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(child: cards[0]),
+                                      SizedBox(width: narrow ? 8 : 10),
+                                      Expanded(child: cards[1]),
+                                    ],
+                                  ),
+                                ),
+                              const SizedBox(height: 24),
+                              DailyTodosSection(key: ObjectKey(user)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
-              IconButton(
-                tooltip: '消息',
-                onPressed: () => openList(context, 'notifications'),
-                icon: const Icon(Icons.notifications_none_rounded),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, size) {
-              final cards = [
-                HomeSummaryCard(
-                  title: '事件纪',
-                  resource: 'dashboard/company',
-                  icon: 'mindmap',
-                  onAll: () => _showFocusCollection(
-                    context,
-                    ref,
-                    title: '事件纪',
-                    resource: 'dashboard/company',
-                  ),
-                  onItem: (item) => _showCompanyItem(context, ref, item),
-                ),
-                HomeSummaryCard(
-                  title: '任务看板',
-                  resource: 'tasks/received-card',
-                  icon: 'task',
-                  onAll: () => context.push('/tasks/received'),
-                  onItem: (item) => openItem(context, 'tasks', item.id),
-                ),
-              ];
-              if (size.maxWidth < 320 ||
-                  MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-                return Column(
-                  children: [cards[0], const SizedBox(height: 12), cards[1]],
-                );
-              }
-              return IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: cards[0]),
-                    const SizedBox(width: 12),
-                    Expanded(child: cards[1]),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          if (user.canReadBusiness) DailyTodosSection(key: ObjectKey(user)),
-        ],
+        ),
       ),
     );
   }
@@ -141,9 +240,8 @@ Future<void> _showCompanyItem(
             loading: () => const Center(child: SunnyLoadingIndicator()),
             error: (error, _) => RecordFailure(
               error,
-              retry: () => dialogRef.invalidate(
-                recordsProvider('dashboard/company'),
-              ),
+              retry: () =>
+                  dialogRef.invalidate(recordsProvider('dashboard/company')),
             ),
             data: (_) {
               if (current == null) {
@@ -160,10 +258,9 @@ Future<void> _showCompanyItem(
                 padding: const EdgeInsets.all(20),
                 child: Text(
                   content.trim().isEmpty ? '暂无可展示内容' : content,
-                  style: Theme.of(dialogContext)
-                      .textTheme
-                      .bodyLarge
-                      ?.copyWith(height: 1.65),
+                  style: Theme.of(
+                    dialogContext,
+                  ).textTheme.bodyLarge?.copyWith(height: 1.65),
                 ),
               );
             },
@@ -172,7 +269,10 @@ Future<void> _showCompanyItem(
         return Center(
           child: SafeArea(
             child: SizedBox(
-              width: math.min(MediaQuery.sizeOf(dialogContext).width - 32, 560.0),
+              width: math.min(
+                MediaQuery.sizeOf(dialogContext).width - 32,
+                560.0,
+              ),
               height: math.min(
                 MediaQuery.sizeOf(dialogContext).height * .72,
                 640.0,
@@ -191,7 +291,9 @@ Future<void> _showCompanyItem(
                           Expanded(
                             child: Text(
                               current?.title ?? '',
-                              style: Theme.of(dialogContext).textTheme.titleLarge,
+                              style: Theme.of(
+                                dialogContext,
+                              ).textTheme.titleLarge,
                             ),
                           ),
                           IconButton(
@@ -253,12 +355,16 @@ Future<void> _showFocusCollection(
             : dialogRef.watch(memberRecordsProvider((resource, ownerId)));
         return state.when(
           loading: () => const Center(child: SunnyLoadingIndicator()),
-          error: (error, _) => Center(child: RecordFailure(
-            error,
-            retry: () => ownerId == null
-                ? dialogRef.invalidate(recordsProvider(resource))
-                : dialogRef.invalidate(memberRecordsProvider((resource, ownerId))),
-          )),
+          error: (error, _) => Center(
+            child: RecordFailure(
+              error,
+              retry: () => ownerId == null
+                  ? dialogRef.invalidate(recordsProvider(resource))
+                  : dialogRef.invalidate(
+                      memberRecordsProvider((resource, ownerId)),
+                    ),
+            ),
+          ),
           data: (page) => page.items.isEmpty
               ? const Center(child: Text('暂无记录'))
               : ListView.separated(
@@ -267,7 +373,9 @@ Future<void> _showFocusCollection(
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final item = page.items[index];
-                    final body = '${item.fields['内容'] ?? item.fields['text'] ?? item.fields['body'] ?? ''}'.trim();
+                    final body =
+                        '${item.fields['内容'] ?? item.fields['text'] ?? item.fields['body'] ?? ''}'
+                            .trim();
                     return InkWell(
                       onTap: () => _showFocusDetail(context, item),
                       onLongPress: ownerId == null
@@ -287,7 +395,9 @@ Future<void> _showFocusCollection(
                             Padding(
                               padding: const EdgeInsets.only(top: 5),
                               child: Icon(
-                                resource == 'dashboard/company' ? Icons.circle : Icons.radio_button_unchecked_rounded,
+                                resource == 'dashboard/company'
+                                    ? Icons.circle
+                                    : Icons.radio_button_unchecked_rounded,
                                 size: resource == 'dashboard/company' ? 10 : 18,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
@@ -301,9 +411,10 @@ Future<void> _showFocusCollection(
                                     item.title,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
                                   ),
                                   if (body.isNotEmpty) ...[
                                     const SizedBox(height: 5),
@@ -311,10 +422,15 @@ Future<void> _showFocusCollection(
                                       body,
                                       maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                        height: 1.4,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                            height: 1.4,
+                                          ),
                                     ),
                                   ],
                                 ],
@@ -333,7 +449,8 @@ Future<void> _showFocusCollection(
 }
 
 Future<void> _showFocusDetail(BuildContext context, Record item) async {
-  final rawBody = item.fields['内容'] ??
+  final rawBody =
+      item.fields['内容'] ??
       item.fields['text'] ??
       item.fields['body'] ??
       item.fields['content'];
@@ -393,7 +510,9 @@ Future<void> _showPersonalItemActions(
   if (action == 'edit') {
     await _showPersonalItem(context, ref, item);
     if (!context.mounted) return;
-    ref.invalidate(memberRecordsProvider((collectionResource, ownerId ?? item.ownerId)));
+    ref.invalidate(
+      memberRecordsProvider((collectionResource, ownerId ?? item.ownerId)),
+    );
     ref.invalidate(recordsProvider(collectionResource));
     return;
   }
@@ -422,23 +541,31 @@ Future<void> _showPersonalItemActions(
   if (confirmed != true || !context.mounted) return;
 
   try {
-    await ref.read(repositoryProvider).execute(
-      collectionResource,
-      Command(
-        'archive',
-        {
-          'id': item.id,
-          'title': item.title,
-          '内容': item.fields['内容'] ?? item.fields['text'] ?? item.fields['body'] ?? '',
-          '排序位置': item.fields['排序位置'] ?? item.fields['position'] ?? 0,
-          'pinned': item.fields['pinned'] ?? false,
-        },
-        version: item.version,
-        idempotencyKey: '${item.id}:${item.version}:archive',
-      ),
-    );
+    await ref
+        .read(repositoryProvider)
+        .execute(
+          collectionResource,
+          Command(
+            'archive',
+            {
+              'id': item.id,
+              'title': item.title,
+              '内容':
+                  item.fields['内容'] ??
+                  item.fields['text'] ??
+                  item.fields['body'] ??
+                  '',
+              '排序位置': item.fields['排序位置'] ?? item.fields['position'] ?? 0,
+              'pinned': item.fields['pinned'] ?? false,
+            },
+            version: item.version,
+            idempotencyKey: '${item.id}:${item.version}:archive',
+          ),
+        );
     refreshBusiness(ref);
-    ref.invalidate(memberRecordsProvider((collectionResource, ownerId ?? item.ownerId)));
+    ref.invalidate(
+      memberRecordsProvider((collectionResource, ownerId ?? item.ownerId)),
+    );
     ref.invalidate(recordsProvider(collectionResource));
   } catch (error) {
     if (context.mounted) {
@@ -454,7 +581,8 @@ Future<void> _showPersonalItem(
 ]) async {
   final title = TextEditingController(text: item?.title ?? '');
   final content = TextEditingController(
-    text: '${item?.fields['内容'] ?? item?.fields['text'] ?? item?.fields['body'] ?? ''}',
+    text:
+        '${item?.fields['内容'] ?? item?.fields['text'] ?? item?.fields['body'] ?? ''}',
   );
   final colors = Theme.of(context).colorScheme;
   var saving = false;
@@ -477,166 +605,204 @@ Future<void> _showPersonalItem(
           bottom: MediaQuery.viewInsetsOf(dialogContext).bottom,
         ),
         child: Center(
-        child: SafeArea(
-          child: SizedBox(
-            width: math.min(MediaQuery.sizeOf(dialogContext).width - 32, 560.0),
-            height: math.max(
-              160.0,
-              math.min(
-                (MediaQuery.sizeOf(dialogContext).height -
-                        MediaQuery.viewInsetsOf(dialogContext).bottom -
-                        32) *
-                    .92,
-                640.0,
+          child: SafeArea(
+            child: SizedBox(
+              width: math.min(
+                MediaQuery.sizeOf(dialogContext).width - 32,
+                560.0,
               ),
-            ),
-            child: PaperSurface(
-              color: colors.surface,
-              borderColor: colors.outlineVariant,
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: title,
-                            enabled: !saving,
-                            maxLength: 80,
-                            decoration: const InputDecoration(
-                              hintText: '标题',
-                              border: InputBorder.none,
-                              counterText: '',
-                            ),
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
+              height: math.max(
+                160.0,
+                math.min(
+                  (MediaQuery.sizeOf(dialogContext).height -
+                          MediaQuery.viewInsetsOf(dialogContext).bottom -
+                          32) *
+                      .92,
+                  640.0,
+                ),
+              ),
+              child: PaperSurface(
+                color: colors.surface,
+                borderColor: colors.outlineVariant,
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: title,
+                              enabled: !saving,
+                              maxLength: 80,
+                              decoration: const InputDecoration(
+                                hintText: '标题',
+                                border: InputBorder.none,
+                                counterText: '',
+                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ),
-                        ),
-                        if (item != null)
+                          if (item != null)
+                            IconButton(
+                              tooltip: '归档个人重点',
+                              onPressed: saving
+                                  ? null
+                                  : () async {
+                                      setDialogState(() {
+                                        saving = true;
+                                        error = null;
+                                      });
+                                      try {
+                                        await ref
+                                            .read(repositoryProvider)
+                                            .execute(
+                                              'dashboard/personal',
+                                              Command(
+                                                'archive',
+                                                {'id': item.id},
+                                                version: item.version,
+                                                idempotencyKey:
+                                                    '${item.id}:${item.version}:archive',
+                                              ),
+                                            );
+                                        refreshBusiness(ref);
+                                        if (dialogContext.mounted) {
+                                          Navigator.pop(dialogContext, true);
+                                        }
+                                      } catch (failure) {
+                                        if (dialogContext.mounted) {
+                                          setDialogState(() {
+                                            saving = false;
+                                            error = '$failure';
+                                          });
+                                        }
+                                      }
+                                    },
+                              icon: const Icon(Icons.archive_outlined),
+                            ),
                           IconButton(
-                            tooltip: '归档个人重点',
+                            tooltip: '关闭',
+                            onPressed: saving
+                                ? null
+                                : () => Navigator.pop(dialogContext, false),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: colors.outlineVariant),
+                    SwitchListTile.adaptive(
+                      value: pinned,
+                      onChanged: saving
+                          ? null
+                          : (value) => setDialogState(() => pinned = value),
+                      title: const Text('置顶'),
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                      ),
+                    ),
+                    Divider(height: 1, color: colors.outlineVariant),
+                    Expanded(
+                      child: TextField(
+                        controller: content,
+                        enabled: !saving,
+                        maxLength: 10000,
+                        expands: true,
+                        minLines: null,
+                        maxLines: null,
+                        textAlignVertical: TextAlignVertical.top,
+                        decoration: const InputDecoration(
+                          hintText: '写下备忘或工作感悟',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.all(20),
+                        ),
+                      ),
+                    ),
+                    if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          error!,
+                          style: TextStyle(color: colors.error),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: saving
+                                ? null
+                                : () => Navigator.pop(dialogContext, false),
+                            child: const Text('取消'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
                             onPressed: saving
                                 ? null
                                 : () async {
-                                    setDialogState(() { saving = true; error = null; });
+                                    if (title.text.trim().isEmpty ||
+                                        content.text.trim().isEmpty) {
+                                      setDialogState(() => error = '标题和内容不能为空');
+                                      return;
+                                    }
+                                    setDialogState(() {
+                                      saving = true;
+                                      error = null;
+                                    });
                                     try {
-                                      await ref.read(repositoryProvider).execute(
-                                        'dashboard/personal',
-                                        Command(
-                                          'archive',
-                                          {'id': item.id},
-                                          version: item.version,
-                                          idempotencyKey: '${item.id}:${item.version}:archive',
-                                        ),
-                                      );
+                                      await ref
+                                          .read(repositoryProvider)
+                                          .execute(
+                                            'dashboard/personal',
+                                            Command(
+                                              'save',
+                                              {
+                                                if (item != null) 'id': item.id,
+                                                'title': title.text.trim(),
+                                                '内容': content.text,
+                                                '排序位置':
+                                                    item?.fields['排序位置'] ??
+                                                    item?.fields['position'] ??
+                                                    0,
+                                                'pinned': pinned,
+                                              },
+                                              version: item?.version ?? 0,
+                                              idempotencyKey: item == null
+                                                  ? 'personal-focus:${ref.read(sessionProvider).id}:${DateTime.now().microsecondsSinceEpoch}'
+                                                  : '${item.id}:${item.version}:save',
+                                            ),
+                                          );
                                       refreshBusiness(ref);
-                                      if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                                      if (dialogContext.mounted) {
+                                        Navigator.pop(dialogContext, true);
+                                      }
                                     } catch (failure) {
                                       if (dialogContext.mounted) {
-                                        setDialogState(() { saving = false; error = '$failure'; });
+                                        setDialogState(() {
+                                          saving = false;
+                                          error = '$failure';
+                                        });
                                       }
                                     }
                                   },
-                            icon: const Icon(Icons.archive_outlined),
+                            child: Text(saving ? '保存中…' : '保存'),
                           ),
-                        IconButton(
-                          tooltip: '关闭',
-                          onPressed: saving ? null : () => Navigator.pop(dialogContext, false),
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Divider(height: 1, color: colors.outlineVariant),
-                  SwitchListTile.adaptive(
-                    value: pinned,
-                    onChanged: saving ? null : (value) => setDialogState(() => pinned = value),
-                    title: const Text('置顶'),
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  ),
-                  Divider(height: 1, color: colors.outlineVariant),
-                  Expanded(
-                    child: TextField(
-                      controller: content,
-                      enabled: !saving,
-                      maxLength: 10000,
-                      expands: true,
-                      minLines: null,
-                      maxLines: null,
-                      textAlignVertical: TextAlignVertical.top,
-                      decoration: const InputDecoration(
-                        hintText: '写下备忘或工作感悟',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(20),
+                        ],
                       ),
                     ),
-                  ),
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(error!, style: TextStyle(color: colors.error)),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: saving ? null : () => Navigator.pop(dialogContext, false),
-                          child: const Text('取消'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: saving
-                              ? null
-                              : () async {
-                                  if (title.text.trim().isEmpty || content.text.trim().isEmpty) {
-                                    setDialogState(() => error = '标题和内容不能为空');
-                                    return;
-                                  }
-                                  setDialogState(() { saving = true; error = null; });
-                                  try {
-                                    await ref.read(repositoryProvider).execute(
-                                      'dashboard/personal',
-                                      Command(
-                                        'save',
-                                        {
-                                          if (item != null) 'id': item.id,
-                                          'title': title.text.trim(),
-                                          '内容': content.text,
-                                          '排序位置': item?.fields['排序位置'] ?? item?.fields['position'] ?? 0,
-                                          'pinned': pinned,
-                                        },
-                                        version: item?.version ?? 0,
-                                        idempotencyKey: item == null
-                                            ? 'personal-focus:${ref.read(sessionProvider).id}:${DateTime.now().microsecondsSinceEpoch}'
-                                            : '${item.id}:${item.version}:save',
-                                      ),
-                                    );
-                                    refreshBusiness(ref);
-                                    if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-                                  } catch (failure) {
-                                    if (dialogContext.mounted) {
-                                      setDialogState(() { saving = false; error = '$failure'; });
-                                    }
-                                  }
-                                },
-                          child: Text(saving ? '保存中…' : '保存'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
     ),
     transitionBuilder: (context, animation, _, child) => FadeTransition(
       opacity: animation,

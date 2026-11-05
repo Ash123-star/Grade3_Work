@@ -1,5 +1,7 @@
 # 月历任务移动发布与回滚
 
+**当前验收目标变化（2026-11-05）**：用户确认恢复每日期最多五行、超过五项为前四项加剩余数量，见 [APP验收D01–D05及C04](app-requirements-acceptance.md)。下文保留完整行版本的历史发布与恢复证据，不作为新折叠要求的验收依据。本批折叠程序和本地复验见[统一验证入口](backend-validation.md)，尚未合并或重新发布。
+
 Issue #58；范围、设计及未完成任务见 [OpenSpec](../openspec/changes/calendar-task-drag-quick-create/tasks.md)。本文件是发布和历史证据的唯一主题入口；以下为已记录结果，文档维护没有重新连接云端或执行部署。
 
 ## 最近已记录发布

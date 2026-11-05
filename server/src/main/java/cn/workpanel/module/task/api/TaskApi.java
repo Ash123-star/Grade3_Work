@@ -5,7 +5,7 @@ import java.util.Map;
 
 /** 任务模块公共接口；调用方不得直接依赖 tasks 表或任务 Controller。 */
 public interface TaskApi {
-    /** 按当前数据范围分页查询任务；列表只含 id、负责人、派发人、标题、截止时间、版本、创建时间，不得包含完成或状态字段。 */
+    /** 按当前公司和组织范围分页查询正式任务；显式投影包含只读phase和真实dispatchAt、参与人和标签，不返回正文或事件。phase来自已生效流转，缺失/未知不得猜测；GET只读、无幂等键，参数/越权错误沿用统一模型。 */
     Map<String, Object> list(ActorContext actor, Map<String, Object> query);
 
     /** 获取任务详情及事件时间线；越权资源应映射为统一资源错误。 */
