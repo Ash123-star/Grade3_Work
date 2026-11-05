@@ -32,4 +32,4 @@
 - 新增 `/api/personal-todos` 资源及独立表，Flyway 版本在 PR 整合且确认迁移执行历史后分配；不修改已发布迁移。
 - Flutter 拆分首页组合、任务摘要和每日事项模块，仅提取日历纯展示/日期运算共享组件，不引入 task/log 依赖到 todo。
 - 负责人协作：A（页面与视觉）、C（任务契约）、B/E（认证/权限与公共契约）、待分配 todo 实施负责人；D 的 #61 月历仅协调展示复用。未派发跨成员消息。
-- Issue：[#63](https://github.com/Ash123-star/Grade3_Work/issues/63) 已关联；Sprint/负责人待分配，Issue正文保存在issue-draft.md。实施验收需两名参与人同看一项任务、第三人隔离，个人 todo 跨会话一致、越权/并发/幂等检查及真实 Android→HTTP→数据库链路。
+- Issue：[#63](https://github.com/Ash123-star/Grade3_Work/issues/63) 已关联；Sprint/负责人待分配；Issue正文以远端为准。实施验收需两名参与人同看一项任务、第三人隔离，个人 todo 跨会话一致、越权/并发/幂等检查及真实 Android→HTTP→数据库链路。

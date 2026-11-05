@@ -1,5 +1,8 @@
 ## Context
 
+> 状态边界：下文观察和批次授权属于所记日期/提交。最新自动化见docs/backend-validation.md，现行导航/完整任务行以方案和相关specs为准；旧“未测试/未合并”不能作为当前状态，未完成设备/外部验收仍按tasks保留。
+
+
 2026-11-04 规划阶段已 fetch 并将 `origin/main`（05d6c25）检出到独立工作区。原目录分支 `chore/public-backend-address` 在 19db6f3，含连接配置、详情页等未提交修改；未 stash、reset、覆盖或在原目录 pull。以下PR表为规划时检查快照；用户批准后的实施、真实服务验收与仍未解决的阻塞见 verification.md。
 
 ### 远程 PR 状态与合并前置条件

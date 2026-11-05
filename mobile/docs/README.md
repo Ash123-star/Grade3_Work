@@ -1,19 +1,24 @@
-# 移动端文档入口
+# 移动端文档索引
 
-先读根目录 [方案](../../方案.md)、[AGENTS.md](../../AGENTS.md) 和 [移动端运行说明](../README.md)。当前需求以产品基线及相关 OpenSpec 为准，行为以源码和实际接口核对；旧批次通过结果不能替代当前验收。
+先读 [产品基线](../../方案.md)、[核心规则](../../AGENTS.md)、[运行说明](../README.md)。这里只索引客户端专题，全仓范围见 [总索引](../../docs/README.md)。文档优先原位维护，小修改不新建OpenSpec或会话交接。
 
-| 需要了解 | 阅读位置 |
+## 现行设计与接入
+
+| 主题 | 入口 |
 | --- | --- |
-| 视觉规范与素材规则 | [UI 设计基线](tuantuan-ui-design-system.md)、[品牌开屏](brand-splash-design.md)、[任务表格](task-management-ui-direction.md) |
-| HTTP 接入与权限边界 | [客户端契约入口](API_CONTRACT.md)、[页面接口矩阵](api-surface-coverage.md) |
-| 当前接口实现与待验收 | [P0 状态](../../docs/mobile-p0-implementation-status.md)、[剩余接口状态](../../docs/mobile-remaining-api-implementation-status.md)、[缺口跟踪](../../docs/backend-interface-gaps.md) |
-| 最新真实联调结果与失败项 | [2026-10-30 联调记录](../../docs/frontend-backend-integration-validation-2026-10-30.md) |
-| 草稿加密、身份恢复与设备限制 | [本地状态验证](secure-local-state-verification.md) |
-| Windows 环境修复依据 | [启动修复记录](windows-startup-repair-verification.md) |
-| 正在进行的范围和任务 | [OpenSpec 变更](../../openspec/changes/)；具体 change 的 design/specs/tasks |
+| 视觉与素材 | [团团设计系统](tuantuan-ui-design-system.md)、[品牌开屏/图标](brand-splash-design.md)、[任务表格](task-management-ui-direction.md) |
+| 首页与个人事项 | [页面设计](home-daily-todos-direction.md)；导航为首页、公司、日志、AI地图、我的，默认首页 |
+| HTTP与权限 | [接入原则](API_CONTRACT.md)、[页面请求矩阵](api-surface-coverage.md)、[接口状态/待验收](../../docs/backend-interface-gaps.md) |
+| 当前验证 | [统一验证入口](../../docs/backend-validation.md)；记录于2026-11-05，不外推到未验设备或供应商 |
+| 活动需求 | [OpenSpec](../../openspec/changes/)中相关大功能的design/specs/tasks；旧小变更不作为新建先例 |
 
-`week5-ui-adjustment.md`、`calendar-task-view-2026-10-18.md` 仍被未完成 OpenSpec 引用，保留其限定批次证据；其日期与 Mock/设备限制不得省略。`backend-contract-gaps-mobile-page-experience-refresh.md` 保留详细场景，接口是否已实现须同时查上表最新状态。
+## 历史验收与限制
 
-历史阶段 0/1/3 方案、旧交付记录、旧主题截图、八屏示意板及旧页面原型已从当前树清理；引用到这些历史材料的链接固定到清理前提交，不能作为现行设计入口。必要的验收结论和未解决风险保留在最新联调记录与 OpenSpec，不把删附件解释为问题已解决。
+| 主题 | 记录及适用边界 |
+| --- | --- |
+| 草稿加密/身份恢复 | [本地状态验收](secure-local-state-verification.md)；真实设备Keystore、跨端等依记录限制核对 |
+| Windows依赖 | [启动修复](windows-startup-repair-verification.md)；保留Android Studio实际启动待验项，操作命令在移动端README |
+| 旧日历阶段 | [2026-10-18视图](calendar-task-view-2026-10-18.md)；旧限行/+N由 [完整行要求](../../docs/calendar-task-drag-release.md)替代 |
+| 旧视觉阶段 | [week5调整](week5-ui-adjustment.md)；只用于相应批次追溯 |
 
-后续截图与临时记录放根目录 `output/`，文档只记录命令、明确退出码、环境、结果和限制。需要版本化的验收图片应随对应 PR 提供，避免重新累积到 `docs/evidence/` 或 `docs/screenshots/`。
+源码和实际接口优先用于核对实现，设计存在、Mock/夹具通过或截图不能证明真实链路。新日志/截图放忽略的`output/`或PR附件，现有必要证据保留其提交和环境限制，不按批次增加另一套验证报告。

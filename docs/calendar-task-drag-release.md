@@ -1,39 +1,44 @@
 # 月历任务移动发布与回滚
 
-关联 Issue #58，OpenSpec `calendar-task-drag-quick-create`。
+Issue #58；范围、设计及未完成任务见 [OpenSpec](../openspec/changes/calendar-task-drag-quick-create/tasks.md)。本文件是发布和历史证据的唯一主题入口；以下为已记录结果，文档维护没有重新连接云端或执行部署。
 
-1. 备份并按现有 server Flyway 链升级到 V27，不混用 deploy/postgresql。V27 新增 `task_reschedule_commands`、待审 MOVE 查询索引与范围索引；不改既有迁移。幂等表有公司一致的用户/任务/审核外键，保留期不短于审核；无超时清理任务。
-2. 全部 task/review 实例先部署能消费 MOVE 与旧截止候选的版本；保持 `CALENDAR_MOVE_ENABLED=false`。全部消费者兼容后再打开。客户端通过服务端 capability 保守显示，不能凭本地角色自行启用。
-3. Android 使用 `--dart-define=USE_MOCK=false` 和可访问的 `--dart-define=API_BASE_URL=...` 构建。长按拿起任务，抓取中间日保留锚点，边缘停留跨月；确认后待审原位，独立审核后刷新。空白长按创建带日，不默认具体时间/人员。
-4. 超时只能显示结果待确认，并保留加密存储中的原键/原意图。确认有界且切后台停止重试。退出登录清除该账号本机移动命令，不能自动换键重提。
-5. 监测 409 各业务错误、422 范围密度、读写耗时、待审积压及 outbox。原因、访问令牌和本机加密内容不写普通日志。
-6. 回滚先关闭新模式并保留兼容消费者，保留 V27 和命令记录。若有待审 MOVE，禁止回退到忽略 MOVE 的旧审核程序；先暂停审核或处理兼容。已生效排期只通过新的正常申请纠正，不恢复旧数据库快照。
+## 最近已记录发布
+
+2026-11-04 20:35（Asia/Shanghai），PR #67合并为`81233ef2621da404614e80f788f756d03c543263`，客户端APK **0.1.5 / 20261108**，SHA256 `bfede00490e3cf4df89ddc03197b1b4a250554986501015230db30443ae79a33`，内部测试签名。构建API为`http://39.96.84.51/api`；本机产物`output/releases/calendar-all-rows/pandora-calendar-fix-0.1.5.apk`。这取代0.1.2/0.1.3/0.1.4记录，不把旧包称为当前包；商店发布签名仍未验收。
+
+该次源码位于服务器`/opt/Grade3_Work-releases/calendar-81233ef/source`，原检出未覆盖。server tree与PR #65相同，后端代码`70f85af`、JAR SHA256 `9bc921368af1dcb7ebf3e00264d27bc48bc3e5eebc706dfa6eb37b71db7b3c43`；仅重启`collaboration-server`，健康UP、CALENDAR_MOVE_ENABLED=true、SCENARIO_DATA_ENABLED=false。V27已应用，无新增迁移。后续整合代码和完整回归另见 [验证入口](backend-validation.md)，不能把本节旧JAR冒充后续整合产物。
+
+发布前后22账号、647任务、2个人事项及任务ID/版本/起止摘要一致，未导入演示数据或修改线上任务；公网33项HTTP检查通过，包含健康/OpenAPI/授权范围、零位移400、旧版本409、员工403、超长范围拒绝。APK下载HTTP200、122975435字节、SHA256一致；Range下载206。证据在`output/releases/calendar-all-rows/`的`deployment.json`、`cloud-http-verification.json`、`download-verification.json`。这些是当时快照，不是当前在线巡检。
+
+## 升级与回滚
+
+1. 备份并核对server Flyway链；V27新增task_reschedule_commands与范围/待审MOVE索引，幂等记录保留期不短于审核。不混用deploy/postgresql，不改既有迁移。
+2. 所有task/review消费者兼容MOVE与旧截止候选后，才从CALENDAR_MOVE_ENABLED=false开启能力；客户端按服务端capability显示，不凭本地角色启用。Android用USE_MOCK=false与可访问API_BASE_URL构建。
+3. 超时保留原键/原意图，有界前台确认；后台停止重试，退出登录清除账号本机命令，不自动换键重提。监测409/422/429、读写耗时、待审积压与outbox，普通日志不写原因原文、令牌或加密内容。
+4. 回滚先关新模式，保留兼容消费者、V27和命令记录；待审MOVE存在时不能回退到忽略MOVE的旧程序。已生效排期以正常新申请纠正，不恢复旧快照抹去新业务。
+5. 客户端回退会恢复旧布局限制，不能撤销既有审核。0.1.5下载路由的历史Caddy备份为`/opt/Grade3_Work-backups/calendar-client-81233ef-20261104T123457Z/Caddyfile`；恢复后须validate/reload，无需恢复数据库。仅更新服务器不会替换手机旧APK。
+
+从flutter drive切回release时允许pub刷新原生插件元数据；旧--no-pub可能遗留integration_test注册。不得手改生成注册器或把测试依赖移入生产包，正式APK不传测试token定义。
+
+## 专项证据与限制
+
+以下记录分属不同提交、存在重叠，不合计为一个通过总数。原始失败保留在对应本机output或Git历史。
+
+| 日期/提交 | 已记录证据 | 边界 |
+| --- | --- | --- |
+| 2026-11-03，基线19db6f3，PR #59 | Docker task/迁移85项、日历专项10项及边界子集退出0；Android跨月改期→待审原位→独立审核→第二客户端/PG读回，空白带日创建；API重启同键回执 | 旧分支迁移V22已由主干V27替代；旧全仓失败不代表当前失败 |
+| 2026-11-04，4674f5e→70f85af，PR #65 | 日历59项、两轮Android→HTTP→PostgreSQL；后端专项107/108（时间线断言失败）；部署33项HTTP通过 | 当时全仓未过；后续全仓结果见统一验证入口 |
+| 2026-11-04，48556d4，C-08 | 日历69项、受影响23项（重叠）、通知12项；19天任务八次取消及独立审核 | 预览/确认同快照、429冷却；0.1.3已被替代 |
+| 2026-11-04，5220e4b，C-09 | 日历76项、通知12项；密集目标跨月移动和独立审核 | 仅三条目标，0.1.4不能证明第四正式行可见 |
+| 2026-11-04，60ba430/5175fdd→81233ef | 布局15项、密集7项（重叠）、五条+第六行/十条+第十一行几何验证；Android独立审核后六条正式任务完整展示；分析/APK/strict退出0 | 未重跑完整后端或profile；0.1.5为完整行修复 |
+
+可复现的自动化入口：`scripts/test-backend.ps1`、`scripts/test-flutter.ps1`；真实写入链路必须使用隔离环境，不能刷生产接口制造429。历史机器证据保留在 [原分支JSON](../openspec/changes/calendar-task-drag-quick-create/verification-evidence.json)、[主干整合JSON](../openspec/changes/calendar-task-drag-quick-create/verification-integration-evidence.json)，版本化截图见 [整合预览](images/calendar-task-drag/integration-preview.png)、[待审](images/calendar-task-drag/integration-pending.png)、[带日创建](images/calendar-task-drag/integration-create-prefill.png) 和该change的`evidence/`。截图为合成测试数据，不能替代后续版本验收。
+
+历史profile十次手势成功，但2026-11-03最终233/233帧超过16.7ms，最长57.938ms；慢帧目标未达标。真实手机、TalkBack、完整设备人工矩阵、B/D/E人工确认及非作者审阅缺口保持未完成。2026-11-05自动化全仓通过不关闭这些设备/审阅任务，也不表示本功能可归档。
 
 ## 验收步骤
 
-- 管理者在公司月历，长按多日任务中间一天拖到另一月；确认新起止和原因，记录原键/审核 ID。待审时日历和数据库仍为原值。
-- 独立审核人通过；原/新月、当天清单、详情/列表和第二 HTTP 客户端读到同一版本，新事件/outbox 各一次。
-- 原键同内容返回同申请；同键不同内容、同版本两键争抢、版本变化、失权和跨公司均不得覆盖任务。
-- 空白或部分占用日期剩余空白长按进入表单；明确选时间/人员，检查创建待审及通过后月历。取消、空白原因、非法日期和无效落点无写入。
-- 设备记录 360/390/412dp、1.0/1.5 字号、TalkBack 替代操作、减少动画、慢网/断网/后台恢复及 60Hz profile 十次跨月拖动。未实测项留在验证报告，不能据 APK/Mock 宣称通过。
-
-## 本机验收产物（2026-11-03）
-
-HTTP release 模式 APK 位于 mobile/build/app/outputs/flutter-apk/app-release.apk，122909455 bytes，SHA256 338590B39EF4412C8A2FDC0CEC65CB8F78DAB332CEB1DB2DC8FEF1B451888F83。命令为 flutter build apk --release --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://10.0.2.2:18088/api，入口 lib/main.dart，不传任何测试 token defines。该地址仅用于 Android 模拟器访问宿主机本任务 Docker；现有 debug signingConfig 只供内部联调，不能当商店发布签名。
-
-从 flutter drive 切回 release 时不要跳过插件元数据刷新：本次直接 --no-pub 构建曾留下 integration_test 注册引用而失败，正常 flutter build（允许 pub 阶段）重新生成注册后退出 0。不手改 GeneratedPluginRegistrant.java，不把 integration_test 移为生产依赖。
-
-真实跨月改期/独立审批/快捷创建链路、Docker 范围专项、最终 Flutter 分析及 OpenSpec strict 已通过。全仓仍有失败；模拟器 10 次 profile 手势成功但 最终 233/233 帧超过 16.7ms，性能目标未达到，TalkBack/完整人工矩阵与跨组确认/审阅未完成。默认新模式保持关闭；按用户 2026-11-03 明确授权已推送[草稿 PR #59](https://github.com/Ash123-star/Grade3_Work/pull/59)并发布[中文工作清单评论](https://github.com/Ash123-star/Grade3_Work/pull/59#issuecomment-6596996618)，尚不满足合并/上线/归档门槛；全部证据与未完成项见 openspec/changes/calendar-task-drag-quick-create/verification.md。
-
-
-2026-11-04 主干整合使用 V27，与已发布 V22/V23/V26 并存；审核消费者沿用当前直属单级审核及创始人权限内免审。上面的 2026-11-03 验收和 APK 只属于旧分支。本轮结果见 `openspec/changes/calendar-task-drag-quick-create/verification-integration.md`。
-
-实现阶段 APK：`output/releases/calendar-drag-integration/pandora-calendar-drag.apk`，SHA256 `2A972561801DC0CEAF0990B8EB424B0C1157444C8F0A49B22F56393C96D872BA`，当时尚未部署服务器。该旧产物已由以下 0.1.2 包替代。日历 59 项、两轮 Android 本地真实链路、分析和打包通过；全仓与性能门槛仍未通过。
-
-## 当前线上发布（2026-11-04 15:46，Asia/Shanghai）
-
-用户明确要求合并部署后，PR #65 已合并为 `70f85af`，39.96.84.51 的单一后端实例先升级 V27／MOVE 消费者，再开启 `CALENDAR_MOVE_ENABLED=true` 并重启。33 项线上 HTTP 检查通过，原 22 个账号、647 条任务、2 条个人事项及任务日期／版本不变。源码检出中的用户改动保持原样。
-
-当前测试 APK：`output/releases/calendar-drag-70f85af/pandora-calendar-drag-0.1.2.apk`，versionCode `20261105`，SHA256 `7C23AA1EB0871D0AD944A4C86B20FBAD73FC6E0B7265014F60D2FAE747E83B31`；签名与此前 0.1.1 相同，可以覆盖安装。真实 API 为 `http://39.96.84.51/api`。
-
-服务器备份、分阶段启动、验证、已知限制及上线后回滚要求见 [部署记录](../openspec/changes/calendar-task-drag-quick-create/deployment-20261104.md)。发布依照用户明确指令进行；全仓、性能、实机及审阅缺口仍保留，不能把部署结果当作全量验收完成。
+- 公司→月视图检查第四行以后完整可见，拖入已有五条任务的区间占第六行，周增高、后续周下移；取消保留正式五行。
+- 从中间日/跨周续段拿起，核对整段高亮与确认起止一致、时长不变；待审保持原位，独立审核后两客户端与PG同版本。
+- 同键同内容返回同申请；同键异内容、旧版本、失权、跨公司、零位移、无效落点不覆盖任务。空白长按带日创建仍需确认时间/人员。
+- 360/390/412dp、1.0/1.5字体、TalkBack替代操作、减少动画、慢网/后台恢复及60Hz profile矩阵须补实测，不据APK/Mock声称通过。

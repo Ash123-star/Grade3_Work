@@ -1,6 +1,6 @@
 ## 1. 追踪、协作与实施边界
 
-2026-11-04 发布状态：按用户“合并部署”指令，PR #67 已合并为 `81233ef`；20:35 在 39.96.84.51 发布 APK 0.1.5 和源码，后端重启并通过公网 33 项检查。见 [发布记录](deployment-calendar-fixes-20261104.md)。47/53 项完成，原六项缺口继续保留，以下未发布表述为各批次历史状态。
+2026-11-04 发布状态：按用户“合并部署”指令，PR #67 已合并为 `81233ef`；20:35 在 39.96.84.51 发布 APK 0.1.5 和源码，后端重启并通过公网 33 项检查。见 [发布记录](../../../docs/calendar-task-drag-release.md)。47/53 项完成，原六项缺口继续保留，以下未发布表述为各批次历史状态。
 
 - [x] 1.1 由 C 关联或创建功能 Issue，写入背景、P0 范围、验收条件、本 change、故事 C-01 至 C-07、Sprint 和负责人；确认工作区边界后建立 `feature/<issue-id>-calendar-task-drag` 分支，保留已有用户改动，不在默认分支直接提交。
 - [ ] 1.2 由 C 与 D 固定月历几何命中／连续纵向滚动／只读入参契约，与 B 固定创建表单日期预填及人员／标签契约，与 E 固定 `TASK_RESCHEDULE` 候选扩展及已部署审核版本；同步其他活动变更对旧改期入口的交叉引用，不改变审核政策。
@@ -86,11 +86,11 @@
 - [x] 8.2 去除通知重复刷新，限制月历重复分页及 429 重试，保持会话／权限隔离和失败恢复。
 - [x] 8.3 完成日期、读取预算、限流及相关日历／通知专项，分析、APK 和 OpenSpec 检查，记录证据并提交修复 PR。
 
-本批设计及边界见 [drag-consistency-fix.md](drag-consistency-fix.md)。下列历史验收结论不替代修复批次验证。
+本批设计及边界见 [design.md](design.md)。下列历史验收结论不替代修复批次验证。
 
-本批证据见 [落点与限流修复验收](verification-drop-consistency.md)：日历专项 69 项、后续受影响回归 23 项（重叠）、通知 12 项、Android 19 天任务八次取消及独立审核链路通过。发布状态与历史限制分别记录。
+本批证据见 [落点与限流修复验收](../../../docs/calendar-task-drag-release.md)：日历专项 69 项、后续受影响回归 23 项（重叠）、通知 12 项、Android 19 天任务八次取消及独立审核链路通过。发布状态与历史限制分别记录。
 
-修复提交 `48556d4` 已推送并创建 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，测试 APK 0.1.3 已构建并验证签名。PR 待审，尚未合并或部署，原未完成任务不变。
+修复提交 `48556d4` 已推送并创建 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，测试 APK 0.1.3 已构建并验证签名。该历史阶段后已合并部署0.1.5，原未完成任务不变。
 
 ## 9. C-09 拖动避让与周高度展开
 
@@ -98,9 +98,9 @@
 - [x] 9.2 支持周高度临时展开、后续周下移和可变月份滚动；布局补偿保持日期落点，取消恢复。
 - [x] 9.3 完成碰撞／密集／跨月／恢复验证、Android 链路、分析、APK 和规范检查，更新 Issue／PR 证据。
 
-设计与用户确认见 [drag-lane-layout.md](drag-lane-layout.md)。
+设计与用户确认见 [design.md](design.md)。
 
-验证见 [周高度与避让验收](verification-lane-layout.md)：日历专项 76 项、通知 12 项、Android 密集目标跨月拖动与独立审核通过；测试包 0.1.4。PR #67 尚未合并发布。
+验证见 [周高度与避让验收](../../../docs/calendar-task-drag-release.md)：日历专项 76 项、通知 12 项、Android 密集目标跨月拖动与独立审核通过；测试包 0.1.4。该历史阶段后PR #67已合并发布0.1.5。
 
 实现提交 `5220e4b` 已推送并更新 [PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)，[Issue #58 验收回执](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6629907441)已发布；当前任务 45/51，六项历史缺口保留。
 
@@ -109,20 +109,12 @@
 - [x] 10.1 取消正式任务三行容量上限，统一按正式与候选最高行计算每周高度。
 - [x] 10.2 验证五条正式任务与第六行候选、小屏大字、取消及审核后读回；更新 APK、Issue 和 PR 验收记录。
 
-证据见 [正式任务完整行验收](verification-all-rows.md)。布局受影响回归 15 项、密集与交互 7 项及 Android 五条目标任务的审核后六条正式任务展示均通过；APK 0.1.5 已构建并验证签名，替代 0.1.4。先前三条目标任务的结果不能证明正式任务第四行以上可见。
+证据见 [正式任务完整行验收](../../../docs/calendar-task-drag-release.md)。布局受影响回归 15 项、密集与交互 7 项及 Android 五条目标任务的审核后六条正式任务展示均通过；APK 0.1.5 已构建并验证签名，替代 0.1.4。先前三条目标任务的结果不能证明正式任务第四行以上可见。
 
 补正提交 `60ba430` 已推送，[PR #67](https://github.com/Ash123-star/Grade3_Work/pull/67)及[Issue #58 回执](https://github.com/Ash123-star/Grade3_Work/issues/58#issuecomment-6630392455)已更新。当前 47/53 项完成，六项历史验收缺口保持未完成。
 
 ## 当前状态与已知限制
 
-- 2026-11-04 当前主干整合结果以 [verification-integration.md](verification-integration.md) 为准：日历专项最终 59 项通过；后端专项 107/108，唯一失败为未改动的时间线断言；两轮 Android→HTTP→PostgreSQL 链路通过。模拟器 profile 十次手势成功但性能未达标，全仓仍未通过，7.4 与实机／审阅项保留未完成。以下为旧分支历史记录。
-- 本批提交 `4674f5e` 最初交付为[草稿 PR #65](https://github.com/Ash123-star/Grade3_Work/pull/65)，随后用户明确要求“合并，并部署”。现已合并为 `70f85af`，2026-11-04 15:46 在 39.96.84.51 完成 V27、后端重启及能力开启；33 项线上 HTTP 检查通过。详见 [部署记录](deployment-20261104.md)。原全仓／性能／实机／审阅缺口不因上线而勾选，保持未归档。
+最近发布为2026-11-04 PR #67 / 81233ef / APK 0.1.5，包含完整任务行。发布与分批验证统一见docs/calendar-task-drag-release.md；全仓自动化最新记录见docs/backend-validation.md（2026-11-05）。上方原批次复选框保持原状态，不能由文档整理补勾。旧分支“尚未合并/全仓失败/默认关闭”的快照不表示当前线上状态；默认代码开关仍false，发布环境已按兼容顺序开启。
 
-- 2026-11-03：主体已实施，分支 feature/58-calendar-task-drag，Issue #58，负责人 C；原目录用户改动保留。
-- Docker task/迁移 85 项、日历专项 10 项、后续边界 3 项及无审核人/驳回 1 项均有退出 0；Flutter 日历核心聚合 45 项、最终月末/布局/辅助操作 26 项、登出 2 项通过，分析退出 0。各批有重叠，不合并为总测试数。
-- Android → HTTP → Docker PostgreSQL 的跨月改期、待审原位、独立审批、第二客户端读回及空白带日创建链路已通过；API 重启后原键仍返回同一申请。证据见 [verification.md](verification.md) 和 [verification-evidence.json](verification-evidence.json)。
-- profile 模式完成 10 次真实跨月拖动，最终 233 帧中慢帧 100%，最长 57.938ms，无 >100ms 帧；未达到 ≤5% 慢帧目标。Widget 360/390/412dp × 1.0/1.5 和减少动画矩阵通过，但真实 TalkBack 和完整设备人工矩阵未完成，3.8/5.6 保持未完成。
-- 全仓 Flutter 与后端验收有失败，不能声称全部通过；5.5 和整体交付门槛未满足。正式 HTTP release APK 构建退出 0；最终 OpenSpec strict 为 41/41 通过，详情见验证报告。
-- B/D/E 人工确认与线上消费者兼容状态尚未取得，1.2 未完成。功能默认关闭，本机独立 Docker 实例单独开启。
-- 用户于 2026-11-03 明确授权直接推送 PR 并用中文评论列举工作；本轮已提交并推送 feature/58-calendar-task-drag，创建[草稿 PR #59](https://github.com/Ash123-star/Grade3_Work/pull/59)并发布[中文工作清单评论](https://github.com/Ash123-star/Grade3_Work/pull/59#issuecomment-6596996618)，取得远程回执后勾选 6.3；当前进度 35/40。其余验收与 6.4 非作者审阅保持未完成，不合并/上线/归档。
-- PR 以当前验证基线 origin/codex/ai-work-assistant（PR #38，19db6f3）为 base。最新主干 05d6c25 已使用 V22/V23，集成主干前须协调迁移编号与更新后的公共契约并重验。
+未完成：设备性能目标、真实手机/TalkBack与完整人工矩阵、跨组人工确认及非作者审阅，未满足归档条件。

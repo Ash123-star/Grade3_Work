@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Readable full-width month previews
-月历 SHALL 使用页面安全区域全宽并保留高度约束，记录使用按格宽适配且最大10dp的紧凑字号并遵循系统字体缩放，MUST NOT 用 FittedBox 压缩文字。
+月历 SHALL 使用页面安全区域全宽并保留高度约束，记录使用可读字号并遵循系统字体缩放，MUST NOT 用 FittedBox 压缩文字。
 
 #### Scenario: Long titles or crowded dates
 - **WHEN** 日期包含长标题或记录超过可读轨道容量
-- **THEN** 标题只显示前6个Unicode字素、严格单行且无省略号，每格按可用高度显示最多五条，点击日期可查看全部
+- **THEN** 标题按每周任务段实际宽度显示、右侧保留10dp，严格单行且超长省略，正式任务与拖动候选共同决定周高度，完整显示所有任务行，点击日期仍可查看全部
 
 #### Scenario: Month-only action placement
 - **WHEN** 用户打开月视图
@@ -13,7 +13,7 @@
 
 #### Scenario: Insufficient height with large text
 - **WHEN** 可用高度不足容纳完整一行
-- **THEN** 不挤压字号，不绘制放不下的轨道，日期入口仍可访问全部记录
+- **THEN** 不挤压字号，使用可变周高度和月份滚动展示完整轨道，日期入口仍可访问全部记录
 
 ### Requirement: Hierarchical sibling swipe navigation
 页面 SHALL 支持底部五栏及现有同级内容平移滑动，保留原按钮、权限与状态。故事优先级P1，范围为日周月、任务分类、AI分析标签和成员面板分类。日志根页MUST NOT通过横滑打开下属日志。
@@ -28,7 +28,7 @@
 
 #### Scenario: Logs navigate between bottom branches
 - **WHEN** 任意角色在日志根页左右滑动
-- **THEN** 左滑到AI地图、右滑到视图，不打开下属日志，服务端权限边界保持不变
+- **THEN** 左滑到AI地图、右滑到公司，不打开下属日志，服务端权限边界保持不变
 
 ### Requirement: Continuous member workspace paging
 下属工作台 SHALL 在同一分页视口连续展示当前与相邻分类，MUST NOT 使用先将唯一页面滑空再滑入下一页的两段转场。优先级P1，范围为已有六类成员内容，不改变权限和接口。

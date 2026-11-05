@@ -3,8 +3,8 @@ info:
   title: 移动端业务接口补充契约
   version: '2026-10-29'
   description: |
-    IMPLEMENTED_UNVERIFIED：P0及剩余接口代码与SpringDoc模式已接入，尚未编译、迁移或HTTP验收。意见反馈已由用户取消，不提供feedback服务；已停用阅读登记不新增人员清单。
-    2026-11-04已从隔离服务刷新docs/openapi.json；personal-todos定向及真实HTTP链路通过，整库未通过。证据见openspec/changes/home-company-daily-todos/verification.md，不以本文件代替验收。
+    历史移动端补充契约快照，不覆盖Controller/运行时SpringDoc。旧IMPLEMENTED_UNVERIFIED状态已过期；当前接入与验证分别见docs/backend-interface-gaps.md、docs/backend-validation.md。意见反馈与阅读登记已停用，不新增对应服务/人员清单。
+    2026-11-04的隔离快照/专项与整库失败属于历史；2026-11-05已有更新的全仓自动化记录。设备及外部供应商限制仍保留，不以本文件代替验收。
 servers:
   - url: /
 security:

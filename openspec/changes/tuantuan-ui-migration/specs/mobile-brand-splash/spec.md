@@ -28,3 +28,10 @@ Android原生启动SHALL使用配套黄底与静态矢量角色，不再引用�
 #### Scenario: Native launch to first Flutter frame
 - **WHEN** Android冷启动进入Flutter开屏
 - **THEN** 原生与Flutter采用同一背景色和角色风格，系统管理原生启动图形区域
+
+### Requirement: Longer normal splash dwell
+开屏SHALL常规持续约2400ms并保留轻入场及末段淡出；减少动画MUST保持180ms静态过渡。
+
+#### Scenario: Normal and reduced motion startup
+- **WHEN** App进程启动
+- **THEN** 普通模式延长中间停留，减少动画模式不增加长等待，底层账号恢复继续并行

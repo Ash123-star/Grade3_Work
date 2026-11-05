@@ -1,63 +1,49 @@
-# 潘多拉 OpenSpec 使用与维护
+# OpenSpec 使用与维护
 
-本项目已初始化 OpenSpec，不需要重复创建另一套目录。全组共用 openspec/config.yaml、openspec/specs 和 openspec/changes。默认采用官方 spec-driven 工作流，不新增自定义 schema，也不覆盖已有 AI 技能。
+先读 [核心规则](../AGENTS.md#核心规则最少必要文档与-git-差异依据) 与 [协作流程](development-workflow.md)。**只有实现具体的大功能才新建 change**，且须先确认已有主规格或活动变更不能承载；小修改、配置和文档维护不创建 OpenSpec。不得为调用工具而虚构产品能力。
 
-## 安装和检查
+## 目录职责
 
-本次安装 CLI 1.14.1，与仓库已有技能 generatedBy 版本一致。其他组员可执行：
+- `config.yaml`：共享上下文和写作约束。
+- `specs/`：已同步规格；不能单凭规格存在宣称实现完成。
+- `changes/<change-id>/`：一个具体大功能的 proposal、design、specs、tasks；修复及后续调整复用该功能范围。
+- `changes/archive/`：历史变更；仅在对应交付范围验收、规格同步后归档，不以清理目录为由归档未完成工作。
 
-```powershell
-npm.cmd install --global @fission-ai/openspec@1.14.1
-openspec.cmd --version
-openspec.cmd list --json
-openspec.cmd validate --all --strict
-```
+每个主题保留一个入口。设计写入 design，验收条件写入 specs，进度和未完成项写入 tasks；运行与发布方式链接已有 `docs/` 主题，不再按日期、批次新建 tracking、handoff、deployment、verification 系列。过程证据放 `output/` 或 PR 附件。
 
-Windows 使用 .cmd 避免 PowerShell 脚本执行策略影响。若找不到命令，先执行 npm.cmd prefix -g，并把返回的全局目录加入当前终端 PATH，或使用该目录下 openspec.cmd 的绝对路径。本机安装路径为 E:/Dev/npm-global/openspec.cmd，不应作为其他成员的固定路径。
+## 操作流程
 
-## 目录与职责
-
-- config.yaml：团队共享上下文及 proposal/specs/design/tasks 的写作约束。
-- specs：已同步的当前规格，不代表实际实现全部通过验收。
-- changes/<change-id>：本次候选需求、设计和实施验证任务。
-- changes/archive：历史归档；未经当前版本验证，不把旧记录作为当前通过证据。
-
-组员 B 负责 auth、organization、review 后端及对应迁移、测试、契约示例；公共鉴权和统一契约与 E 协调，任务/日报生效规则与 C 协调，通知投递与 D 协调。配置属于全组共有规则，不能将整个仓库限制为 B 的工作区。
-
-## 一次业务变更
-
-先按复杂度判断是否需要 OpenSpec。新能力或涉及架构、权限/数据范围、数据库、公共接口、跨模块契约、重要业务状态变化的复杂变更按以下流程处理。简单文案/样式、小范围且不改变契约的修复、文档/规则维护、无行为变化的配置整理及仓库清理直接修改，在现有 Issue/PR 记录范围与验证，不强制新建 change 或文档；影响已有规格时同步相关内容。
-
-1. 确定需求、范围、异常和权限，建立 Issue/看板任务，记录 Sprint 和负责人；检查现有规格和活动变更。
-2. 在工作分支创建变更；优先复用适合的现有 change，避免重复启动同一项工作。
-3. 完成 proposal.md、design.md、specs/<capability>/spec.md、tasks.md，再进行实现。
-4. 通过相关单元、集成和异常/权限验证，记录命令、环境、结果；同步接口和迁移说明。
-5. 检查差异、提交、推送、PR 与非作者审阅；归档前严格校验并同步主规格。
+1. 核对产品、代码、现有规格及 Issue，明确范围、权限、边界、优先级和验收。
+2. 大功能优先复用已有 change；确需新增时编写 proposal/design/specs/tasks。规格使用 SHALL/MUST、WHEN/THEN，覆盖正常和异常场景。
+3. 规划校验后实施，完成批准批次再统一验收。没有实际运行证据的任务保持未勾选，记录限制。
+4. 按 Git 实际差异提交和更新 PR；验收、审阅及规格同步完成后才归档。详见 [PR 比较流程](development-workflow.md#pr-的-git-比较基线)。
 
 ```powershell
 openspec.cmd list
-openspec.cmd new change <change-id>
-openspec.cmd status --change <change-id> --json
-openspec.cmd instructions proposal --change <change-id> --json
-openspec.cmd instructions specs --change <change-id> --json
-openspec.cmd instructions design --change <change-id> --json
-openspec.cmd instructions tasks --change <change-id> --json
-openspec.cmd validate <change-id> --strict
+openspec.cmd status --change <已有变更名> --json
 openspec.cmd validate --all --strict
+# 仅在确需为大功能新建时：
+openspec.cmd new change <change-id>
 ```
 
-可直接向助手说“openspec propose 描述需求”“openspec apply 变更名”“openspec archive 变更名”。仓库已有相关技能；创建提案不等于实施完成，归档不应提前执行。
+安装或版本不匹配时参考仓库技能的 compatibility/generatedBy，核对 CLI 后再操作；Windows 可用 `npm.cmd prefix -g` 定位 `openspec.cmd`，不依赖个人机器路径。
 
-没有产品行为变化的简单配置/文档维护无需 OpenSpec，不必为使用 `skip_specs` 额外创建 proposal、design、tasks。相关记录优先追加到现有通用主题文档或 Issue/PR，避免重复材料；已有活动变更仍按实际范围维护。
+## 范围查找
 
-## 当前 B 工作入口与限制
+用 `openspec.cmd list` 查看活动变更及记录中的进度，再读对应 proposal/specs/tasks。不要把目录名、已勾任务数或历史通过数当作当前完成度。按业务进入：
 
-initial-product 的 2.1—2.4 涉及认证、组织和审核；另有 architecture-modularization、api-contract-unification 等活动变更。先复核实际代码及任务证据，不能自动批量勾选。登录失败锁定、重复待审策略和层级访问规则应作为后续明确的业务变更，本次配置不实现这些功能。
+| 主题 | 活动范围入口 |
+| --- | --- |
+| 产品与模块、契约 | `initial-product`、`architecture-modularization`、`api-contract-unification` |
+| 移动端页面与视觉 | `mobile-page-experience-refresh`、`tuantuan-ui-migration`、`mobile-live-record-display` |
+| 任务、日历、个人事项 | `calendar-task-drag-quick-create`、`home-company-daily-todos`；另见 [任务发布](task-lifecycle-release.md)、[月历发布](calendar-task-drag-release.md) |
+| 认证、组织与审核 | `member-b-week6-permissions`；另见 [分工](mvp-team-division.md) |
+| AI | `ai-work-assistant`；另见 [API](ai-work-assistant-api.md)、[部署](ai-work-assistant-deployment.md)、[地图运维](ai-map-operations.md) |
 
-配置上下文已按 AGENTS.md 使用左→右“导图、视图、日志、AI地图、我的”；方案.md 相反表述仍需 A/E 协调同步。配置是 AI 的指导信息，严格校验不是对权限、性能或所有团队约束的自动执行测试。
+旧的小改动 change 暂保留其有效验收和未完成任务，不作为新建先例；后续若并入大功能，必须迁移唯一要求、保留未完成状态、更新引用后再删除，不假称已完成归档。
 
-## 本次配置验证
+## 配置维护历史限制
 
-日期：2026-10-11。维护分支：用户指定 lyb。初次严格校验 8 passed / 1 failed，既有 ai-map-direction-ui 的 Purpose 是归档占位文本，严格模式将其警告视为失败。仅补充用途说明，未修改产品需求和场景。
+2026-10-11工作流初始化、2026-10-16 #18合并复查的CLI加载/严格校验证据属于当时版本；原`configure-project-workflow`配置型change已并入本指南、AGENTS和共享config，不作为产品能力保留。共享四种artifact指导仍应包含产品基线、模块边界、迁移及验收约束；配置维护不要求虚构delta规格。
 
-后端环境和业务测试不在本次配置验收范围；CLI 配置成功不表示组员 B 的业务完成。最终严格校验和规则加载检查结果见本次 change/tasks.md。
+- [ ] 原配置任务2.2中的Sprint归属及非作者审阅证据尚未核实（原关联Issue #3）；不因目录合并标为完成。旧批次的暂不推送指令不作为当前交付规则。

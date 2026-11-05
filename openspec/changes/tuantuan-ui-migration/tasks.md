@@ -52,3 +52,25 @@
 - [ ] 7.4 检查混合用户改动，满足条件后提交推送和 PR；阻塞时明确记录
 
 7.4 阻塞：原有两个 pubspec.lock 用户改动保留，依 AGENTS.md 第 4 节停止自动提交/推送；GitHub CLI 未登录，远程 Issue/PR 待关联。验收证据见 [历史文件](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/docs/ai-map-layout-verification.md)。
+
+## 合并维护：mobile-brand-splash
+
+原小改动并入本功能维护，以下复选框保持原状态。2026-10-23只做静态检查的授权与结果属于历史批次，不限制后续已授权验收；通用自动化结果见docs/backend-validation.md，不能代替具体设备验收。
+
+### 1. Planning
+- [x] 1.1 明确布局、动画、状态保留和异常范围，通过实施前strict：33 passed / 0 failed，退出码0。
+
+### 2. Implementation and acceptance
+- [ ] 2.1 接入CustomPainter三色角色与名称、入场及交叉淡化；实际冷启动和大小屏视觉验收尚未执行。
+- [ ] 2.2 维持底层挂载与原登录流程，减少动画及输入/焦点保护；运行态状态与异常验收尚未执行。
+- [ ] 2.3 统一原生启动背景和矢量角色；Android不同版本冷启动验收尚未执行。
+- [x] 2.4 完成定向Dart分析、XML资源检查和diff检查：No issues found，7个XML解析及资源引用检查通过，命令退出码均0，详见verification.md。
+
+用户此前只允许定向静态检查，本批不执行测试、构建、模拟器或设备。未取得运行证据的事项不勾选。
+
+
+历史静态证据：Windows/PowerShell、D:/flutter，定向dart analyze、OpenSpec strict及git diff --check均退出0。品牌另有7个XML解析/引用检查；任务显示分析保留Mock原有2条info。未执行当时的运行态测试、构建或设备验收；冷启动/状态保留、返回布局、手势/大字/权限、姓名缺失及新旧任务链路仍按上方未完成项验收。
+
+## 原截图Issue的验收边界
+
+本地Issue草稿已合并。2026-10-15记录中分析、日历/截图修复/统计HTTP专项和模拟器冷启动通过，不能替代全页面素材迁移。原5.3、5.4、6.1、6.3所需逐路由素材/字体覆盖、实体设备、TalkBack和真实服务仍需依对应未完成项取证。月历旧限行/+N布局由完整任务行大功能替代，不能据早期截图恢复。

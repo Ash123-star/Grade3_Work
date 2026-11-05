@@ -1,9 +1,9 @@
 ## ADDED Requirements
 ### Requirement: Monthly task previews
-系统 SHALL 在每日零到五条任务时完整显示，超过五条时显示四条及 +剩余数量，点击打开完整日清单；相邻月份也可点击。
+系统 SHALL 完整显示正式任务与候选所需任务行，按2026-11-04确认要求增长周高，不以五行或+N折叠；点击日期打开完整日清单，相邻月份也可点击。
 #### Scenario: Six tasks
 - WHEN 某日六条任务
-- THEN 显示四条和 +2，打开清单可见六条
+- THEN 六条全部显示、周高增加，打开清单仍可见六条
 #### Scenario: Adjacent month
 - WHEN 点击相邻月份日期
 - THEN 按真实年月日显示对应任务

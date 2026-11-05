@@ -10,10 +10,3 @@
 #### Scenario: Missing display fields or unknown identities
 - **WHEN** 旧Mock任务缺少名称或HTTP返回仅含ID
 - **THEN** Mock从现有组织记录精确按ID补齐；HTTP保留实际姓名，缺失时明确提示，不编造姓名或额外查询越权数据
-
-### Requirement: Longer normal splash dwell
-开屏SHALL常规持续约2400ms并保留轻入场及末段淡出；减少动画MUST保持180ms静态过渡。
-
-#### Scenario: Normal and reduced motion startup
-- **WHEN** App进程启动
-- **THEN** 普通模式延长中间停留，减少动画模式不增加长等待，底层账号恢复继续并行

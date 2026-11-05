@@ -39,7 +39,7 @@
 | 后端分层、模块职责和依赖 | [docs/backend-architecture.md](docs/backend-architecture.md) |
 | REST、SSE、附件和 AI 接口 | [docs/backend-interface.md](docs/backend-interface.md) |
 | 数据库表和迁移说明 | [docs/database-schema.md](docs/database-schema.md) |
-| 最新前后端验证与限制 | [docs/frontend-backend-integration-validation-2026-10-30.md](docs/frontend-backend-integration-validation-2026-10-30.md) |
+| 最新前后端验证与限制 | [docs/backend-validation.md](docs/backend-validation.md) |
 | 组员开发流程和 PR 约定 | [docs/development-workflow.md](docs/development-workflow.md) |
 | OpenSpec 变更列表 | [openspec/changes](openspec/changes) |
 
@@ -67,9 +67,13 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1
 
 测试脚本会创建独立的随机容器和端口，并清理自己创建的资源。Docker 不可用时，不能把测试报告为通过，应在 [docs/backend-validation.md](docs/backend-validation.md) 记录阻塞原因。
 
+## 核心维护规则
+
+不要随意创建文档：先复用已有主题，只有必要且有长期独立价值时才新建并加入 [总索引](docs/README.md)。小修改不创建OpenSpec；PR描述依据Git目标分支到HEAD的完整差异，更新时核对上次提交到HEAD的增量，禁止依赖会话历史。执行步骤见 [协作流程](docs/development-workflow.md)。
+
 ## 开发约束
 
-- 新能力先澄清需求、权限、数据、状态、异常、非目标和验收条件，再建立 OpenSpec 变更。
+- 新能力先澄清需求、权限、数据、状态、异常、非目标和验收条件，仅具体大功能且无合适现有 change 时新建 OpenSpec，小修改不创建。
 - Controller 只负责协议映射和输入校验；应用层负责事务和用例编排；领域层负责规则；基础设施层负责数据库、缓存、消息和外部服务。
 - 数据库变更只能新增 Flyway 迁移，不能修改已发布迁移。
 - 任务列表不得出现完成情况字段；下属日志入口固定在日志模块。

@@ -32,7 +32,7 @@ powershell -ExecutionPolicy Bypass -File scripts/prepare-flutter-sqlite.ps1
 
 ## 代码与素材
 
-`lib/core` 管理配置和状态，`routing` 管理路由，`data` 管理模型及 HTTP/Mock 数据源，`features` 按业务组织页面，`shared` 和 `theme` 管理公共组件与主题；`packages/cute_ui` 是本地组件依赖。导航顺序为导图、视图、日志、AI地图、我的，默认导图。
+`lib/core` 管理配置和状态，`routing` 管理路由，`data` 管理模型及 HTTP/Mock 数据源，`features` 按业务组织页面，`shared` 和 `theme` 管理公共组件与主题；`packages/cute_ui` 是本地组件依赖。导航顺序为首页、公司、日志、AI地图、我的，默认首页。
 
 运行素材在 `assets/generated_ui`、`assets/phosphor`、`assets/companions` 等目录；打包入口见 `pubspec.yaml`。`assets/new`、`assets/dog` 是当前加工脚本所需原图，`tool/` 保留其生成工具及桌面图标工具。来源和许可证见 `assets/licenses/` 及 [OpenMoji 署名](packages/cute_ui/ATTRIBUTION.md)，不得删除仍使用素材的署名。
 
@@ -40,6 +40,6 @@ powershell -ExecutionPolicy Bypass -File scripts/prepare-flutter-sqlite.ps1
 
 后续开发按 [仓库流程](../docs/development-workflow.md) 集中验收，常用命令为 `flutter analyze` 和 `flutter test --dart-define=USE_MOCK=true`。真实服务专项需按各自测试文件的环境要求显式启用，不可对业务数据库盲目运行写入测试。
 
-截图、命令日志、临时原型和诊断结果统一放仓库根目录 `output/`（Git 忽略），或本地 `.diagnostics/`。仓库只保留必要的结论、命令、环境、退出码和未解决问题；旧截图和阶段交付记录从 Git 历史查询。最新联调结果见 [2026-10-30 记录](../docs/frontend-backend-integration-validation-2026-10-30.md)，其中失败和待验收项仍需处理。本次仓库清理没有执行功能测试。
+截图、命令日志、临时原型和诊断结果统一放仓库根目录 `output/`（Git 忽略），或本地 `.diagnostics/`。仓库只保留必要的结论、命令、环境、退出码和未解决问题；旧截图和阶段交付记录从 Git 历史查询。最新已记录自动化结果和设备/供应商限制见 [统一验证入口](../docs/backend-validation.md)，历史失败数不能作为当前状态。本次文档整理未执行业务测试。
 
-?????`powershell -ExecutionPolicy Bypass -File ../scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat`?HTTP?Mock????????
+统一客户端验收入口：`powershell -ExecutionPolicy Bypass -File ../scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat`，分别运行HTTP与Mock分组；需要实际服务的opt-in用例按脚本和测试文件显式启用。
