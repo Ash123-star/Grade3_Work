@@ -128,9 +128,11 @@ class PageResult {
     this.nextCursor,
     this.snapshotToken,
     this.scheduleConstraints,
+    this.unread,
   });
   final List<Record> items;
   final int total;
+  final int? unread;
   final String? nextCursor, snapshotToken;
   final Map<String, dynamic>? scheduleConstraints;
 }
@@ -188,8 +190,12 @@ class Query {
     this.ownerId,
     this.from,
     this.to,
+    this.notificationCategory,
+    this.unreadOnly = false,
   });
   final String search;
+  final String? notificationCategory;
+  final bool unreadOnly;
   final int limit;
   final String? cursor, ownerId, departmentId, snapshotToken;
 
@@ -198,6 +204,8 @@ class Query {
   final DateTime? from, to;
   Map<String, dynamic> toJson() => {
     'search': search,
+    if (notificationCategory != null) 'category': notificationCategory,
+    if (unreadOnly) 'unreadOnly': true,
     if (snapshotToken != null) 'snapshotToken': snapshotToken,
     'limit': limit,
     if (cursor != null) 'cursor': cursor,

@@ -12,7 +12,9 @@ import java.util.Map;
 
 public class ApiError extends RuntimeException {
     public final int status; public final String code;
-    public ApiError(int status,String code,String message) { super(message); this.status=status; this.code=code; }
+    public final Long retryAfterSeconds;
+    public ApiError(int status,String code,String message) { this(status,code,message,null); }
+    public ApiError(int status,String code,String message,Long retryAfterSeconds) { super(message); this.status=status; this.code=code; this.retryAfterSeconds=retryAfterSeconds; }
     public static ApiError bad(String code,String message) { return new ApiError(400,code,message); }
     public static ApiError forbidden() { return new ApiError(403,"FORBIDDEN","不在授权范围内"); }
     public static ApiError notFound() { return new ApiError(404,"NOT_FOUND","记录不存在"); }
@@ -33,7 +35,11 @@ class Errors {
         return ResponseEntity.status(503).body(body("REQUEST_TIMEOUT","请求处理超时，请稍后重试",request));
     }
     @ExceptionHandler(ApiError.class)
-    ResponseEntity<?> business(ApiError e,HttpServletRequest r) { return ResponseEntity.status(e.status).body(body(e.code,e.getMessage(),r)); }
+    ResponseEntity<?> business(ApiError e,HttpServletRequest r) {
+        var response=ResponseEntity.status(e.status);
+        if(e.retryAfterSeconds!=null) response.header("Retry-After",e.retryAfterSeconds.toString());
+        return response.body(body(e.code,e.getMessage(),r));
+    }
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<?> integrity(Exception e,HttpServletRequest r) { return ResponseEntity.status(409).body(body("DATA_CONFLICT","唯一性或关联约束冲突",r)); }
     @ExceptionHandler({HttpMessageNotReadableException.class,MethodArgumentTypeMismatchException.class,IllegalArgumentException.class,ServletRequestBindingException.class})

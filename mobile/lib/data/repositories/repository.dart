@@ -44,6 +44,50 @@ class HttpRepository implements Repository {
            headers: {if (token != null) 'Authorization': 'Bearer $token'},
          ),
        ) {
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (request, handler) {
+          final remaining = rateLimitRemaining;
+          if (!request.path.startsWith('/auth/') && remaining > Duration.zero) {
+            request.extra['rateLimitCooldown'] = true;
+            handler.reject(
+              DioException(
+                requestOptions: request,
+                type: DioExceptionType.badResponse,
+                response: Response(
+                  requestOptions: request,
+                  statusCode: 429,
+                  data: const {'code': 'RATE_LIMITED'},
+                  headers: Headers.fromMap({
+                    'retry-after': [
+                      '${(remaining.inMilliseconds / 1000).ceil()}',
+                    ],
+                  }),
+                ),
+              ),
+            );
+            return;
+          }
+          handler.next(request);
+        },
+        onError: (error, handler) {
+          final failure = ApiFailure.fromDio(error);
+          if (error.requestOptions.extra['rateLimitCooldown'] != true &&
+              !error.requestOptions.path.startsWith('/auth/') &&
+              failure.statusCode == 429 &&
+              failure.code == 'RATE_LIMITED') {
+            final until = DateTime.now().add(
+              failure.retryAfter ?? const Duration(seconds: 60),
+            );
+            if (_rateLimitUntil == null || until.isAfter(_rateLimitUntil!)) {
+              _rateLimitUntil = until;
+              dio.options.extra['rateLimitUntil'] = until;
+            }
+          }
+          handler.next(error);
+        },
+      ),
+    );
     if (!businessAllowed) {
       dio.interceptors.add(
         InterceptorsWrapper(
@@ -93,6 +137,12 @@ class HttpRepository implements Repository {
     }
   }
   final Dio dio;
+  DateTime? _rateLimitUntil;
+  Duration get rateLimitRemaining {
+    final remaining =
+        _rateLimitUntil?.difference(DateTime.now()) ?? Duration.zero;
+    return remaining > Duration.zero ? remaining : Duration.zero;
+  }
 
   Future<Response<T>> _getWithRetry<T>(
     String path, {
@@ -268,6 +318,9 @@ class HttpRepository implements Repository {
     if (query.departmentId != null) 'departmentId': query.departmentId,
     'limit': query.limit,
     if (query.search.isNotEmpty) 'search': query.search,
+    if (resource == 'notifications' && query.notificationCategory != null)
+      'category': query.notificationCategory,
+    if (resource == 'notifications' && query.unreadOnly) 'unreadOnly': true,
     if (query.from != null) 'date': _date(query),
     if (query.from != null) 'period': _period(query),
   };
@@ -612,6 +665,7 @@ class HttpRepository implements Repository {
     if (raw.containsKey('recipient_id')) {
       fields['type'] = notificationTitle(raw['type']);
       fields['notificationType'] = raw['type'];
+      if (raw['summary'] is String) fields['summary'] = raw['summary'];
       final target = notificationResource(raw['type']);
       if (target != null && raw['object_id'] != null) {
         fields['targetResource'] = target;
@@ -660,6 +714,7 @@ class HttpRepository implements Repository {
           .map((item) => _record(Map<String, dynamic>.from(item as Map)))
           .toList(),
       total: (map['total'] as num?)?.toInt() ?? rawItems.length,
+      unread: (map['unread'] as num?)?.toInt(),
       nextCursor: map['nextCursor']?.toString(),
       snapshotToken: map['snapshotToken'] as String?,
       scheduleConstraints: map['scheduleConstraints'] is Map

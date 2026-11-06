@@ -2,6 +2,15 @@
 
 需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
 
+## 消息刷新与限流修复（2026-11-06，未发布）
+
+基线 `3f9eb2d561e17a41f91fb22c80cbfd23da2361ff`，分支 `fix/53-notification-refresh`，关联 Issue #53。通知改为每页30条、显式加载更多，搜索/分类/未读筛选在服务端分页前执行，返回全量未读数及按当前任务/日志/审核权限读取的摘要。客户端移除逐条详情摘要请求；SSE事件2秒合并、刷新至少间隔5秒，按类型和对象刷新，连接成功/常规重连不再触发全局刷新，前后台重放保留尚未刷新的事件。限额仍为同账号120次/60秒，429返回剩余窗口的Retry-After，客户端共享冷却、缺失头默认60秒，不自动重放写入。无数据库迁移。
+
+- Windows / PowerShell、Java21、Maven3.9.15：`mvn.cmd -B -f server/pom.xml '-Dmaven.test.skip=true' package` 退出0，JAR打包成功；证据 `output/yellow-theme/notification-refresh-backend-build.log`。测试源码编译及测试执行均跳过。
+- D:/flutter：`flutter.bat build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://39.96.84.51/api` 退出0，assembleDebug成功；证据 `output/yellow-theme/notification-refresh-mobile-build.log`，导出安装包 `output/yellow-theme/workpanel-notification-refresh-debug.apk`，289315802字节。受影响文件的`git diff --check`通过。
+- 规划阶段 `openspec.cmd validate --all --strict` 46项通过、退出0；证据 `output/yellow-theme/notification-refresh-spec.log`。本批只做编译验证，不运行测试套件、数据库/API或设备链路验收；分页变化、权限收回、通知密集到达、前后台重放与429恢复待用户验证。
+- 需要先更新后端以支持新的筛选和摘要，再安装对应APK；旧后端只提供旧字段，无法兑现完整筛选。用户随后明确授权将本次修复推送云端，提交仅纳入消息刷新修复；工作区既有指标JSON、Android运行配置及依赖锁文件的无关改动保留。实际部署结果见云端部署记录与对应PR。
+
 ## 月历、日志与统计布局修复（2026-11-06，未发布）
 
 基线 `983b7e76ec1532df5ac7a59bbf86197cff61e8ba`，分支 `fix/53-calendar-cell-overflow`，关联 Issue #53。月历各周统一预留五行显示空间，超过五项时前四项加右下角黄色 `+N`，今天右上角显示角色；移除创建任务按钮下方的整行占位。日志近三天查询原被转换成起始日的单日查询，现本人日志与下属日志均保留明确的 `from/to`；编辑器保持同一输入框，取消因键盘高度主动失焦，右上角下属日志入口使用单行自然宽度。统计页周期居中在上、日期及唯一筛选入口在下，并同步现有 HTML 原型。接口、权限与数据库未改。

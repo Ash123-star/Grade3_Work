@@ -80,6 +80,86 @@ class _ListPageState extends ConsumerState<ListPage> {
   bool readingAll = false;
   Object? messageError;
   bool get messageBusy => readingMessage != null || readingAll;
+  String notificationSearch = '';
+  Timer? _messageSearchTimer;
+  final _olderMessages = <Record>[];
+  String? _olderCursor;
+  Object? _olderError;
+  bool _loadingOlder = false;
+  int _messageGeneration = 0;
+  (String, String, bool) get _messageQuery =>
+      (notificationSearch, filter == '全部' ? '' : filter, inbox == 1);
+
+  void _resetOlder() {
+    _messageGeneration++;
+    _olderMessages.clear();
+    _olderCursor = null;
+    _olderError = null;
+    _loadingOlder = false;
+  }
+
+  void _refreshMessages() => ref.invalidate(notificationPageProvider);
+
+  Future<void> _loadOlder(PageResult loaded) async {
+    if (_loadingOlder || loaded.nextCursor == null) return;
+    final query = _messageQuery, generation = _messageGeneration;
+    final session = ref.read(sessionProvider);
+    setState(() {
+      _loadingOlder = true;
+      _olderError = null;
+    });
+    try {
+      final page = await ref
+          .read(repositoryProvider)
+          .list(
+            'notifications',
+            Query(
+              limit: 30,
+              cursor: loaded.nextCursor,
+              search: query.$1,
+              notificationCategory: query.$2.isEmpty ? null : query.$2,
+              unreadOnly: query.$3,
+            ),
+          );
+      if (!sameSession(session) ||
+          generation != _messageGeneration ||
+          query != _messageQuery)
+        return;
+      if (page.total != loaded.total) {
+        setState(_resetOlder);
+        _refreshMessages();
+        return;
+      }
+      final ids = loaded.items.map((record) => record.id).toSet();
+      if (page.items.isEmpty ||
+          page.nextCursor == loaded.nextCursor ||
+          page.items.any((record) => !ids.add(record.id))) {
+        setState(_resetOlder);
+        _refreshMessages();
+        return;
+      }
+      setState(() {
+        _olderMessages.addAll(page.items);
+        _olderCursor = loaded.items.length + page.items.length < page.total
+            ? page.nextCursor
+            : null;
+      });
+    } catch (error) {
+      if (sameSession(session) && generation == _messageGeneration) {
+        setState(() => _olderError = error);
+      }
+    } finally {
+      if (sameSession(session) && generation == _messageGeneration) {
+        setState(() => _loadingOlder = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _messageSearchTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -92,6 +172,7 @@ class _ListPageState extends ConsumerState<ListPage> {
           readingMessage = null;
           readingAll = false;
           messageError = null;
+          _resetOlder();
           owner = null;
           ownerName = null;
         });
@@ -140,7 +221,7 @@ class _ListPageState extends ConsumerState<ListPage> {
       }
       if (!mounted) return;
       if (!sameSession(session)) return;
-      ref.invalidate(recordsProvider('notifications'));
+      _refreshMessages();
       if (message == null) return;
       final target = message.fields['targetResource'];
       final id = message.fields['targetId'];
@@ -184,10 +265,31 @@ class _ListPageState extends ConsumerState<ListPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.resource == 'notifications') {
+      ref.listen(notificationPageProvider(_messageQuery), (before, after) {
+        if (after.hasValue &&
+            !identical(before?.valueOrNull, after.valueOrNull)) {
+          setState(_resetOlder);
+        }
+      });
+    }
     final resource = widget.resource,
         user = ref.watch(sessionProvider),
         data = resource == 'audit'
             ? ref.watch(auditRecordsProvider)
+            : resource == 'notifications'
+            ? ref
+                  .watch(notificationPageProvider(_messageQuery))
+                  .whenData(
+                    (page) => PageResult(
+                      [...page.items, ..._olderMessages],
+                      total: page.total,
+                      nextCursor: _olderMessages.isEmpty
+                          ? page.nextCursor
+                          : _olderCursor,
+                      unread: page.unread,
+                    ),
+                  )
             : ref.watch(recordsProvider(widget.resource));
     final deniedMessage =
         messageError is ApiFailure &&
@@ -271,7 +373,23 @@ class _ListPageState extends ConsumerState<ListPage> {
               hintText: resource == 'organization' ? '搜索姓名、部门或团队' : '搜索标题或内容',
               prefixIcon: const Icon(Icons.search),
             ),
-            onChanged: (v) => setState(() => search = v),
+            onChanged: (v) {
+              if (resource != 'notifications') {
+                setState(() => search = v);
+                return;
+              }
+              _messageSearchTimer?.cancel();
+              _messageSearchTimer = Timer(
+                const Duration(milliseconds: 400),
+                () {
+                  if (mounted)
+                    setState(() {
+                      notificationSearch = v.trim();
+                      _resetOlder();
+                    });
+                },
+              );
+            },
           ),
           const SizedBox(height: 12),
           if (resource == 'reviews')
@@ -284,7 +402,10 @@ class _ListPageState extends ConsumerState<ListPage> {
             PillTabs(
               labels: const ['全部', '未读'],
               selected: inbox,
-              onChanged: (v) => setState(() => inbox = v),
+              onChanged: (v) => setState(() {
+                inbox = v;
+                _resetOlder();
+              }),
             ),
           if (resource == 'notifications') const NotificationConnectionStatus(),
           if (resource == 'tasks') ...[
@@ -354,7 +475,10 @@ class _ListPageState extends ConsumerState<ListPage> {
                       child: TuantuanFilterChip(
                         label: Text(value),
                         selected: filter == value,
-                        onSelected: (_) => setState(() => filter = value),
+                        onSelected: (_) => setState(() {
+                          filter = value;
+                          if (resource == 'notifications') _resetOlder();
+                        }),
                       ),
                     ),
                 ],
@@ -401,19 +525,28 @@ class _ListPageState extends ConsumerState<ListPage> {
             TextButton(
               onPressed: () {
                 setState(() => messageError = null);
-                ref.invalidate(recordsProvider('notifications'));
+                _refreshMessages();
               },
               child: const Text('重新检查消息权限'),
             ),
           ] else
             data.when(
-              skipLoadingOnRefresh: false,
+              skipLoadingOnRefresh: resource == 'notifications',
               skipLoadingOnReload: false,
+              skipError:
+                  resource == 'notifications' &&
+                  !(data.error is ApiFailure &&
+                      [
+                        FailureKind.unauthorized,
+                        FailureKind.forbidden,
+                      ].contains((data.error as ApiFailure).kind)),
               loading: () => const LoadingSkeleton(),
               error: (e, _) => RecordFailure(
                 e,
                 retry: () => resource == 'audit'
                     ? ref.invalidate(auditRecordsProvider)
+                    : resource == 'notifications'
+                    ? _refreshMessages()
                     : ref.invalidate(recordsProvider(resource)),
               ),
               data: (page) {
@@ -445,11 +578,6 @@ class _ListPageState extends ConsumerState<ListPage> {
                         (due == null || !due.isBefore(DateTime.now()))) {
                       return false;
                     }
-                  }
-                  if (resource == 'notifications' &&
-                      (inbox == 1 && r.fields['read'] == true ||
-                          filter != '全部' && r.fields['type'] != filter)) {
-                    return false;
                   }
                   if (resource == 'reviews' &&
                       (inbox == 0 &&
@@ -634,6 +762,26 @@ class _ListPageState extends ConsumerState<ListPage> {
               },
             ),
           const DemoLabel(),
+          if (resource == 'notifications' && data.hasValue) ...[
+            if (data.isLoading) const LinearProgressIndicator(minHeight: 2),
+            if (data.hasError)
+              RecordFailure(data.error!, retry: _refreshMessages),
+            if (_olderError != null)
+              RecordFailure(
+                _olderError!,
+                retry: () => _loadOlder(data.requireValue),
+              ),
+            if (data.requireValue.nextCursor != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: OutlinedButton(
+                  onPressed: _loadingOlder || data.isLoading
+                      ? null
+                      : () => _loadOlder(data.requireValue),
+                  child: Text(_loadingOlder ? '正在加载…' : '加载更多消息'),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -795,7 +943,7 @@ class NotificationConnectionStatus extends ConsumerWidget {
           ],
           if (status.connection != NotificationConnection.live)
             TextButton(
-              onPressed: () => ref.invalidate(recordsProvider('notifications')),
+              onPressed: () => ref.invalidate(notificationPageProvider),
               child: const Text('刷新消息列表'),
             ),
         ],

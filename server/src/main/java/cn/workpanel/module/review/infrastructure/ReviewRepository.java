@@ -2,6 +2,7 @@ package cn.workpanel.module.review.infrastructure;
 
 import cn.workpanel.Actor;
 import cn.workpanel.Db;
+import cn.workpanel.Business;
 import org.springframework.stereotype.Repository;
 import java.util.Map;
 
@@ -10,8 +11,12 @@ import java.util.Map;
 public class ReviewRepository {
     private final Db db;
     public ReviewRepository(Db db) { this.db = db; }
+    /** Reusable current review visibility; alias r, no notification-based grant. */
+    public static Business.Clause readableScope(Actor actor) {
+        return new Business.Clause("r.company_id=? AND (r.applicant_id=? OR EXISTS (SELECT 1 FROM review_steps s JOIN users reviewer ON reviewer.id=s.reviewer_id AND reviewer.company_id=r.company_id WHERE s.request_id=r.id AND s.reviewer_id=? AND s.state<>'SUPERSEDED' AND "+validReviewer("r","reviewer")+"))", java.util.List.of(actor.company(),actor.id(),actor.id()));
+    }
     public Map<String, Object> list(Actor actor, int cursor, int limit) {
-        String where = "r.company_id=? AND (r.applicant_id=? OR EXISTS (SELECT 1 FROM review_steps s JOIN users reviewer ON reviewer.id=s.reviewer_id AND reviewer.company_id=r.company_id WHERE s.request_id=r.id AND s.reviewer_id=? AND s.state<>'SUPERSEDED' AND "+validReviewer("r","reviewer")+"))";
+        String where = readableScope(actor).sql();
         var items=db.rows("SELECT r.id,r.kind,r.target_id,r.applicant_id,u.name AS applicant_name,r.status,r.reason,r.expected_version,r.approval_mode,r.decision_source,r.created_at FROM review_requests r JOIN users u ON u.id=r.applicant_id AND u.company_id=r.company_id WHERE " + where + " ORDER BY r.created_at DESC,r.id LIMIT ? OFFSET ?", actor.company(), actor.id(), actor.id(), limit, cursor);
         for(var item:items) {
             var current=currentReviewerView(Db.str(item,"id")); item.put("reviewer_id",current.get("reviewer_id")); item.put("reviewer_name",current.get("reviewer_name")); item.put("reviewer_configured",!current.isEmpty());

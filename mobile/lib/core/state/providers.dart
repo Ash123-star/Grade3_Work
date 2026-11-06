@@ -203,6 +203,9 @@ final recordsProvider = FutureProvider.autoDispose.family<PageResult, String>((
   if (!session.canReadBusiness) {
     throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
   }
+  if (resource == 'notifications') {
+    return ref.watch(notificationPageProvider(('', '', false)).future);
+  }
   var active = true;
   ref.onDispose(() => active = false);
   return readCompleteList(
@@ -212,6 +215,26 @@ final recordsProvider = FutureProvider.autoDispose.family<PageResult, String>((
     isActive: () => active,
   );
 });
+
+/// One bounded first page per server-side filter. Home/profile share the default page.
+final notificationPageProvider = FutureProvider.autoDispose
+    .family<PageResult, (String, String, bool)>((ref, key) {
+      final user = ref.watch(sessionProvider);
+      if (!user.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
+      }
+      return ref
+          .watch(repositoryProvider)
+          .list(
+            'notifications',
+            Query(
+              limit: 30,
+              search: key.$1,
+              notificationCategory: key.$2.isEmpty ? null : key.$2,
+              unreadOnly: key.$3,
+            ),
+          );
+    });
 final receivedTaskCardProvider = FutureProvider.autoDispose<PageResult>((ref) {
   final session = ref.watch(sessionProvider);
   if (!session.canReadBusiness) {
@@ -274,20 +297,24 @@ final analyticsFiltersProvider = StateProvider.family<AnalyticsFilters, String>(
 final analyticsSummaryProvider = FutureProvider.autoDispose<Record>((ref) {
   final accountId = ref.watch(sessionProvider).id;
   final filters = ref.watch(analyticsFiltersProvider(accountId));
-  return ref.watch(repositoryProvider).analytics(
-    AnalyticsQuery(
-      date: ref.watch(selectedDateProvider),
-      period: switch (ref.watch(periodProvider)) {
-        '日' => 'day',
-        '周' => 'week',
-        _ => 'month',
-      },
-      groupBy: filters.groupBy,
-      departmentId: filters.departmentId.isEmpty ? null : filters.departmentId,
-      teamId: filters.teamId.isEmpty ? null : filters.teamId,
-      ownerId: filters.ownerId.isEmpty ? null : filters.ownerId,
-    ),
-  );
+  return ref
+      .watch(repositoryProvider)
+      .analytics(
+        AnalyticsQuery(
+          date: ref.watch(selectedDateProvider),
+          period: switch (ref.watch(periodProvider)) {
+            '日' => 'day',
+            '周' => 'week',
+            _ => 'month',
+          },
+          groupBy: filters.groupBy,
+          departmentId: filters.departmentId.isEmpty
+              ? null
+              : filters.departmentId,
+          teamId: filters.teamId.isEmpty ? null : filters.teamId,
+          ownerId: filters.ownerId.isEmpty ? null : filters.ownerId,
+        ),
+      );
 });
 final datedRecordsProvider = FutureProvider.autoDispose
     .family<PageResult, String>((ref, resource) {
@@ -340,7 +367,8 @@ final calendarMonthTasksProvider = FutureProvider.autoDispose
               to: range.to,
             ),
             isActive: () => active,
-          ).then((page) {
+          )
+          .then((page) {
             if (active) {
               final keep = ref.keepAlive();
               ref.onDispose(retention.retain(key, keep.close));
