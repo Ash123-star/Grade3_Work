@@ -69,31 +69,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, viewport) => period == '月'
-                    ? Column(
-                        children: [
-                          Expanded(
-                            child: LayoutBuilder(
-                              builder: (context, monthViewport) =>
-                                  CalendarContent(
-                                    availableHeight: monthViewport.maxHeight,
-                                  ),
-                            ),
-                          ),
-                          SizedBox(
-                            height: user.manager && user.dispatch ? 72 : null,
-                            child: Padding(
-                              padding: EdgeInsets.only(
-                                left: 16,
-                                right: user.manager && user.dispatch ? 88 : 16,
-                              ),
-                              child: const Align(
-                                alignment: Alignment.centerLeft,
-                                child: DemoLabel(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
+                    ? CalendarContent(availableHeight: viewport.maxHeight)
                     : ListView(
                         padding: EdgeInsets.only(
                           bottom: user.manager && user.dispatch ? 80 : 16,

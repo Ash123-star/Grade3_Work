@@ -73,6 +73,8 @@
 
 移动端日期范围列表同时支持 `from/to`；成员月状态使用 `GET /logs/subordinates/calendar?ownerId=<id>&month=YYYY-MM`，返回 `employmentStartDate` 和逐日 `SUBMITTED/MISSING/FUTURE/UNKNOWN`。首次提交后的直接正文修改使用 `PUT /logs/{id}/content`，请求 `{work,version}`，只能由本人在 `submitted_at + 24h` 前执行，必须保留首次提交时间并递增版本。
 
+本人及下属日志列表在指定起止时间时均发送成对的`from/to`，移除互斥的`date/period`。近三天为上海前天零点至明天零点的左闭右开区间；例如2026年11月6日发送`2026-11-03T16:00:00Z`至`2026-11-06T16:00:00Z`，不得将三天区间转换成前天的单日查询。提交后沿用既有日志列表失效刷新，不需要修改后端或重新提交已保存日志。
+
 ## 审核 `/reviews`
 
 `PUT /tasks/{id}/pin`、`DELETE /tasks/{id}/pin` 为个人置顶：调用者须能读取该任务（范围外404），只影响本人 `GET /tasks` 排序（置顶优先、最近置顶在前，其后按截止时间），列表项增加 `pinned`/`pinnedAt`；不改变任务 version、不走审核、不写通知。每人最多10项（仅计仍可见任务），超出409 `PIN_LIMIT`；重复置顶返回原 `pinnedAt`，取消未置顶任务也返回成功。日历、导图公司任务卡和已接收任务卡不受置顶影响。

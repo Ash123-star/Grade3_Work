@@ -111,7 +111,6 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
   bool _readOnly = false;
   bool _closing = false;
   bool _allowPop = false;
-  bool _keyboardCollapsedForSpace = false;
   late Future<void> _restoreFuture;
   String? _error;
 
@@ -124,41 +123,12 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
     _sessionToken = session.token;
     _draftStore = ref.read(draftStoreProvider);
     final selected = widget.date ?? ref.read(logDateProvider);
-    final resolved = selected ?? DateTime.now();
+    final resolved = selected ?? shanghaiWallTime(DateTime.now());
     _date = DateTime(resolved.year, resolved.month, resolved.day);
     _location = DraftLocation.diary(_accountId, _date);
     _recordId = widget.recordId;
     _version = widget.version;
     _restoreFuture = _restore();
-  }
-
-  @override
-  void didChangeMetrics() {
-    if (!mounted) return;
-    final view = View.of(context);
-    final scale = view.devicePixelRatio;
-    final screenHeight = view.physicalSize.height / scale;
-    final keyboardHeight = view.viewInsets.bottom / scale;
-    if (keyboardHeight == 0) {
-      if (_keyboardCollapsedForSpace) {
-        _keyboardCollapsedForSpace = false;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() {});
-        });
-      }
-      return;
-    }
-    if (screenHeight > 0 && keyboardHeight + 112 > screenHeight * 2 / 3) {
-      if (!_keyboardCollapsedForSpace) {
-        _keyboardCollapsedForSpace = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() {});
-        });
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusNode.unfocus();
-      });
-    }
   }
 
   @override
@@ -187,16 +157,24 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
 
   bool get _isCurrentAccount {
     final session = ref.read(sessionProvider);
-    return session.id == _accountId && session.token == _sessionToken && session.canReadBusiness;
+    return session.id == _accountId &&
+        session.token == _sessionToken &&
+        session.canReadBusiness;
   }
 
   Future<void> _restore() async {
     try {
       var local = await ref.read(draftStoreProvider).read(_location);
       if (local == null && widget.recordId != null && widget.version != null) {
-        local = await ref.read(draftStoreProvider).read(
-          DraftLocation.revision(_accountId, widget.recordId!, widget.version!),
-        );
+        local = await ref
+            .read(draftStoreProvider)
+            .read(
+              DraftLocation.revision(
+                _accountId,
+                widget.recordId!,
+                widget.version!,
+              ),
+            );
       }
       if (!mounted || !_isCurrentAccount) return;
       if (local != null) {
@@ -450,122 +428,128 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
     final view = View.of(context);
     final scale = view.devicePixelRatio;
     final screenHeight = view.physicalSize.height / scale;
-    final keyboardHeight = view.viewInsets.bottom / scale;
-    final heightBudget = math.max(0.0, screenHeight * 2 / 3 - keyboardHeight);
-    final height = math.min(heightBudget, MediaQuery.sizeOf(context).height);
-    final compact = height < 210;
-    final active = session.id == _accountId && session.token == _sessionToken && session.canReadBusiness;
+    // Subscribe to inset changes without replacing the active TextField.
+    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
+    final active =
+        session.id == _accountId &&
+        session.token == _sessionToken &&
+        session.canReadBusiness;
 
-    return PopScope<void>(
-      canPop: _allowPop,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) unawaited(_close());
-      },
-      child: SizedBox(
-        height: height,
-        child: SafeArea(
-          top: false,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(color: SunnyPalette.paper),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 8, 8),
-                  child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableHeight = math.max(
+          0.0,
+          constraints.maxHeight - keyboardHeight,
+        );
+        // Prefer the existing 2/3 budget, but keep a usable editor above tall IMEs.
+        // Only an explicit close/back action dismisses the keyboard.
+        final height = math.min(
+          availableHeight,
+          math.max(260.0, screenHeight * 2 / 3 - keyboardHeight),
+        );
+        return Padding(
+          padding: EdgeInsets.only(bottom: keyboardHeight),
+          child: PopScope<void>(
+            canPop: _allowPop,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop) unawaited(_close());
+            },
+            child: SizedBox(
+              height: height,
+              child: SafeArea(
+                top: false,
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(color: SunnyPalette.paper),
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 8, 8),
+                        child: Row(
                           children: [
-                            Text(
-                              '今日工作',
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(
-                                    color: SunnyPalette.ink,
-                                    fontWeight: FontWeight.w800,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '今日工作',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color: SunnyPalette.ink,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                   ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _dayKey,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: SunnyPalette.muted,
+                                          letterSpacing: .2,
+                                        ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _dayKey,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: SunnyPalette.muted,
-                                    letterSpacing: .2,
-                                  ),
+                            _ComposerIconAction(
+                              label: '关闭',
+                              icon: Icons.close_rounded,
+                              onPressed: _close,
                             ),
                           ],
                         ),
                       ),
-                      _ComposerIconAction(
-                        label: '关闭',
-                        icon: Icons.close_rounded,
-                        onPressed: _close,
+                      Divider(
+                        height: 1,
+                        color: const Color(0xFFD8C8B5).withValues(alpha: .55),
                       ),
+                      if (!active)
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              '账号权限已变化，请关闭后重新打开',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: colors.onSurfaceVariant),
+                            ),
+                          ),
+                        )
+                      else if (_readOnly)
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              '首次提交已满24小时，日志仅可查看',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: colors.onSurfaceVariant),
+                            ),
+                          ),
+                        )
+                      else
+                        Expanded(child: _fullEditor(context)),
+                      if (active)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                          child: Row(
+                            children: [
+                              Expanded(child: _saveState(context)),
+                              if (_restoreFailed)
+                                _ComposerAction(
+                                  label: '重试读取',
+                                  icon: Icons.refresh_rounded,
+                                  onPressed: _retryRestore,
+                                  emphasized: true,
+                                ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                Divider(
-                  height: 1,
-                  color: const Color(0xFFD8C8B5).withValues(alpha: .55),
-                ),
-                if (!active)
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        '账号权限已变化，请关闭后重新打开',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  )
-                else if (_readOnly)
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        '首次提交已满24小时，日志仅可查看',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  )
-                else if (height < 128)
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        '键盘占用空间较大，请收起键盘后继续编辑',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  )
-                else if (compact)
-                  _compactEditor(context)
-                else
-                  Expanded(child: _fullEditor(context)),
-                if (active && height >= 210)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    child: Row(
-                      children: [
-                        Expanded(child: _saveState(context)),
-                        if (_restoreFailed)
-                          _ComposerAction(
-                            label: '重试读取',
-                            icon: Icons.refresh_rounded,
-                            onPressed: _retryRestore,
-                            emphasized: true,
-                          ),
-                      ],
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -636,54 +620,6 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
     ),
   );
 
-  Widget _compactEditor(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-    child: SizedBox(
-      height: 54,
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              onChanged: _changed,
-              maxLines: 1,
-              enabled:
-                  !_loading &&
-                  !_restoreFailed &&
-                  !_submitted &&
-                  !_closing &&
-                  !_readOnly,
-              decoration: InputDecoration(
-                hintText: '今日工作',
-                filled: true,
-                fillColor: SunnyPalette.paper,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFD8C8B5)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFD8C8B5)),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          _ComposerIconAction(
-            label: '提交',
-            icon: Icons.arrow_upward_rounded,
-            onPressed: _submitting || _loading || _submitted ? null : _submit,
-          ),
-        ],
-      ),
-    ),
-  );
-
   Widget _saveState(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final label =
@@ -692,8 +628,6 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
             ? '正在读取草稿'
             : _saving
             ? '自动保存中'
-            : _keyboardCollapsedForSpace
-            ? '键盘已收起，可继续编辑'
             : '自动保存到此设备');
     return Text(
       label,

@@ -13,6 +13,12 @@
 #### Scenario: Adjacent month
 - WHEN 点击相邻月份日期
 - THEN 按真实年月日显示对应任务
+#### Scenario: Fixed overflow badge and today marker
+- WHEN 同月包含空闲日期、五条任务日期和超过五条任务日期，或剩余数量达到三位以上
+- THEN 系统 SHALL 使用与任务数量无关的统一基础周高；剩余数量以黄色圆角胶囊固定在日期格右下角，单行且限制在格内，不遮挡前四条任务、不拉长单元格；今天的右上角 SHALL 显示小黄鸭角色，日期、节日及休/班标记预留独立空间，拖动候选不计入剩余数量
+#### Scenario: Calendar visible behind dispatch button row
+- WHEN 有派发权限的用户查看公司月历
+- THEN 月历滚动区 SHALL 延伸到底部导航上方，不为派发浮钮保留整行不透明空白；浮钮权限及点击操作保持不变
 ### Requirement: Mainland holidays
 系统 SHALL 在客户端离线计算1900–2100年的节日本日，仅在元旦、除夕、春节、清明节、劳动节、端午节、中秋节、国庆节当天显示名称，不加星标，不在连休或补班日重复标注；同日重合合并名称。节日 SHALL 独立展示、不可拖动，不占任务五行且不计入任务剩余数，长名称可查看完整内容。服务端既有放假公告接口 MUST 保持兼容，其行政放假安排不能冒充节日本日。
 #### Scenario: National Day vacation

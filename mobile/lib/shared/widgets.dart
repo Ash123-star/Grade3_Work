@@ -120,7 +120,7 @@ class PageFrame extends StatelessWidget {
     final headerContent = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (showTitle || canGoBack)
+        if (showTitle || canGoBack || inlineAction)
           ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 52),
             child: Row(
@@ -153,15 +153,18 @@ class PageFrame extends StatelessWidget {
                         )
                       : const SizedBox.shrink(),
                 ),
-                SizedBox(
-                  width: edgeWidth,
-                  child: inlineAction
-                      ? Align(
-                          alignment: Alignment.centerRight,
-                          child: actions!.single,
-                        )
-                      : null,
-                ),
+                if (inlineAction && !showTitle)
+                  actions!.single
+                else
+                  SizedBox(
+                    width: edgeWidth,
+                    child: inlineAction
+                        ? Align(
+                            alignment: Alignment.centerRight,
+                            child: actions!.single,
+                          )
+                        : null,
+                  ),
               ],
             ),
           ),
