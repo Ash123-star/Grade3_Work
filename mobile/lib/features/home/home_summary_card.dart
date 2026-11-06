@@ -31,7 +31,7 @@ class HomeSummaryCard extends ConsumerWidget {
         ],
       ),
       child: Material(
-        color: paper.note,
+        color: resource == 'dashboard/company' ? paper.note : paper.surface,
         shape: RoundedRectangleBorder(
           side: const BorderSide(color: HomePaperTokens.noteEdge),
           borderRadius: BorderRadius.circular(18),
@@ -51,8 +51,8 @@ class HomeSummaryCard extends ConsumerWidget {
                     constraints: BoxConstraints(minHeight: large ? 56 : 48),
                     child: Row(
                       children: [
-                        DogAvatar(
-                          index: DogAssets.friendly,
+                        TuantuanIcon(
+                          resource == 'dashboard/company' ? 'calendar' : 'task',
                           size: narrow ? 22 : 24,
                         ),
                         const SizedBox(width: 6),

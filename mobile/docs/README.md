@@ -23,3 +23,5 @@
 | 旧视觉阶段 | [week5调整](week5-ui-adjustment.md)；只用于相应批次追溯 |
 
 源码和实际接口优先用于核对实现，设计存在、Mock/夹具通过或截图不能证明真实链路。新日志/截图放忽略的`output/`或PR附件，现有必要证据保留其提交和环境限制，不按批次增加另一套验证报告。
+
+奶油黄主题的当前设计与验收范围统一维护在[设计基线](tuantuan-ui-design-system.md)，可直接打开[交互原型](../prototypes/sunshine-workspace.html)。

@@ -129,6 +129,6 @@ class CalendarSchedule {
       return '${businessDateText(wall)} ${wall.hour.toString().padLeft(2, '0')}:${wall.minute.toString().padLeft(2, '0')}';
     }
 
-    return '${start == null ? '' : '${format(start!)} → '}${format(end)}（上海）';
+    return '${start == null ? '' : '${format(start!)} → '}${format(end)}';
   }
 }

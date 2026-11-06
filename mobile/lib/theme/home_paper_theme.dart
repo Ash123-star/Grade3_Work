@@ -1,48 +1,49 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
+import 'sunshine_palette.dart';
 
 /// Values shared with the approved home-daily-todos.html prototype.
-/// Scoped to the home and its dialogs; other business pages keep their theme.
+/// Home geometry shares the global sunshine brand roles.
 class HomePaperTokens extends ThemeExtension<HomePaperTokens> {
   const HomePaperTokens({
     this.canvas = SunnyPalette.paper,
     this.surface = const Color(0xFFFFFEFA),
-    this.note = const Color(0xFFF1E1C8),
-    this.ink = const Color(0xFF3E4941),
-    this.muted = const Color(0xFF687268),
-    this.line = const Color(0xFFE9DFCF),
-    this.accent = const Color(0xFFF3A45D),
-    this.green = const Color(0xFF32694D),
+    this.note = const Color(0xFFFFF4C9),
+    this.ink = const Color(0xFF3D352B),
+    this.muted = const Color(0xFF796F61),
+    this.line = const Color(0xFFEEE4CD),
+    this.accent = SunshinePalette.yellow,
+    this.green = const Color(0xFF775B10),
   });
 
   final Color canvas, surface, note, ink, muted, line, accent, green;
-  static const accentInk = Color(0xFF44210D);
-  static const orangeInk = Color(0xFF74421C);
-  static const mint = Color(0xFFE9F2E7);
+  static const accentInk = Color(0xFF3D352B);
+  static const orangeInk = Color(0xFF775B10);
+  static const mint = Color(0xFFFFF0AC);
   static const error = Color(0xFFA53E3B);
-  static const noteEdge = Color(0xFFDCC6A5);
-  static const noteShadow = Color(0x18AD8C61);
-  static const noteRule = Color(0xFFE3D0B1);
-  static const noteFold = Color(0xFFE6D1AF);
-  static const previewLine = Color(0x13415246);
-  static const moreInk = Color(0xFF4F685A);
-  static const messageSurface = Color(0xFFFFF5E4);
-  static const messageEdge = Color(0xFFEDDFC7);
-  static const unread = Color(0xFFC16C40);
-  static const binding = Color(0xFFC7D4BD);
-  static const bindingEdge = Color(0xFFB8C9AE);
+  static const noteEdge = Color(0xFFEFDEA5);
+  static const noteShadow = Color(0x109C7B20);
+  static const noteRule = Color(0xFFF0E4BE);
+  static const noteFold = Color(0xFFF0DF9D);
+  static const previewLine = Color(0x18775B10);
+  static const moreInk = Color(0xFF775B10);
+  static const messageSurface = Color(0xFFFFF5D3);
+  static const messageEdge = Color(0xFFF0E3BA);
+  static const unread = Color(0xFFC76C35);
+  static const binding = Color(0xFFE9CD63);
+  static const bindingEdge = Color(0xFFD6B752);
   static const sheetShadow = Color(0x29E8DCC7);
-  static const todayEdge = Color(0xFFC77A34);
-  static const outside = Color(0xFF8B8D81);
-  static const todaySurface = Color(0xFFFFF3E3);
-  static const checkEdge = Color(0xFF8B9D89);
-  static const completedEdge = Color(0xFF83A187);
-  static const rowLine = Color(0xFFEEE9DF);
-  static const navigationSurface = Color(0xFFF8F6EA);
-  static const navigationLine = Color(0xFFE8E2D3);
-  static const navigationTray = Color(0xFFFFDFB7);
-  static const navigationInk = Color(0xFF5C442A);
-  static const navigationDot = Color(0xFFBD742E);
+  static const todayEdge = Color(0xFFC29B28);
+  static const outside = Color(0xFF978C78);
+  static const todaySurface = Color(0xFFFFF6D4);
+  static const checkEdge = Color(0xFFCABB96);
+  static const completedEdge = Color(0xFFD2AF26);
+  static const rowLine = Color(0xFFEEE4CD);
+  static const navigationSurface = Color(0xFFFFFEFA);
+  static const navigationLine = Color(0xFFEEE4CD);
+  static const navigationTray = Color(0xFFFFDA35);
+  static const navigationInk = Color(0xFF3D352B);
+  static const navigationDot = Color(0xFF775B10);
 
   static HomePaperTokens of(BuildContext context) =>
       Theme.of(context).extension<HomePaperTokens>() ?? const HomePaperTokens();
@@ -104,8 +105,8 @@ ThemeData homePaperTheme(BuildContext context) {
     ],
     scaffoldBackgroundColor: paper.canvas,
     colorScheme: base.colorScheme.copyWith(
-      primary: paper.accent,
-      onPrimary: HomePaperTokens.accentInk,
+      primary: paper.green,
+      onPrimary: paper.surface,
       secondary: paper.green,
       surface: paper.surface,
       onSurface: paper.ink,
@@ -145,7 +146,7 @@ ThemeData homePaperTheme(BuildContext context) {
         foregroundColor: paper.ink,
         backgroundColor: Colors.white,
         minimumSize: const Size(48, 48),
-        side: const BorderSide(color: Color(0xFFCBD2C3)),
+        side: const BorderSide(color: Color(0xFFCABB96)),
         padding: const EdgeInsets.all(12),
         textStyle: paper.body(13),
         alignment: Alignment.centerLeft,
@@ -169,11 +170,11 @@ ThemeData homePaperTheme(BuildContext context) {
       contentPadding: const EdgeInsets.all(12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD2C3)),
+        borderSide: const BorderSide(color: Color(0xFFCABB96)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD2C3)),
+        borderSide: const BorderSide(color: Color(0xFFCABB96)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

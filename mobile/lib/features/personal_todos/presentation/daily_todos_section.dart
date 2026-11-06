@@ -289,7 +289,7 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const DogAvatar(index: DogAssets.friendly, size: 24),
+                      const TuantuanIcon('calendar', size: 24),
                       const SizedBox(width: 6),
                       Text('每日事项', style: paper.heading(18)),
                     ],

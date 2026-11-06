@@ -18,9 +18,22 @@ class HolidayDay {
 }
 
 class HolidayCalendar {
-  const HolidayCalendar(this.days, this.warning);
+  const HolidayCalendar(
+    this.days,
+    this.warning, [
+    this.yearWarnings = const {},
+  ]);
   final Map<String, HolidayDay> days;
   final String warning;
+  final Map<int, String> yearWarnings;
+
+  String warningForRange(DateTime start, DateTime end) {
+    if (yearWarnings.isEmpty) return warning;
+    return [
+      for (var y = start.year; y <= end.year; y++)
+        if (yearWarnings[y]?.isNotEmpty ?? false) '$y年${yearWarnings[y]}',
+    ].join('；');
+  }
 }
 
 String holidayDateKey(DateTime d) =>
@@ -106,6 +119,7 @@ Stream<HolidayCalendar> loadHolidayCalendar(
   ].where((y) => y >= 2007 && y <= 2100).toList();
   final snapshots = <int, Map<String, bool>>{};
   final sources = <int, String>{};
+  final yearWarnings = <int, String>{};
   HolidayCalendar merge(String warning) {
     final days = {...local.days};
     // Later announcements may include December of the previous year.
@@ -118,7 +132,11 @@ Stream<HolidayCalendar> loadHolidayCalendar(
         );
       }
     }
-    return HolidayCalendar(Map.unmodifiable(days), warning);
+    return HolidayCalendar(
+      Map.unmodifiable(days),
+      warning,
+      Map.unmodifiable(yearWarnings),
+    );
   }
 
   for (final y in years) {
@@ -148,11 +166,17 @@ Stream<HolidayCalendar> loadHolidayCalendar(
       }(),
   ]);
   var fresh = 0;
+  for (final y in years) {
+    yearWarnings[y] = snapshots.containsKey(y)
+        ? '放假调休使用缓存，更新暂不可用'
+        : '暂无放假调休公告，节日已离线计算';
+  }
   for (final result in results) {
     if (result == null) continue;
     snapshots[result.year] = result.days;
     final isFresh = result.body['status'] == 'FRESH';
     if (isFresh) fresh++;
+    yearWarnings[result.year] = isFresh ? '' : '放假调休使用服务端缓存，更新暂不可用';
     sources[result.year] = isFresh ? '联网公告' : '服务端缓存，更新暂不可用';
     try {
       await writeCache(result.year, jsonEncode(result.body));

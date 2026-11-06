@@ -337,7 +337,7 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-              const DogAvatar(index: DogAssets.friendly, size: 32),
+              const TuantuanIcon('task', size: 32),
             ],
           ),
           const SizedBox(height: 8),

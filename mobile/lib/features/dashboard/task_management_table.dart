@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:pandora_mobile/theme/sunshine_palette.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -277,19 +278,22 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                       alignment: Alignment.centerLeft,
                       child: _TaskIconAction(
                         tooltip: '返回',
-                        icon: Icons.arrow_back_rounded,
+                        icon: Icons.chevron_left_rounded,
                         onPressed: () => context.pop(),
                       ),
                     ),
                     Text(
                       '任务管理',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
                 child: TextField(
                   controller: _searchController,
                   focusNode: _searchFocus,
@@ -320,7 +324,7 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                   data: (page) {
                     final rows = _filtered(page.items);
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Material(
                         color: colors.surface,
                         shape: RoundedRectangleBorder(
@@ -332,6 +336,9 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                           builder: (context, constraints) => Scrollbar(
                             controller: _horizontalController,
                             thumbVisibility: true,
+                            trackVisibility: true,
+                            thickness: 5,
+                            radius: const Radius.circular(4),
                             child: SingleChildScrollView(
                               key: const ValueKey(
                                 'task-table-horizontal-scroll',
@@ -393,6 +400,7 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                                         itemBuilder: (context, index) =>
                                             _TaskRow(
                                               record: rows[index],
+                                              alternate: index.isOdd,
                                               pinBusy: _pinBusy.contains(
                                                 rows[index].id,
                                               ),
@@ -412,6 +420,19 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                       ),
                     );
                   },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '横向滑动查看全部字段 · 点击表头筛选 · 长按任务置顶',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: 11,
+                      color: SunshinePalette.muted,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -835,14 +856,20 @@ class _TaskHeaderCell extends StatelessWidget {
     width: column.width,
     height: 48,
     child: Material(
-      color: Theme.of(
-        context,
-      ).colorScheme.surfaceContainerHighest.withValues(alpha: .42),
+      color: selectedCount > 0
+          ? SunshinePalette.butter
+          : const Color(0xFFFFF6D5),
       child: InkWell(
         key: ValueKey('task-filter-header:${column.label}'),
         onTap: onTap,
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: const BoxDecoration(
+            border: Border(
+              right: BorderSide(color: SunshinePalette.line),
+              bottom: BorderSide(color: SunshinePalette.line),
+            ),
+          ),
           child: Row(
             children: [
               Expanded(
@@ -854,7 +881,7 @@ class _TaskHeaderCell extends StatelessWidget {
                     color: selectedCount > 0
                         ? SunnyPalette.primaryStrong
                         : SunnyPalette.ink,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -896,11 +923,12 @@ class _TaskRow extends StatelessWidget {
     required this.onTap,
     required this.onPin,
     this.pinBusy = false,
+    this.alternate = false,
   });
   final Record record;
   final VoidCallback onTap;
   final VoidCallback onPin;
-  final bool pinBusy;
+  final bool pinBusy, alternate;
 
   Future<void> _showValue(BuildContext context, int index, String value) async {
     final entries = _taskColumns[index].options?.call(record).toList();
@@ -947,71 +975,66 @@ class _TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final pinned = record.fields['pinned'] == true;
     return Material(
-      color: colors.surface,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 64),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: colors.outlineVariant)),
-        ),
+      color: alternate ? const Color(0xFFFFFDF7) : SunshinePalette.surface,
+      child: IntrinsicHeight(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (var index = 0; index < _taskColumns.length; index++)
-              SizedBox(
+              Container(
                 width: _taskColumns[index].width,
-                child: index == 0
-                    ? InkWell(
-                        onTap: onTap,
-                        child: Padding(
-                          padding: const EdgeInsets.only(
-                            left: 14,
-                            top: 8,
-                            bottom: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(child: _valueText(context, index)),
-                              SizedBox(
-                                width: 48,
-                                child: IconButton(
-                                  key: ValueKey('task-pin-${record.id}'),
-                                  tooltip: record.fields['pinned'] == true
-                                      ? '取消置顶'
-                                      : '置顶',
-                                  onPressed: pinBusy ? null : onPin,
-                                  icon: Icon(
-                                    record.fields['pinned'] == true
-                                        ? Icons.push_pin
-                                        : Icons.push_pin_outlined,
-                                    size: 20,
-                                    color: record.fields['pinned'] == true
-                                        ? colors.primary
-                                        : colors.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : InkWell(
-                        key: ValueKey(
-                          'task-cell:${record.id}:${_taskColumns[index].label}',
-                        ),
-                        onTap: () => _showValue(
+                constraints: const BoxConstraints(minHeight: 83),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    right: BorderSide(color: SunshinePalette.line),
+                    bottom: BorderSide(color: SunshinePalette.line),
+                  ),
+                ),
+                child: InkWell(
+                  key: ValueKey(
+                    'task-cell:${record.id}:${_taskColumns[index].label}',
+                  ),
+                  onTap: index == 0
+                      ? onTap
+                      : () => _showValue(
                           context,
                           index,
                           _taskColumns[index].value(record),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          child: _valueText(context, index),
-                        ),
-                      ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: index == 0
+                          ? Row(
+                              children: [
+                                IconButton(
+                                  key: ValueKey('task-pin-${record.id}'),
+                                  tooltip: pinned ? '取消置顶' : '置顶任务',
+                                  onPressed: pinBusy ? null : onPin,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 48,
+                                    minHeight: 48,
+                                  ),
+                                  icon: Icon(
+                                    pinned
+                                        ? Icons.push_pin
+                                        : Icons.push_pin_outlined,
+                                    size: 20,
+                                    color: pinned
+                                        ? SunshinePalette.accentInk
+                                        : SunshinePalette.muted,
+                                  ),
+                                ),
+                                Expanded(child: _valueText(context, index)),
+                              ],
+                            )
+                          : _valueText(context, index),
+                    ),
+                  ),
+                ),
               ),
           ],
         ),
@@ -1025,8 +1048,10 @@ class _TaskRow extends StatelessWidget {
       final values = _taskColumns[index].options!.call(record).toList();
       return Semantics(
         label: '查看全部${_taskColumns[index].label}，共${values.length}项',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             for (final item in values.take(2))
               Padding(
@@ -1039,7 +1064,7 @@ class _TaskRow extends StatelessWidget {
                       )
                     : AppLabelBadge(
                         item,
-                        color: SunnyPalette.primaryContainer,
+                        color: const Color(0xFFF5EDDA),
                         compact: true,
                       ),
               ),
@@ -1059,12 +1084,22 @@ class _TaskRow extends StatelessWidget {
         ),
       );
     }
+    if (index == 3) {
+      return AppLabelBadge(
+        value,
+        compact: true,
+        color: value == '已验收' || value == '已归档'
+            ? SunshinePalette.successSurface
+            : SunshinePalette.butter,
+      );
+    }
     return Text(
       value.isEmpty ? '—' : value,
       maxLines: index == 0 ? 2 : 3,
       overflow: TextOverflow.ellipsis,
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: SunnyPalette.ink,
+        fontSize: index >= 4 ? 11 : 13,
+        color: index >= 4 ? SunshinePalette.muted : SunshinePalette.ink,
         fontWeight: index == 0 ? FontWeight.w600 : FontWeight.w400,
         height: 1.35,
       ),

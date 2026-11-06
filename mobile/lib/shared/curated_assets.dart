@@ -55,7 +55,7 @@ class AppLabelBadge extends StatelessWidget {
     style: (_) => FBadgeStyle(
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(compact ? 8 : 12),
       ),
       contentStyle: FBadgeContentStyle(
         padding: EdgeInsets.symmetric(
@@ -63,7 +63,9 @@ class AppLabelBadge extends StatelessWidget {
           vertical: compact ? 3 : 4,
         ),
         labelTextStyle: Theme.of(context).textTheme.labelMedium!.copyWith(
-          color: SunnyPalette.ink,
+          color: ThemeData.estimateBrightnessForColor(color) == Brightness.dark
+              ? Colors.white
+              : SunnyPalette.ink,
           fontSize: fontSize,
           fontWeight: FontWeight.w500,
         ),

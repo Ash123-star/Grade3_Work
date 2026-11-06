@@ -9,9 +9,9 @@
 GET /api/calendar/holidays?year=2026：已确认登录用户可读；2007..2100，越界400 INVALID_YEAR，未登录401，待确认403。只读、幂等，无分页和写版本。返回 year、days（date/name/isOffDay）、papers（国务院来源）、status、fetchedAt。FRESH 为24小时内成功获取；STALE 为刷新失败但保留旧数据；UNAVAILABLE 为尚无可信数据。无数据绝不等同“无假期”。
 
 ## 数据更新与部署
-服务端放假来源：NateScarlet/holiday-cn（GitHub，MIT）；通过固定 GitHub contents API（Accept: application/vnd.github.raw+json）获取，无客户端直连、无密钥、无新增迁移。数据保留公告链接，严格验证年份、日期、重复项和调休布尔值。服务端内存缓存24小时后下次读取自动更新；失败5分钟冷却后重试；重启清空服务端缓存。运行服务器需要可访问该固定来源。查询相邻年份处理公告覆盖上年12月情况。
+服务端放假来源：NateScarlet/holiday-cn（GitHub，MIT）；通过固定 raw.githubusercontent.com/NateScarlet/holiday-cn/master/<year>.json 获取，无客户端直连、无密钥、无新增迁移。数据保留公告链接，严格验证年份、日期、重复项和调休布尔值。服务端内存缓存24小时后下次读取自动更新；失败5分钟冷却后重试；重启清空服务端缓存。运行服务器需要可访问该固定来源。同一年请求合并，不同年份独立加锁，避免相邻三年请求串行超过客户端8秒超时。2026-11-06本地API容器实际联网诊断：contents接口403（未鉴权限流），原始文件地址200；本次不是后端断网。查询相邻年份处理公告覆盖上年12月情况。
 
-客户端先计算节日本日，加载本地公共公告缓存，再并发请求既有接口更新。联网成功时持久保存快照（SharedPreferences，calendar.official-holidays.v1.<year>），失败保留缓存并在月历上方说明，支持点击刷新；损坏缓存和存储失败不影响任务及已获取数据。首次断网无缓存不猜调休。新客户端继续兼容既有接口，无需后端迁移或部署新接口。
+客户端先计算节日本日，加载本地公共公告缓存，再并发请求既有接口更新。联网成功时持久保存快照（SharedPreferences，calendar.official-holidays.v1.<year>），失败保留缓存并在月历上方说明，提示仅针对当前月格实际可见年份，支持点击刷新；损坏缓存和存储失败不影响任务及已获取数据。首次断网无缓存不猜调休。新客户端继续兼容既有接口，无需后端迁移或部署新接口。
 
 节日本日复用6tail/lunar 1.7.8（MIT，来源GitHub 6tail/lunar-flutter），范围1900–2100：元旦/劳动节/国庆固定公历日，春节/端午/中秋按农历，除夕为春节前一日，清明按节气。同日重合保留两个名称，农历闰月不重复；不以放假区间name覆盖本日名称。许可证副本位于 mobile/assets/licenses/lunar-LICENSE.txt。官方连休和补班每年由公告决定，算法不能预测。公告接口仍只支持2007–2100；部分相邻年份未公布不删除已知安排。
 

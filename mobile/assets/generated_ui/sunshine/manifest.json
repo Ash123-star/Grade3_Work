@@ -1,0 +1,627 @@
+{
+  "method": "equal-grid crop, connected exterior near-white removal, alpha preserved, normalized padding",
+  "icons": {
+    "source_sha256": "9c9edd8dfc6d37f9d6b0b93553bfbdbdd5a9d0994e37e96c9b120482364f1418",
+    "assets": [
+      {
+        "name": "home",
+        "file": "home.png",
+        "sheet_bounds": [
+          0,
+          0,
+          314,
+          314
+        ],
+        "content_bounds": [
+          44,
+          70,
+          302,
+          289
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "0edd456bc9f7fd073d4dec6b731b9985702bceb838642803a2e4d0540e068064"
+      },
+      {
+        "name": "calendar",
+        "file": "calendar.png",
+        "sheet_bounds": [
+          314,
+          0,
+          627,
+          314
+        ],
+        "content_bounds": [
+          56,
+          66,
+          278,
+          282
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "b0fd519b840ed6b57a92ada56b1ef3618c1f75906d5a27cadaaf366a1291af68"
+      },
+      {
+        "name": "log",
+        "file": "log.png",
+        "sheet_bounds": [
+          627,
+          0,
+          940,
+          314
+        ],
+        "content_bounds": [
+          46,
+          66,
+          279,
+          288
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "4230f1de6c9509e2fe86dd5246641cd443e74ce4e20e8c174e72d744440df78f"
+      },
+      {
+        "name": "ai",
+        "file": "ai.png",
+        "sheet_bounds": [
+          940,
+          0,
+          1254,
+          314
+        ],
+        "content_bounds": [
+          42,
+          70,
+          254,
+          277
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "cc93a7956b69877156959de3ccff1210ca1842576cf980a702c3f1185f2f4c8b"
+      },
+      {
+        "name": "members",
+        "file": "members.png",
+        "sheet_bounds": [
+          0,
+          314,
+          314,
+          627
+        ],
+        "content_bounds": [
+          44,
+          57,
+          307,
+          264
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "0ce924cdf2bc636672f3156c88f728a11c8e440463a5288d1d4e611937c1af1c"
+      },
+      {
+        "name": "task",
+        "file": "task.png",
+        "sheet_bounds": [
+          314,
+          314,
+          627,
+          627
+        ],
+        "content_bounds": [
+          68,
+          34,
+          266,
+          267
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "7346b6212090c404e0428208fcf1d5fd801aeb66ead53e0a4b127f00ac7a6e34"
+      },
+      {
+        "name": "notification",
+        "file": "notification.png",
+        "sheet_bounds": [
+          627,
+          314,
+          940,
+          627
+        ],
+        "content_bounds": [
+          56,
+          38,
+          261,
+          274
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "34dc995bc0fff7654730c60ed09ccbe8c0466a0ddf395a7028b6502764ffc5c0"
+      },
+      {
+        "name": "approval",
+        "file": "approval.png",
+        "sheet_bounds": [
+          940,
+          314,
+          1254,
+          627
+        ],
+        "content_bounds": [
+          43,
+          43,
+          274,
+          274
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "6c0e969364a8ca35dc342201dfc1f5ff5c6ffc05afe5d082d04967d33ecd0e56"
+      },
+      {
+        "name": "report",
+        "file": "report.png",
+        "sheet_bounds": [
+          0,
+          627,
+          314,
+          940
+        ],
+        "content_bounds": [
+          45,
+          34,
+          297,
+          233
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "d76a8261fad49af22390c6a86fb0a37ab8fad75ebfa79743097eb51c45cbbe14"
+      },
+      {
+        "name": "settings",
+        "file": "settings.png",
+        "sheet_bounds": [
+          314,
+          627,
+          627,
+          940
+        ],
+        "content_bounds": [
+          50,
+          24,
+          284,
+          257
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "d35f65cc90a99e579c5e82c604dde4b24773fdfe15dfea8d6d0234d7d1ec83aa"
+      },
+      {
+        "name": "help",
+        "file": "help.png",
+        "sheet_bounds": [
+          627,
+          627,
+          940,
+          940
+        ],
+        "content_bounds": [
+          43,
+          34,
+          279,
+          247
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "1dce529107a3cc81dca23fc9e3cf25ce15c5557881e57eb19cde34ffce690763"
+      },
+      {
+        "name": "empty",
+        "file": "empty.png",
+        "sheet_bounds": [
+          940,
+          627,
+          1254,
+          940
+        ],
+        "content_bounds": [
+          26,
+          32,
+          284,
+          258
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "761771b85d0aea9cfac639c2e7d07dd2b3300bdf102c6d27f1d07288584a1795"
+      },
+      {
+        "name": "error",
+        "file": "error.png",
+        "sheet_bounds": [
+          0,
+          940,
+          314,
+          1254
+        ],
+        "content_bounds": [
+          68,
+          3,
+          296,
+          241
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "d90b96f013186067366e8eb872834d06a49e82a11439bdbb7e83779204b8a2ec"
+      },
+      {
+        "name": "loading",
+        "file": "loading.png",
+        "sheet_bounds": [
+          314,
+          940,
+          627,
+          1254
+        ],
+        "content_bounds": [
+          68,
+          0,
+          267,
+          241
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "fb2792d1f96467f478256058badc1a2dfdc9b8c43c9b006ed9cd26a7c750913b"
+      },
+      {
+        "name": "success",
+        "file": "success.png",
+        "sheet_bounds": [
+          627,
+          940,
+          940,
+          1254
+        ],
+        "content_bounds": [
+          38,
+          2,
+          282,
+          243
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "24a0110ed5b7adf3e53c8953bf452a8fd713e790373864a7ad929721ec308a42"
+      },
+      {
+        "name": "mindmap",
+        "file": "mindmap.png",
+        "sheet_bounds": [
+          940,
+          940,
+          1254,
+          1254
+        ],
+        "content_bounds": [
+          34,
+          7,
+          274,
+          235
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "b14f9fb9cf0da370b7360e6a1f667f860ce3691670cfb54752bcf677e679ae59"
+      }
+    ]
+  },
+  "mascots": {
+    "source_sha256": "21057582d03db219fdda02f83e5ebb0061d9a8069087f9d8a21f831262b65d51",
+    "assets": [
+      {
+        "name": "welcome",
+        "file": "welcome.png",
+        "sheet_bounds": [
+          0,
+          0,
+          627,
+          627
+        ],
+        "content_bounds": [
+          70,
+          58,
+          563,
+          588
+        ],
+        "size": [
+          384,
+          384
+        ],
+        "sha256": "446b0711a311f6d781e09884ae8e51b6b9bb0e5750a3d4700ffae12c415d69a9"
+      },
+      {
+        "name": "journal",
+        "file": "journal.png",
+        "sheet_bounds": [
+          627,
+          0,
+          1254,
+          627
+        ],
+        "content_bounds": [
+          118,
+          59,
+          523,
+          595
+        ],
+        "size": [
+          384,
+          384
+        ],
+        "sha256": "7583e1a967778543d3d5ac470a2f817e9f922c5dc7d36d5281ceda9efd350c0a"
+      },
+      {
+        "name": "empty",
+        "file": "empty.png",
+        "sheet_bounds": [
+          0,
+          627,
+          627,
+          1254
+        ],
+        "content_bounds": [
+          75,
+          34,
+          584,
+          574
+        ],
+        "size": [
+          384,
+          384
+        ],
+        "sha256": "9754b7256385603d8d794b787f8af13fa699b2497d477a93c731857c000101b2"
+      },
+      {
+        "name": "assistant",
+        "file": "assistant.png",
+        "sheet_bounds": [
+          627,
+          627,
+          1254,
+          1254
+        ],
+        "content_bounds": [
+          88,
+          45,
+          543,
+          563
+        ],
+        "size": [
+          384,
+          384
+        ],
+        "sha256": "0c8884f35a8b22bfa86b8c729b57e601dcb5bb50096703429a7e7505fc555fe5"
+      }
+    ]
+  },
+  "profile_icons": {
+    "source_sha256": "cdaf38062f6a3ffd3de50c47ed2b4c475e2d81fd67dc48020004145ca4715430",
+    "assets": [
+      {
+        "name": "phone",
+        "file": "phone.png",
+        "sheet_bounds": [
+          0,
+          0,
+          418,
+          418
+        ],
+        "content_bounds": [
+          69,
+          70,
+          375,
+          386
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "fca86eeb49fefcd692c92d2b2c38d9a434ac37f146c095fa55f586b26c4ff9d1"
+      },
+      {
+        "name": "email",
+        "file": "email.png",
+        "sheet_bounds": [
+          418,
+          0,
+          836,
+          418
+        ],
+        "content_bounds": [
+          52,
+          103,
+          371,
+          348
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "d645c7b41d2071755741edd123596aff103b57414ab52d6b5cba8bf876b74304"
+      },
+      {
+        "name": "person",
+        "file": "person.png",
+        "sheet_bounds": [
+          836,
+          0,
+          1254,
+          418
+        ],
+        "content_bounds": [
+          79,
+          63,
+          355,
+          393
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "c51ddc39a48ffbabe3816bead6accb35a3b7aec0659f705c8750cdd133eb2d7d"
+      },
+      {
+        "name": "birthday",
+        "file": "birthday.png",
+        "sheet_bounds": [
+          0,
+          418,
+          418,
+          836
+        ],
+        "content_bounds": [
+          84,
+          30,
+          360,
+          351
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "5f639638cba95071b3799619611b689b7ee462a800f6c90ec49816dc88bdb48d"
+      },
+      {
+        "name": "employment",
+        "file": "employment.png",
+        "sheet_bounds": [
+          418,
+          418,
+          836,
+          836
+        ],
+        "content_bounds": [
+          68,
+          45,
+          359,
+          345
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "d74c1856cf0be721e6ce1d57a8bf6c71a31189407336d5b4cfc0b48f52a0b3dd"
+      },
+      {
+        "name": "tenure",
+        "file": "tenure.png",
+        "sheet_bounds": [
+          836,
+          418,
+          1254,
+          836
+        ],
+        "content_bounds": [
+          58,
+          51,
+          383,
+          367
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "3b636cfd138020e18c78ed394d6cb5d83283a0458224474dddb4ae244ce83003"
+      },
+      {
+        "name": "edit",
+        "file": "edit.png",
+        "sheet_bounds": [
+          0,
+          836,
+          418,
+          1254
+        ],
+        "content_bounds": [
+          73,
+          43,
+          379,
+          308
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "03429bea22992db07fcd0876891c3ae6f4ad61a5bea5591732a0239d9f37999e"
+      },
+      {
+        "name": "identity",
+        "file": "identity.png",
+        "sheet_bounds": [
+          418,
+          836,
+          836,
+          1254
+        ],
+        "content_bounds": [
+          57,
+          61,
+          370,
+          284
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "af52cd7011b26ed9c97f7189c4168601f1c037b0b1d638947c3a8183ae4c3a4b"
+      },
+      {
+        "name": "organization",
+        "file": "organization.png",
+        "sheet_bounds": [
+          836,
+          836,
+          1254,
+          1254
+        ],
+        "content_bounds": [
+          42,
+          47,
+          385,
+          296
+        ],
+        "size": [
+          192,
+          192
+        ],
+        "sha256": "44f381a8e37c4387b9cb2b91ae07d974000f9226d56d0b7c27e28f573c9ce090"
+      }
+    ]
+  }
+}

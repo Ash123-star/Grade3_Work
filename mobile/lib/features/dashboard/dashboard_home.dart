@@ -81,9 +81,12 @@ class _HomeContent extends ConsumerWidget {
                         ),
                         child: Row(
                           children: [
-                            DogAvatar(
-                              index: DogAssets.friendly,
-                              size: compact ? 44 : 52,
+                            Container(
+                              decoration: BoxDecoration(
+                                color: SunnyPalette.primaryContainer,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: SunshineMascot(size: compact ? 44 : 52),
                             ),
                             SizedBox(width: compact ? 8 : 12),
                             Expanded(
@@ -519,7 +522,7 @@ Future<void> _showPersonalItemActions(
 
   final confirmed = await showDialog<bool>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
+    builder: (dialogContext) => TuantuanDialog(
       title: const Text('删除这条个人重点？'),
       content: const Text('删除后会从个人重点列表中移除。'),
       actions: [

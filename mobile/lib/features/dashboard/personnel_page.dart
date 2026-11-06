@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/tenure.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
@@ -45,23 +46,6 @@ class _PersonnelPageState extends ConsumerState<PersonnelPage> {
       ],
       child: PageBody(
         children: [
-          PaperSurface(
-            color: DogBrandPalette.surface,
-            borderColor: DogBrandPalette.line,
-            child: Row(
-              children: [
-                const DogAvatar(index: DogAssets.friendly, size: 32),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    current.manager ? '按部门浏览团队成员' : '查看授权范围内的成员信息',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
           TextField(
             decoration: const InputDecoration(
               hintText: '搜索姓名、部门或团队',
@@ -134,8 +118,42 @@ class _PersonnelPageState extends ConsumerState<PersonnelPage> {
                               ),
                             );
                             context.push('/me/team/${encode(person.id)}');
-                          } else {
+                          } else if (person.id == current.id) {
                             context.push('/me/profile');
+                          } else {
+                            showTuantuanBottomSheet<void>(
+                              context: context,
+                              useSafeArea: true,
+                              builder: (_) => Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      person.title,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleLarge,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Text(
+                                      '入职日期：${employmentDateLabel(person.fields['employmentStartDate'])}',
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      '工龄：${tenureLabel(parseEmploymentDate(person.fields['employmentStartDate']), shanghaiWallTime(DateTime.now()))}',
+                                    ),
+                                    const SizedBox(height: 20),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('收起'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
                           }
                         },
                       ),
@@ -205,7 +223,9 @@ class _PersonnelCard extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     AppLabelBadge(
-                      taskCount == null ? '参与任务数未知' : '参与任务 ${taskCount.toInt()}',
+                      taskCount == null
+                          ? '参与任务数未知'
+                          : '参与任务 ${taskCount.toInt()}',
                       color: SunnyPalette.orange,
                       compact: true,
                     ),

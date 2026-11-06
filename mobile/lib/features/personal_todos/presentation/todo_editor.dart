@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/errors/api_failure.dart';
@@ -167,7 +168,7 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
   Widget build(BuildContext context) {
     ref.watch(sessionProvider);
     if (!sameSession) {
-      return AlertDialog(
+      return TuantuanDialog(
         title: const Text('账号权限已变化'),
         content: const Text('请关闭后重新查看。'),
         actions: [
@@ -182,7 +183,7 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
     final locked = busy || pending != null || conflict || deleted;
     return PopScope(
       canPop: !busy,
-      child: AlertDialog(
+      child: TuantuanDialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         constraints: const BoxConstraints(maxWidth: 390),
         titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
@@ -302,7 +303,7 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                   : () async {
                       final confirmed = await showDialog<bool>(
                         context: context,
-                        builder: (c) => AlertDialog(
+                        builder: (c) => TuantuanDialog(
                           title: const Text('删除这条事项？'),
                           content: const Text('删除后将从每日事项中移除。'),
                           actions: [

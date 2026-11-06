@@ -889,6 +889,8 @@ class _MonthGrid extends StatelessWidget {
                   1.15 +
               3;
           final gridLast = start.add(Duration(days: weeks * 7 - 1));
+          final holidayWarning =
+              holidays?.warningForRange(start, gridLast) ?? '';
           final lanes = _monthLanes(events, start, gridLast);
           final folded = calendarMonthPreview(
             first: start,
@@ -985,40 +987,41 @@ class _MonthGrid extends StatelessWidget {
                                   alignment: Alignment.bottomCenter,
                                   child: Padding(
                                     padding: const EdgeInsets.only(bottom: 3),
-                                    child: Text(
-                                      _weekdays[i],
-                                      key: ValueKey(
-                                        'month-weekday:${_weekdays[i]}',
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const SunshineMascot(size: 14),
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: Text(
+                                            _weekdays[i],
+                                            key: ValueKey(
+                                              'month-weekday:${_weekdays[i]}',
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
-                                if (!(holidays?.warning.isNotEmpty ?? false))
-                                  Positioned(
-                                    top: -2,
-                                    right: 0,
-                                    child: DogAvatar(
-                                      index: DogAssets.weekdayAvatars[i],
-                                      size: 20,
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
                       ],
                     ),
-                    if (holidays?.warning.isNotEmpty ?? false)
+                    if (holidayWarning.isNotEmpty)
                       Positioned(
                         left: 4,
                         right: 4,
                         top: 0,
                         height: 18,
                         child: Tooltip(
-                          message: holidays!.warning,
+                          message: holidayWarning,
                           child: TextButton(
                             style: TextButton.styleFrom(
                               padding: EdgeInsets.zero,
@@ -1027,7 +1030,7 @@ class _MonthGrid extends StatelessWidget {
                             ),
                             onPressed: onRefreshHolidays,
                             child: Text(
-                              '${holidays!.warning} · 刷新',
+                              '调休数据待更新 · 刷新',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 10),
@@ -1185,24 +1188,6 @@ class _MonthGrid extends StatelessWidget {
                                                         : Colors.blue.shade700,
                                                   ),
                                                 ),
-                                              ),
-                                            ),
-                                          if (today &&
-                                              holiday?.off == null &&
-                                              !(holiday?.label.isNotEmpty ??
-                                                  false) &&
-                                              cellWidth >= 38 &&
-                                              eventsOnDay(events, day).every(
-                                                (event) => lanes.containsKey(
-                                                  event.record.id,
-                                                ),
-                                              ))
-                                            const Positioned(
-                                              top: 1,
-                                              right: 1,
-                                              child: DogAvatar(
-                                                index: DogAssets.todayAvatar,
-                                                size: 22,
                                               ),
                                             ),
                                         ],

@@ -1,9 +1,11 @@
+import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'dart:async';
 import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/data/models/record_display.dart';
 import 'package:pandora_mobile/data/models/review_display.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
+import 'package:pandora_mobile/theme/sunshine_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart'
@@ -535,16 +537,29 @@ class _ListPageState extends ConsumerState<ListPage> {
                                   const SizedBox(width: 12),
                                 ],
                                 if (resource == 'notifications') ...[
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Icon(
-                                      r.fields['read'] == true
-                                          ? Icons.notifications_none
-                                          : Icons.circle,
-                                      size: r.fields['read'] == true ? 20 : 9,
-                                      color: r.fields['read'] == true
-                                          ? CuteTokens.muted
-                                          : const Color(0xFFA7460E),
+                                  SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: Stack(
+                                      children: [
+                                        const TuantuanIconTile(
+                                          icon: 'notification',
+                                          size: 36,
+                                        ),
+                                        if (r.fields['read'] != true)
+                                          Positioned(
+                                            right: 0,
+                                            top: 0,
+                                            child: Container(
+                                              width: 7,
+                                              height: 7,
+                                              decoration: const BoxDecoration(
+                                                color: SunshinePalette.error,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -632,7 +647,7 @@ class _ListPageState extends ConsumerState<ListPage> {
     final tagColor = _recordColor(f['tagColor'] ?? f['tag_color']);
     return PaperSurface(
       onTap: onTap,
-      color: const Color(0xFFFFF5C8),
+      color: SunshinePalette.surface,
       texture: TuantuanAssets.textures['warmSparkle'],
       cornerDecoration: TuantuanAssets.cardCorners['warm'],
       padding: const EdgeInsets.all(14),
@@ -990,11 +1005,11 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     child: Text(label),
   );
   Widget section(String title, dynamic value) => Padding(
-    padding: const EdgeInsets.only(top: 20),
+    padding: const EdgeInsets.only(top: 14),
     child: PaperSurface(
       skin:
           TuantuanAssets.detailSections[title.contains('私人') ? 'warm' : 'blue'],
-      color: title.contains('私人') ? SunnyPalette.orange : SunnyPalette.paper,
+      color: SunshinePalette.surface,
       texture: TuantuanAssets.textures['paper'],
       cornerDecoration: TuantuanAssets.cardCorners['mint'],
       child: Column(
@@ -1002,12 +1017,12 @@ class _DetailPageState extends ConsumerState<DetailPage> {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           Text(
             _value(value),
-            style: const TextStyle(fontSize: 15, height: 1.7),
+            style: const TextStyle(fontSize: 14, height: 1.9),
           ),
         ],
       ),
@@ -1045,7 +1060,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       height: 10,
                       decoration: BoxDecoration(
                         color: i == events.length - 1
-                            ? const Color(0xFFFF8A24)
+                            ? SunshinePalette.accentInk
                             : CuteTokens.line,
                         shape: BoxShape.circle,
                       ),
@@ -1175,11 +1190,20 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 20),
+                section('任务说明', f['任务内容'] ?? f['content'] ?? f['body']),
+                const SizedBox(height: 14),
                 PaperSurface(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const Text(
+                        '任务信息',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       _attribute(
                         '开始时间',
                         prettyDate(f['startAt'] ?? f['start_at']),
@@ -1187,11 +1211,36 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       const SizedBox(height: 14),
                       _attribute('截止时间', prettyDate(f['deadline'])),
                       const SizedBox(height: 14),
-                      _attribute(
-                        '参与人',
-                        participantNames.isEmpty
-                            ? '尚未返回参与人'
-                            : participantNames.join('、'),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(
+                            width: 74,
+                            child: Text(
+                              '参与人',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: SunshinePalette.muted,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Wrap(
+                              spacing: 5,
+                              runSpacing: 5,
+                              children: [
+                                if (participantNames.isEmpty)
+                                  const Text('尚未返回参与人'),
+                                for (final name in participantNames)
+                                  AppLabelBadge(
+                                    name,
+                                    color: const Color(0xFFF5EDDA),
+                                    compact: true,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 14),
                       _attribute(
@@ -1201,7 +1250,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     ],
                   ),
                 ),
-                section('任务说明', f['任务内容'] ?? f['content'] ?? f['body']),
                 if (!AppConfig.mock && ['进行中', '需补充', '待验收'].contains(status))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),

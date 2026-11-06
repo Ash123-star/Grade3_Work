@@ -58,7 +58,7 @@ class HomePaperNavigation extends StatelessWidget {
                   labelPadding: const EdgeInsets.only(top: 3, bottom: 4),
                   destinations: [
                     for (final tab in const [
-                      ('首页', 'mindmap'),
+                      ('首页', 'home'),
                       ('公司', 'calendar'),
                       ('日志', 'log'),
                       ('AI地图', 'ai'),
