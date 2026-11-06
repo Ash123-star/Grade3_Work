@@ -61,5 +61,51 @@
     "original_collection_history": "https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/assets/fonts/GenSenRounded2-B.ttc"
   },
   "source_history": "https://github.com/Ash123-star/Grade3_Work/tree/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/assets/resources",
-  "source_originals_retained": false
+  "source_originals_retained": false,
+  "sunshine_pack": {
+    "source_type": "user_authorized_ai_generated_original_art",
+    "generated_at": "2026-11-06",
+    "provider": "DragonAPI",
+    "requested_model": "gpt-image-2.5",
+    "requested_quality": "high",
+    "returned_model": null,
+    "returned_quality": null,
+    "backend_identity_independently_verified": false,
+    "reference": "mobile/assets/icon_desktop.png",
+    "reference_sha256": "947b744fb4431fcedf19cd837a07defbd257d6cdc101f1a70ddf92053efb3e5b",
+    "reference_preserved": true,
+    "prompts": [
+      "mobile/tool/prompts/sunshine-icons.txt",
+      "mobile/tool/prompts/sunshine-mascots.txt"
+    ],
+    "processing_script": "mobile/tool/process_sunshine_assets.py",
+    "output_directory": "mobile/assets/generated_ui/sunshine",
+    "manifest": "mobile/assets/generated_ui/sunshine/manifest.json",
+    "asset_count": 29,
+    "request_ids": {
+      "icons": "9775fed7-faaf-400b-bc03-a2c5ef7e97ae",
+      "mascots": "93f26b68-be38-435f-81e3-c10695982e0e"
+    },
+    "raw_sheets_and_receipts": "output/yellow-theme (local, Git-ignored)",
+    "third_party_brands_or_characters": [],
+    "review": {
+      "transparent_background_checked": true,
+      "text_and_logo_checked": true,
+      "copyright_character_checked": true,
+      "approved_for_product": true,
+      "approval_basis": "User authorized agent to design, review and integrate original artwork matching the supplied app icon. Visual review completed; public distribution/model terms require release review."
+    },
+    "license_note": "Original AI-generated artwork based on project-owned reference, generated with user-authorized provider. Not copied from reference products. Provider did not echo backend model or quality; no third-party asset license is asserted.",
+    "profile_icons": {
+      "prompt": "mobile/tool/prompts/sunshine-profile.txt",
+      "request_id": "b52874bf-d0e5-4aaa-add2-76057a6a2f9c",
+      "requested_model": "gpt-image-2.5",
+      "requested_quality": "high",
+      "returned_model": null,
+      "returned_quality": null,
+      "reference_preserved": true,
+      "count": 9,
+      "review": "Decoded sheet and transparent contact sheet visually reviewed."
+    }
+  }
 }

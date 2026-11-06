@@ -23,6 +23,8 @@ import 'package:pandora_mobile/data/models/diary_task_links.dart';
 import 'package:pandora_mobile/shared/diary_task_links.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/task_label_selector.dart';
+import 'package:pandora_mobile/shared/organization_directory.dart';
+import 'package:pandora_mobile/theme/home_paper_theme.dart';
 import 'catalog.dart';
 
 class FormPage extends ConsumerStatefulWidget {
@@ -426,30 +428,30 @@ class _FormPageState extends ConsumerState<FormPage> {
   bool requiredField(String field) =>
       !(widget.kind == 'dispatch' && field == '开始时间') &&
       [
-    '任务名称',
-    '标题',
-    '账号',
-    '密码',
-    '手机号',
-    '部门',
-    '参与人',
-    '开始时间',
-    '截止时间',
-    '今日工作',
-    '成果说明',
-    '问题描述',
-    '验收意见',
-    '驳回原因',
-    '变更理由',
-    '修改理由',
-    '撤回原因',
-    '原密码',
-    '新密码',
-    '确认密码',
-    '名称',
-    '员工',
-    '停用理由',
-  ].contains(field);
+        '任务名称',
+        '标题',
+        '账号',
+        '密码',
+        '手机号',
+        '部门',
+        '参与人',
+        '开始时间',
+        '截止时间',
+        '今日工作',
+        '成果说明',
+        '问题描述',
+        '验收意见',
+        '驳回原因',
+        '变更理由',
+        '修改理由',
+        '撤回原因',
+        '原密码',
+        '新密码',
+        '确认密码',
+        '名称',
+        '员工',
+        '停用理由',
+      ].contains(field);
   String? validate(String field, String? value) {
     if (requiredField(field) && (value ?? '').trim().isEmpty) {
       return '请填写$field';
@@ -490,28 +492,37 @@ class _FormPageState extends ConsumerState<FormPage> {
   }
 
   Future<void> selectPerson(String field) async {
-    final result = await showTuantuanBottomSheet<Record>(
+    final session = ref.read(sessionProvider);
+    final epoch = ref.read(sessionEpochProvider);
+    final multiple = field == '参与人';
+    final result = await showTuantuanBottomSheet<Object>(
       context: context,
       isScrollControlled: true,
       builder: (_) => PersonPicker(
         dispatch: ['dispatch', 'transfer', 'ai-draft'].contains(widget.kind),
+        multiSelect: multiple,
+        initialSelected: multiple ? participants.values.toList() : const [],
       ),
     );
     if (result != null &&
         mounted &&
-        ref.read(sessionProvider).id == accountId) {
+        ref.read(sessionProvider).id == accountId &&
+        ref.read(sessionProvider).token == session.token &&
+        ref.read(sessionEpochProvider) == epoch) {
       setState(() {
-        if (field == '参与人') {
-          participants[result.id] = result;
+        if (multiple && result is List<Record>) {
+          participants
+            ..clear()
+            ..addEntries(result.map((person) => MapEntry(person.id, person)));
           controllers[field]!.text = participants.values
               .map((p) => p.title)
               .join('、');
-        } else if (field == '协作人') {
+        } else if (result is Record && field == '协作人') {
           if (result.id != selectedOwner) collaborators[result.id] = result;
           controllers[field]!.text = collaborators.values
               .map((p) => p.title)
               .join('、');
-        } else {
+        } else if (result is Record) {
           controllers[field]!.text = result.title;
           if (field == '主负责人') {
             selectedOwner = result.id;
@@ -628,7 +639,16 @@ class _FormPageState extends ConsumerState<FormPage> {
               size: 38,
             ),
             const SizedBox(width: 12),
-            SizedBox(width: 72, child: _taskLabel(label)),
+            SizedBox(
+              width: 72,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 38),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _taskLabel(label),
+                ),
+              ),
+            ),
             const SizedBox(width: 8),
             Expanded(child: value),
           ],
@@ -828,7 +848,7 @@ class _FormPageState extends ConsumerState<FormPage> {
               initialValue: page.items.any((r) => r.id == selectedDepartment)
                   ? selectedDepartment
                   : null,
-              decoration: const InputDecoration(labelText: '申请部门'),
+              decoration: const InputDecoration(hintText: '请选择申请部门'),
               items: page.items
                   .map(
                     (r) => DropdownMenuItem(value: r.id, child: Text(r.title)),
@@ -854,7 +874,12 @@ class _FormPageState extends ConsumerState<FormPage> {
         initialValue: options.contains(controller.text)
             ? controller.text
             : null,
-        decoration: InputDecoration(labelText: label),
+        decoration: InputDecoration(
+          labelText: ['login', 'register'].contains(widget.kind) ? null : label,
+          hintText: ['login', 'register'].contains(widget.kind)
+              ? '请选择$label'
+              : null,
+        ),
         items: options
             .map((v) => DropdownMenuItem(value: v, child: Text(v)))
             .toList(),
@@ -1005,11 +1030,41 @@ class _FormPageState extends ConsumerState<FormPage> {
     final person = ['主负责人', '协作人', '参与人', '员工', '直属上级'].contains(label);
     return TextFormField(
       controller: controller,
+      enabled: ['login', 'register'].contains(widget.kind) ? !busy : null,
+      autocorrect: !['login', 'register'].contains(widget.kind),
+      enableSuggestions: !label.contains('密码'),
+      autofillHints: ['login', 'register'].contains(widget.kind)
+          ? label == '账号'
+                ? const [AutofillHints.username]
+                : label == '密码'
+                ? [
+                    widget.kind == 'register'
+                        ? AutofillHints.newPassword
+                        : AutofillHints.password,
+                  ]
+                : label == '手机号'
+                ? const [AutofillHints.telephoneNumber]
+                : null
+          : null,
+      textInputAction: widget.kind == 'login' && label == '密码'
+          ? TextInputAction.done
+          : null,
+      onFieldSubmitted: widget.kind == 'login' && label == '密码'
+          ? (_) {
+              if (!busy) submit();
+            }
+          : null,
       decoration: InputDecoration(
-        labelText: document
+        labelText: ['login', 'register'].contains(widget.kind)
+            ? null
+            : document
             ? null
             : '$label${requiredField(label) ? ' *' : ''}',
-        hintText: document ? '填写$label' : null,
+        hintText: ['login', 'register'].contains(widget.kind)
+            ? '请输入$label'
+            : document
+            ? '填写$label'
+            : null,
         filled: document ? false : null,
         border: document ? InputBorder.none : null,
         enabledBorder: document ? InputBorder.none : null,
@@ -1476,6 +1531,162 @@ class _FormPageState extends ConsumerState<FormPage> {
     );
   }
 
+  Widget _authPage() {
+    final register = widget.kind == 'register';
+    return Scaffold(
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 488),
+            child: AutofillGroup(
+              child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(28, 30, 28, 32),
+                children: [
+                  Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.asset(
+                          'assets/icon_desktop.png',
+                          width: 46,
+                          height: 46,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '潘多拉',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            '工作协作空间',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: SunnyPalette.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 36),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              register ? '加入你的团队' : '欢迎回来',
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w700,
+                                height: 1.3,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              register ? '创建账号，让协作从这里开始' : '把工作理清，把每一天安排好。',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                height: 1.7,
+                                color: SunnyPalette.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const SunshineMascot(size: 80),
+                    ],
+                  ),
+                  const SizedBox(height: 26),
+                  Form(
+                    key: form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final label in spec.fields) ...[
+                          Text(
+                            label == '部门' ? '申请部门' : label,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 9),
+                          field(label),
+                          const SizedBox(height: 22),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (register) ...[
+                    const PaperSurface(
+                      color: Color(0xFFFFF6D5),
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        '注册后需等待管理员确认部门，确认前无法查看公司内容。',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.6,
+                          color: SunnyPalette.primaryStrong,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (error != null) ...[failure(), const SizedBox(height: 12)],
+                  submitButton(),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        register ? '已有账号？' : '还没有账号？',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      TextButton(
+                        onPressed: busy
+                            ? null
+                            : () => context.go(
+                                register ? '/auth/login' : '/auth/register',
+                              ),
+                        child: Text(register ? '立即登录' : '申请加入'),
+                      ),
+                    ],
+                  ),
+                  if (register) const SizedBox(height: 26),
+                  if (register)
+                    Text(
+                      '账号归属由管理员确认',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1.8,
+                        color: SunnyPalette.muted,
+                      ),
+                    ),
+                  const DemoLabel(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!AppConfig.mock && widget.kind == 'ai-draft') {
@@ -1509,6 +1720,7 @@ class _FormPageState extends ConsumerState<FormPage> {
         (spec.admin && !user.administrator) ||
         (['dispatch', 'ai-draft'].contains(widget.kind) && !user.dispatch);
     final auth = ['login', 'register'].contains(widget.kind);
+    if (auth) return _authPage();
     if (denied) {
       return PageFrame(
         title: spec.title,
@@ -1566,132 +1778,9 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.initialBusinessDate != null)
             Text(
               calendarSeedError ??
-                  '月历所选日期：${businessDateText(calendarSeed!)}（上海）。请选择具体截止时间。',
+                  '月历所选日期：${businessDateText(calendarSeed!)}。请选择具体截止时间。',
               key: const ValueKey('calendar-create-date'),
             ),
-          if (auth) ...[
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF3E5),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFF0DDC8)),
-              ),
-              padding: const EdgeInsets.fromLTRB(18, 18, 14, 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: SunnyPalette.primary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: widget.kind == 'login' ? '工作' : '协作',
-                                style: const TextStyle(
-                                  fontFamily: 'serif',
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w600,
-                                  color: DogBrandPalette.ink,
-                                ),
-                              ),
-                              TextSpan(
-                                text: widget.kind == 'login' ? '有序' : '同行',
-                                style: const TextStyle(
-                                  fontFamily: 'serif',
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w700,
-                                  fontStyle: FontStyle.italic,
-                                  color: SunnyPalette.primaryStrong,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const DogPose(index: DogAssets.sitting, size: 104),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                for (final feature in const [
-                  ('任务协同', Icons.task_alt_rounded),
-                  ('工作日志', Icons.edit_note_rounded),
-                  ('日程视图', Icons.calendar_month_rounded),
-                ])
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 42),
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFFCF7),
-                          borderRadius: BorderRadius.circular(13),
-                          border: Border.all(color: DogBrandPalette.line),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              feature.$2,
-                              size: 16,
-                              color: SunnyPalette.primaryStrong,
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                feature.$1,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: DogBrandPalette.ink,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'login', label: Text('登录')),
-                ButtonSegment(value: 'register', label: Text('注册')),
-              ],
-              selected: {widget.kind},
-              onSelectionChanged: busy
-                  ? null
-                  : (selection) => context.go(
-                      selection.single == 'register'
-                          ? '/auth/register'
-                          : '/auth/login',
-                    ),
-              showSelectedIcon: false,
-            ),
-            const SizedBox(height: 14),
-          ],
           if (widget.kind == 'password') ...[
             PaperSurface(
               child: Text(
@@ -1811,7 +1900,9 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('策略范围'),
             const PaperSurface(
-              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人的修改由其他在职创始人审核，仅一位创始人时自动批准。'),
+              child: Text(
+                '普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人的修改由其他在职创始人审核，仅一位创始人时自动批准。',
+              ),
             ),
             const SizedBox(height: 16),
           ],
@@ -1844,65 +1935,28 @@ class _FormPageState extends ConsumerState<FormPage> {
                         ],
                       ),
                     )
-                  : auth
-                  ? PaperSurface(
-                      color: DogBrandPalette.surface,
-                      borderColor: DogBrandPalette.line,
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.key_rounded,
-                                size: 19,
-                                color: SunnyPalette.primaryStrong,
-                              ),
-                              const SizedBox(width: 7),
-                              Text(
-                                widget.kind == 'login' ? '账号密码登录' : '创建员工账号',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: DogBrandPalette.ink,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          for (final label in spec.fields) ...[
-                            field(label),
-                            if (label != spec.fields.last)
-                              const SizedBox(height: 14),
-                          ],
-                        ],
-                      ),
-                    )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         for (final group in groups) ...[
-                          if (!auth) SectionHeader(group.$1),
-                          if (auth) ...[
-                            for (final label in group.$2)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 18),
-                                child: field(label),
+                          if (groups.length > 1)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: 12,
+                                bottom: 16,
                               ),
-                          ] else
-                            PaperSurface(
-                              child: Column(
-                                children: [
-                                  for (final label in group.$2)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 16,
-                                      ),
-                                      child: field(label),
-                                    ),
-                                ],
+                              child: Text(
+                                group.$1,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
+                            ),
+                          for (final label in group.$2)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 22),
+                              child: field(label),
                             ),
                         ],
                       ],
@@ -1920,71 +1974,11 @@ class _FormPageState extends ConsumerState<FormPage> {
           if (widget.kind == 'policy') ...[
             const SectionHeader('审核方式'),
             const PaperSurface(
-              child: Text('普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人的修改由其他在职创始人审核，仅一位创始人时自动批准。'),
+              child: Text(
+                '普通成员的关键修改由配置的直属上级单级审核；未配置直属上级时保持待审。创始人的修改由其他在职创始人审核，仅一位创始人时自动批准。',
+              ),
             ),
           ],
-          if (widget.kind == 'register')
-            Padding(
-              padding: const EdgeInsets.only(top: 14),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF4E8),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFF0DDC8)),
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        size: 19,
-                        color: SunnyPalette.primaryStrong,
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '注册仅申请创建待确认员工。请选择申请部门；管理员确认前无法访问公司内容。短信验证尚未接入。',
-                          style: TextStyle(
-                            color: DogBrandPalette.ink,
-                            height: 1.45,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          if (auth)
-            Padding(
-              padding: const EdgeInsets.only(top: 14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.shield_outlined,
-                    size: 18,
-                    color: DogBrandPalette.muted,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.kind == 'login'
-                          ? '本机自动记住登录，有效期一周；下次打开无需重复输入账号密码。退出登录或会话失效后需重新登录。'
-                          : '账号归属由管理员确认；确认前不会开放公司业务资料。',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 1.45,
-                        color: DogBrandPalette.muted,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           const DemoLabel(),
         ],
       ),
@@ -1993,8 +1987,15 @@ class _FormPageState extends ConsumerState<FormPage> {
 }
 
 class PersonPicker extends ConsumerStatefulWidget {
-  const PersonPicker({super.key, this.dispatch = false});
+  const PersonPicker({
+    super.key,
+    this.dispatch = false,
+    this.multiSelect = false,
+    this.initialSelected = const [],
+  });
   final bool dispatch;
+  final bool multiSelect;
+  final List<Record> initialSelected;
   @override
   ConsumerState<PersonPicker> createState() => _PersonPickerState();
 }
@@ -2009,12 +2010,26 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
   bool loading = true, more = false, exhausted = false;
   Object? error;
   int generation = 0;
-  String? selectedDepartment;
-  String? selectedTeam;
-  late final String account = ref.read(sessionProvider).id;
+  final expandedDepartments = <String>{};
+  final expandedTeams = <String>{};
+  final selected = <String, Record>{};
+  late final String account;
+  late final String? token;
+  late final int sessionEpoch;
+  bool get _sameSession =>
+      account == ref.read(sessionProvider).id &&
+      token == ref.read(sessionProvider).token &&
+      sessionEpoch == ref.read(sessionEpochProvider);
   @override
   void initState() {
     super.initState();
+    final session = ref.read(sessionProvider);
+    account = session.id;
+    token = session.token;
+    sessionEpoch = ref.read(sessionEpochProvider);
+    selected.addEntries(
+      widget.initialSelected.map((person) => MapEntry(person.id, person)),
+    );
     load(reset: true);
   }
 
@@ -2039,9 +2054,7 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
         widget.dispatch ? 'organization/dispatch-people' : 'organization',
         Query(search: querySearch, cursor: reset ? null : cursor),
       );
-      if (!mounted ||
-          ticket != generation ||
-          account != ref.read(sessionProvider).id) {
+      if (!mounted || ticket != generation || !_sameSession) {
         return;
       }
       setState(() {
@@ -2053,6 +2066,10 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
                   (p.fields['status'] == 'ACTIVE' &&
                       p.fields['taskSelectable'] != false))) {
             items.add(p);
+            if (_searching) {
+              expandedDepartments.add(_departmentKey(p));
+              expandedTeams.add(_branchKey(p));
+            }
           }
         }
         exhausted =
@@ -2065,9 +2082,7 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
         more = false;
       });
     } catch (e) {
-      if (mounted &&
-          ticket == generation &&
-          account == ref.read(sessionProvider).id) {
+      if (mounted && ticket == generation && _sameSession) {
         setState(() {
           error = e;
           loading = false;
@@ -2094,44 +2109,12 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
     super.dispose();
   }
 
-  Map<String, Map<String, List<Record>>> _groupedPeople() {
-    final departments = <String, Map<String, List<Record>>>{};
-    for (final person in items) {
-      final department = _departmentOf(person);
-      final team = _teamOf(person);
-      departments
-          .putIfAbsent(department, () => <String, List<Record>>{})
-          .putIfAbsent(team, () => <Record>[])
-          .add(person);
-    }
-    return departments;
-  }
-
-  String _departmentOf(Record person) {
-    final department =
-        '${person.fields['departmentName'] ?? person.subtitle ?? '未分配部门'}'
-            .trim();
-    return department.isEmpty ? '未分配部门' : department;
-  }
-
-  String _teamOf(Record person) {
-    final team = '${person.fields['teamName'] ?? '未分配团队'}'.trim();
-    return team.isEmpty ? '未分配团队' : team;
-  }
-
+  String _departmentOf(Record person) => PersonOrganization(person).department;
+  String _teamOf(Record person) => PersonOrganization(person).team;
+  String _departmentKey(Record person) =>
+      PersonOrganization(person).departmentKey;
+  String _branchKey(Record person) => PersonOrganization(person).branchKey;
   bool get _searching => search.trim().isNotEmpty;
-
-  bool get _canGoBack => _searching || selectedDepartment != null;
-
-  void _goBack() {
-    if (_searching) {
-      _clearSearch();
-    } else if (selectedTeam != null) {
-      setState(() => selectedTeam = null);
-    } else if (selectedDepartment != null) {
-      setState(() => selectedDepartment = null);
-    }
-  }
 
   void _clearSearch() {
     searchController.clear();
@@ -2146,237 +2129,316 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
     load(reset: true);
   }
 
-  void _openBranch(String department, String? team) {
-    selectedDepartment = department;
-    selectedTeam = team;
-    _clearSearch();
+  void _toggleNode(Set<String> expanded, String id) {
+    setState(() {
+      if (!expanded.remove(id)) expanded.add(id);
+    });
   }
 
-  List<Widget> _pickerRows(
-    Map<String, Map<String, List<Record>>> departments,
-    String? department,
-    String? team,
-  ) {
-    if (_searching) return _searchRows(departments);
-    if (department == null) {
-      return [
-        for (final name in departments.keys)
-          _nodeTile(
-            name,
-            key: ValueKey('picker-department-$name'),
-            onTap: () => setState(() {
-              selectedDepartment = name;
-              selectedTeam = null;
-            }),
-          ),
-      ];
-    }
-    final teams = departments[department]!;
-    if (team == null) {
-      return [
-        for (final name in teams.keys)
-          _nodeTile(
-            name,
-            key: ValueKey('picker-team-$department-$name'),
-            onTap: () => setState(() => selectedTeam = name),
-          ),
-      ];
-    }
-    return [for (final person in teams[team]!) _personTile(person)];
-  }
-
-  /// 搜索命中按真实组织路径展示部门 / 团队节点；点击节点进入对应分支。
-  List<Widget> _searchRows(
-    Map<String, Map<String, List<Record>>> departments,
-  ) => [
-    for (final department in departments.entries) ...[
-      _searchHeader(
-        department.key,
-        depth: 0,
-        onTap: () => _openBranch(department.key, null),
-      ),
-      for (final team in department.value.entries) ...[
-        _searchHeader(
-          team.key,
-          depth: 1,
-          onTap: () => _openBranch(department.key, team.key),
-        ),
-        for (final person in team.value)
-          _personTile(person, indent: 32, showPath: false),
-      ],
-    ],
-  ];
-
-  Widget _searchHeader(
-    String name, {
-    required int depth,
-    required VoidCallback onTap,
-  }) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(10),
-    child: Padding(
-      padding: EdgeInsets.fromLTRB(4 + depth * 16, 10, 4, 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: depth == 0 ? FontWeight.w700 : FontWeight.w600,
-                color: depth == 0 ? SunnyPalette.ink : CuteTokens.muted,
-              ),
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            size: 16,
-            color: CuteTokens.muted,
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget _nodeTile(
-    String name, {
-    required Key key,
-    required VoidCallback onTap,
-  }) => ListTile(
-    key: key,
-    title: Text(name),
-    trailing: const Icon(
-      Icons.chevron_right_rounded,
-      size: 20,
-      color: CuteTokens.muted,
-    ),
-    onTap: onTap,
-  );
-
-  Widget _personTile(
-    Record person, {
-    double indent = 16,
-    bool showPath = true,
-  }) {
+  Widget _personTile(Record person) {
     final role = '${person.fields['role'] ?? ''}'.trim();
     final path = '${_departmentOf(person)} / ${_teamOf(person)}';
     final subtitle = [
       role,
-      if (showPath && person.fields['organizationPath'] is List) path,
+      path,
     ].where((value) => value.isNotEmpty).join(' · ');
+    final checked = selected.containsKey(person.id);
+    void choose() {
+      if (!_sameSession) return;
+      if (!widget.multiSelect) {
+        Navigator.pop(context, person);
+        return;
+      }
+      setState(() {
+        if (checked) {
+          selected.remove(person.id);
+        } else {
+          selected[person.id] = person;
+        }
+      });
+    }
+
+    final paper = HomePaperTokens.of(context);
     return ListTile(
-      contentPadding: EdgeInsets.only(left: indent, right: 16),
-      title: Text(person.title),
-      subtitle: subtitle.isEmpty ? null : Text(subtitle),
-      onTap: () => Navigator.pop(context, person),
+      key: ValueKey('picker-person-${person.id}'),
+      minTileHeight: 72,
+      minLeadingWidth: 40,
+      horizontalTitleGap: 10,
+      minVerticalPadding: 10,
+      contentPadding: const EdgeInsets.only(left: 6, right: 4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      selectedTileColor: const Color(0xFFFFF2DF),
+      leading: ProtectedAvatar(
+        name: person.title,
+        attachmentId: person.fields['avatarAttachmentId'] as String?,
+        radius: 20,
+      ),
+      title: Text(person.title, style: paper.body(15)),
+      subtitle: subtitle.isEmpty
+          ? null
+          : Text(
+              subtitle,
+              style: paper.body(11, color: paper.muted, height: 1.6),
+            ),
+      trailing: widget.multiSelect
+          ? Checkbox(
+              value: checked,
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              activeColor: paper.accent,
+              checkColor: HomePaperTokens.accentInk,
+              onChanged: (_) => choose(),
+            )
+          : Icon(Icons.chevron_right_rounded, color: paper.muted, size: 20),
+      selected: widget.multiSelect && checked,
+      onTap: choose,
+    );
+  }
+
+  Widget _selectionFooter(BuildContext context, {required bool compact}) {
+    final paper = HomePaperTokens.of(context);
+    final forbidden =
+        error is ApiFailure &&
+        [
+          FailureKind.forbidden,
+          FailureKind.unauthorized,
+        ].contains((error as ApiFailure).kind);
+    return Container(
+      decoration: BoxDecoration(
+        color: paper.surface,
+        border: Border(top: BorderSide(color: paper.line)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text('已选 ${selected.length} 人', style: paper.body(12)),
+                ),
+              ),
+              TextButton(
+                onPressed: selected.isEmpty
+                    ? null
+                    : () => setState(selected.clear),
+                child: const Text('清空'),
+              ),
+            ],
+          ),
+          if (!compact && selected.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final person in selected.values)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Tooltip(
+                          message: PersonOrganization(person).path,
+                          child: InputChip(
+                            key: ValueKey('picker-selected-${person.id}'),
+                            avatar: ProtectedAvatar(
+                              name: person.title,
+                              attachmentId:
+                                  person.fields['avatarAttachmentId']
+                                      as String?,
+                              radius: 12,
+                            ),
+                            label: Text(person.title, style: paper.body(12)),
+                            backgroundColor: paper.note,
+                            side: BorderSide(color: paper.line),
+                            onDeleted: () =>
+                                setState(() => selected.remove(person.id)),
+                            deleteButtonTooltipMessage:
+                                '移除${person.title}，${PersonOrganization(person).path}',
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(alignment: Alignment.center),
+                  child: const Text('取消'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  key: const ValueKey('person-picker-confirm'),
+                  onPressed: forbidden
+                      ? null
+                      : () {
+                          if (_sameSession) {
+                            Navigator.pop(context, selected.values.toList());
+                          }
+                        },
+                  child: Text('确定（${selected.length}人）'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
-    if (session.id != account || !session.canReadBusiness) {
+    final epoch = ref.watch(sessionEpochProvider);
+    if (epoch != sessionEpoch || !_sameSession || !session.canReadBusiness) {
       return const SafeArea(
         child: EmptyIllustration(showCharacter: false, title: '账号状态已变化，请重新选择'),
       );
     }
-    final departments = _groupedPeople();
-    final department =
-        !_searching && departments.containsKey(selectedDepartment)
-        ? selectedDepartment
-        : null;
-    final teams = department == null ? null : departments[department]!;
-    final team =
-        !_searching &&
-            selectedTeam != null &&
-            teams != null &&
-            teams.containsKey(selectedTeam)
-        ? selectedTeam
-        : null;
-    final title = _searching
-        ? '搜索结果'
-        : team != null
-        ? '$department / $team'
-        : department ?? '选择部门';
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .75,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  if (_canGoBack)
-                    IconButton(
-                      onPressed: _goBack,
-                      tooltip: '返回上一级',
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: searchController,
-                decoration: const InputDecoration(
-                  labelText: '搜索姓名、部门或团队',
-                  prefixIcon: Icon(Icons.search),
-                ),
-                onChanged: (v) {
-                  search = v;
-                  debounce?.cancel();
-                  generation++;
-                  setState(() {
-                    items.clear();
-                    loading = true;
-                  });
-                  debounce = Timer(
-                    const Duration(milliseconds: 300),
-                    () => load(reset: true),
-                  );
-                },
-              ),
-              Expanded(
-                child: ListView(
-                  controller: scroll,
+    final media = MediaQuery.of(context);
+    final compact =
+        media.viewInsets.bottom > 0 ||
+        media.size.height - media.viewInsets.bottom < 500;
+    final paper = HomePaperTokens.of(context);
+    return Theme(
+      data: homePaperTheme(context),
+      child: Builder(
+        builder: (context) => SafeArea(
+          top: false,
+          child: SizedBox(
+            height: media.size.height * .94,
+            child: ColoredBox(
+              color: paper.canvas,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+                child: Column(
                   children: [
-                    if (loading) const LoadingSkeleton(),
-                    if (error != null)
-                      RecordFailure(
-                        error!,
-                        retry: () => load(reset: items.isEmpty),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            tooltip: '关闭人员选择',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.chevron_left_rounded),
+                          ),
+                          Expanded(
+                            child: Text(
+                              widget.multiSelect ? '选择参与人' : '选择人员',
+                              style: paper.heading(22),
+                            ),
+                          ),
+                          const DogAvatar(index: DogAssets.friendly, size: 36),
+                        ],
                       ),
-                    if (!loading && error == null && items.isEmpty)
-                      const EmptyIllustration(
-                        title: '暂无匹配成员',
-                        subtitle: '可以更换姓名或部门',
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        controller: searchController,
+                        decoration: InputDecoration(
+                          hintText: '搜索姓名、部门或团队',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: _searching
+                              ? IconButton(
+                                  onPressed: _clearSearch,
+                                  tooltip: '清空人员搜索',
+                                  icon: const Icon(Icons.clear),
+                                )
+                              : null,
+                        ),
+                        onChanged: (value) {
+                          search = value;
+                          debounce?.cancel();
+                          generation++;
+                          setState(() {
+                            items.clear();
+                            loading = true;
+                          });
+                          debounce = Timer(
+                            const Duration(milliseconds: 300),
+                            () => load(reset: true),
+                          );
+                        },
                       ),
-                    if (!loading && error == null && items.isNotEmpty)
-                      ..._pickerRows(departments, department, team),
-                    if (!loading && !exhausted)
-                      TextButton(
-                        onPressed: more ? null : () => load(),
-                        child: Text(more ? '正在读取…' : '加载更多成员'),
+                    ),
+                    if (!compact)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _searching ? '搜索结果 · 保留组织路径' : '按部门和团队展开选择',
+                            style: paper.body(12, color: paper.muted),
+                          ),
+                        ),
                       ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: ListView(
+                        controller: scroll,
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                        children: [
+                          if (loading) const LoadingSkeleton(),
+                          if (error != null)
+                            RecordFailure(
+                              error!,
+                              retry: () => load(reset: items.isEmpty),
+                            ),
+                          if (!loading && error == null && items.isEmpty)
+                            const EmptyIllustration(
+                              showCharacter: false,
+                              title: '暂无匹配成员',
+                              subtitle: '可以更换姓名、部门或团队',
+                            ),
+                          if (!loading && error == null && items.isNotEmpty)
+                            Material(
+                              color: paper.surface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                side: BorderSide(color: paper.line),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: OrganizationDirectory(
+                                  keyPrefix: 'picker',
+                                  people: items,
+                                  expandedDepartments: expandedDepartments,
+                                  expandedTeams: expandedTeams,
+                                  onDepartmentToggle: (id) =>
+                                      _toggleNode(expandedDepartments, id),
+                                  onTeamToggle: (id) =>
+                                      _toggleNode(expandedTeams, id),
+                                  personBuilder: _personTile,
+                                  showCounts: exhausted,
+                                ),
+                              ),
+                            ),
+                          if (!loading && !exhausted)
+                            TextButton(
+                              onPressed: more ? null : () => load(),
+                              child: Text(more ? '正在读取…' : '加载更多成员'),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (widget.multiSelect)
+                      _selectionFooter(context, compact: compact),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

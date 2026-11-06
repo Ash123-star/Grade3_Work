@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'calendar_schedule.dart';
 
 /// Owns form state until the dialog route (including its exit animation) is
@@ -28,7 +29,7 @@ class _CalendarMoveConfirmationState extends State<CalendarMoveConfirmation> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => TuantuanDialog(
     title: const Text('确认移动排期'),
     content: SingleChildScrollView(
       child: Form(
@@ -37,17 +38,35 @@ class _CalendarMoveConfirmationState extends State<CalendarMoveConfirmation> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.anchor != null && widget.target != null) ...[
-              Text(
-                '抓取处：${businessDateText(widget.anchor!)} → ${businessDateText(widget.target!)}',
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(height: 12),
-            ],
-            Text('原排期：${widget.before.description}'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('原排期', style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.before.description,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('调整后', style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.after.description,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
-            Text('新排期：${widget.after.description}'),
-            const SizedBox(height: 12),
-            const Text('按现有审核规则处理；需要审核时，生效前任务留在原日期。'),
+            const Text('审核通过后生效'),
+            const SizedBox(height: 20),
             TextFormField(
               controller: reason,
               autofocus: true,

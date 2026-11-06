@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'sunshine_palette.dart';
 import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
 
@@ -92,41 +93,41 @@ class _WorkMotionScopeState extends State<WorkMotionScope>
 }
 
 class SunnyPalette {
-  static const primary = Color(0xFFF08A3C);
-  static const primaryStrong = Color(0xFFB65B1F);
-  static const onPrimary = Color(0xFF44210D);
-  static const primaryContainer = Color(0xFFFFE3C2);
-  static const onPrimaryContainer = Color(0xFF65380F);
-  static const paper = Color(0xFFFFFDF4);
-  static const surface = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF43514B);
-  static const muted = Color(0xFF7F8B83);
-  static const mint = Color(0xFFE6FAEF);
-  static const successInk = Color(0xFF287653);
+  static const primary = SunshinePalette.yellow;
+  static const primaryStrong = Color(0xFF775B10);
+  static const onPrimary = Color(0xFF3D352B);
+  static const primaryContainer = Color(0xFFFFF0AC);
+  static const onPrimaryContainer = Color(0xFF775B10);
+  static const paper = Color(0xFFFFFDF5);
+  static const surface = SunshinePalette.surface;
+  static const ink = Color(0xFF3D352B);
+  static const muted = Color(0xFF796F61);
+  static const mint = Color(0xFFEDF3E9);
+  static const successInk = Color(0xFF39734E);
   static const blue = Color(0xFFDDF1FA);
-  static const purple = Color(0xFFF1E7FF);
+  static const purple = Color(0xFFFFF0AC);
   static const orange = Color(0xFFFFF4B8);
   static const coral = Color(0xFFFFE1E1);
-  static const brandOrange = Color(0xFFFF8A24);
+  static const brandOrange = Color(0xFFFFDA35);
   static const calendarEntries = [coral, mint, blue, purple];
 }
 
 /// Quiet surfaces for the Shiba brand pages; business colors stay semantic.
 class DogBrandPalette {
-  static const canvas = Color(0xFFF8F6F2);
-  static const surface = Color(0xFFFFFEFC);
-  static const line = Color(0xFFEAE5DE);
-  static const ink = Color(0xFF403B36);
-  static const muted = Color(0xFF80776E);
+  static const canvas = Color(0xFFFFFDF5);
+  static const surface = Color(0xFFFFFEFA);
+  static const line = Color(0xFFEEE4CD);
+  static const ink = Color(0xFF3D352B);
+  static const muted = Color(0xFF796F61);
 }
 
 /// Semantic roles owned by the app, separate from immutable illustration colors.
 class SunnyPaperTokens extends ThemeExtension<SunnyPaperTokens> {
   const SunnyPaperTokens({
     this.canvas = SunnyPalette.paper,
-    this.pressed = const Color(0xFFD9752F),
-    this.actionEdge = const Color(0xFFB65B1F),
-    this.focus = const Color(0xFF8B4AC9),
+    this.pressed = const Color(0xFFECC52B),
+    this.actionEdge = const Color(0xFF775B10),
+    this.focus = const Color(0xFF775B10),
     this.warm = const Color(0xFFFFF4B8),
     this.ai = SunnyPalette.purple,
     this.information = SunnyPalette.blue,
@@ -219,23 +220,28 @@ class SunnyPaperTokens extends ThemeExtension<SunnyPaperTokens> {
 ThemeData appTheme() {
   final scheme = ColorScheme.fromSeed(
     seedColor: SunnyPalette.primary,
-    primary: SunnyPalette.primary,
-    onPrimary: SunnyPalette.onPrimary,
+    primary: SunnyPalette.primaryStrong,
+    onPrimary: SunshinePalette.surface,
     primaryContainer: SunnyPalette.primaryContainer,
     onPrimaryContainer: SunnyPalette.onPrimaryContainer,
-    secondary: const Color(0xFF7650B6),
-    onSecondary: Colors.white,
-    secondaryContainer: const Color(0xFFF1E7FF),
-    onSecondaryContainer: const Color(0xFF7650B6),
+    secondary: const Color(0xFF775B10),
+    onSecondary: SunshinePalette.surface,
+    secondaryContainer: const Color(0xFFFFF0AC),
+    onSecondaryContainer: const Color(0xFF775B10),
     tertiary: const Color(0xFFC66A2E),
     onTertiary: Colors.white,
     tertiaryContainer: const Color(0xFFFFE9D4),
-    onTertiaryContainer: const Color(0xFF65380F),
+    onTertiaryContainer: const Color(0xFF775B10),
     surface: SunnyPalette.surface,
     onSurface: SunnyPalette.ink,
     onSurfaceVariant: SunnyPalette.muted,
-    outline: const Color(0xFFD8C3AE),
-    outlineVariant: const Color(0xFFECE1D4),
+    surfaceContainerLowest: SunshinePalette.surface,
+    surfaceContainerLow: const Color(0xFFFFFAE8),
+    surfaceContainer: const Color(0xFFF8F1DE),
+    surfaceContainerHigh: const Color(0xFFF3EBD4),
+    surfaceContainerHighest: const Color(0xFFF0E7D0),
+    outline: const Color(0xFFCABB96),
+    outlineVariant: const Color(0xFFEEE4CD),
     error: const Color(0xFFC94E5B),
     errorContainer: SunnyPalette.coral,
   );
@@ -305,9 +311,12 @@ ThemeData appTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: SunnyPalette.surface,
+      backgroundColor: const Color(0xFFFFFAF0),
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: const BorderSide(color: Color(0xFFEADBB9)),
+      ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       titleTextStyle: TextStyle(
         fontFamily: AppTypography.displayFamily,
@@ -322,10 +331,10 @@ ThemeData appTheme() {
       ),
     ),
     bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: SunnyPalette.surface,
+      backgroundColor: Color(0xFFFFFAF0),
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
-      dragHandleColor: Color(0xFFD8C3AE),
+      dragHandleColor: Color(0xFFCABB96),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -334,11 +343,11 @@ ThemeData appTheme() {
     appBarTheme: const AppBarTheme(
       backgroundColor: SunnyPalette.paper,
       foregroundColor: SunnyPalette.ink,
-      centerTitle: false,
+      centerTitle: true,
       scrolledUnderElevation: 0,
       titleTextStyle: TextStyle(
         fontFamily: AppTypography.displayFamily,
-        fontSize: 26,
+        fontSize: 19,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
         color: SunnyPalette.ink,
@@ -383,21 +392,24 @@ ThemeData appTheme() {
       filled: true,
       fillColor: SunnyPalette.surface,
       contentPadding: const EdgeInsets.all(16),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFD8C3AE), width: 1.5),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFDDCFAC), width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: SunnyPalette.primaryStrong, width: 2),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: SunnyPalette.primaryStrong,
+          width: 2,
+        ),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFFC94E5B), width: 2),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFFB33643), width: 2),
       ),
     ),

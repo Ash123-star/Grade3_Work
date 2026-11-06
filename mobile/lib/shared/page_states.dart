@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'paper_layout.dart';
+import 'generated_assets.dart';
 
 class SunnyLoadingIndicator extends StatefulWidget {
   const SunnyLoadingIndicator({super.key, this.size = 22, this.color});
@@ -235,10 +236,9 @@ class EmptyIllustration extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Center(
-          child: SunnyStatusIcon(
-            icon: showCharacter ? Icons.inbox_outlined : Icons.lock_outline,
-            size: 60,
-          ),
+          child: showCharacter
+              ? const SunshineMascot(pose: 'empty', size: 88)
+              : const SunnyStatusIcon(icon: Icons.lock_outline, size: 60),
         ),
         const SizedBox(height: 12),
         Text(

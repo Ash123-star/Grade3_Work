@@ -60,6 +60,7 @@ final liveNotificationsProvider =
           ref.invalidate(itemProvider);
           ref.invalidate(scopedItemProvider);
           ref.invalidate(logDayRecordsProvider);
+          ref.invalidate(recentDiaryRecordsProvider);
           ref.invalidate(memberRecordsProvider);
         });
         // Stop transport immediately when the last UI subscriber disappears,

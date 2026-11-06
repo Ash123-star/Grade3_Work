@@ -1,9 +1,11 @@
+import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/errors/api_failure.dart';
 import '../../../core/state/providers.dart';
 import '../../../data/models/models.dart';
 import '../../../shared/calendar/civil_date.dart';
+import '../../../theme/home_paper_theme.dart';
 import '../application/todo_providers.dart';
 import '../data/personal_todo.dart';
 
@@ -15,7 +17,10 @@ Future<bool?> showTodoEditor(
 }) => showDialog<bool>(
   context: context,
   barrierDismissible: false,
-  builder: (_) => TodoEditor(date: date, todo: todo, completed: completed),
+  builder: (dialogContext) => Theme(
+    data: homePaperTheme(dialogContext),
+    child: TodoEditor(date: date, todo: todo, completed: completed),
+  ),
 );
 
 class TodoEditor extends ConsumerStatefulWidget {
@@ -163,7 +168,7 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
   Widget build(BuildContext context) {
     ref.watch(sessionProvider);
     if (!sameSession) {
-      return AlertDialog(
+      return TuantuanDialog(
         title: const Text('账号权限已变化'),
         content: const Text('请关闭后重新查看。'),
         actions: [
@@ -178,7 +183,12 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
     final locked = busy || pending != null || conflict || deleted;
     return PopScope(
       canPop: !busy,
-      child: AlertDialog(
+      child: TuantuanDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        constraints: const BoxConstraints(maxWidth: 390),
+        titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 22),
+        actionsPadding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
         scrollable: true,
         title: Text(
           pending?.method == 'DELETE'
@@ -195,12 +205,17 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const Text('事项标题'),
+                const SizedBox(height: 7),
                 TextFormField(
                   key: const ValueKey('todo-title'),
                   controller: title,
                   enabled: !locked,
                   maxLength: 120,
-                  decoration: const InputDecoration(labelText: '事项标题'),
+                  decoration: const InputDecoration(
+                    hintText: '记录一件自己的事',
+                    counterText: '',
+                  ),
                   validator: (v) => (v ?? '').trim().isEmpty
                       ? '请填写事项标题'
                       : (v ?? '').runes.length > 120
@@ -208,6 +223,8 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                       : null,
                 ),
                 const SizedBox(height: 12),
+                const Text('日期'),
+                const SizedBox(height: 7),
                 OutlinedButton.icon(
                   onPressed: locked
                       ? null
@@ -222,10 +239,12 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                             setState(() => date = civilDate(picked));
                           }
                         },
-                  icon: const Icon(Icons.calendar_today_outlined),
+                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
                   label: Text(date),
                 ),
                 const SizedBox(height: 12),
+                const Text('备注（选填）'),
+                const SizedBox(height: 7),
                 TextFormField(
                   key: const ValueKey('todo-note'),
                   controller: note,
@@ -233,17 +252,11 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                   maxLength: 2000,
                   minLines: 2,
                   maxLines: 5,
-                  decoration: const InputDecoration(labelText: '备注（选填）'),
-                ),
-                if (id != null)
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('已完成'),
-                    value: completed,
-                    onChanged: locked
-                        ? null
-                        : (v) => setState(() => completed = v!),
+                  decoration: const InputDecoration(
+                    hintText: '补充说明',
+                    counterText: '',
                   ),
+                ),
                 if (error != null)
                   Text(
                     error!,
@@ -290,7 +303,7 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                   : () async {
                       final confirmed = await showDialog<bool>(
                         context: context,
-                        builder: (c) => AlertDialog(
+                        builder: (c) => TuantuanDialog(
                           title: const Text('删除这条事项？'),
                           content: const Text('删除后将从每日事项中移除。'),
                           actions: [

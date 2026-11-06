@@ -10,14 +10,14 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/tasks")
-/** 任务接口。列表隐藏完成情况字段，生命周期通过详情 events 表达。 */
+/** 任务接口。列表用正式phase展示只读完成情况，派发请求不接受状态，详情events保留流转留痕。 */
 public class TaskController {
     final cn.workpanel.module.task.application.TaskMovementApplication movements;
     final cn.workpanel.module.task.TaskPinService pins;
     final Business business; final Db db; final ReviewApplicationService reviews; final cn.workpanel.module.task.TaskLifecycleService lifecycle; final cn.workpanel.module.task.TaskRevisionService revisions; final cn.workpanel.module.task.TaskQueryService queries;
     public TaskController(Business business, Db db, ReviewApplicationService reviews, cn.workpanel.module.task.TaskLifecycleService lifecycle, cn.workpanel.module.task.TaskRevisionService revisions, cn.workpanel.module.task.TaskQueryService queries, cn.workpanel.module.task.application.TaskMovementApplication movements,cn.workpanel.module.task.TaskPinService pins) { this.pins=pins; this.movements=movements; this.business=business; this.db=db; this.reviews=reviews; this.lifecycle=lifecycle; this.revisions=revisions; this.queries=queries; }
     /** 分页查询范围内任务。支持 search、participantId、date、period、cursor、limit；越权参与人筛选返回 403。 */
-    @io.swagger.v3.oas.annotations.Operation(summary="范围内任务列表",description="date/period 和 from/to 均按任务区间相交。新 from/to 为带时区 [from,to)，最多 62 日，COALESCE(start_at,deadline)<to AND deadline>=from。不得混用 date/period；ownerId 为 participantId 兼容别名，两者不同返回 400；参与人须经授权。范围响应含 snapshotToken、scheduleConstraints，后页须原 token；变化 409 CALENDAR_SNAPSHOT_CHANGED，超过 5000 条 422 CALENDAR_RANGE_TOO_DENSE；末页 nextCursor 为 null。列表 capabilities.reschedule 为当前部署及角色能力，不含业务状态列。")
+    @io.swagger.v3.oas.annotations.Operation(summary="范围内任务列表",description="date/period 和 from/to 均按任务区间相交。新 from/to 为带时区 [from,to)，最多 62 日，COALESCE(start_at,deadline)<to AND deadline>=from。不得混用 date/period；ownerId 为 participantId 兼容别名，两者不同返回 400；参与人须经授权。范围响应含 snapshotToken、scheduleConstraints，后页须原 token；变化 409 CALENDAR_SNAPSHOT_CHANGED，超过 5000 条 422 CALENDAR_RANGE_TOO_DENSE；末页 nextCursor 为 null。列表phase为正式流转只读值，dispatchAt为真实派发时间；capabilities.reschedule只表示当前部署及角色动作能力。")
     @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(defaultValue="") String search,@RequestParam(required=false) String participantId,@RequestParam(required=false) String date,@RequestParam(required=false) String period,
             @RequestParam(required=false) String from,@RequestParam(required=false) String to,@RequestParam(required=false) String snapshotToken,@RequestParam(required=false) String ownerId) {
         String canonical=text(participantId),alias=text(ownerId);

@@ -70,7 +70,7 @@ void main() {
     (430.0, 1.5, 10),
   ]) {
     testWidgets(
-      'occupied rows stay separate, week expands and cancellation restores: $height/$scale/$count',
+      'folded rows, overflow and candidate stay separate; cancellation restores: $height/$scale/$count',
       (t) async {
         final store = dragStore();
         final original = store.records['tasks']!.single;
@@ -100,7 +100,10 @@ void main() {
         final existing = find.byWidgetPredicate(
           (w) => w is CalendarTaskHandle && w.record.id.startsWith('busy-'),
         );
-        expect(existing, findsNWidgets(count));
+        expect(existing, findsNWidgets(count > 5 ? 4 : count));
+        if (count > 5) {
+          expect(find.text('+${count - 4}'), findsWidgets);
+        }
         expect(beforeHeight, greaterThan(emptyHeight));
         final cellBefore = t.getRect(dayCell(11, 10));
         final rectangles = [
@@ -129,6 +132,13 @@ void main() {
         await t.pump();
         await t.pump(const Duration(milliseconds: 80));
         expect(state.drag.target!.day, day(10));
+        if (count > 5) {
+          expect(
+            find.text('+${count - 4}'),
+            findsWidgets,
+            reason: 'the candidate never changes the formal task count',
+          );
+        }
         final preview = t.getRect(
           find.byKey(const ValueKey('calendar-drag-bar')),
         );
@@ -137,7 +147,7 @@ void main() {
               (w) => w is CalendarTaskHandle && w.record.id.startsWith('busy-'),
             )
             .hitTestable();
-        expect(visible, findsNWidgets(count));
+        expect(visible, findsNWidgets(count > 5 ? 4 : count));
         for (final node in visible.evaluate()) {
           final rect = t.getRect(find.byWidget(node.widget));
           expect(
@@ -171,9 +181,36 @@ void main() {
         await t.tap(find.text('取消'));
         await t.pumpAndSettle();
         expect(t.getSize(dayCell(11, 10)).height, beforeHeight);
-        expect(existing, findsNWidgets(count));
+        expect(existing, findsNWidgets(count > 5 ? 4 : count));
+        if (count > 5) {
+          expect(find.text('+${count - 4}'), findsWidgets);
+        }
         expect(store.records['reviews'], isEmpty);
         expect(find.byKey(const ValueKey('calendar-drag-bar')), findsNothing);
+        if (count == 10) {
+          // Simulate the subsequent authorized server read after approval,
+          // rather than promoting the transient candidate in local state.
+          store.records['tasks']![0] = Record(
+            id: original.id,
+            title: original.title,
+            version: original.version + 1,
+            fields: {
+              ...original.fields,
+              'startAt': '2026-11-09T09:00:00+08:00',
+              'deadline': '2026-11-11T18:00:00+08:00',
+            },
+          );
+          state.ref.invalidate(calendarMonthTasksProvider);
+          await settleLocalIo(t);
+          await t.pumpAndSettle();
+          expect(find.text('+7'), findsWidgets);
+          final overflow = find.byKey(
+            const ValueKey('month-overflow:2026-11-10'),
+          );
+          await t.tap(overflow);
+          await t.pumpAndSettle();
+          expect(find.text('11 条记录'), findsOneWidget);
+        }
         expect(t.takeException(), isNull);
       },
     );

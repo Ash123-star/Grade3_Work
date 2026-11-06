@@ -1,9 +1,11 @@
+import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'dart:async';
 import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/data/models/record_display.dart';
 import 'package:pandora_mobile/data/models/review_display.dart';
 import 'package:pandora_mobile/shared/public_comments.dart';
 import 'package:flutter/material.dart';
+import 'package:pandora_mobile/theme/sunshine_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart'
@@ -22,6 +24,7 @@ import 'form_page.dart';
 import '../dashboard/diary_composer_sheet.dart';
 import '../../core/state/live_notifications.dart';
 import '../../shared/generated_assets.dart';
+import '../../shared/notification_preview.dart';
 
 String _reviewMetadata(Record record) => [
   '${record.fields['reviewState'] ?? '审核状态未提供'}',
@@ -124,8 +127,11 @@ class _ListPageState extends ConsumerState<ListPage> {
         );
       } catch (error) {
         if (message == null ||
-            error is ApiFailure && [FailureKind.forbidden, FailureKind.unauthorized]
-                .contains(error.kind)) {
+            error is ApiFailure &&
+                [
+                  FailureKind.forbidden,
+                  FailureKind.unauthorized,
+                ].contains(error.kind)) {
           rethrow;
         }
         if (!mounted || !sameSession(session)) return;
@@ -140,7 +146,13 @@ class _ListPageState extends ConsumerState<ListPage> {
       final id = message.fields['targetId'];
       if (id is! String ||
           id.trim().isEmpty ||
-          !['tasks', 'logs', 'reviews', 'ai-jobs', 'ai-work'].contains(target)) {
+          ![
+            'tasks',
+            'logs',
+            'reviews',
+            'ai-jobs',
+            'ai-work',
+          ].contains(target)) {
         notice(context, '关联内容暂不可用，请返回工作台查看');
         return;
       }
@@ -218,7 +230,10 @@ class _ListPageState extends ConsumerState<ListPage> {
     return PageFrame(
       title: resourceTitles[resource] ?? '记录',
       feedback: messageError != null && !deniedMessage
-          ? ErrorPanel('消息操作未完成：$messageError。请再次选择消息或全部已读重试。', key: ValueKey(messageError))
+          ? ErrorPanel(
+              '消息操作未完成：$messageError。请再次选择消息或全部已读重试。',
+              key: ValueKey(messageError),
+            )
           : null,
       actions: [
         if (resource == 'dashboard/personal')
@@ -522,16 +537,29 @@ class _ListPageState extends ConsumerState<ListPage> {
                                   const SizedBox(width: 12),
                                 ],
                                 if (resource == 'notifications') ...[
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Icon(
-                                      r.fields['read'] == true
-                                          ? Icons.notifications_none
-                                          : Icons.circle,
-                                      size: r.fields['read'] == true ? 20 : 9,
-                                      color: r.fields['read'] == true
-                                          ? CuteTokens.muted
-                                          : const Color(0xFFA7460E),
+                                  SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: Stack(
+                                      children: [
+                                        const TuantuanIconTile(
+                                          icon: 'notification',
+                                          size: 36,
+                                        ),
+                                        if (r.fields['read'] != true)
+                                          Positioned(
+                                            right: 0,
+                                            top: 0,
+                                            child: Container(
+                                              width: 7,
+                                              height: 7,
+                                              decoration: const BoxDecoration(
+                                                color: SunshinePalette.error,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -551,13 +579,16 @@ class _ListPageState extends ConsumerState<ListPage> {
                                         ),
                                       ),
                                       const SizedBox(height: 6),
-                                      Text(
-                                        r.subtitle,
-                                        style: const TextStyle(
-                                          color: CuteTokens.muted,
-                                          fontSize: 12,
+                                      if (resource == 'notifications')
+                                        NotificationPreview(r)
+                                      else
+                                        Text(
+                                          r.subtitle,
+                                          style: const TextStyle(
+                                            color: CuteTokens.muted,
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                      ),
                                       if (resource == 'notifications')
                                         Padding(
                                           padding: const EdgeInsets.only(
@@ -616,7 +647,7 @@ class _ListPageState extends ConsumerState<ListPage> {
     final tagColor = _recordColor(f['tagColor'] ?? f['tag_color']);
     return PaperSurface(
       onTap: onTap,
-      color: const Color(0xFFFFF5C8),
+      color: SunshinePalette.surface,
       texture: TuantuanAssets.textures['warmSparkle'],
       cornerDecoration: TuantuanAssets.cardCorners['warm'],
       padding: const EdgeInsets.all(14),
@@ -795,6 +826,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       });
     }
   }
+
   bool busy = false;
   String? error;
   late final Session initialLogIdentity = ref.read(sessionProvider);
@@ -857,7 +889,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 },
               },
               version: widget.resource == 'reviews'
-                  ? (item.fields['baseVersion'] as num?)?.toInt() ?? item.version
+                  ? (item.fields['baseVersion'] as num?)?.toInt() ??
+                        item.version
                   : item.version,
               idempotencyKey: '${item.id}:${item.version}:$action',
             ),
@@ -882,10 +915,12 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       error = null;
     });
     try {
-      await ref.read(repositoryProvider).execute(
-        'tasks/pin',
-        Command(pinned ? 'unpin' : 'pin', {'id': item.id}),
-      );
+      await ref
+          .read(repositoryProvider)
+          .execute(
+            'tasks/pin',
+            Command(pinned ? 'unpin' : 'pin', {'id': item.id}),
+          );
       ref.invalidate(recordsProvider('tasks'));
       ref.invalidate(itemProvider(('tasks', item.id)));
       if (mounted) notice(context, pinned ? '已取消置顶' : '已置顶', success: true);
@@ -911,19 +946,23 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       error = null;
     });
     try {
-      await ref.read(repositoryProvider).execute(
-        'reviews',
-        Command(
-          'select-reviewer',
-          {
-            'id': item.id,
-            'reviewerId': picked,
-            'expectedVersion':
-                (item.fields['baseVersion'] as num?)?.toInt() ?? item.version,
-          },
-          version: (item.fields['baseVersion'] as num?)?.toInt() ?? item.version,
-        ),
-      );
+      await ref
+          .read(repositoryProvider)
+          .execute(
+            'reviews',
+            Command(
+              'select-reviewer',
+              {
+                'id': item.id,
+                'reviewerId': picked,
+                'expectedVersion':
+                    (item.fields['baseVersion'] as num?)?.toInt() ??
+                    item.version,
+              },
+              version:
+                  (item.fields['baseVersion'] as num?)?.toInt() ?? item.version,
+            ),
+          );
       refreshBusiness(ref);
       if (mounted) notice(context, '已更换审核人', success: true);
     } catch (e) {
@@ -966,11 +1005,11 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     child: Text(label),
   );
   Widget section(String title, dynamic value) => Padding(
-    padding: const EdgeInsets.only(top: 20),
+    padding: const EdgeInsets.only(top: 14),
     child: PaperSurface(
       skin:
           TuantuanAssets.detailSections[title.contains('私人') ? 'warm' : 'blue'],
-      color: title.contains('私人') ? SunnyPalette.orange : SunnyPalette.paper,
+      color: SunshinePalette.surface,
       texture: TuantuanAssets.textures['paper'],
       cornerDecoration: TuantuanAssets.cardCorners['mint'],
       child: Column(
@@ -978,12 +1017,12 @@ class _DetailPageState extends ConsumerState<DetailPage> {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           Text(
             _value(value),
-            style: const TextStyle(fontSize: 15, height: 1.7),
+            style: const TextStyle(fontSize: 14, height: 1.9),
           ),
         ],
       ),
@@ -1021,7 +1060,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       height: 10,
                       decoration: BoxDecoration(
                         color: i == events.length - 1
-                            ? const Color(0xFFFF8A24)
+                            ? SunshinePalette.accentInk
                             : CuteTokens.line,
                         shape: BoxShape.circle,
                       ),
@@ -1151,11 +1190,20 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 20),
+                section('任务说明', f['任务内容'] ?? f['content'] ?? f['body']),
+                const SizedBox(height: 14),
                 PaperSurface(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const Text(
+                        '任务信息',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       _attribute(
                         '开始时间',
                         prettyDate(f['startAt'] ?? f['start_at']),
@@ -1163,11 +1211,36 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       const SizedBox(height: 14),
                       _attribute('截止时间', prettyDate(f['deadline'])),
                       const SizedBox(height: 14),
-                      _attribute(
-                        '参与人',
-                        participantNames.isEmpty
-                            ? '尚未返回参与人'
-                            : participantNames.join('、'),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(
+                            width: 74,
+                            child: Text(
+                              '参与人',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: SunshinePalette.muted,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Wrap(
+                              spacing: 5,
+                              runSpacing: 5,
+                              children: [
+                                if (participantNames.isEmpty)
+                                  const Text('尚未返回参与人'),
+                                for (final name in participantNames)
+                                  AppLabelBadge(
+                                    name,
+                                    color: const Color(0xFFF5EDDA),
+                                    compact: true,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 14),
                       _attribute(
@@ -1177,7 +1250,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     ],
                   ),
                 ),
-                section('任务说明', f['任务内容'] ?? f['content'] ?? f['body']),
                 if (!AppConfig.mock && ['进行中', '需补充', '待验收'].contains(status))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1240,8 +1312,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             } else if (resource == 'reviews') {
               final self = item.ownerId == user.id;
               final pending = f['reviewState'] == '待审';
-              final creating = f['reviewKind'] == 'TASK_CREATE' ||
-                  f['baseVersion'] == 0;
+              final creating =
+                  f['reviewKind'] == 'TASK_CREATE' || f['baseVersion'] == 0;
               final assigned = f['reviewerId'] == user.id;
               if (!self && pending && assigned) {
                 bottom = button('通过申请', () => action(item, 'approve'));
@@ -1299,7 +1371,12 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Text(reviewSnapshotText(f['before'], f['displayReferences'])),
+                        Text(
+                          reviewSnapshotText(
+                            f['before'],
+                            f['displayReferences'],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1327,7 +1404,10 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                           '已失效' => '申请已失效，以上内容不再等待审核',
                           _ => '以上为提交申请时记录的内容',
                         },
-                        style: const TextStyle(color: CuteTokens.muted, fontSize: 12),
+                        style: const TextStyle(
+                          color: CuteTokens.muted,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -1557,10 +1637,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   item.subtitle,
                   style: const TextStyle(color: CuteTokens.muted),
                 ),
-                section(
-                  '内容',
-                  f['内容'] ?? f['body'],
-                ),
+                section('内容', f['内容'] ?? f['body']),
               ]);
               if (resource == 'dashboard/company') {
                 actions.add(
@@ -1611,14 +1688,16 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ? '工作日志'
                   : '${resourceTitles[resource] ?? '记录'}详情',
               actions: actions,
-              feedback: error == null ? null : ErrorPanel(
-                error!,
-                key: ValueKey(error),
-                retry: () {
-                  setState(() => error = null);
-                  ref.invalidate(provider);
-                },
-              ),
+              feedback: error == null
+                  ? null
+                  : ErrorPanel(
+                      error!,
+                      key: ValueKey(error),
+                      retry: () {
+                        setState(() => error = null);
+                        ref.invalidate(provider);
+                      },
+                    ),
               bottom: bottom == null
                   ? null
                   : Column(
@@ -1845,7 +1924,6 @@ class MemberRecords extends ConsumerWidget {
   );
 }
 
-
 class _ReviewerPickerSheet extends ConsumerStatefulWidget {
   const _ReviewerPickerSheet({required this.reviewId});
   final String reviewId;
@@ -1882,7 +1960,10 @@ class _ReviewerPickerSheetState extends ConsumerState<_ReviewerPickerSheet> {
         } else if (snapshot.data!.items.isEmpty) {
           body = const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text('暂无其他在职创始人可选', style: TextStyle(color: CuteTokens.muted)),
+            child: Text(
+              '暂无其他在职创始人可选',
+              style: TextStyle(color: CuteTokens.muted),
+            ),
           );
         } else {
           body = Column(
@@ -1890,9 +1971,14 @@ class _ReviewerPickerSheetState extends ConsumerState<_ReviewerPickerSheet> {
             children: [
               for (final person in snapshot.data!.items)
                 ListTile(
-                  title: Text(displayPersonName(person.fields['name'] ?? person.title)),
+                  title: Text(
+                    displayPersonName(person.fields['name'] ?? person.title),
+                  ),
                   trailing: person.fields['current'] == true
-                      ? const Text('当前审核人', style: TextStyle(color: CuteTokens.muted))
+                      ? const Text(
+                          '当前审核人',
+                          style: TextStyle(color: CuteTokens.muted),
+                        )
                       : null,
                   onTap: () => Navigator.pop(context, person.id),
                 ),
@@ -1917,4 +2003,3 @@ class _ReviewerPickerSheetState extends ConsumerState<_ReviewerPickerSheet> {
     ),
   );
 }
-

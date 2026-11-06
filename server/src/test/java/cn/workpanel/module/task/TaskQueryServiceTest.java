@@ -47,13 +47,15 @@ class TaskQueryServiceTest {
         return task;
     }
 
-    @Test void listUsesExplicitProjectionAndNeverLeaksLifecycleFields() {
+    @Test void listProjectsCanonicalPhaseWithoutLeakingBodyOrSyntheticCompletion() {
         when(db.count(anyString(),any(Object[].class))).thenReturn(1L);
         when(db.rows(startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at"),any(Object[].class))).thenReturn(List.of(row()));
         var result=service.list(LEADER,new TaskQueryService.Query(0,20,"查询",null,null,null));
         @SuppressWarnings("unchecked") var item=((List<Map<String,Object>>)result.get("items")).getFirst();
-        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","labels","label","capabilities"),item.keySet());
-        for(String hidden:List.of("phase","status","completion","progress","done","body","events")) assertFalse(item.containsKey(hidden),hidden);
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","created_at","phase","dispatchAt","participants","labels","label","capabilities"),item.keySet());
+        assertEquals("ACCEPTED",item.get("phase"));
+        assertNull(item.get("dispatchAt"));
+        for(String hidden:List.of("status","completion","progress","done","body","events")) assertFalse(item.containsKey(hidden),hidden);
         verify(db).count(contains("FROM tasks t WHERE"),any(Object[].class));
         verify(db).rows(startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at"),any(Object[].class));
     }
@@ -104,8 +106,19 @@ class TaskQueryServiceTest {
     @Test void taskListViewCopiesOnlyContractColumns() {
         var item=TaskListView.of(row());
         assertEquals("task-1",item.get("id"));
-        assertFalse(item.containsKey("phase"));
+        assertEquals("ACCEPTED",item.get("phase"));
         assertFalse(item.containsKey("body"));
+    }
+
+    @Test void completionKeepsAllRealPhasesAndMissingDispatchIsNotCreationTime() {
+        for(String phase:List.of("DISPATCHED","RECEIVED","FEEDBACK","ACCEPTED","ARCHIVED","WITHDRAWN","FUTURE_PHASE")) {
+            var task=row();task.put("phase",phase);
+            assertEquals(phase,TaskListView.of(task).get("phase"));
+            assertNull(TaskListView.of(task).get("dispatchAt"));
+        }
+        var task=row();task.remove("phase");task.put("dispatch_at","2026-10-12T01:00:00Z");
+        assertNull(TaskListView.of(task).get("phase"));
+        assertEquals("2026-10-12T01:00:00Z",TaskListView.of(task).get("dispatchAt"));
     }
 
     @Test void receivedCardKeepsPhasesAndSortsByEarliestRealDispatch() {

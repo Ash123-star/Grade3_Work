@@ -4,15 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/tenure.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
-import 'package:pandora_mobile/shared/premium_pickers.dart';
+import 'package:pandora_mobile/shared/organization_directory.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 
-/// Read-only personnel overview grouped by the server-provided department.
+/// Read-only personnel records in the authorized department/team directory.
 class PersonnelPage extends ConsumerStatefulWidget {
   const PersonnelPage({super.key});
 
@@ -22,7 +23,13 @@ class PersonnelPage extends ConsumerStatefulWidget {
 
 class _PersonnelPageState extends ConsumerState<PersonnelPage> {
   String search = '';
-  String department = '全部部门';
+  final expandedDepartments = <String>{};
+  final expandedTeams = <String>{};
+  String expandedSearch = '';
+
+  void toggle(Set<String> nodes, String id) => setState(() {
+    if (!nodes.remove(id)) nodes.add(id);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -39,26 +46,9 @@ class _PersonnelPageState extends ConsumerState<PersonnelPage> {
       ],
       child: PageBody(
         children: [
-          PaperSurface(
-            color: DogBrandPalette.surface,
-            borderColor: DogBrandPalette.line,
-            child: Row(
-              children: [
-                const DogAvatar(index: DogAssets.friendly, size: 32),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    current.manager ? '按部门浏览团队成员' : '查看授权范围内的成员信息',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
           TextField(
             decoration: const InputDecoration(
-              hintText: '搜索姓名或部门',
+              hintText: '搜索姓名、部门或团队',
               prefixIcon: Icon(Icons.search),
               filled: true,
               fillColor: DogBrandPalette.surface,
@@ -67,105 +57,108 @@ class _PersonnelPageState extends ConsumerState<PersonnelPage> {
           ),
           const SizedBox(height: 16),
           people.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-            data: (page) {
-              final departments = {
-                '全部部门',
-                ...page.items.map(
-                  (p) =>
-                      '${p.fields['departmentName'] ?? p.fields['department'] ?? '未分组'}',
-                ),
-              };
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: PremiumDropdownField<String>(
-                  key: ValueKey('personnel-department:$department'),
-                  initialValue: departments.contains(department)
-                      ? department
-                      : '全部部门',
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: '部门筛选'),
-                  items: [
-                    for (final name in departments)
-                      DropdownMenuItem(value: name, child: Text(name)),
-                  ],
-                  onChanged: (value) => setState(() => department = value!),
-                ),
-              );
-            },
-          ),
-          people.when(
             loading: () => const LoadingSkeleton(),
             error: (error, _) => RecordFailure(
               error,
               retry: () => ref.invalidate(recordsProvider('organization')),
             ),
             data: (page) {
-              final visible = page.items.where((person) {
-                final personDepartment =
-                    '${person.fields['departmentName'] ?? person.fields['department'] ?? '未分组'}';
-                return (department == '全部部门' ||
-                        personDepartment == department) &&
-                    '${person.title}$personDepartment'.toLowerCase().contains(
-                      search.toLowerCase(),
-                    );
-              }).toList();
+              final visible = page.items
+                  .where((person) => PersonOrganization(person).matches(search))
+                  .toList();
               if (visible.isEmpty) {
+                expandedSearch = search;
                 return const EmptyIllustration(
                   title: '暂无匹配人员',
                   subtitle: '可以调整搜索条件',
                 );
               }
-              final groups = <String, List<Record>>{};
-              for (final person in visible) {
-                final department =
-                    '${person.fields['departmentName'] ?? person.fields['department'] ?? '未分组'}';
-                groups.putIfAbsent(department, () => []).add(person);
+              final groups = groupOrganizationPeople(visible);
+              if (search.isNotEmpty && expandedSearch != search) {
+                for (final person in visible) {
+                  final org = PersonOrganization(person);
+                  expandedDepartments.add(org.departmentKey);
+                  expandedTeams.add(org.branchKey);
+                }
+                expandedSearch = search;
+              } else if (search.isEmpty) {
+                expandedSearch = '';
               }
-              final names = groups.keys.toList()..sort();
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '${visible.length} 位可见成员 · ${names.length} 个部门',
+                    '${visible.length} 位可见成员 · ${groups.length} 个部门',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 10),
-                  for (final department in names) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8, bottom: 8),
-                      child: Text(
-                        department,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  OrganizationDirectory(
+                    keyPrefix: 'personnel',
+                    people: visible,
+                    expandedDepartments: expandedDepartments,
+                    expandedTeams: expandedTeams,
+                    onDepartmentToggle: (id) => toggle(expandedDepartments, id),
+                    onTeamToggle: (id) => toggle(expandedTeams, id),
+                    personBuilder: (person) => Padding(
+                      key: ValueKey('personnel-record-${person.id}'),
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _PersonnelCard(
+                        person: person,
+                        onTap: () {
+                          if (current.manager && person.id != current.id) {
+                            final month = ref.read(
+                              memberCalendarDateProvider(person.id),
+                            );
+                            unawaited(
+                              ref.read(
+                                calendarMonthTasksProvider((
+                                  person.id,
+                                  month.year * 12 + month.month - 1,
+                                )).future,
+                              ),
+                            );
+                            context.push('/me/team/${encode(person.id)}');
+                          } else if (person.id == current.id) {
+                            context.push('/me/profile');
+                          } else {
+                            showTuantuanBottomSheet<void>(
+                              context: context,
+                              useSafeArea: true,
+                              builder: (_) => Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      person.title,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleLarge,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Text(
+                                      '入职日期：${employmentDateLabel(person.fields['employmentStartDate'])}',
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      '工龄：${tenureLabel(parseEmploymentDate(person.fields['employmentStartDate']), shanghaiWallTime(DateTime.now()))}',
+                                    ),
+                                    const SizedBox(height: 20),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('收起'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                        },
                       ),
                     ),
-                    for (final person in groups[department]!)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _PersonnelCard(
-                          person: person,
-                          onTap: () {
-                            if (current.manager && person.id != current.id) {
-                              final month = ref.read(
-                                memberCalendarDateProvider(person.id),
-                              );
-                              unawaited(
-                                ref.read(
-                                  calendarMonthTasksProvider((
-                                    person.id,
-                                    month.year * 12 + month.month - 1,
-                                  )).future,
-                                ),
-                              );
-                              context.push('/me/team/${encode(person.id)}');
-                            } else {
-                              context.push('/me/profile');
-                            }
-                          },
-                        ),
-                      ),
-                  ],
+                  ),
                 ],
               );
             },
@@ -230,7 +223,9 @@ class _PersonnelCard extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     AppLabelBadge(
-                      taskCount == null ? '参与任务数未知' : '参与任务 ${taskCount.toInt()}',
+                      taskCount == null
+                          ? '参与任务数未知'
+                          : '参与任务 ${taskCount.toInt()}',
                       color: SunnyPalette.orange,
                       compact: true,
                     ),

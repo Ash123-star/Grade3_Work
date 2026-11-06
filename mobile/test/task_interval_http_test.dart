@@ -103,6 +103,44 @@ void main() {
     expect((request.data as Map)['labelIds'], ['current-label-id']);
   });
 
+  test(
+    'list completion uses canonical lifecycle and retains missing dispatch',
+    () async {
+      for (final entry in <String?, String>{
+        'DISPATCHED': '待接收',
+        'RECEIVED': '进行中',
+        'FEEDBACK': '待验收',
+        'ACCEPTED': '已验收',
+        'ARCHIVED': '已归档',
+        'WITHDRAWN': '已撤回',
+        'FUTURE_PHASE': '情况未知',
+        null: '情况未知',
+      }.entries) {
+        adapter.response = {
+          'items': [
+            {
+              'id': 'task-completion',
+              'issuer_id': 'issuer',
+              'title': '真实任务',
+              'phase': entry.key,
+              'created_at': '2026-10-01T00:00:00Z',
+              'dispatchAt': null,
+              'fields': {'status': '已验收'},
+            },
+          ],
+          'total': 1,
+        };
+        final task = (await repository.list(
+          'tasks',
+          const Query(),
+        )).items.single;
+        expect(task.fields['phase'], entry.key);
+        expect(task.fields['status'], entry.value);
+        expect(task.fields['dispatchAt'], isNull);
+      }
+    },
+  );
+
   test('creation review decision sends expected version zero', () async {
     adapter.response = {'id': 'review-1', 'status': 'APPROVED', 'expected_version': 0};
     await repository.execute(

@@ -1,5 +1,16 @@
 ## ADDED Requirements
 
+### Requirement: Enrich existing fictional annual members
+P0：年度增量迁移 SHALL 补齐场景成员空资料及同公司团队归属，保留已填资料、角色、状态和汇报关系。非场景维护账号 MUST 保持原样。
+
+#### Scenario: Existing annual database
+- **WHEN** 已有年度库升级到 V5
+- **THEN** SHALL 在主公司拥有四名创始人，为无团队成员分配同公司同部门团队，并为每位在职普通员工追加八条重叠排期及参与关系，使月历可复现溢出折叠
+
+#### Scenario: Pending member or conflicting ownership
+- **WHEN** 成员仍待确认或已有团队与公司部门冲突
+- **THEN** MUST 不激活待确认成员、不为其生成业务任务；归属冲突时整体拒绝迁移，不能跨公司分配或覆盖既有资料
+
 ### Requirement: Fresh annual scenario dataset
 P0：系统 SHALL 在显式启用annual-2026数据集时，通过同一DataSource与独立Flyway历史在空业务库生成2026年6—11月数据。现有正式与旧场景迁移 MUST 保持原样，默认路径保持兼容。
 

@@ -159,7 +159,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     );
     final value = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => TuantuanDialog(
         title: const Text('我的目标与偏好'),
         content: SizedBox(
           width: 420,
@@ -331,7 +331,7 @@ class _AiPageState extends ConsumerState<AiPage> {
     final reason = TextEditingController();
     final value = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => TuantuanDialog(
         title: Text(item == null ? '补充经历' : '纠正记忆'),
         content: SizedBox(
           width: 420,
@@ -409,7 +409,7 @@ class _AiPageState extends ConsumerState<AiPage> {
   Future<void> forget(Map<String, dynamic> item) async {
     final yes = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => TuantuanDialog(
         title: const Text('停止使用这条来源的记忆？'),
         content: const Text('停止用于当前记忆范围的分析，不删除原始工作记录。'),
         actions: [

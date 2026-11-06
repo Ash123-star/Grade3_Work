@@ -13,8 +13,7 @@ import 'package:pandora_mobile/features/common/catalog.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
-import 'package:pandora_mobile/shared/generated_assets.dart';
-import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/home_paper_navigation.dart';
 import 'package:pandora_mobile/features/dashboard/member_workspace.dart';
 import 'package:pandora_mobile/features/dashboard/personnel_page.dart';
 import 'package:pandora_mobile/features/dashboard/task_management_page.dart'
@@ -113,50 +112,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           body: shell,
           bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
               ? null
-              : ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(24),
-                  ),
-                  child: PaperSurface(
-                    skin: TuantuanAssets.detailSections['mint'],
-                    padding: EdgeInsets.zero,
-                    child: NavigationBar(
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      animationDuration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : const Duration(milliseconds: 160),
-                      selectedIndex: shell.currentIndex,
-                      onDestinationSelected: (i) => shell.goBranch(i),
-                      destinations: const [
-                        NavigationDestination(
-                          icon: TuantuanIcon('mindmap', size: 26),
-                          selectedIcon: TuantuanIcon('mindmap', size: 26),
-                          label: '首页',
-                        ),
-                        NavigationDestination(
-                          icon: TuantuanIcon('calendar', size: 26),
-                          selectedIcon: TuantuanIcon('calendar', size: 26),
-                          label: '公司',
-                        ),
-                        NavigationDestination(
-                          icon: TuantuanIcon('log', size: 26),
-                          selectedIcon: TuantuanIcon('log', size: 26),
-                          label: '日志',
-                        ),
-                        NavigationDestination(
-                          icon: TuantuanIcon('ai', size: 26),
-                          selectedIcon: TuantuanIcon('ai', size: 26),
-                          label: 'AI地图',
-                        ),
-                        NavigationDestination(
-                          icon: TuantuanIcon('members', size: 26),
-                          selectedIcon: TuantuanIcon('members', size: 26),
-                          label: '我的',
-                        ),
-                      ],
-                    ),
-                  ),
+              : HomePaperNavigation(
+                  index: shell.currentIndex,
+                  onSelected: (i) => shell.goBranch(i),
                 ),
         ),
         branches: [
@@ -345,13 +303,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                 key: ValueKey(s.uri.toString()),
                 id: s.uri.queryParameters['id'],
                 source: s.uri.queryParameters['source'],
-                initialBusinessDate: s.uri.queryParameters['initialBusinessDate'],
-                scheduleConstraints: s.uri.queryParameters.containsKey('initialBusinessDate') ? {
-                  'zone':'Asia/Shanghai',
-                  'minDate':s.uri.queryParameters['calendarMinDate'],
-                  'maxDate':s.uri.queryParameters['calendarMaxDate'],
-                  'revision':s.uri.queryParameters['calendarRevision'],
-                } : null,
+                initialBusinessDate:
+                    s.uri.queryParameters['initialBusinessDate'],
+                scheduleConstraints:
+                    s.uri.queryParameters.containsKey('initialBusinessDate')
+                    ? {
+                        'zone': 'Asia/Shanghai',
+                        'minDate': s.uri.queryParameters['calendarMinDate'],
+                        'maxDate': s.uri.queryParameters['calendarMaxDate'],
+                        'revision': s.uri.queryParameters['calendarRevision'],
+                      }
+                    : null,
                 version:
                     int.tryParse(s.uri.queryParameters['version'] ?? '') ?? 1,
                 restoreDiaryDraft:

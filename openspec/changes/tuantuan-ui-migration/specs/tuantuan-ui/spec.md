@@ -2,7 +2,7 @@
 
 ### Requirement: Screenshot repair visual layers
 
-客户端 SHALL 使用本地无文字皮肤作为可见卡片主体背景，以中心切片保持边框比例，由代码渲染真实文字、状态和操作，MUST 保持五栏导航、数据权限、错误恢复和人工确认规则。
+客户端 SHALL 使用统一奶油黄代码表面承载卡片，由代码渲染真实文字、状态和操作，生成素材只用于功能图标及少量陪伴插画，MUST 保持五栏导航、数据权限、错误恢复和人工确认规则。
 
 #### Scenario: Compact dashboard and aligned actions
 
@@ -30,7 +30,7 @@
 
 ### Requirement: Distinct filters and grouped destinations
 
-客户端 SHALL 为通知及其他筛选提供醒目的橙色选中态、勾选标记、柔和边界；我的页 SHALL 使用有纹理的功能入口与明确按钮容器，分组标题与按钮可区分。
+客户端 SHALL 为通知及其他筛选提供醒目的黄色选中态、勾选标记、柔和边界；我的页 SHALL 使用清晰的功能图标入口与明确按钮容器，分组标题与按钮可区分。
 
 #### Scenario: Filter and open a destination
 
@@ -110,3 +110,38 @@
 
 - **WHEN** 用户启用减少动画或设备离线
 - **THEN** 开屏跳过动态缩放并仍显示本地图标，动画结束后不阻塞路由、会话恢复或错误状态
+
+### Requirement: Sunshine brand consistency
+
+优先级 Must，范围为 Flutter 全局主题、共享组件与品牌资源。客户端 SHALL 使用现有 App 图标衍生的明黄/奶油白/深色描边体系，MUST 保持首页、公司、日志、AI地图、我的五栏及真实业务交互。主按钮和选中托盘使用明黄底与深色文字，小字链接使用可读深琥珀色；成功/错误与用户标签仍保留语义色。
+
+#### Scenario: Original brand assets across pages
+
+- **WHEN** 用户打开任一主导航、编辑弹层或空列表
+- **THEN** 功能图标采用同系列黄色本地素材，角色限于问候/空列表/引导，卡片不铺旧绿色纹理或四角插画，普通标题和星期栏不重复放角色
+
+#### Scenario: Artwork unavailable or enlarged text
+
+- **WHEN** 图片缺失、设备离线或文字放大
+- **THEN** 代码表面、实际文字、日期、权限状态和操作继续可访问，不把装饰图片作为业务内容或唯一操作标签；本批设备人工验收保持待执行，不以编译通过代替
+
+
+### Requirement: Sunshine subpage layouts
+The application SHALL use the approved cream-yellow task table and cohesive authentication, form, detail and settings layouts while preserving existing authorization and business contracts.
+
+#### Scenario: Authentication forms
+- **WHEN** a user opens login or registration
+- **THEN** the page SHALL show the app brand, a clear title, labeled single-column fields and a nearby submit action
+- **AND** registration SHALL retain the real department selector and pending-membership explanation
+- **AND** loading, invalid input and service errors SHALL remain visible without granting business access
+
+#### Scenario: Task table reference
+- **WHEN** a user opens task management
+- **THEN** the table SHALL retain its seven columns, horizontal scrolling and existing filters
+- **AND** it SHALL use a pale-yellow header, fine grid lines, participant capsules and each label's own color
+- **AND** the task title SHALL show a small pinned label when applicable, with pin actions available from a long-press menu and task details
+- **AND** no completion field SHALL be introduced into dispatch forms
+
+#### Scenario: Company month view preservation
+- **WHEN** the subpage theme is applied
+- **THEN** the existing company month grid, cross-day task layout, five-row folding, drag interactions and holiday positions SHALL remain unchanged

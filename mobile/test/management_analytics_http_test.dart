@@ -588,7 +588,16 @@ void main() {
     'personnel includes later pages and rejected management has no company resubmit',
     (t) async {
       final c = await launch(t, '/me/people');
+      // Data still includes later pages; records become visible after expanding
+      // their department and team in the approved inline directory.
+      expect(find.text('第二页成员'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('personnel-department-id:dept')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('personnel-team-id:dept-id:team')));
+      await t.pumpAndSettle();
       expect(find.text('第二页成员'), findsOneWidget);
+      expect(adapter.requests.any((r) => r.path == '/organization/people' &&
+          r.queryParameters['cursor'] == '30'), isTrue);
       c.read(routerProvider).go('/me/reviews/rejected');
       await settle(t);
       expect(find.text('修改后重新提交'), findsNothing);

@@ -264,7 +264,7 @@ void main() {
     },
   );
   testWidgets(
-    'cross-year month continuations never paint over blank date cells',
+    'cross-year month continuations keep writable handles inside real month dates',
     (tester) async {
       tester.view.physicalSize = const Size(390, 900);
       tester.view.devicePixelRatio = 1;
@@ -315,7 +315,10 @@ void main() {
         final state = await readyInteraction(tester);
         final handle = find
             .byWidgetPredicate(
-              (w) => w is CalendarTaskHandle && w.record.id == 'move-task',
+              (w) =>
+                  w is CalendarTaskHandle &&
+                  w.record.id == 'move-task' &&
+                  w.constraints != null,
             )
             .hitTestable()
             .first;

@@ -33,13 +33,15 @@
 
 任务事件 `actor_name`、审核步骤 `reviewer_name`、审计 `actor_name` 为同公司 `users.name`。姓名缺失显示未知成员，不回退登录账号/内部ID。日志保留业务日期，但列表/卡片标题从work首个非空行生成最多48字符摘要，无正文显示工作日志，无新增存储字段。运行时OpenAPI模式已同步；`docs/openapi.json`快照留待统一验收时重新导出。
 
-组织树和 `/people` 返回范围内数据。管理员策略、人员和组织单元的关键变更使用 `version`、`reason`，通过审核后生效。主要接口：`GET /organization`、`GET /organization/departments`、`GET /organization/people`、`POST /organization/membership-application`、`GET/POST /organization/review-policy`、`POST /organization/reviewer-application`、`POST /organization/users/{id}/revisions`、`POST /organization/{departments|teams}/revisions`、`GET /organization/audit`。
+组织树和 `/people` 返回范围内数据。人员目录项增加可空 `employmentStartDate`（真实入职日期，YYYY-MM-DD），沿用原组织查询权限，无新增表或接口。移动端点击授权员工可展示入职日期及按上海业务日计算的工龄；缺失/未来日期不从注册时间推测。管理员策略、人员和组织单元的关键变更使用 `version`、`reason`，通过审核后生效。主要接口：`GET /organization`、`GET /organization/departments`、`GET /organization/people`、`POST /organization/membership-application`、`GET/POST /organization/review-policy`、`POST /organization/reviewer-application`、`POST /organization/users/{id}/revisions`、`POST /organization/{departments|teams}/revisions`、`GET /organization/audit`。
 
 ## 任务 `/tasks`
 
 2026-10-30（Issue #49）：`GET /tasks/received-card` 仅返回当前用户本人参与的任务（包括本人派发且参与），包含全部生命周期状态，不再返回仅下属参与的授权范围任务。`items/total/nextCursor`使用相同过滤；每项增加`issuer_id`。导图卡片与完整列表共用该资源，管理任务表继续使用`GET /tasks`授权范围查询。
 
-`GET /tasks` 列表故意不返回完成情况或状态列，也不返回主负责人或协作人；每项只返回无角色的 `participants` 集合和最多一个由服务端给出的 `label`。流转事件只在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
+`GET /tasks` 使用显式授权投影，不返回主负责人或协作人；参与人使用无角色的 `participants` 集合，标签以本文“统一集成兼容约定”的 `labels` 集合及旧 `label` 兼容规则为准。流转事件在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,labelIds,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
+
+**2026-11-05实现增量（部署与验证状态另见统一验证入口）**：复用Issue #53确认的可选只读 `phase`，任务管理在开始时间前展示完成情况，派发表单仍不显示或接收该字段。映射为 `DISPATCHED` 待接收、`RECEIVED` 进行中、`FEEDBACK` 待验收、`ACCEPTED` 已验收、`ARCHIVED` 已归档、`WITHDRAWN` 已撤回；`RETURNED`是事件，生效后phase为RECEIVED。缺失/未知显示“情况未知”，不从截止时间、备注或任一参与人反馈推断。另返回可空 `dispatchAt`，取同公司同任务最早真实DISPATCHED事件时间，旧数据缺失为null，不能拿created_at伪造派发时间。增量字段向后兼容，旧客户端可忽略，新客户端连接旧服务端时显示未知/未提供；列表授权范围、分页与审核政策不变，不暴露未过滤body/事件。任务状态只读，创建/修订伪造状态仍由服务端拒绝。验收见 [A03](app-requirements-acceptance.md)。
 
 `GET /tasks?date=YYYY-MM-DD&period=day|week|month` 使用上海自然日/周/月按任务区间相交筛选：`COALESCE(start_at,deadline) < 范围结束 && deadline >= 范围开始`，排除反向区间。移动端自行计算月历可见网格并发送成对带时区的 `from/to`；不得与 `date/period` 混用。`participantId` 为正式参与人参数，`ownerId` 是兼容别名，同时出现且不同返回400。
 
@@ -171,4 +173,4 @@ GET /organization/people沿用原组织数据范围，追加可空team_name，�
 
 ### 中国大陆节假日月历（成员 D）
 `GET /api/calendar/holidays?year=2026`：已登录、已确认且无需强制改密的账号可读；沿用公共认证规则。year为2007至2100，越界400 `INVALID_YEAR`；缺失/格式错误400；未登录401、无业务访问权限403。只读幂等，无写入版本及分页。返回 `{year,days:[{date,name,isOffDay}],papers,status,fetchedAt}`；date为中国大陆业务日期，isOffDay=false表示公告指定的调休上班日。status为FRESH、STALE或UNAVAILABLE；fetchedAt为最后成功获取的UTC时间，无成功记录为空字符串。
-固定来源为 NateScarlet/holiday-cn 的 GitHub contents API（raw JSON Accept），保留国务院公告链接。缓存24小时；失败5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。客户端查询相邻公告年份处理跨年网格；数据故障不阻塞任务。服务端响应上限256 KiB、完整请求6秒超时；无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。
+固定来源为 NateScarlet/holiday-cn 的固定 raw.githubusercontent.com 原始文件地址，保留国务院公告链接。缓存24小时；失败5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。同年请求合并、不同年份独立加载。客户端查询相邻公告年份处理跨年网格，提示仅针对可见年份；数据故障不阻塞任务。服务端响应上限256 KiB、完整请求6秒超时；无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。

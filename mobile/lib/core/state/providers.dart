@@ -228,16 +228,26 @@ final receivedTaskCardProvider = FutureProvider.autoDispose<PageResult>((ref) {
 });
 
 /// Home reads bounded previews; full task board loads pages on demand.
-final homePreviewProvider = FutureProvider.autoDispose.family<PageResult,String>((ref,resource) {
-  final session=ref.watch(sessionProvider);
-  if(!session.canReadBusiness) throw const ApiFailure(FailureKind.forbidden,'请先确认账号业务访问权限');
-  return ref.watch(repositoryProvider).list(resource,const Query(limit:2));
-});
-final receivedTaskPageProvider = FutureProvider.autoDispose.family<PageResult,String>((ref,cursor) {
-  final session=ref.watch(sessionProvider);
-  if(!session.canReadBusiness) throw const ApiFailure(FailureKind.forbidden,'请先确认账号业务访问权限');
-  return ref.watch(repositoryProvider).list('tasks/received-card',Query(cursor:cursor));
-});
+final homePreviewProvider = FutureProvider.autoDispose
+    .family<PageResult, String>((ref, resource) {
+      final session = ref.watch(sessionProvider);
+      if (!session.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
+      }
+      return ref
+          .watch(repositoryProvider)
+          .list(resource, const Query(limit: 2));
+    });
+final receivedTaskPageProvider = FutureProvider.autoDispose
+    .family<PageResult, String>((ref, cursor) {
+      final session = ref.watch(sessionProvider);
+      if (!session.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
+      }
+      return ref
+          .watch(repositoryProvider)
+          .list('tasks/received-card', Query(cursor: cursor));
+    });
 final itemProvider = FutureProvider.autoDispose
     .family<Record, (String, String)>(
       (ref, key) => ref.watch(repositoryProvider).detail(key.$1, key.$2),
@@ -400,6 +410,7 @@ void refreshBusiness(WidgetRef ref) {
   ref.invalidate(analyticsSummaryProvider);
   ref.invalidate(memberRecordsProvider);
   ref.invalidate(logDayRecordsProvider);
+  ref.invalidate(recentDiaryRecordsProvider);
 }
 
 /// Each member date belongs to the current account, independent of own diary/calendar.
@@ -427,6 +438,31 @@ final memberRecordsProvider = FutureProvider.autoDispose
     });
 
 final logDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+
+/// Read the current account's three Shanghai business dates as one range.
+/// [today] carries a calendar date, not the device's current timezone.
+final recentDiaryRecordsProvider = FutureProvider.autoDispose
+    .family<PageResult, DateTime>((ref, today) {
+      final session = ref.watch(sessionProvider);
+      ref.watch(sessionEpochProvider);
+      if (!session.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '账号权限已变化，请重新登录');
+      }
+      var active = true;
+      ref.onDispose(() => active = false);
+      final first = BusinessRange(
+        DateTime.utc(today.year, today.month, today.day - 2),
+        '日',
+      );
+      final last = BusinessRange(today, '日');
+      return readCompleteList(
+        ref.watch(repositoryProvider),
+        'logs',
+        Query(ownerId: session.id, from: first.from, to: last.to),
+        isActive: () => active,
+      );
+    });
+
 final logDayRecordsProvider = FutureProvider.autoDispose
     .family<PageResult, (String, String?)>((ref, key) {
       var active = true;

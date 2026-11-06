@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/tenure.dart';
 import 'package:pandora_mobile/data/repositories/complete_list.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
@@ -247,6 +248,21 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                               spacing: 12,
                               runSpacing: 6,
                               children: [
+                                _memberInfo(
+                                  '入职日期',
+                                  employmentDateLabel(
+                                    member.fields['employmentStartDate'],
+                                  ),
+                                ),
+                                _memberInfo(
+                                  '工龄',
+                                  tenureLabel(
+                                    parseEmploymentDate(
+                                      member.fields['employmentStartDate'],
+                                    ),
+                                    shanghaiWallTime(DateTime.now()),
+                                  ),
+                                ),
                                 _memberInfo(
                                   '职位',
                                   member.fields['position'] ??

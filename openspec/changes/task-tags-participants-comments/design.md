@@ -1,5 +1,7 @@
 ## Context
 
+当前多标签目标按 `specs/task-labels/spec.md` 及 `docs/backend-interface.md` 的统一集成兼容约定执行，任务支持零/一/多个标签；下文单标签主键和上限说明仅为早期设计，已被V30多标签关联替代。2026-11-05验收对齐继续使用多标签目标，不修改已发布迁移。
+
 任务模块当前把 `tasks.owner_id` 作为主负责人，并以 `task_assignees.kind` 区分 `PRIMARY`/`COLLABORATOR`；任务创建直接写入 `tasks`，通用修订和转派/改期才走复核。该实现既无法表达无角色参与人集合，也不能满足创建、修改和删除必须审核的要求。`review_requests` 已支持候选值、申请/审核记录、禁止自审和事务内调用业务生效器，适合承载任务治理，但其种类约束和任务业务生效器需以前向迁移扩展。
 
 ## Goals / Non-Goals

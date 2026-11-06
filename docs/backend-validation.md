@@ -1,6 +1,63 @@
 # 后端验证与验收入口
 
-本文件集中维护验证命令、最新已记录结果与限制。最新完整自动化为下节2026-11-05整合验收（实现修正提交117f2db，后合并PR #70）；2026-10-29/30联调仅为历史，不据此报告当前失败数。文档整理未重跑业务测试，不能把历史通过外推到新业务代码或当前在线环境。
+需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
+
+## APP验收对齐修复（2026-11-05，尚未合并发布）
+
+基线为 `e5bc21557618a8c1d331eea3ab5578b8661d70f0`，分支 `fix/53-app-acceptance-alignment`；关联Issue #53、#28、#58、#60、#63。用户明确的三项覆盖旧要求：任务管理只读完成情况、五行折叠、同页人员树。任务和证据分别维护在对应OpenSpec与本入口，不新建平行验收报告。
+
+- A/H：补齐近三天上海业务日分区、跨午夜/回前台/提交/通知刷新、历史筛选，恢复任务管理完成情况及真实派发时间、多人员/多标签折叠；摘要非消息区域可进入完整列表。完成情况来自服务端正式phase，未知/空值不伪装完成；dispatchAt只取真实派发事件。列表权限和派发表单禁状态不变。
+- B：同页部门→团队→人员树，稳定ID多选确认/取消、搜索路径、会话失效及小屏键盘避让；沿用服务端组织和标签校验。
+- C/D：≤5项全显，>5前4项与总数减4的+N；完整日清单、邻月只读任务、跨周同ID、独立节假日/候选行，保留抓取日、版本、幂等和审核策略。
+- T：现有独立本人todo和任务看板链路复验；新增修复跨客户端完成排序/数量变化后的OFFSET分页漏项。检测不一致后保留列表并自动重读一次，失败可手动重试，旧会话响应被丢弃。
+- 恢复来源：核对 `4a1885fd1833f2073903095879b5f616ffc78ef5` 的patch和完整树，不包含近三天或完成情况列。相应代码在 `C:/Users/念/.codex/worktrees/member-a-verification/Grade3_Work` 的未提交修改中；仅只读参考，未改该工作树，不能据指定SHA断言合并丢代码。
+
+环境：Windows/PowerShell、Java21、Maven3.9.15、D:/flutter、Docker隔离PostgreSQL/Redis/Neo4j；Android模拟器Pixel_8_Pro另行运行。证据均在忽略的 `output/`，其中fixture与临时定义含合成测试凭证，不提交或外传。
+
+| 检查 | 本批实际结果 | 证据位置 |
+| --- | --- | --- |
+| `scripts/test-backend.ps1 -KeepContainers` | 退出1；513项，1失败、2错误、1跳过。失败为本批派发时间断言比较毫秒JSON与微秒DB，已修正；2错误为年度场景既有日期缺陷，见#73 | `output/app-acceptance/backend.log`、`backend-initial-reports/` |
+| 干净隔离后端重点复验 | 通过MAVEN_ARGS选择BackendIntegrationTest、TaskDispatchIntegrationTest、TaskQueryServiceTest、OpenApiSerializationTest、PersonalTodoIntegrationTest、MultiFounderReviewIntegrationTest、OrganizationIntegrationTest，再执行原test-backend脚本；95项全部通过、退出0，JAR打包成功 | `output/app-acceptance/backend-clean-recheck.log` |
+| `flutter analyze --no-pub` | 全项目最终无问题、退出0；末次todo边界修复后两文件定向分析通过 | `output/app-acceptance/flutter-final-analyze.log`、`todo-partial-refresh-analyze.log` |
+| `scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat` | 最终HTTP55、Mock403通过；6个opt-in跳过，退出0；此后仅末页失败边界一处修正，按下一行定向补验 | `output/flutter-regression/{http.log,mock.log,exit-codes.json}` |
+| todo并发分页定向回归 | 先18项通过，再补三页局部刷新/末页失败回归，最终19项通过、退出0；覆盖重排、总数变化、重读失败重试、切号以及61条稳定列表保留 | `output/app-acceptance/todo-partial-refresh-test.log` |
+| `scripts/test-home-todos-live.ps1` | 退出0；Flutter UI→真实HTTP→PostgreSQL，事项新增/重登/完成恢复/跨日编辑/删除、他人不可读写、甲乙12条共同参与任务及外人空看板；运行时OpenAPI重新导出 | `output/workpanel-home-live-d86649e8a5/` |
+| `scripts/test-calendar-live.ps1 -SkipBuild -CrowdedTarget -Device emulator-5554` | 两次退出1，均未完成正式移动/审核链路；连续取消后的再次长按失败，第二次有坐标/状态和截图诊断。设备图像与采样日期错位，尚不能确认产品/测试根因，不计Android通过 | `output/calendar-live-375094a7ab/`、`output/calendar-live-c179c4c309/` |
+| 真实HTTP release APK | 构建退出0；0.1.6 / 20261109，120976423字节；apksigner验证退出0，为Android Debug内部测试签名；API为仓库现有 `http://39.96.84.51/api`，未部署本批后端，不能代表匹配环境签收 | `output/app-acceptance/releases/pandora-app-acceptance-0.1.6.apk`、`apk-release.log`、`apk-signature.log` |
+| `npm ci` / `npm run build` | 均退出0 | `output/app-acceptance/web-{install,build}.log` |
+| `openspec.cmd validate --all --strict` / 文档链接 / 差异 | 46项通过、退出0；28份受影响Markdown的本地链接无缺失；最终diff另在提交前复核 | `output/app-acceptance/openspec-final.log` |
+
+候选APK SHA-256：`2e5da45a871506babaaf382ff9b31042a895cc169ee56cacfedb47a2e95b088c`。仅本地构建，未发布；正式候选须从实际合并提交重建并使用匹配后端验收。
+
+后端第一次定向复验曾复用已初始化测试库，因初始管理员密码已变更产生级联失败（`backend-recheck.log`）；未以此修改认证或放宽测试。上表95项结果来自重新创建并清理的干净隔离数据环境。
+
+非功能已覆盖安全/隐私（跨公司、待确认、本人todo与组织隔离、自审禁止）及可靠性（幂等重放、版本冲突、并发审核/重路由、跨页一致性恢复）；这不替代设备性能与TalkBack人工验证。
+
+未解决：Issue #73 的年度V1演示初始化随日期滚动插入空审核人，新空库显式annual-2026和完整后端回归仍阻塞；不改已发布V1、不伪造夹具掩盖。Android拖动集成链路尚未通过；非作者审阅、合并提交干净构建、实际候选APK全部41项签收、实体设备/TalkBack及完整人工/性能矩阵仍未完成。本批未合并、未部署，不宣称全部APP验收通过。
+
+2026-11-05 首页样式与入口定向增量：删除每日事项右下方日期按钮，年月标题打开1900–2100年月滚轮，确认切到所选月1日、取消不变；双摘要改低饱和信纸细横线/小折角；移除日志页任务管理快捷按钮。Windows/D:/flutter 下，`flutter test --no-pub --concurrency=1 test/personal_todos_test.dart test/home_prototype_layout_test.dart test/home_summary_navigation_test.dart` 34项通过、退出0；`flutter test --no-pub test/recent_logs_acceptance_test.dart` 6项通过、退出0；受影响4份源码、首页主题及2份测试的定向 `dart analyze` 无问题、退出0。覆盖320/360/390/480宽、1.0/1.5字号、年月确认/取消/上界、事项与摘要交互及日志原功能；源码差异检查通过。日志见 `output/home-prototype/home-stationery-{recheck,logs-test}.log`，Flutter截图 `output/home-prototype/flutter-390-top.png`。首次统一运行被主线程正在编辑的人员目录fold类型错误阻塞，修复由主线程完成后日志测试已复验通过；初次年月测试控件定位错误也已更正复验。此增量尚未独立重建/安装APK，未提交或推送，工作区包含其他并行修改，不把组件截图当作真机验收。
+
+## 公司月历节日本日与离线兜底（2026-11-05，未发布）
+
+沿用 `fix/53-app-acceptance-alignment` / HEAD `e5bc215` 的未提交工作区，关联既有Issue #60。用户本次要求覆盖旧星标/逐日假期名称：只在节日本日显示名称，无星标；联网取现有公告的休/班并持久缓存，断网以缓存和本地历法兜底，不推算行政调休。服务端接口/数据库未改，新增锁定依赖lunar 1.7.8（MIT，许可证随客户端保留）；最终产品口径见[月历主题](member-d-calendar.md)。
+
+- Windows/PowerShell、D:/flutter（3.38.7），`flutter test --no-pub --dart-define=USE_MOCK=true test/holiday_data_test.dart test/member_d_calendar_test.dart test/calendar_month_preview_test.dart test/calendar_preview_lane_test.dart test/calendar_drag_widget_test.dart`：56项通过，退出0。覆盖2024–2026公农历/清明、除夕、重合/闰月、1900/2100边界、跨年、联网/断网/缓存损坏/存储失败、360dp及1.4倍字号、五行折叠与拖动候选。证据 `output/app-acceptance/holiday-tests-recheck.log`。
+- `flutter test --no-pub --dart-define=USE_MOCK=false test/holiday_http_test.dart`：1项通过，退出0；真实StreamProvider→HttpRepository/Dio→合成HTTP适配器及SharedPreferences测试存储，验证既有URL/相邻年度查询、跨provider会话恢复、联网刷新及缓存不含token。未连接真实供应商，也不等于Android系统持久存储已验收。证据 `output/app-acceptance/holiday-http-test.log`；已加入 `scripts/test-flutter.ps1` 的HTTP分组。
+- 初始 `flutter analyze --no-pub` 全项目无问题、退出0；最终布局修复和HTTP测试补齐后，`dart analyze` 对两个受影响实现和三个测试文件无问题、退出0。证据 `holiday-analyze.log`、`holiday-final-analyze.log`。`openspec.cmd validate --all --strict` 46项通过、退出0，证据 `holiday-openspec.log`。
+- 初轮55项通过、1项长任务拖动失败：新增提示行改变网格高度。已把提示移至现有星期标题装饰区域，保持网格高度与命中几何，再执行完整上述56项全部通过，未改拖动断言。安全/隐私验证公共缓存不含token；可靠性验证慢网立即显示本地节日、无缓存/坏缓存/磁盘失败和重新联网恢复。
+- 未进行本轮后端全量回归、APK重建、真实上游/实体Android断网重启、TalkBack或正式部署；仍须按D04/D05人工签收。工作区含本轮前已有大量混合改动，依据AGENTS自动推送前置规则，不自动提交或推送整个工作区，保留原有改动。
+
+## 任务表格、表单对齐与消息摘要（2026-11-05，未发布）
+
+工作区沿用 `fix/53-app-acceptance-alignment` / HEAD `e5bc215`，保留已有混合改动。参与人改用主题浅色胶囊、标签未选中即可预览服务端背景色、共用派发表单字段名按图标高度居中。检查共用SectionHeader、通用表单、事项编辑及日志标题后，其他既有居中行/标准label布局未发现相同顶部字段名问题。消息副标题优先已有内容，否则复用授权详情读取及itemProvider缓存刷新，失败明确提示，不新增接口/迁移。
+
+用户中途明确要求停止测试，仅确认编译，由用户自行验收。此后未继续执行测试；先前测试过程不作为本轮完整签收结论。`flutter build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://127.0.0.1:8080/api` 实际退出0，Gradle assembleDebug成功，产物 `mobile/build/app/outputs/flutter-apk/app-debug.apk`，220308865字节；日志 `output/app-acceptance/ui-details-build.log`。API需模拟器 `adb reverse tcp:8080 tcp:8080`。本轮没有安装/人工操作验证、发布、提交或推送；真实界面、读屏和消息名称由用户安装签收。
+
+### 标签颜色覆盖及节日标题位置补修
+
+随后按用户截图修复Material3全局ChipTheme.color覆盖单个标签背景的问题：FilterChip显式设置各状态为目录颜色，文字及勾选按底色明暗显示，去除表面染色。节日本日名称移至日期数字右侧同排加粗，窄格缩放，休/班独立放到下方；任务行及折叠计算不变。继续遵循用户只编译、不测试的要求。同一真实HTTP/本地8080参数执行 `flutter build apk --debug --no-pub`，退出0、assembleDebug成功；日志 `output/app-acceptance/label-colors-calendar-header-build.log`。当前同路径APK为258263674字节，替代上一包；未执行测试或安装签收。混合工作区不自动提交/推送。
+
+后续按用户截图将休/班固定于日期格右上角，并按系统字号为日期/加粗节日名称预留标记宽度，禁止换到下一行；上段“下方”布局为已替代版本。仍只执行同参数Debug APK编译，退出0，日志 `output/app-acceptance/calendar-corner-badge-build.log`；同路径APK已更新，未执行测试或安装验收。
 
 ## 五个 PR 集成与发布（2026-11-04）
 
@@ -31,8 +88,27 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 
 ## 当前待处理项
 
-2026-10-30 的 442 项、49 失败、1 错误为历史结果；当前整合基线的完整后端回归已由上述 511 项、零失败零错误结果更新。目标设备、外部 DeepSeek/OCR、性能与无障碍仍有未验收范围，保留对应历史记录中的具体限制。
+### 前批草稿 PR 验证记录（2026-11-06，69f6c60）
+
+工作分支 `fix/53-app-acceptance-alignment`，比较基线 `e5bc21557618a8c1d331eea3ab5578b8661d70f0`；包含上述验收修复及随后首页、人员目录UI修改。前文APK及旧批次通过记录不能代表最新工作树已通过完整验收。
+
+- 最新 `scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat`：HTTP56项通过、退出0；Mock447项通过、6项opt-in跳过、4项失败、退出1。证据 `output/flutter-regression/{http.log,mock.log,exit-codes.json}`；人员目录旧平铺与部门下拉两项断言已按批准的目录交互更新，随后定向复验通过；另两项 `member_d_calendar_test` 的联网/缓存离线布局仍有右侧14px溢出，未解决。
+- `flutter test --no-pub --dart-define=USE_MOCK=true test/personnel_directory_test.dart test/management_analytics_http_test.dart test/week5_ui_acceptance_test.dart --reporter expanded`：24项通过、退出0，覆盖原记录条/资料路由、目录身份分组和搜索、失败重试、320dp/大字号及选择清空。证据 `output/home-prototype/people-implementation/affected-regression.log`。上述旧断言修正后未重跑完整回归，不能将原全量结果改写为全通过。
+- 人员目录定向分析无问题、退出0，规划阶段OpenSpec严格校验46项通过、退出0；证据 `output/home-prototype/people-implementation/{analyze.log,openspec-plan.log}`。最新整批静态及规范检查以PR补充的实际结果为准。
+- PR整理时再次严格校验：46项通过、退出0，证据 `output/pr-openspec.log`。全项目分析首轮退出1，仅发现首页及其测试3处缺少if花括号的info；已补充花括号，不改变分支行为。`flutter analyze --no-pub` 复验无问题、退出0，证据 `output/pr-flutter-analyze-final.log`；该纯样式补修后未重跑业务测试或重建APK。
+- 人员展示保留原记录条与导航，选择器沿用服务端授权分页和资格筛选；没有新增数据库迁移。此次最新UI未重新构建安装APK、未完成设备人工验收；后端95项重点复验、年度初始化#73、真实Android拖动阻塞仍按前文范围记录。
+
+2026-10-30 的 442 项、49 失败、1 错误，以及此前整合批次的511项、零失败零错误均为历史结果。本批完整回归与重点复验以文首APP验收对齐记录为准，年度初始化#73和Android月历链路尚有阻塞；目标设备、外部DeepSeek/OCR、性能与无障碍仍有未验收范围，保留对应历史记录中的具体限制。
 
 历史测试 JVM 等待退出后被强制结束的诊断仍见 [专项安全回归](member-b-security-regression.md)；构建成功不能据此宣称优雅退出已验证。旧数据库转换只允许按工具支持的已知历史先备份、恢复副本再校验，不改写已发布 Flyway 脚本或直接 repair 业务库。
 
-后续结果更新现有主题文档或 Issue/PR，必须提供代码基线、环境、命令、明确退出码、结果及限制。过程日志与截图放被忽略的 `output/`。本次仓库清理没有运行功能测试，也没有部署或数据库修改。
+后续结果更新现有主题文档或 Issue/PR，必须提供代码基线、环境、命令、明确退出码、结果及限制。过程日志与截图放被忽略的 `output/`。此前仓库文档清理没有运行功能测试、部署或修改数据库；本批修复的测试范围见文首，不继承清理批次的状态。
+
+### 黄色主题与年度增量：当前编译和数据库核对（2026-11-06）
+
+沿用 PR #74，previous head `69f6c60f1b4eb6182f3ca89056bd1a563d7cfcad`。本次按用户要求不运行测试套件，历史测试失败记录不能改写为通过。
+
+- `mvn.cmd -B -f server/pom.xml '-Dmaven.test.skip=true' package`：退出 0，JAR 已生成；证据 `output/yellow-theme/member-enrichment-backend-build.log`。
+- `flutter.bat build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://39.96.84.51/api`：退出 0；证据 `output/yellow-theme/public-mobile-build.log`。这是公网后端版本，设备运行未验收。
+- 本地实际数据库 V4/V5 已成功，创始人 4 名、场景成员未分配 0、在职个人资料缺失 0，每位在职普通员工有 8 条新增月历重叠计划。备份及执行证据见[年度场景](annual-scenario-rebuild.md)。
+- 原月历折叠/拖动逻辑保持；统计页、黄色主题、各子页及历史 14px 溢出等仍需用户设备验收，未将编译当作功能验收。云端部署结果以本次实际操作记录更新。

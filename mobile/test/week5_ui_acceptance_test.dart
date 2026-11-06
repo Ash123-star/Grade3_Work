@@ -193,10 +193,20 @@ void main() {
         await capture('08-profile');
         router.push('/me/people');
         await settle();
-        expect(
-          find.byKey(const ValueKey('personnel-department:全部部门')),
-          findsOneWidget,
-        );
+        final department = find.byWidgetPredicate((w) =>
+            w.key is ValueKey<String> &&
+            (w.key as ValueKey<String>).value.startsWith('personnel-department-'));
+        expect(department, findsWidgets);
+        await t.tap(department.first);
+        await settle();
+        final team = find.byWidgetPredicate((w) =>
+            w.key is ValueKey<String> &&
+            (w.key as ValueKey<String>).value.startsWith('personnel-team-'));
+        expect(team, findsWidgets);
+        await t.tap(team.first);
+        await settle();
+        expect(find.byWidgetPredicate((w) => w.key is ValueKey<String> &&
+            (w.key as ValueKey<String>).value.startsWith('personnel-record-')), findsWidgets);
         await capture('09-personnel');
         router.go('/me/tasks');
         await settle();

@@ -2,7 +2,7 @@
   "openapi" : "3.1.0",
   "info" : {
     "title" : "企业协作智能面板 API",
-    "description" : "UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表不提供完成情况。分页 cursor 是非负偏移量。",
+    "description" : "UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表以只读phase反映正式完成情况，派发表单不接受状态。分页 cursor 是非负偏移量。",
     "version" : "1.0.0"
   },
   "servers" : [ {
@@ -1426,7 +1426,7 @@
       "get" : {
         "tags" : [ "task-controller" ],
         "summary" : "范围内任务列表",
-        "description" : "在服务端组织数据范围内分页查询已生效任务。列表项仅为 TaskListItem，永不返回负责人、协作人、阶段、完成情况、进度、正文或事件。",
+        "description" : "在服务端公司和组织数据范围内分页查询已生效任务。列表项为TaskListItem，phase只读反映正式流转，dispatchAt为真实派发事件时间；不返回历史负责人、协作人、正文或事件，未生效候选不改变正式phase。",
         "operationId" : "list",
         "parameters" : [ {
           "name" : "cursor",
@@ -20766,7 +20766,7 @@
       "TaskListItem" : {
         "type" : "object",
         "additionalProperties" : false,
-        "description" : "任务列表安全投影；不返回 owner、collaborator、phase、status、completion、progress、正文、事件或任何替代状态字段。",
+        "description" : "任务列表授权投影；phase供任务管理完成情况只读展示，不返回 owner、collaborator、status、completion、progress、正文或事件；派发表单不接受任何状态字段。",
         "properties" : {
           "id" : {
             "type" : "string",
@@ -20781,7 +20781,7 @@
             "maxLength" : 20000
           },
           "start_at" : {
-            "type" : "string",
+            "type" : [ "string", "null" ],
             "format" : "date-time"
           },
           "deadline" : {
@@ -20797,6 +20797,12 @@
           "label" : {
             "$ref" : "#/components/schemas/TaskLabel"
           },
+          "labels" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TaskLabel"
+            }
+          },
           "version" : {
             "type" : "integer",
             "format" : "int32",
@@ -20811,8 +20817,18 @@
             "description" : "当前用户个人置顶"
           },
           "pinnedAt" : {
-            "type" : "string",
+            "type" : [ "string", "null" ],
             "format" : "date-time"
+          },
+          "phase" : {
+            "type" : [ "string", "null" ],
+            "description" : "只读正式流转：待接收/进行中/待验收/已验收/已归档/已撤回；未知值按情况未知展示，退回事件回到RECEIVED",
+            "enum" : [ "DISPATCHED", "RECEIVED", "FEEDBACK", "ACCEPTED", "ARCHIVED", "WITHDRAWN", null ]
+          },
+          "dispatchAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time",
+            "description" : "最早真实DISPATCHED事件时间，缺失为null，不能用created_at补造"
           },
           "capabilities" : {
             "type" : "object",

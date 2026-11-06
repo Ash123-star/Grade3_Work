@@ -15,15 +15,16 @@ public class HolidayService {
     public record Snapshot(int year,List<Day> days,List<String> papers,String status,String fetchedAt) {}
     interface Source { String fetch(int year) throws Exception; }
     private record Entry(Snapshot data,Instant retryAt) {}
-    private final Map<Integer,Entry> cache=new HashMap<>();
+    private final Map<Integer,Entry> cache=new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<Integer,Object> yearLocks=new java.util.concurrent.ConcurrentHashMap<>();
     private final Clock clock; private final Source source; private final ObjectMapper json;
     @org.springframework.beans.factory.annotation.Autowired
     public HolidayService(ObjectMapper json) {
         this(json,Clock.systemUTC(),HolidayService::fetchPublicYear);
     }
     static String fetchPublicYear(int year) throws Exception {
-        var request=HttpRequest.newBuilder(URI.create("https://api.github.com/repos/NateScarlet/holiday-cn/contents/"+year+".json"))
-                .header("Accept","application/vnd.github.raw+json").header("User-Agent","Pandora-Holiday-Calendar")
+        var request=HttpRequest.newBuilder(URI.create("https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/"+year+".json"))
+                .header("Accept","application/json").header("User-Agent","Pandora-Holiday-Calendar")
                 .timeout(Duration.ofSeconds(6)).GET().build();
         try(var client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()) {
             var response=client.send(request, info -> new LimitedBody());
@@ -51,8 +52,10 @@ public class HolidayService {
 
     HolidayService(ObjectMapper json,Clock clock,Source source) { this.json=json; this.clock=clock; this.source=source; }
     /** Bounded annual cache; repeated failures are throttled, last valid data retained. */
-    public synchronized Snapshot year(int year) {
+    public Snapshot year(int year) {
         if(year<2007||year>2100) throw ApiError.bad("INVALID_YEAR","年份须在2007至2100之间");
+        // Coalesce the same year without serializing adjacent-year network requests.
+        synchronized(yearLocks.computeIfAbsent(year, ignored -> new Object())) {
         Instant now=clock.instant(); var old=cache.get(year);
         if(old!=null&&now.isBefore(old.retryAt())) return old.data();
         Snapshot result; Duration delay;
@@ -64,6 +67,7 @@ public class HolidayService {
             delay=Duration.ofMinutes(5);
         }
         cache.put(year,new Entry(result,now.plus(delay))); return result;
+        }
     }
     Snapshot parse(int year,String body,Instant now) throws Exception {
         var root=json.readTree(body);

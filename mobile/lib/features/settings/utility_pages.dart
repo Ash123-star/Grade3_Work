@@ -13,6 +13,7 @@ import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
 import 'diary_sync_page.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -23,45 +24,95 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool exiting = false;
   String? exitError;
+  Widget _settingRow(
+    String icon,
+    String title,
+    String? subtitle,
+    VoidCallback onTap,
+  ) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    leading: TuantuanIcon(icon, size: 28),
+    title: Text(title),
+    subtitle: subtitle == null
+        ? null
+        : Text(
+            subtitle,
+            style: const TextStyle(fontSize: 12, color: CuteTokens.muted),
+          ),
+    trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+    onTap: onTap,
+  );
+
   @override
   Widget build(BuildContext context) => PageFrame(
     title: '设置',
     child: PageBody(
       children: [
-        const SectionHeader('阅读偏好'),
-        Text('文字大小 ${(ref.watch(fontScaleProvider) * 100).round()}%'),
-        Slider(
-          value: ref.watch(fontScaleProvider),
-          min: 1,
-          max: 1.5,
-          divisions: 5,
-          onChanged: (v) => ref.read(fontScaleProvider.notifier).state = v,
+        PaperSurface(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '阅读偏好',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Expanded(child: Text('文字大小')),
+                  Text('${(ref.watch(fontScaleProvider) * 100).round()}%'),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                '调整后应用于所有页面',
+                style: TextStyle(fontSize: 12, color: CuteTokens.muted),
+              ),
+              Slider(
+                value: ref.watch(fontScaleProvider),
+                min: 1,
+                max: 1.5,
+                divisions: 5,
+                onChanged: (v) =>
+                    ref.read(fontScaleProvider.notifier).state = v,
+              ),
+            ],
+          ),
         ),
-        ListTile(
-          title: const Text('帮助与新手引导'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/me/help'),
-        ),
-        ListTile(
-          title: const Text('修改密码'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => openForm(context, 'password'),
-        ),
-        ListTile(
-          title: const Text('隐私与数据'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/privacy'),
-        ),
-        ListTile(
-          title: const Text('草稿与同步'),
-          subtitle: const Text('查看本机草稿与服务器日志版本'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/conflict'),
-        ),
-        ListTile(
-          title: const Text('开源素材许可'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/licenses'),
+        const SizedBox(height: 18),
+        PaperSurface(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              _settingRow(
+                'person',
+                '个人资料',
+                null,
+                () => context.push('/me/profile'),
+              ),
+              const Divider(height: 1),
+              _settingRow(
+                'settings',
+                '修改密码',
+                null,
+                () => openForm(context, 'password'),
+              ),
+              const Divider(height: 1),
+              _settingRow(
+                'approval',
+                '隐私与数据',
+                null,
+                () => context.push('/privacy'),
+              ),
+              const Divider(height: 1),
+              _settingRow(
+                'report',
+                '开源素材许可',
+                null,
+                () => context.push('/licenses'),
+              ),
+            ],
+          ),
         ),
         if (AppConfig.mock &&
             ref.watch(sessionProvider).token == null &&
@@ -244,7 +295,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       ),
       'licenses' => (
         '素材与开源许可',
-        'Phosphor Icons：官方 phosphor-icons/core，MIT，导航与工作入口使用本地SVG。Forui 0.17.0：MIT，日历和角色标签沿用动漫橙主题。欢迎与个人页使用项目原创猫狗。用户已拒绝网络角色方案，当前界面不使用宝可梦角色图片。Untitled UI仅设计参考。\n\nOpenMoji，作者：HfG Schwäbisch Gmünd 及 OpenMoji contributors。来源：https://openmoji.org/ 。许可：CC BY-SA 4.0。原样使用六份SVG，未修改图形。',
+        'Phosphor Icons：官方 phosphor-icons/core，MIT，导航与工作入口使用本地SVG。Forui 0.17.0：MIT。当前品牌使用奶油黄主题及项目原创鸭系插画和功能图标，素材来源见随应用维护的清单。\n\nOpenMoji，作者：HfG Schwäbisch Gmünd 及 OpenMoji contributors。来源：https://openmoji.org/ 。许可：CC BY-SA 4.0。原样使用六份SVG，未修改图形。',
       ),
       'history' => ('历史修订与已读', '已提交版本与待审候选内容分别展示，审核通过后更新正式记录。'),
       'report' => ('周报与月报', '按所选业务日期区间聚合已提交日报。AI 摘要为建议草稿，发布前请核对来源。'),

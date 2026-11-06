@@ -141,7 +141,7 @@ class TaskDispatchIntegrationTest {
         assertEquals(taskId,call(200,"GET","/tasks/"+taskId,"alice",null,null).get("id").asText());
     }
 
-    /** 任务列表只使用白名单投影，不因不同生命周期泄露状态、完成或正文。 */
+    /** 列表展示正式流转phase和真实派发时间；组织范围和正文白名单保持有效。 */
     @Test void taskListUsesSafeProjectionAndOrganizationScope() throws Exception {
         String prefix="list-safe-"+UUID.randomUUID();
         String alice=dispatch("leader",body(prefix+"-alice","alice"),key()).get("id").asText();
@@ -150,14 +150,36 @@ class TaskDispatchIntegrationTest {
         var leaderPage=list(200,"search="+prefix+"&limit=10","leader");
         assertEquals(2,leaderPage.get("total").asInt());
         assertEquals(Set.of(alice,amy),Set.of(leaderPage.get("items").get(0).get("id").asText(),leaderPage.get("items").get(1).get("id").asText()));
-        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","labels","label","capabilities","pinned","pinnedAt");
+        Set<String> allowed=Set.of("id","issuer_id","title","start_at","deadline","version","created_at","phase","dispatchAt","participants","labels","label","capabilities","pinned","pinnedAt");
         for(JsonNode item:leaderPage.get("items")) {
             var names=new HashSet<String>(); item.fieldNames().forEachRemaining(names::add);
             assertEquals(allowed,names);
-            for(String hidden:List.of("phase","status","completion","progress","done","accepted","archived","withdrawn","body","events")) assertFalse(item.has(hidden),hidden);
+            assertEquals(item.get("id").asText().equals(alice)?"RECEIVED":"DISPATCHED",item.get("phase").asText());
+            var sent=(java.sql.Timestamp)db.one("SELECT min(created_at) AS sent FROM task_events WHERE task_id=? AND type='DISPATCHED'",item.get("id").asText()).get("sent");
+            assertEquals(sent.toInstant().toEpochMilli(),Instant.parse(item.get("dispatchAt").asText()).toEpochMilli());
+            for(String hidden:List.of("status","completion","progress","done","accepted","archived","withdrawn","body","events")) assertFalse(item.has(hidden),hidden);
         }
         var alicePage=list(200,"search="+prefix+"&limit=10","alice");
         assertEquals(1,alicePage.get("total").asInt()); assertEquals(alice,alicePage.get("items").get(0).get("id").asText());
+    }
+
+    /** 列表完成情况读取生效阶段；退回回到待反馈，并保留归档和撤销的真实结果。 */
+    @Test void listCompletionFollowsEffectiveLifecycleThroughReturnAndArchive() throws Exception {
+        String prefix="list-completion-"+UUID.randomUUID();
+        String task=dispatch("leader",body(prefix,"alice"),key()).get("id").asText();
+        String[] events={"RECEIVED","FEEDBACK","RETURNED","FEEDBACK","ACCEPTED","ARCHIVED"};
+        String[] phases={"RECEIVED","FEEDBACK","RECEIVED","FEEDBACK","ACCEPTED","ARCHIVED"};
+        for(int n=0;n<events.length;n++) {
+            String type=events[n];
+            event(task,Set.of("RECEIVED","FEEDBACK").contains(type)?"alice":"leader",type,n+1,"验收事实");
+            var item=list(200,"search="+prefix+"&limit=10","alice").get("items").get(0);
+            assertEquals(phases[n],item.get("phase").asText(),type);
+            assertEquals(task,item.get("id").asText());
+            assertFalse(item.has("body"));assertFalse(item.has("events"));
+        }
+        String withdrawn=dispatch("leader",body(prefix+"-withdrawn","amy"),key()).get("id").asText();
+        event(withdrawn,"leader","WITHDRAWN",1,"取消计划");
+        assertEquals("WITHDRAWN",list(200,"search="+prefix+"-withdrawn&limit=10","amy").get("items").get(0).get("phase").asText());
     }
 
     /** 越权负责人筛选和分页同样不能成为任务存在性探测通道。 */

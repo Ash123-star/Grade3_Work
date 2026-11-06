@@ -1,7 +1,7 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../theme/sunshine_palette.dart';
 
-/// Paths for the user-provided local illustration pack.
+/// Stable asset API: current sunshine artwork with legacy paths retained for rollback.
 class TuantuanAssets {
   static const paper = 'assets/generated_ui/backgrounds/paper_dots.png';
   static const workspace =
@@ -75,21 +75,32 @@ class TuantuanAssets {
   };
 
   static const icons = <String, String>{
-    'task': 'assets/generated_ui/icons/task.png',
-    'log': 'assets/generated_ui/icons/log.png',
-    'calendar': 'assets/generated_ui/icons/calendar.png',
-    'approval': 'assets/generated_ui/icons/approval.png',
-    'ai': 'assets/generated_ui/icons/ai.png',
-    'members': 'assets/generated_ui/icons/members.png',
-    'notification': 'assets/generated_ui/icons/notification.png',
-    'mindmap': 'assets/generated_ui/icons/mindmap.png',
-    'report': 'assets/generated_ui/icons/report.png',
-    'settings': 'assets/generated_ui/icons/settings.png',
-    'help': 'assets/generated_ui/icons/help.png',
-    'empty': 'assets/generated_ui/icons/empty.png',
-    'error': 'assets/generated_ui/icons/error.png',
-    'loading': 'assets/generated_ui/icons/loading.png',
-    'success': 'assets/generated_ui/icons/success.png',
+    'phone': 'assets/generated_ui/sunshine/icons/phone.png',
+    'email': 'assets/generated_ui/sunshine/icons/email.png',
+    'person': 'assets/generated_ui/sunshine/icons/person.png',
+    'birthday': 'assets/generated_ui/sunshine/icons/birthday.png',
+    'employment': 'assets/generated_ui/sunshine/icons/employment.png',
+    'tenure': 'assets/generated_ui/sunshine/icons/tenure.png',
+    'edit': 'assets/generated_ui/sunshine/icons/edit.png',
+    'identity': 'assets/generated_ui/sunshine/icons/identity.png',
+    'organization': 'assets/generated_ui/sunshine/icons/organization.png',
+
+    'home': 'assets/generated_ui/sunshine/icons/home.png',
+    'task': 'assets/generated_ui/sunshine/icons/task.png',
+    'log': 'assets/generated_ui/sunshine/icons/log.png',
+    'calendar': 'assets/generated_ui/sunshine/icons/calendar.png',
+    'approval': 'assets/generated_ui/sunshine/icons/approval.png',
+    'ai': 'assets/generated_ui/sunshine/icons/ai.png',
+    'members': 'assets/generated_ui/sunshine/icons/members.png',
+    'notification': 'assets/generated_ui/sunshine/icons/notification.png',
+    'mindmap': 'assets/generated_ui/sunshine/icons/mindmap.png',
+    'report': 'assets/generated_ui/sunshine/icons/report.png',
+    'settings': 'assets/generated_ui/sunshine/icons/settings.png',
+    'help': 'assets/generated_ui/sunshine/icons/help.png',
+    'empty': 'assets/generated_ui/sunshine/icons/empty.png',
+    'error': 'assets/generated_ui/sunshine/icons/error.png',
+    'loading': 'assets/generated_ui/sunshine/icons/loading.png',
+    'success': 'assets/generated_ui/sunshine/icons/success.png',
   };
 
   static const decorations = <String, String>{
@@ -151,14 +162,13 @@ class DogAssets {
   static const weekdayAvatars = <int>[3, 7, 8, 9, 10, 11, 15];
   static const todayAvatar = 14;
 
-  static String avatar(int index) =>
-      '$root/avatars/avatar_${_number(index)}.png';
-  static String pose(int index) => '$root/poses/pose_${_number(index)}.png';
-  static String background(int index) =>
-      '$root/backgrounds/background_${_number(index)}.png';
+  // Keep existing callers while migrating the visual identity as one family.
+  static String avatar(int index) => SunshineAssets.mascot('welcome');
+  static String pose(int index) => SunshineAssets.mascot(
+    index == resting ? 'empty' : index == sitting ? 'journal' : 'welcome',
+  );
+  static String background(int index) => SunshineAssets.mascot('assistant');
 
-  static String _number(int index) =>
-      (index % 16 + 1).toString().padLeft(2, '0');
 }
 
 class DogAvatar extends StatelessWidget {
@@ -233,77 +243,48 @@ Widget _missingDogArt(String path, {double? width, double? height}) {
   return SizedBox(width: width, height: height);
 }
 
-/// Raster borders keep their original proportions as blank centers stretch.
-/// Labels and interactions are always rendered by Flutter above this layer.
+/// Original brand illustrations. Decorative assets never represent user identity.
+abstract final class SunshineAssets {
+  static const root = 'assets/generated_ui/sunshine';
+  static String mascot(String name) => '$root/mascots/$name.png';
+}
+
+class SunshineMascot extends StatelessWidget {
+  const SunshineMascot({super.key, this.pose = 'welcome', this.size = 72});
+  final String pose;
+  final double size;
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: IgnorePointer(
+      child: Image.asset(
+        SunshineAssets.mascot(pose),
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => SizedBox.square(dimension: size),
+      ),
+    ),
+  );
+}
+
+/// Legacy skin callers receive a scalable code surface instead of raster borders.
 class TuantuanSkin extends StatelessWidget {
   const TuantuanSkin(this.path, {super.key, this.opacity = 1});
   final String path;
   final double opacity;
   @override
-  Widget build(BuildContext context) {
-    final name = path.split('/').last;
-    final (slice, size, scale) = name.startsWith('detail_')
-        ? (const Rect.fromLTRB(36, 38, 290, 152), const Size(360, 190), 3.0)
-        : name.startsWith('button_')
-        ? (const Rect.fromLTRB(92, 40, 208, 90), const Size(300, 130), 5.0)
-        : name.startsWith('filter_')
-        ? (const Rect.fromLTRB(65, 35, 235, 85), const Size(300, 120), 3.0)
-        : name.startsWith('pill_')
-        ? (const Rect.fromLTRB(48, 30, 192, 70), const Size(240, 100), 5.0)
-        : name.startsWith('cell_')
-        ? (const Rect.fromLTRB(45, 70, 175, 225), const Size(240, 280), 4.0)
-        : name.startsWith('metric_')
-        ? (const Rect.fromLTRB(85, 42, 275, 155), const Size(360, 220), 3.0)
-        : name.startsWith('toast_')
-        ? (const Rect.fromLTRB(105, 42, 285, 118), const Size(360, 160), 3.0)
-        : name == 'modal_panel.png'
-        ? (const Rect.fromLTRB(55, 50, 310, 210), const Size(360, 260), 2.0)
-        : name == 'bottom_sheet.png'
-        ? (const Rect.fromLTRB(55, 45, 305, 155), const Size(360, 220), 2.0)
-        : name.contains('_corner')
-        ? (const Rect.fromLTRB(72, 70, 170, 190), const Size(240, 260), 3.0)
-        : (const Rect.fromLTRB(50, 55, 190, 245), const Size(240, 300), 3.0);
-    return ExcludeSemantics(
-      child: IgnorePointer(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Very narrow calendar pills still need space for the stretch center.
-            final minimumScale = math.max(
-              scale,
-              math.max(
-                (size.width - slice.width) /
-                    math.max(1, constraints.maxWidth - 1),
-                (size.height - slice.height) /
-                    math.max(1, constraints.maxHeight - 1),
-              ),
-            );
-            // Binary scales avoid rounding in Flutter's exact nine-slice size
-            // check, and explicit dimensions fill loose icon-tray constraints.
-            final imageScale = math
-                .pow(2, (math.log(minimumScale) / math.ln2).ceil())
-                .toDouble();
-            return Opacity(
-              opacity: opacity,
-              child: Image.asset(
-                '${TuantuanAssets.newPack}/skins/$name',
-                width: constraints.maxWidth,
-                height: constraints.maxHeight,
-                centerSlice: Rect.fromLTRB(
-                  slice.left / imageScale,
-                  slice.top / imageScale,
-                  slice.right / imageScale,
-                  slice.bottom / imageScale,
-                ),
-                scale: imageScale,
-                fit: BoxFit.fill,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
-            );
-          },
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Opacity(
+      opacity: opacity,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: SunshinePalette.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: SunshinePalette.line),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 /// Decorative raster layer. Content and input remain available if it is absent.
@@ -326,7 +307,9 @@ class TuantuanArt extends StatelessWidget {
       child: Opacity(
         opacity: opacity,
         child: Image.asset(
-          path,
+          path.contains('/ai/')
+              ? SunshineAssets.mascot(path.contains('warning') ? 'empty' : 'assistant')
+              : path,
           width: width,
           height: height,
           fit: fit,
@@ -352,10 +335,13 @@ class TuantuanIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = TuantuanAssets.icons[name];
     if (path == null) return SizedBox(width: size, height: size);
-    return Semantics(
-      image: true,
-      label: '$name 图标',
-      child: Image.asset(path, width: size, height: size, fit: fit),
+    return ExcludeSemantics(
+      child: Image.asset(
+        path, width: size, height: size, fit: fit,
+        errorBuilder: (_, _, _) => Icon(
+          Icons.circle_outlined, size: size, color: SunshinePalette.accentInk,
+        ),
+      ),
     );
   }
 }
@@ -391,61 +377,13 @@ class TuantuanDecoration extends StatelessWidget {
   }
 }
 
+/// A quiet canvas keeps dense business content readable without corner artwork.
 class TuantuanPaperBackdrop extends StatelessWidget {
   const TuantuanPaperBackdrop({super.key, required this.child});
   final Widget child;
-
   @override
-  Widget build(BuildContext context) => Stack(
-    fit: StackFit.expand,
-    children: [
-      IgnorePointer(
-        child: Opacity(
-          opacity: .12,
-          child: Image.asset(TuantuanAssets.paper, fit: BoxFit.cover),
-        ),
-      ),
-      Positioned(
-        top: 0,
-        left: -12,
-        child: TuantuanArt(
-          TuantuanAssets.illustrationLayers['topLeft']!,
-          width: 112,
-          height: 112,
-          opacity: .48,
-        ),
-      ),
-      Positioned(
-        top: 0,
-        right: -10,
-        child: TuantuanArt(
-          TuantuanAssets.illustrationLayers['topRight']!,
-          width: 118,
-          height: 118,
-          opacity: .38,
-        ),
-      ),
-      Positioned(
-        bottom: 0,
-        left: -8,
-        child: TuantuanArt(
-          TuantuanAssets.illustrationLayers['bottomLeft']!,
-          width: 130,
-          height: 130,
-          opacity: .26,
-        ),
-      ),
-      Positioned(
-        bottom: 0,
-        right: -8,
-        child: TuantuanArt(
-          TuantuanAssets.illustrationLayers['bottomRight']!,
-          width: 145,
-          height: 145,
-          opacity: .34,
-        ),
-      ),
-      child,
-    ],
+  Widget build(BuildContext context) => ColoredBox(
+    color: SunshinePalette.canvas,
+    child: child,
   );
 }

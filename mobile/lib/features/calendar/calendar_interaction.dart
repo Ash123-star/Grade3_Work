@@ -253,7 +253,7 @@ class CalendarInteractionSurfaceState
         initial: seed,
         firstDate: constraints.min,
         lastDate: constraints.max,
-        title: '移动到日期（上海）',
+        title: '移动到日期',
       );
       if (!writable || generation != operation || target == null) return;
       final delta = businessDayDelta(seed, target);

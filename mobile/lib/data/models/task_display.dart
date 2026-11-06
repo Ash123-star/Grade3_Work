@@ -6,6 +6,28 @@ const taskTagLabels = <String, String>{
   'personal-today': '今日',
 };
 
+/// Completion is a projection of the server lifecycle, never a date estimate.
+/// A returned result goes back to RECEIVED; RETURNED itself is an event.
+const taskCompletionLabels = <String, String>{
+  'DISPATCHED': '待接收',
+  'RECEIVED': '进行中',
+  'FEEDBACK': '待验收',
+  'ACCEPTED': '已验收',
+  'ARCHIVED': '已归档',
+  'WITHDRAWN': '已撤回',
+};
+
+String taskCompletionLabel(Map<String, dynamic> fields) {
+  final phase = fields['phase'];
+  if (fields.containsKey('phase')) {
+    return taskCompletionLabels['$phase'] ?? '情况未知';
+  }
+  // Older local fixtures contain the explicit lifecycle label instead of phase.
+  final status = '${fields['status'] ?? ''}';
+  return taskCompletionLabels[status] ??
+      (taskCompletionLabels.containsValue(status) ? status : '情况未知');
+}
+
 String taskTagLabel(Map<String, dynamic> fields) {
   final labels = fields['labels'];
   if (labels is List) {
@@ -31,10 +53,14 @@ String taskTagLabel(Map<String, dynamic> fields) {
 }
 
 /// Forward-compatible display for optional multi-label responses; legacy label remains valid.
-List<String> taskTagNames(Map<String,dynamic> fields) {
-  final labels=fields['labels'];
-  if(labels is List) {
-    return labels.whereType<Map>().map((label)=>'${label['name']??''}'.trim()).where((name)=>name.isNotEmpty).toSet().toList();
+List<String> taskTagNames(Map<String, dynamic> fields) {
+  final labels = fields['labels'];
+  if (labels is List) {
+    return labels
+        .whereType<Map>()
+        .map((label) => '${label['name'] ?? label['title'] ?? ''}'.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
   }
   return [taskTagLabel(fields)];
 }

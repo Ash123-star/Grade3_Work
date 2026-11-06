@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'generated_assets.dart';
+import '../theme/sunshine_palette.dart';
 
 enum NoticeTone { info, success, warning, error }
 
@@ -29,27 +31,11 @@ void showAppNotice(
   entry = OverlayEntry(
     builder: (context) {
       final media = MediaQuery.of(context);
-      final (background, ink, icon) = switch (tone) {
-        NoticeTone.success => (
-          const Color(0xFFEAF6F0),
-          const Color(0xFF246447),
-          Icons.check_circle_outline,
-        ),
-        NoticeTone.error => (
-          const Color(0xFFFBEFEC),
-          const Color(0xFF963F38),
-          Icons.error_outline,
-        ),
-        NoticeTone.warning => (
-          const Color(0xFFFFF5E5),
-          const Color(0xFF805B24),
-          Icons.warning_amber_rounded,
-        ),
-        NoticeTone.info => (
-          const Color(0xFFEDF3F8),
-          const Color(0xFF365C78),
-          Icons.info_outline,
-        ),
+      final (ink, asset, status) = switch (tone) {
+        NoticeTone.success => (SunshinePalette.ink, 'success', '成功'),
+        NoticeTone.error => (SunshinePalette.error, 'error', '错误'),
+        NoticeTone.warning => (SunshinePalette.accentInk, 'notification', '注意'),
+        NoticeTone.info => (SunshinePalette.ink, 'help', '提示'),
       };
       return Positioned(
         top: media.padding.top + 12,
@@ -88,43 +74,79 @@ void showAppNotice(
                 child: Semantics(
                   liveRegion: true,
                   child: Material(
-                    color: background,
-                    elevation: 5,
-                    shadowColor: const Color(0x2232463E),
-                    borderRadius: BorderRadius.circular(16),
+                    color: const Color(0xFFFFFAF0),
+                    elevation: 4,
+                    shadowColor: const Color(0x335F471B),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: const BorderSide(color: Color(0xFFEADBB9)),
+                    ),
                     clipBehavior: Clip.antiAlias,
                     child: SingleChildScrollView(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 4, 2, 4),
+                        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
                         child: Row(
                           children: [
-                            Icon(icon, color: ink),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                text,
-                                style: TextStyle(
-                                  color: ink,
-                                  fontSize: 14,
-                                  height: 1.45,
-                                ),
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: SunshinePalette.butter,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Image.asset(
+                                TuantuanAssets.icons[asset]!,
+                                width: 28,
+                                height: 28,
+                                excludeFromSemantics: true,
                               ),
                             ),
-                            if (onAction != null)
-                              TextButton(
-                                onPressed: () {
-                                  close();
-                                  onAction();
-                                },
-                                child: Text(
-                                  actionLabel ?? '查看',
-                                  style: TextStyle(color: ink),
-                                ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Semantics(
+                                    label: '$status：$text',
+                                    excludeSemantics: true,
+                                    child: Text(
+                                      text,
+                                      style: TextStyle(
+                                        color: ink,
+                                        fontSize: 14,
+                                        height: 1.45,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  if (onAction != null)
+                                    TextButton(
+                                      onPressed: () {
+                                        close();
+                                        onAction();
+                                      },
+                                      child: Text(
+                                        actionLabel ?? '查看',
+                                        style: const TextStyle(
+                                          color: SunshinePalette.accentInk,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
+                            ),
                             IconButton(
                               tooltip: '关闭提示',
                               onPressed: close,
-                              icon: Icon(Icons.close_rounded, color: ink),
+                              constraints: const BoxConstraints(
+                                minWidth: 48,
+                                minHeight: 48,
+                              ),
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: SunshinePalette.muted,
+                                size: 18,
+                              ),
                             ),
                           ],
                         ),
@@ -192,12 +214,17 @@ class _FloatingFeedbackState extends State<FloatingFeedback> {
       return Align(
         alignment: Alignment.bottomRight,
         child: Material(
-          color: Theme.of(context).colorScheme.surface,
+          color: const Color(0xFFFFFAF0),
           elevation: 2,
           borderRadius: BorderRadius.circular(24),
           child: TextButton.icon(
             onPressed: () => setState(() => dismissed = false),
-            icon: const Icon(Icons.info_outline),
+            icon: Image.asset(
+              TuantuanAssets.icons['help']!,
+              width: 24,
+              height: 24,
+              excludeFromSemantics: true,
+            ),
             label: const Text('查看操作提示'),
           ),
         ),
@@ -206,9 +233,13 @@ class _FloatingFeedbackState extends State<FloatingFeedback> {
     return Semantics(
       liveRegion: true,
       child: Material(
-        color: Theme.of(context).colorScheme.surface,
-        elevation: 5,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFFFFFAF0),
+        elevation: 4,
+        shadowColor: const Color(0x335F471B),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFEADBB9)),
+        ),
         clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -228,6 +259,8 @@ class _FloatingFeedbackState extends State<FloatingFeedback> {
                 Row(
                   children: [
                     const SizedBox(width: 16),
+                    const SunshineMascot(size: 28),
+                    const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
                         '操作提示',

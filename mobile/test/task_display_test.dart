@@ -4,6 +4,52 @@ import 'package:pandora_mobile/data/models/task_display.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 
 void main() {
+  test(
+    'completion uses the authoritative lifecycle including unknown phases',
+    () {
+      const expected = {
+        'DISPATCHED': '待接收',
+        'RECEIVED': '进行中',
+        'FEEDBACK': '待验收',
+        'ACCEPTED': '已验收',
+        'ARCHIVED': '已归档',
+        'WITHDRAWN': '已撤回',
+      };
+      for (final entry in expected.entries) {
+        expect(taskCompletionLabel({'phase': entry.key}), entry.value);
+      }
+      expect(
+        taskCompletionLabel({'phase': 'RETURNED', 'status': '已验收'}),
+        '情况未知',
+      );
+      expect(
+        taskCompletionLabel({'phase': 'NEW_PHASE', 'status': '已验收'}),
+        '情况未知',
+      );
+      expect(taskCompletionLabel({'status': '进行中'}), '进行中');
+      expect(taskCompletionLabel({'deadline': '2020-01-01'}), '情况未知');
+      expect(taskCompletionLabel({'phase': null, 'status': '已验收'}), '情况未知');
+    },
+  );
+
+  test(
+    'multi-label display preserves zero labels and complete label names',
+    () {
+      expect(taskTagNames({'labels': []}), isEmpty);
+      expect(taskTagNames({'tagName': '旧标签'}), ['旧标签']);
+      expect(
+        taskTagNames({
+          'labels': [
+            {'id': 'a', 'name': '设计'},
+            {'id': 'b', 'name': '研发'},
+            {'id': 'c', 'name': '设计'},
+          ],
+        }),
+        ['设计', '研发', '设计'],
+      );
+    },
+  );
+
   test('known tags stay Chinese and unknown tags do not expose IDs', () {
     expect(taskTagLabel({'tagId': 'department-research'}), '研发');
     expect(taskTagLabel({'tag_id': 'department-design'}), '设计');
