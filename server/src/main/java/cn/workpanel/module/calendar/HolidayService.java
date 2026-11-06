@@ -23,13 +23,28 @@ public class HolidayService {
         this(json,Clock.systemUTC(),HolidayService::fetchPublicYear);
     }
     static String fetchPublicYear(int year) throws Exception {
-        var request=HttpRequest.newBuilder(URI.create("https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/"+year+".json"))
-                .header("Accept","application/json").header("User-Agent","Pandora-Holiday-Calendar")
-                .timeout(Duration.ofSeconds(6)).GET().build();
         try(var client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()) {
-            var response=client.send(request, info -> new LimitedBody());
-            if(response.statusCode()!=200) throw new IllegalStateException("source unavailable");
-            return new String(response.body(),java.nio.charset.StandardCharsets.UTF_8);
+            Exception failure=null;
+            // The cloud can reach Contents while raw resets; local networks can hit
+            // the anonymous Contents limit. Both addresses serve the same public file.
+            for(String address:List.of(
+                    "https://api.github.com/repos/NateScarlet/holiday-cn/contents/"+year+".json",
+                    "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/"+year+".json")) {
+                try {
+                    var request=HttpRequest.newBuilder(URI.create(address))
+                            .header("Accept","application/vnd.github.raw+json").header("User-Agent","Pandora-Holiday-Calendar")
+                            .timeout(Duration.ofSeconds(3)).GET().build();
+                    var response=client.send(request, info -> new LimitedBody());
+                    if(response.statusCode()==200)
+                        return new String(response.body(),java.nio.charset.StandardCharsets.UTF_8);
+                    failure=new IllegalStateException("public calendar source returned "+response.statusCode());
+                } catch(InterruptedException interrupted) {
+                    throw interrupted;
+                } catch(Exception unavailable) {
+                    failure=unavailable;
+                }
+            }
+            throw new IllegalStateException("public calendar sources unavailable",failure);
         }
     }
     /** Cancel before buffering more than 256 KiB; the request deadline covers the full body. */

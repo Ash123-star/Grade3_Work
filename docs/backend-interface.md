@@ -173,4 +173,4 @@ GET /organization/people沿用原组织数据范围，追加可空team_name，�
 
 ### 中国大陆节假日月历（成员 D）
 `GET /api/calendar/holidays?year=2026`：已登录、已确认且无需强制改密的账号可读；沿用公共认证规则。year为2007至2100，越界400 `INVALID_YEAR`；缺失/格式错误400；未登录401、无业务访问权限403。只读幂等，无写入版本及分页。返回 `{year,days:[{date,name,isOffDay}],papers,status,fetchedAt}`；date为中国大陆业务日期，isOffDay=false表示公告指定的调休上班日。status为FRESH、STALE或UNAVAILABLE；fetchedAt为最后成功获取的UTC时间，无成功记录为空字符串。
-固定来源为 NateScarlet/holiday-cn 的固定 raw.githubusercontent.com 原始文件地址，保留国务院公告链接。缓存24小时；失败5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。同年请求合并、不同年份独立加载。客户端查询相邻公告年份处理跨年网格，提示仅针对可见年份；数据故障不阻塞任务。服务端响应上限256 KiB、完整请求6秒超时；无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。
+固定来源为同一 NateScarlet/holiday-cn 仓库：GitHub Contents API（raw Accept）优先，raw.githubusercontent.com 原始文件兜底，保留国务院公告链接。缓存24小时；两入口均失败时5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。同年请求合并、不同年份独立加载。客户端查询相邻公告年份处理跨年网格，提示仅针对可见年份；数据故障不阻塞任务。每入口仅请求一次、各3秒，合计请求预算6秒，流式响应上限256 KiB，连接超时2秒；中断立即停止。无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。

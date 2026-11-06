@@ -4,6 +4,16 @@
 
 关联 Issue：#44（文档维护，延续 #42 的云端更新）。
 
+## 2026-11-06 实际更新记录
+
+PR #74 已合并到 main，业务发布提交 `b3b0a3d4944e8941520e8af358b13661d3221d16`。用户明确豁免本次非作者审阅；本地前后端编译和 GitHub 构建检查通过，按要求没有运行测试套件。云端年度 V2–V6 实际成功，人员和任务核对见[年度场景](annual-scenario-rebuild.md)。
+
+云端 GitHub 直连 fetch 连接重置，因此使用本机 fetch 后生成的增量 Git bundle，经已认证 SSH 上传、校验依赖及 SHA 后快进云端 main。云端原有暂存 CI/Dockerfile 修改与两个备份文件均保留，更新前后补丁逐字节一致。构建在 `/opt/Grade3_Work-releases/<SHA>` 的干净 worktree 完成，没有把服务器私有修改混入镜像。
+
+`workpanel-backend:b3b0a3d` 镜像已生成并标记为 `workpanel-backend:local`。从镜像提取 JAR 后替换原 systemd 服务文件并重启实际 API；没有启动第二个 API 容器或重启数据库容器。服务 active/running、NRestarts=0，本机8080和移动端公网 `/api/health` 均返回 UP。原 JAR、配置、实际库及切换前二次备份位于 `/root/workpanel-backups/20261106-member-enrichment`，不要删除；新镜像存在不代表 API 已部署，仍须核对实际 JAR/进程。
+
+公网 APK 已覆盖安装到 `emulator-5554`，保留应用数据。首次公网登录可用；部署核对另发现 raw 域名在云端超时而 Contents API 可用，后续双入口修复及最终公网结果以对应 PR 的实际发布记录为准。此段是上述提交的运行证据，不代替用户设备界面验收。
+
 ## 适用环境与已确认事实
 
 2026-10-29 用户提供的服务器输出确认：
