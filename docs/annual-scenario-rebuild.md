@@ -177,9 +177,9 @@ SELECT name,color FROM task_labels WHERE company_id='annual-cm';
 
 每位在职普通员工追加 8 条 2026-11-06 开始、11 月 9—11 日结束的重叠排期，包含参与人、标签及派发事件，不生成未来完成记录或消息。用于验证原月历前四项加 `+N` 的折叠，界面行为未修改；用户设备验收仍待进行。
 
-2026-11-06 本地已备份并通过既有 `flyway_local_annual2026_history` 执行 V4/V5，历史到 V5 全部成功：主公司创始人 4 名、场景未分配成员 0、在职资料缺失 0、10 位在职普通员工各有 8 条新增重叠任务。证据 `output/yellow-theme/local-member-migration.log`，备份 `output/yellow-theme/before-member-enrichment-20261106-110213.dump`。初次 V4 试图更新历史事件，被只追加触发器拒绝并完整回滚；修正后成功，未 repair 或改写历史。
+2026-11-06 本地已备份并通过既有 `flyway_local_annual2026_history` 执行 V4/V5，随后 V6 也已成功，历史到 V6 全部成功：主公司创始人 4 名、场景未分配成员 0、在职资料缺失 0、10 位在职普通员工各有 8 条新增重叠任务。证据 `output/yellow-theme/local-member-migration.log`，备份 `output/yellow-theme/before-member-enrichment-20261106-110213.dump`。初次 V4 试图更新历史事件，被只追加触发器拒绝并完整回滚；修正后成功，未 repair 或改写历史。
 
-云端实际使用 `workpanel_annual2026`、独立历史 `flyway_annual2026_history`，原先只有 V1。本次部署前已备份实际库、原 JAR、服务配置和远端未提交补丁至 `/root/workpanel-backups/20261106-member-enrichment`。待合并及部署后核对 V2–V5；不能用本地迁移结果替代云端结果。新增创始人复用主创始人的既有密码摘要，不重置任何已有账号密码。
+云端实际使用 `workpanel_annual2026`、独立历史 `flyway_annual2026_history`，原先只有 V1。本次部署前已备份实际库、原 JAR、服务配置和远端未提交补丁至 `/root/workpanel-backups/20261106-member-enrichment`。待合并及部署后核对 V2–V6；不能用本地迁移结果替代云端结果。新增创始人复用主创始人的既有密码摘要，不重置任何已有账号密码。
 
 ## 回滚连接
 
