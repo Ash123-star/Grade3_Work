@@ -88,7 +88,7 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 
 ## 当前待处理项
 
-### 当前草稿PR验证状态（2026-11-06）
+### 前批草稿 PR 验证记录（2026-11-06，69f6c60）
 
 工作分支 `fix/53-app-acceptance-alignment`，比较基线 `e5bc21557618a8c1d331eea3ab5578b8661d70f0`；包含上述验收修复及随后首页、人员目录UI修改。前文APK及旧批次通过记录不能代表最新工作树已通过完整验收。
 
@@ -103,3 +103,12 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 历史测试 JVM 等待退出后被强制结束的诊断仍见 [专项安全回归](member-b-security-regression.md)；构建成功不能据此宣称优雅退出已验证。旧数据库转换只允许按工具支持的已知历史先备份、恢复副本再校验，不改写已发布 Flyway 脚本或直接 repair 业务库。
 
 后续结果更新现有主题文档或 Issue/PR，必须提供代码基线、环境、命令、明确退出码、结果及限制。过程日志与截图放被忽略的 `output/`。此前仓库文档清理没有运行功能测试、部署或修改数据库；本批修复的测试范围见文首，不继承清理批次的状态。
+
+### 黄色主题与年度增量：当前编译和数据库核对（2026-11-06）
+
+沿用 PR #74，previous head `69f6c60f1b4eb6182f3ca89056bd1a563d7cfcad`。本次按用户要求不运行测试套件，历史测试失败记录不能改写为通过。
+
+- `mvn.cmd -B -f server/pom.xml '-Dmaven.test.skip=true' package`：退出 0，JAR 已生成；证据 `output/yellow-theme/member-enrichment-backend-build.log`。
+- `flutter.bat build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://39.96.84.51/api`：退出 0；证据 `output/yellow-theme/public-mobile-build.log`。这是公网后端版本，设备运行未验收。
+- 本地实际数据库 V4/V5 已成功，创始人 4 名、场景成员未分配 0、在职个人资料缺失 0，每位在职普通员工有 8 条新增月历重叠计划。备份及执行证据见[年度场景](annual-scenario-rebuild.md)。
+- 原月历折叠/拖动逻辑保持；统计页、黄色主题、各子页及历史 14px 溢出等仍需用户设备验收，未将编译当作功能验收。云端部署结果以本次实际操作记录更新。
