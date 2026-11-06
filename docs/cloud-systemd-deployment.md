@@ -6,6 +6,12 @@
 
 ## 2026-11-06 实际更新记录
 
+消息刷新修复已按用户授权部署，代码提交 `bec842266a5be42e4d0587e065c3b4e5a30f569e`，草稿 PR #77；本次未请求合并 main，服务器切换至 `fix/53-notification-refresh`。本机已编译通过的 JAR 经 SSH 上传，Git bundle 校验所需祖先及目标 SHA 后更新源码，并建立同提交干净 release worktree。使用现有运行镜像作为基础，仅替换 JAR，生成 `workpanel-backend:bec8422` 并更新 `workpanel-backend:local`；镜像及线上 JAR SHA-256 均为 `f2d737d2d9fe52fe01c14aef08c423ed8ca62ea983d1421fab9df826cf590d4a`。未启动第二个 API 容器，实际服务仍由 systemd 管理。
+
+发布前备份、停写后二次备份均指向实际 `workpanel_annual2026` 库，`pg_restore --list` 校验成功；旧 JAR、服务配置及服务器私有补丁保存在 `/root/workpanel-backups/20261106-notification-bec8422`。新旧 JAR 中全部数据库迁移 SQL 逐字节相同，无新增迁移、未切换数据库；服务器既有暂存 CI/Dockerfile 修改前后补丁一致，原备份文件保留。重启后 active/running、NRestarts=0，内网及公网 `/api/health` 返回 UP；公网登录后的 `GET /notifications?limit=1&category=任务&unreadOnly=false&search=` 返回200，已核对单条分页、summary及全量unread字段，核对会话已退出。证据在本机忽略的 `output/yellow-theme/notification-{deployment-receipt,public-result}.json`，远端备份目录保留镜像构建日志。
+
+这次仅完成编译及必要的发布连通性核对，按用户要求未运行测试套件；设备刷新、前后台重放、权限和429冷却仍待用户手工验收。移动端需安装 `output/yellow-theme/workpanel-notification-refresh-debug.apk` 才会使用新的分页与刷新逻辑。回滚时恢复该备份中的 `previous.jar` 并重启原服务，镜像可回退 `workpanel-backend:983b7e7`；无需回滚数据库。
+
 PR #74 已合并到 main，业务发布提交 `b3b0a3d4944e8941520e8af358b13661d3221d16`。用户明确豁免本次非作者审阅；本地前后端编译和 GitHub 构建检查通过，按要求没有运行测试套件。云端年度 V2–V6 实际成功，人员和任务核对见[年度场景](annual-scenario-rebuild.md)。
 
 云端 GitHub 直连 fetch 连接重置，因此使用本机 fetch 后生成的增量 Git bundle，经已认证 SSH 上传、校验依赖及 SHA 后快进云端 main。云端原有暂存 CI/Dockerfile 修改与两个备份文件均保留，更新前后补丁逐字节一致。构建在 `/opt/Grade3_Work-releases/<SHA>` 的干净 worktree 完成，没有把服务器私有修改混入镜像。

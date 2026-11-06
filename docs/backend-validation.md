@@ -2,7 +2,7 @@
 
 需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
 
-## 消息刷新与限流修复（2026-11-06，未发布）
+## 消息刷新与限流修复（2026-11-06，已部署，设备待验收）
 
 基线 `3f9eb2d561e17a41f91fb22c80cbfd23da2361ff`，分支 `fix/53-notification-refresh`，关联 Issue #53。通知改为每页30条、显式加载更多，搜索/分类/未读筛选在服务端分页前执行，返回全量未读数及按当前任务/日志/审核权限读取的摘要。客户端移除逐条详情摘要请求；SSE事件2秒合并、刷新至少间隔5秒，按类型和对象刷新，连接成功/常规重连不再触发全局刷新，前后台重放保留尚未刷新的事件。限额仍为同账号120次/60秒，429返回剩余窗口的Retry-After，客户端共享冷却、缺失头默认60秒，不自动重放写入。无数据库迁移。
 
@@ -10,6 +10,7 @@
 - D:/flutter：`flutter.bat build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://39.96.84.51/api` 退出0，assembleDebug成功；证据 `output/yellow-theme/notification-refresh-mobile-build.log`，导出安装包 `output/yellow-theme/workpanel-notification-refresh-debug.apk`，289315802字节。受影响文件的`git diff --check`通过。
 - 规划阶段 `openspec.cmd validate --all --strict` 46项通过、退出0；证据 `output/yellow-theme/notification-refresh-spec.log`。本批只做编译验证，不运行测试套件、数据库/API或设备链路验收；分页变化、权限收回、通知密集到达、前后台重放与429恢复待用户验证。
 - 需要先更新后端以支持新的筛选和摘要，再安装对应APK；旧后端只提供旧字段，无法兑现完整筛选。用户随后明确授权将本次修复推送云端，提交仅纳入消息刷新修复；工作区既有指标JSON、Android运行配置及依赖锁文件的无关改动保留。实际部署结果见云端部署记录与对应PR。
+- 代码提交 `bec842266a5be42e4d0587e065c3b4e5a30f569e` 已部署，草稿PR #77，未合并main。镜像、线上JAR哈希一致，服务active/running、NRestarts=0，公网健康UP；登录后新版通知分页接口200，summary/unread字段存在，核对后退出会话。实际库与旧JAR已备份，迁移SQL未变化，未运行测试套件。详见[云端部署](cloud-systemd-deployment.md)；发布核对不等于刷新功能设备验收。
 
 ## 月历、日志与统计布局修复（2026-11-06，未发布）
 
