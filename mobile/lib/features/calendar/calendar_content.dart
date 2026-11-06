@@ -874,7 +874,7 @@ class _MonthGrid extends StatelessWidget {
           final height = availableHeight > 0
               ? availableHeight
               : constraints.maxWidth * 1.6;
-          final cellHeight = math.max(
+          final viewportCellHeight = math.max(
             0.0,
             (height - 16 - weekdayHeight) / weeks,
           );
@@ -888,6 +888,21 @@ class _MonthGrid extends StatelessWidget {
               MediaQuery.textScalerOf(context).scale(_monthRecordFontSize) *
                   1.15 +
               3;
+          final overflowBadgeHeight = math.max(
+            20.0,
+            MediaQuery.textScalerOf(context).scale(_monthRecordFontSize) *
+                    1.15 +
+                6,
+          );
+          // Every week reserves the same five slots, regardless of task count.
+          // Crowded dates use the last slot for a badge instead of growing a row.
+          final cellHeight = math.max(
+            viewportCellHeight,
+            recordTop +
+                4 * (barHeight + 1) +
+                math.max(barHeight, overflowBadgeHeight) +
+                8,
+          );
           final gridLast = start.add(Duration(days: weeks * 7 - 1));
           final holidayWarning =
               holidays?.warningForRange(start, gridLast) ?? '';
@@ -906,13 +921,6 @@ class _MonthGrid extends StatelessWidget {
                   ),
                 ),
           );
-          final weekRows = List.filled(weeks, 0);
-          for (var week = 0; week < weeks; week++) {
-            for (var col = 0; col < 7; col++) {
-              final day = start.add(Duration(days: week * 7 + col));
-              weekRows[week] = math.max(weekRows[week], folded[day]!.rows);
-            }
-          }
           final previewLanes = <int, int>{};
           if (moving != null && this.constraints != null) {
             for (var week = 0; week < weeks; week++) {
@@ -950,22 +958,21 @@ class _MonthGrid extends StatelessWidget {
               );
             }
           }
-          double overflowSpace(int week) =>
-              [
-                for (var col = 0; col < 7; col++)
-                  folded[start.add(Duration(days: week * 7 + col))]!.remaining,
-              ].any((remaining) => remaining > 0)
-              ? math.max(0.0, 48 - barHeight)
-              : 0.0;
+          bool hasOverflow(int week) => [
+            for (var col = 0; col < 7; col++)
+              folded[start.add(Duration(days: week * 7 + col))]!.remaining,
+          ].any((remaining) => remaining > 0);
 
           double weekHeight(int week) {
-            final rows = math.max(
-              weekRows[week],
-              previewLanes.containsKey(week) ? previewLanes[week]! + 1 : 0,
-            );
+            final previewLane = previewLanes[week];
+            if (previewLane == null) return cellHeight;
+            // Preserve drag preview space, keeping the bottom badge below it.
             return math.max(
               cellHeight,
-              recordTop + rows * (barHeight + 1) + 2 + overflowSpace(week),
+              recordTop +
+                  (previewLane + 1) * (barHeight + 1) +
+                  (hasOverflow(week) ? overflowBadgeHeight + 4 : 0) +
+                  4,
             );
           }
 
@@ -1061,6 +1068,12 @@ class _MonthGrid extends StatelessWidget {
                                 );
                             final holiday = holidays?.days[holidayDateKey(day)];
                             final currentMonth = day.month == date.month;
+                            final headingRightInset = today
+                                ? 22.0
+                                : holiday?.off == null
+                                ? 3.0
+                                : MediaQuery.textScalerOf(context).scale(10) +
+                                      6;
                             return Positioned(
                               left: col * cellWidth,
                               top: 0,
@@ -1120,24 +1133,40 @@ class _MonthGrid extends StatelessWidget {
                                         children: [
                                           Positioned(
                                             left: 3,
-                                            right: holiday?.off == null
-                                                ? 3
-                                                : MediaQuery.textScalerOf(
-                                                        context,
-                                                      ).scale(10) +
-                                                      6,
+                                            right: headingRightInset,
                                             top: 3,
                                             child: Row(
                                               children: [
-                                                Text(
-                                                  '${day.day}',
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    height: 1.15,
-                                                    fontWeight:
-                                                        selected || today
-                                                        ? FontWeight.w700
-                                                        : null,
+                                                ConstrainedBox(
+                                                  constraints: BoxConstraints(
+                                                    maxWidth: math.max(
+                                                      0,
+                                                      cellWidth -
+                                                          12 -
+                                                          headingRightInset -
+                                                          ((holiday
+                                                                      ?.label
+                                                                      .isNotEmpty ??
+                                                                  false)
+                                                              ? 3
+                                                              : 0),
+                                                    ),
+                                                  ),
+                                                  child: FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Text(
+                                                      '${day.day}',
+                                                      maxLines: 1,
+                                                      softWrap: false,
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        height: 1.15,
+                                                        fontWeight:
+                                                            selected || today
+                                                            ? FontWeight.w700
+                                                            : null,
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
                                                 if (holiday?.label.isNotEmpty ??
@@ -1169,9 +1198,20 @@ class _MonthGrid extends StatelessWidget {
                                               ],
                                             ),
                                           ),
+                                          if (today)
+                                            const Positioned(
+                                              top: 2,
+                                              right: 2,
+                                              child: SunshineMascot(
+                                                key: ValueKey(
+                                                  'month-today-mascot',
+                                                ),
+                                                size: 16,
+                                              ),
+                                            ),
                                           if (holiday?.off != null)
                                             Positioned(
-                                              top: 3,
+                                              top: today ? 21 : 3,
                                               right: 3,
                                               child: Tooltip(
                                                 message:
@@ -1216,10 +1256,10 @@ class _MonthGrid extends StatelessWidget {
                                 .remaining >
                             0)
                           Positioned(
-                            left: col * cellWidth + 2,
-                            top: recordTop + 4 * (barHeight + 1),
-                            width: cellWidth - 4,
-                            height: math.max(48, barHeight),
+                            right: (6 - col) * cellWidth + 4,
+                            bottom: 5,
+                            width: cellWidth - 8,
+                            height: overflowBadgeHeight,
                             child: Semantics(
                               label:
                                   '${dayHeading(start.add(Duration(days: week * 7 + col)))}，另有${folded[start.add(Duration(days: week * 7 + col))]!.remaining}项任务，查看当天全部任务',
@@ -1235,15 +1275,33 @@ class _MonthGrid extends StatelessWidget {
                                 // This entry is not an empty date cell.
                                 onLongPress: () {},
                                 child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    '+${folded[start.add(Duration(days: week * 7 + col))]!.remaining}',
-                                    maxLines: 1,
-                                    style: TextStyle(
-                                      fontSize: _monthRecordFontSize,
-                                      height: 1.15,
-                                      fontWeight: FontWeight.w700,
-                                      color: SunnyPalette.ink,
+                                  alignment: Alignment.bottomRight,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Container(
+                                      height: overflowBadgeHeight,
+                                      constraints: BoxConstraints(
+                                        minWidth: overflowBadgeHeight,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                      ),
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: SunnyPalette.primary,
+                                        borderRadius: BorderRadius.circular(99),
+                                      ),
+                                      child: Text(
+                                        '+${folded[start.add(Duration(days: week * 7 + col))]!.remaining}',
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: TextStyle(
+                                          fontSize: _monthRecordFontSize,
+                                          height: 1.15,
+                                          fontWeight: FontWeight.w700,
+                                          color: SunnyPalette.ink,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1262,7 +1320,6 @@ class _MonthGrid extends StatelessWidget {
                           this.constraints,
                           onChanged,
                           previewDay: drag!.target!.day,
-                          extraAfterFifthRow: overflowSpace(week),
                         ),
                     ],
                   ),
@@ -1287,7 +1344,6 @@ List<Widget> _monthWeekBars(
   ValueChanged<DateTime> onChanged, {
   DateTime? previewDay,
   Map<DateTime, CalendarFoldedDay>? foldedDays,
-  double extraAfterFifthRow = 0,
 }) {
   final weekEnd = weekStart.add(const Duration(days: 6));
   final candidates =
@@ -1384,8 +1440,7 @@ List<Widget> _monthWeekBars(
       final top =
           recordTop +
           MediaQuery.textScalerOf(context).scale(10) * 1.3 +
-          segment.lane * (barHeight + 1) +
-          (segment.lane >= 5 ? extraAfterFifthRow : 0);
+          segment.lane * (barHeight + 1);
       final content = Material(
         key:
             previewDay != null &&

@@ -2,6 +2,14 @@
 
 需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
 
+## 月历、日志与统计布局修复（2026-11-06，未发布）
+
+基线 `983b7e76ec1532df5ac7a59bbf86197cff61e8ba`，分支 `fix/53-calendar-cell-overflow`，关联 Issue #53。月历各周统一预留五行显示空间，超过五项时前四项加右下角黄色 `+N`，今天右上角显示角色；移除创建任务按钮下方的整行占位。日志近三天查询原被转换成起始日的单日查询，现本人日志与下属日志均保留明确的 `from/to`；编辑器保持同一输入框，取消因键盘高度主动失焦，右上角下属日志入口使用单行自然宽度。统计页周期居中在上、日期及唯一筛选入口在下，并同步现有 HTML 原型。接口、权限与数据库未改。
+
+- Windows / D:/flutter：`flutter.bat build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://39.96.84.51/api` 退出0，assembleDebug 成功；证据 `output/yellow-theme/calendar-diary-statistics-build.log`，导出安装包 `output/yellow-theme/workpanel-calendar-diary-debug.apk`。
+- `openspec.cmd validate --all --strict` 46项通过、退出0；受影响文件的 `git diff --check` 通过。按用户要求未运行测试套件或设备操作；日历溢出、手机输入与日志提交显示、统计筛选交互均待用户手工验收，编译不代表功能验收通过。
+- 无后端修改，未重新部署。用户后续明确要求提交PR并合并；本批提交仅包含上述修复及年度登录表补全，既有指标JSON、Android运行配置及依赖锁文件的无关修改保留在本地，不纳入提交。合并状态以远端PR为准。
+
 ## APP验收对齐修复（2026-11-05，尚未合并发布）
 
 基线为 `e5bc21557618a8c1d331eea3ab5578b8661d70f0`，分支 `fix/53-app-acceptance-alignment`；关联Issue #53、#28、#58、#60、#63。用户明确的三项覆盖旧要求：任务管理只读完成情况、五行折叠、同页人员树。任务和证据分别维护在对应OpenSpec与本入口，不新建平行验收报告。

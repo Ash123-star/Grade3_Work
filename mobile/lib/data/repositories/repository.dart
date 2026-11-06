@@ -722,7 +722,7 @@ class HttpRepository implements Repository {
           timer.cancel();
         }
       }
-      if (resource == 'logs/subordinates' &&
+      if ((resource == 'logs' || resource == 'logs/subordinates') &&
           query.from != null &&
           query.to != null) {
         parameters

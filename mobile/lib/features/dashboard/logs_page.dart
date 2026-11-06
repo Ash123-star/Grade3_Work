@@ -186,7 +186,7 @@ class _LogsPageState extends ConsumerState<LogsPage>
         if (!team && user.manager)
           TextButton(
             onPressed: () => context.push('/logs/subordinates'),
-            child: const Text('下属日志 ›'),
+            child: const Text('下属日志 ›', maxLines: 1, softWrap: false),
           ),
       ],
       fab: team || !canCreateForDate

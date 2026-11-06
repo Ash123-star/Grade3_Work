@@ -123,18 +123,6 @@ class _ServerAnalyticsPageState extends ConsumerState<ServerAnalyticsPage> {
         child: EmptyIllustration(showCharacter: false, title: '暂无查看权限'),
       );
     final filter = ref.watch(analyticsFiltersProvider(user.id));
-    final org = ref.watch(organizationTreeProvider).valueOrNull;
-    final people = (org?.fields['people'] as List? ?? []).whereType<Record>();
-    final selectedPerson = people
-        .where((p) => p.id == filter.ownerId)
-        .firstOrNull;
-    final scope = filter.ownerId.isNotEmpty
-        ? selectedPerson?.title ?? '已选员工'
-        : filter.teamId.isNotEmpty
-        ? '已选团队'
-        : filter.departmentId.isNotEmpty
-        ? '已选部门'
-        : '全部授权范围';
     return PageFrame(
       title: '工作统计',
       actions: [
@@ -152,29 +140,14 @@ class _ServerAnalyticsPageState extends ConsumerState<ServerAnalyticsPage> {
       ],
       child: PageBody(
         children: [
-          const _StatisticsDateControls(),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            minVerticalPadding: 0,
-            leading: Image.asset(
-              TuantuanAssets.icons['organization']!,
-              width: 24,
-              height: 24,
-              excludeFromSemantics: true,
-            ),
-            title: Text(
-              scope,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13),
-            ),
-            trailing: const Text(
-              '筛选 ›',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-            onTap: filters,
+          _StatisticsDateControls(
+            onFilters: filters,
+            filtered:
+                filter.departmentId.isNotEmpty ||
+                filter.teamId.isNotEmpty ||
+                filter.ownerId.isNotEmpty,
           ),
+          const SizedBox(height: 12),
           ref
               .watch(analyticsSummaryProvider)
               .when(
@@ -477,7 +450,12 @@ class _ServerAnalyticsPageState extends ConsumerState<ServerAnalyticsPage> {
 }
 
 class _StatisticsDateControls extends ConsumerWidget {
-  const _StatisticsDateControls();
+  const _StatisticsDateControls({
+    required this.onFilters,
+    required this.filtered,
+  });
+  final VoidCallback onFilters;
+  final bool filtered;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final period = ref.watch(periodProvider),
@@ -485,41 +463,62 @@ class _StatisticsDateControls extends ConsumerWidget {
     final label = period == '月'
         ? '${date.year}年${date.month}月'
         : '${date.month}月${date.day}日${period == '周' ? '所在周' : ''}';
-    return Row(
+    return Column(
       children: [
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: '日', label: Text('日')),
-            ButtonSegment(value: '周', label: Text('周')),
-            ButtonSegment(value: '月', label: Text('月')),
-          ],
-          selected: {period},
-          showSelectedIcon: false,
-          onSelectionChanged: (v) =>
-              ref.read(periodProvider.notifier).state = v.first,
-          style: const ButtonStyle(visualDensity: VisualDensity.compact),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: TextButton(
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: date,
-                firstDate: DateTime(2007),
-                lastDate: DateTime(2100, 12, 31),
-                helpText: '选择统计日期',
-                initialEntryMode: DatePickerEntryMode.calendarOnly,
-              );
-              if (picked != null && context.mounted)
-                ref.read(selectedDateProvider.notifier).state = picked;
-            },
-            child: Text(
-              '$label ▾',
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
+        Center(
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: '日', label: Text('日')),
+              ButtonSegment(value: '周', label: Text('周')),
+              ButtonSegment(value: '月', label: Text('月')),
+            ],
+            selected: {period},
+            showSelectedIcon: false,
+            onSelectionChanged: (v) =>
+                ref.read(periodProvider.notifier).state = v.first,
+            style: const ButtonStyle(visualDensity: VisualDensity.compact),
           ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: date,
+                    firstDate: DateTime(2007),
+                    lastDate: DateTime(2100, 12, 31),
+                    helpText: '选择统计日期',
+                    initialEntryMode: DatePickerEntryMode.calendarOnly,
+                  );
+                  if (picked != null && context.mounted)
+                    ref.read(selectedDateProvider.notifier).state = picked;
+                },
+                label: Text(
+                  '$label ▾',
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: onFilters,
+              icon: const Icon(Icons.filter_list_rounded, size: 18),
+              label: Text(
+                filtered ? '筛选 · 已选' : '筛选',
+                maxLines: 1,
+                softWrap: false,
+              ),
+            ),
+          ],
         ),
       ],
     );
