@@ -179,7 +179,9 @@ SELECT name,color FROM task_labels WHERE company_id='annual-cm';
 
 2026-11-06 本地已备份并通过既有 `flyway_local_annual2026_history` 执行 V4/V5，随后 V6 也已成功，历史到 V6 全部成功：主公司创始人 4 名、场景未分配成员 0、在职资料缺失 0、10 位在职普通员工各有 8 条新增重叠任务。证据 `output/yellow-theme/local-member-migration.log`，备份 `output/yellow-theme/before-member-enrichment-20261106-110213.dump`。初次 V4 试图更新历史事件，被只追加触发器拒绝并完整回滚；修正后成功，未 repair 或改写历史。
 
-云端实际使用 `workpanel_annual2026`、独立历史 `flyway_annual2026_history`，原先只有 V1。本次部署前已备份实际库、原 JAR、服务配置和远端未提交补丁至 `/root/workpanel-backups/20261106-member-enrichment`。待合并及部署后核对 V2–V6；不能用本地迁移结果替代云端结果。新增创始人复用主创始人的既有密码摘要，不重置任何已有账号密码。
+2026-11-06 云端已实际从 V1 升级到 V6，独立历史 `flyway_annual2026_history` 全部成功。主公司创始人 4 名，场景成员未分配、在职资料缺失、跨公司/部门归属错误及示例手机号格式错误均为 0；9 位在职普通员工各有 8 条新增重叠计划，待确认员工新增任务为 0。云端和本地在职人数不同，保留两边已有审批状态，不强行激活待确认账号。新增创始人复用主创始人的既有密码摘要，没有重置已有账号密码。
+
+本次实际库为 `workpanel_annual2026`。部署前备份、旧 JAR、服务配置与远端未提交补丁保存在 `/root/workpanel-backups/20261106-member-enrichment`；停 API 后又保存 `pre-switch-database.dump`，用 `pg_restore --list` 核对成功。迁移由与应用同版本 Flyway 执行，读取现有连接和主创始人摘要，不记录明文凭据、不启用场景密码开关、不 repair 历史。证据为该目录 `annual-migration.log`、`deploy.log`；本机副本在 `output/yellow-theme/`。PR #74 已合并，用户明确豁免本次非作者审阅。设备上 `+N` 的显示仍由用户验收。
 
 ## 回滚连接
 

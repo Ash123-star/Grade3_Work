@@ -110,5 +110,6 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 
 - `mvn.cmd -B -f server/pom.xml '-Dmaven.test.skip=true' package`：退出 0，JAR 已生成；证据 `output/yellow-theme/member-enrichment-backend-build.log`。
 - `flutter.bat build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://39.96.84.51/api`：退出 0；证据 `output/yellow-theme/public-mobile-build.log`。这是公网后端版本，设备运行未验收。
-- 本地实际数据库 V4/V5 已成功，创始人 4 名、场景成员未分配 0、在职个人资料缺失 0，每位在职普通员工有 8 条新增月历重叠计划。备份及执行证据见[年度场景](annual-scenario-rebuild.md)。
-- 原月历折叠/拖动逻辑保持；统计页、黄色主题、各子页及历史 14px 溢出等仍需用户设备验收，未将编译当作功能验收。云端部署结果以本次实际操作记录更新。
+- 本地实际数据库 V4–V6、云端 V2–V6 已成功；两边主公司创始人均 4 名，场景成员未分配 0、在职个人资料缺失 0，每位在职普通员工有 8 条新增月历重叠计划（本地10人、云端9人，保留既有审批状态）。备份及执行证据见[年度场景](annual-scenario-rebuild.md)。
+- 原月历折叠/拖动逻辑保持；统计页、黄色主题、各子页及历史 14px 溢出等仍需用户设备验收，未将编译当作功能验收。PR #74 已合并，云端 API 重启后内网/公网健康检查 UP，公网 APK 已覆盖安装模拟器；云端 raw 网络故障及双入口修复另按实际发布记录跟踪。
+- 后续双入口修复：`mvn.cmd -B -f server/pom.xml '-Dmaven.test.skip=true' package` 退出0；`openspec.cmd validate --all --strict` 46项通过、退出0，证据 `output/yellow-theme/holiday-fallback-{build,spec}.log`。部署诊断在云端用相同 Java HTTP 设置读取 Contents 返回200、2026年39条安排，raw入口超时；没有把探测程序当作测试套件或完整功能验收。最终公网接口结果以修复PR发布记录为准。
