@@ -240,7 +240,7 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                       ),
                     ),
                     Text(
-                      '派发任务',
+                      '管理任务',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],

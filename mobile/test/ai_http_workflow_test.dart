@@ -406,9 +406,16 @@ void main() {
         'attachments': ['file'],
         'collaborators': ['person'],
       };
-      expect((await repo.confirm(edited, 0, task, 'stable-key'))['id'], 'task-created');
+      expect(
+        (await repo.confirm(edited, 0, task, 'stable-key'))['id'],
+        'task-created',
+      );
       expect(adapter.requests.last.path, '/ai/jobs/job/confirm-task');
-      expect(adapter.requests.last.data, {'version': 5, 'actionIndex': 0, 'task': task});
+      expect(adapter.requests.last.data, {
+        'version': 5,
+        'actionIndex': 0,
+        'task': task,
+      });
       expect(adapter.requests.last.headers['Idempotency-Key'], 'stable-key');
       await repo.cancel(created.id);
       expect(adapter.requests.last.method, 'DELETE');
@@ -834,6 +841,10 @@ void main() {
   );
   Future<void> fillConfirmation(WidgetTester t) async {
     await tapVisible(t, find.text('选择主负责人'));
+    await t.tap(find.text('技术部'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('未分配团队'));
+    await t.pumpAndSettle();
     await t.tap(find.text('实际负责人'));
     await t.pumpAndSettle();
     await t.ensureVisible(find.text('选择截止时间'));

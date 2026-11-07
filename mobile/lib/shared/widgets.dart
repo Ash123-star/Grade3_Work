@@ -381,7 +381,7 @@ class DateControls extends ConsumerWidget {
             children: [
               Expanded(
                 child: _DateControlAction(
-                  label: '派发任务',
+                  label: '管理任务',
                   icon: Icons.table_rows_rounded,
                   onPressed: () => context.push('/me/tasks'),
                   emphasized: false,

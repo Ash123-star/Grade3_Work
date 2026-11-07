@@ -128,7 +128,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
         if (!team)
           TextButton(
             onPressed: () => context.push('/me/tasks'),
-            child: const Text('派发任务 ›'),
+            child: const Text('管理任务 ›'),
           ),
         if (!team && user.manager)
           TextButton(

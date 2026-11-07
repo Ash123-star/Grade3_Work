@@ -479,12 +479,12 @@ void main() {
       router.go('/me');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.text('任务管理'), findsNothing);
+      expect(find.text('管理任务'), findsNothing);
       router.go('/view');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(find.text('任务管理'), findsOneWidget);
-      await t.tap(find.text('任务管理'));
+      expect(find.text('管理任务'), findsOneWidget);
+      await t.tap(find.text('管理任务'));
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(find.byType(TaskManagementPage), findsOneWidget);
