@@ -46,34 +46,9 @@ class HttpRepository implements Repository {
        ) {
     dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (request, handler) {
-          final remaining = rateLimitRemaining;
-          if (!request.path.startsWith('/auth/') && remaining > Duration.zero) {
-            request.extra['rateLimitCooldown'] = true;
-            handler.reject(
-              DioException(
-                requestOptions: request,
-                type: DioExceptionType.badResponse,
-                response: Response(
-                  requestOptions: request,
-                  statusCode: 429,
-                  data: const {'code': 'RATE_LIMITED'},
-                  headers: Headers.fromMap({
-                    'retry-after': [
-                      '${(remaining.inMilliseconds / 1000).ceil()}',
-                    ],
-                  }),
-                ),
-              ),
-            );
-            return;
-          }
-          handler.next(request);
-        },
         onError: (error, handler) {
           final failure = ApiFailure.fromDio(error);
-          if (error.requestOptions.extra['rateLimitCooldown'] != true &&
-              !error.requestOptions.path.startsWith('/auth/') &&
+          if (!error.requestOptions.path.startsWith('/auth/') &&
               failure.statusCode == 429 &&
               failure.code == 'RATE_LIMITED') {
             final until = DateTime.now().add(
@@ -142,6 +117,42 @@ class HttpRepository implements Repository {
     final remaining =
         _rateLimitUntil?.difference(DateTime.now()) ?? Duration.zero;
     return remaining > Duration.zero ? remaining : Duration.zero;
+  }
+
+  final _notificationCache = <String, (String?, PageResult)>{};
+  final _notificationReads = <String, Future<PageResult>>{};
+
+  Future<PageResult> _notificationPage(Map<String, dynamic> parameters) {
+    final key = jsonEncode(parameters);
+    final running = _notificationReads[key];
+    if (running != null) return running;
+    return _notificationReads[key] = _readNotificationPage(
+      key,
+      parameters,
+    ).whenComplete(() => _notificationReads.remove(key));
+  }
+
+  Future<PageResult> _readNotificationPage(
+    String key,
+    Map<String, dynamic> parameters,
+  ) async {
+    final cached = _notificationCache[key];
+    final response = await dio.get<dynamic>(
+      '/notifications',
+      queryParameters: parameters,
+      options: Options(
+        headers: {if (cached?.$1 != null) 'If-None-Match': cached!.$1},
+        validateStatus: (status) => status == 304 || status == 200,
+      ),
+    );
+    if (response.statusCode == 304 && cached != null) return cached.$2;
+    final page = _page(response.data);
+    _notificationCache.remove(key);
+    _notificationCache[key] = (response.headers.value('etag'), page);
+    while (_notificationCache.length > 32) {
+      _notificationCache.remove(_notificationCache.keys.first);
+    }
+    return page;
   }
 
   Future<Response<T>> _getWithRetry<T>(
@@ -748,6 +759,8 @@ class HttpRepository implements Repository {
         return _page(response.data);
       }
       final parameters = _query(query, resource: resource);
+      if (resource == 'notifications')
+        return await _notificationPage(parameters);
       if (resource == 'tasks' && query.from != null && query.to != null) {
         parameters
           ..remove('date')

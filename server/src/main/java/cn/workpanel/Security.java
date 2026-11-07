@@ -20,7 +20,7 @@ public class Security {
     @Bean BCryptPasswordEncoder passwords() { return new BCryptPasswordEncoder(12); }
     @Bean SecurityFilterChain apiSecurityChain(HttpSecurity http, CorsConfigurationSource cors) throws Exception { return http.csrf(c->c.disable()).cors(c->c.configurationSource(cors)).authorizeHttpRequests(a->a.anyRequest().permitAll()).sessionManagement(s->s.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)).build(); }
     @Bean CorsConfigurationSource cors(@Value("${app.cors-origins}") String origins) {
-        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(Arrays.asList(origins.split(","))); c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS")); c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key","Last-Event-ID","If-Match")); c.setExposedHeaders(List.of("X-Trace-Id","Content-Disposition","Retry-After"));
+        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(Arrays.asList(origins.split(","))); c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS")); c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key","Last-Event-ID","If-Match","If-None-Match")); c.setExposedHeaders(List.of("X-Trace-Id","Content-Disposition","Retry-After","ETag"));
         UrlBasedCorsConfigurationSource source=new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**",c); return source;
     }
     @Bean FilterRegistrationBean<OncePerRequestFilter> authentication(Db db,Limiter limiter,WorkspaceAccessAudit accessAudit) {

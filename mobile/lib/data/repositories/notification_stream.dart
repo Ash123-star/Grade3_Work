@@ -13,6 +13,23 @@ class NotificationSignal {
 class NotificationStream {
   NotificationStream(this.dio);
   final Dio dio;
+
+  /// A new session starts at the current head, not by replaying its full history.
+  Future<int> latestSequence(CancelToken cancel) async {
+    try {
+      final response = await dio.get<Map<String, dynamic>>(
+        '/notifications',
+        queryParameters: {'limit': 1},
+        cancelToken: cancel,
+      );
+      final items = response.data?['items'];
+      if (items is! List || items.isEmpty) return 0;
+      return (items.first['sequence'] as num?)?.toInt() ?? 0;
+    } on DioException catch (error) {
+      throw ApiFailure.fromDio(error);
+    }
+  }
+
   Duration get cooldown {
     final until = dio.options.extra['rateLimitUntil'];
     if (until is! DateTime) return Duration.zero;

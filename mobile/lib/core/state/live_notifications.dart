@@ -8,7 +8,6 @@ import '../../data/repositories/notification_stream.dart';
 import 'providers.dart';
 import '../../data/models/notification_display.dart';
 
-final notificationForegroundProvider = StateProvider<bool>((ref) => true);
 final notificationCursorProvider = StateProvider<int>((ref) {
   ref.watch(sessionEpochProvider);
   return 0;
@@ -59,7 +58,7 @@ final liveNotificationsProvider =
               ref.read(sessionCheckProvider) != null) {
             return;
           }
-          ref.invalidate(notificationPageProvider);
+          // Message lists are refreshed by their cached 30-second poller.
           final types = signals.map((signal) => signal.type ?? '').toSet();
           final reviewChanged = types.any((type) => type.startsWith('REVIEW_'));
           final taskChanged = types.any(
@@ -137,11 +136,12 @@ class LiveNotifications extends StateNotifier<LiveNotificationState> {
   CancelToken? cancel;
   Timer? reconnect, debounce;
   bool alive = true, subscribed = true;
+  bool initialized = false;
   int generation = 0, sequence, failures = 0;
   final pending = <String, NotificationSignal>{};
   DateTime? lastRefresh, retryAt;
 
-  void connect() {
+  void connect() async {
     if (!alive || !subscribed || gateway == null) return;
     reconnect?.cancel();
     final remaining = retryAt?.difference(DateTime.now()) ?? Duration.zero;
@@ -155,6 +155,18 @@ class LiveNotifications extends StateNotifier<LiveNotificationState> {
       sequence: sequence,
     );
     cancel = CancelToken();
+    if (!initialized && sequence == 0) {
+      try {
+        final head = await gateway!.latestSequence(cancel!);
+        if (!alive || attempt != generation) return;
+        sequence = head;
+        initialized = true;
+        onSequence?.call(sequence);
+      } catch (error) {
+        if (alive && attempt == generation) disconnected(error);
+        return;
+      }
+    }
     subscription = gateway!
         .connect(sequence, cancel!)
         .listen(

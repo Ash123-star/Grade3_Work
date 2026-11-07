@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.*;
 import java.util.concurrent.*;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.ResponseEntity;
 
 @Service
 public class MessageApplicationService {
@@ -53,11 +56,22 @@ public class MessageApplicationService {
 @RequestMapping("/api/notifications")
 /** 通知查询、已读和 SSE 接口；写入由事务 outbox 负责，客户端只消费消息。 */
 class NotificationController {
-    final NotificationQueryService queries; final MessageApplicationService messages;
-    NotificationController(NotificationQueryService queries,MessageApplicationService messages) { this.queries=queries; this.messages=messages; }
+    final NotificationQueryService queries; final MessageApplicationService messages; final Db db;
+    NotificationController(NotificationQueryService queries,MessageApplicationService messages,Db db) { this.queries=queries; this.messages=messages; this.db=db; }
     /** 本人通知分页；可选type/category/search/unreadOnly，摘要执行当前对象授权，未读数为全量；非法400、鉴权401/403、限流429；只读无需版本或幂等键。 */
-    @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(required=false) String type,@RequestParam(required=false) String category,@RequestParam(required=false) String search,@RequestParam(defaultValue="false") boolean unreadOnly) {
-        return queries.list(Actor.current(r),cursor,limit,type,category,search,unreadOnly);
+    @GetMapping public ResponseEntity<?> list(HttpServletRequest r,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit,@RequestParam(required=false) String type,@RequestParam(required=false) String category,@RequestParam(required=false) String search,@RequestParam(defaultValue="false") boolean unreadOnly) {
+        // Always authorize and render current summaries before checking a private validator.
+        var actor=Actor.current(r);
+        var result=queries.list(actor,cursor,limit,type,category,search,unreadOnly);
+        String etag;
+        try { etag="W/\""+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((actor.company()+":"+actor.id()+":"+db.write(result)).getBytes(StandardCharsets.UTF_8)))+"\""; }
+        catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+        var response=ResponseEntity.status(org.springframework.http.HttpStatus.OK).eTag(etag).header("Cache-Control","private, no-cache").header("Vary","Authorization");
+        String validator=r.getHeader("If-None-Match");
+        if(validator!=null&&Arrays.stream(validator.split(",")).map(String::trim).anyMatch(v->v.equals("*")||v.replaceFirst("^W/", "").equals(etag.replaceFirst("^W/", "")))) {
+            return ResponseEntity.status(304).eTag(etag).header("Cache-Control","private, no-cache").header("Vary","Authorization").build();
+        }
+        return response.body(result);
     }
     /** 将本人全部通知标记为已读；幂等，无版本字段；鉴权401/403、限流429。 */
     @PostMapping("/read-all") public Map<String,Object> readAll(HttpServletRequest r) { return queries.readAll(Actor.current(r)); }

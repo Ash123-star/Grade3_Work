@@ -2,6 +2,17 @@
 
 需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
 
+## 消息缓存与定时再验证（2026-11-07，待部署与设备验收）
+
+在 PR #77 的 `472ac42e9aaca0f9d24cebf180e54dfd7d5485a8` 上修订。此前消息页缓存随路由销毁、回前台无变化的Session替换及初始SSE历史回放仍会导致重复请求；共享客户端本地合成429又使其他操作显示限流。此次采用先显示缓存再后台验证：同会话按查询保留分页、离页5分钟回收，有订阅且前台每30秒检查、相同请求合并；后台暂停，已有内容不因临时网络错误而清空。定时对已加载分页发送条件GET，未变304不下载列表或更新状态；历史分页边界变化只重建首屏，不混合两个OFFSET快照。点击已读后立即核对，真实401/403及切号/退出清缓存。首次SSE以当前序号为基线，其他业务仍按后续事件刷新；消息页不再受SSE全局失效驱动。常规回前台身份校验静默进行，身份/权限不变不替换Session，服务端始终重验权限；客户端不再合成429阻断业务操作，后台仍尊重服务端Retry-After。
+
+依据为成熟查询库的缓存新鲜时间、保留时间、结构复用和后台验证机制，以及HTTP标准条件请求，复用现有Riverpod，不新增框架或迁移。30秒与5分钟是本项目可调整的默认取值，非企业统一标准；本次缓存仅内存，冷启动仍需首屏加载。参考：[TanStack Query默认行为](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults)、[Riverpod生命周期](https://riverpod.dev/docs/concepts2/auto_dispose)、[RFC9110条件请求](https://www.rfc-editor.org/rfc/rfc9110.html#name-if-none-match)。ETag在当前用户授权查询后生成，减少网络传输，不代表免除数据库查询；后续若证据显示查询成本过高，再考虑持久版本与真正增量协议。
+
+- 规划阶段 `openspec.cmd validate --all --strict`：46项通过、退出0，`output/yellow-theme/notification-cache-spec.log`。
+- Java21/Maven3.9.15：`mvn.cmd -B -f server/pom.xml -Dmaven.test.skip=true package`退出0，测试源码及执行均跳过；`output/yellow-theme/notification-cache-backend-build.log`。
+- D:/flutter：`flutter.bat build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://39.96.84.51/api`退出0，assembleDebug成功；证据 `output/yellow-theme/notification-cache-mobile-build.log`，安装包 `output/yellow-theme/workpanel-notification-cache-debug.apk`。受影响差异检查通过。
+- 设备与SQL运行态、304/切号/后台定时/已读同步等仍待验收；用户要求只编译，不运行测试套件。编译不能视为这些功能已通过。
+
 ## 消息刷新与限流修复（2026-11-06，已部署，设备待验收）
 
 基线 `3f9eb2d561e17a41f91fb22c80cbfd23da2361ff`，分支 `fix/53-notification-refresh`，关联 Issue #53。通知改为每页30条、显式加载更多，搜索/分类/未读筛选在服务端分页前执行，返回全量未读数及按当前任务/日志/审核权限读取的摘要。客户端移除逐条详情摘要请求；SSE事件2秒合并、刷新至少间隔5秒，按类型和对象刷新，连接成功/常规重连不再触发全局刷新，前后台重放保留尚未刷新的事件。限额仍为同账号120次/60秒，429返回剩余窗口的Retry-After，客户端共享冷却、缺失头默认60秒，不自动重放写入。无数据库迁移。

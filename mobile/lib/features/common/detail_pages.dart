@@ -22,7 +22,6 @@ import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'catalog.dart';
 import 'form_page.dart';
 import '../dashboard/diary_composer_sheet.dart';
-import '../../core/state/live_notifications.dart';
 import '../../shared/generated_assets.dart';
 import '../../shared/notification_preview.dart';
 
@@ -82,76 +81,34 @@ class _ListPageState extends ConsumerState<ListPage> {
   bool get messageBusy => readingMessage != null || readingAll;
   String notificationSearch = '';
   Timer? _messageSearchTimer;
-  final _olderMessages = <Record>[];
-  String? _olderCursor;
-  Object? _olderError;
   bool _loadingOlder = false;
-  int _messageGeneration = 0;
   (String, String, bool) get _messageQuery =>
       (notificationSearch, filter == '全部' ? '' : filter, inbox == 1);
 
-  void _resetOlder() {
-    _messageGeneration++;
-    _olderMessages.clear();
-    _olderCursor = null;
-    _olderError = null;
-    _loadingOlder = false;
+  void _refreshMessages() {
+    unawaited(
+      ref
+          .read(notificationPageProvider(_messageQuery).notifier)
+          .refresh(force: true, interactive: true),
+    );
+    if (_messageQuery != ('', '', false)) {
+      unawaited(
+        ref
+            .read(notificationPageProvider(('', '', false)).notifier)
+            .refresh(force: true),
+      );
+    }
   }
 
-  void _refreshMessages() => ref.invalidate(notificationPageProvider);
-
-  Future<void> _loadOlder(PageResult loaded) async {
-    if (_loadingOlder || loaded.nextCursor == null) return;
-    final query = _messageQuery, generation = _messageGeneration;
-    final session = ref.read(sessionProvider);
-    setState(() {
-      _loadingOlder = true;
-      _olderError = null;
-    });
+  Future<void> _loadOlder(PageResult _) async {
+    if (_loadingOlder) return;
+    setState(() => _loadingOlder = true);
     try {
-      final page = await ref
-          .read(repositoryProvider)
-          .list(
-            'notifications',
-            Query(
-              limit: 30,
-              cursor: loaded.nextCursor,
-              search: query.$1,
-              notificationCategory: query.$2.isEmpty ? null : query.$2,
-              unreadOnly: query.$3,
-            ),
-          );
-      if (!sameSession(session) ||
-          generation != _messageGeneration ||
-          query != _messageQuery)
-        return;
-      if (page.total != loaded.total) {
-        setState(_resetOlder);
-        _refreshMessages();
-        return;
-      }
-      final ids = loaded.items.map((record) => record.id).toSet();
-      if (page.items.isEmpty ||
-          page.nextCursor == loaded.nextCursor ||
-          page.items.any((record) => !ids.add(record.id))) {
-        setState(_resetOlder);
-        _refreshMessages();
-        return;
-      }
-      setState(() {
-        _olderMessages.addAll(page.items);
-        _olderCursor = loaded.items.length + page.items.length < page.total
-            ? page.nextCursor
-            : null;
-      });
-    } catch (error) {
-      if (sameSession(session) && generation == _messageGeneration) {
-        setState(() => _olderError = error);
-      }
+      await ref
+          .read(notificationPageProvider(_messageQuery).notifier)
+          .loadMore();
     } finally {
-      if (sameSession(session) && generation == _messageGeneration) {
-        setState(() => _loadingOlder = false);
-      }
+      if (mounted) setState(() => _loadingOlder = false);
     }
   }
 
@@ -172,7 +129,6 @@ class _ListPageState extends ConsumerState<ListPage> {
           readingMessage = null;
           readingAll = false;
           messageError = null;
-          _resetOlder();
           owner = null;
           ownerName = null;
         });
@@ -265,31 +221,12 @@ class _ListPageState extends ConsumerState<ListPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.resource == 'notifications') {
-      ref.listen(notificationPageProvider(_messageQuery), (before, after) {
-        if (after.hasValue &&
-            !identical(before?.valueOrNull, after.valueOrNull)) {
-          setState(_resetOlder);
-        }
-      });
-    }
     final resource = widget.resource,
         user = ref.watch(sessionProvider),
         data = resource == 'audit'
             ? ref.watch(auditRecordsProvider)
             : resource == 'notifications'
-            ? ref
-                  .watch(notificationPageProvider(_messageQuery))
-                  .whenData(
-                    (page) => PageResult(
-                      [...page.items, ..._olderMessages],
-                      total: page.total,
-                      nextCursor: _olderMessages.isEmpty
-                          ? page.nextCursor
-                          : _olderCursor,
-                      unread: page.unread,
-                    ),
-                  )
+            ? ref.watch(notificationPageProvider(_messageQuery))
             : ref.watch(recordsProvider(widget.resource));
     final deniedMessage =
         messageError is ApiFailure &&
@@ -385,7 +322,6 @@ class _ListPageState extends ConsumerState<ListPage> {
                   if (mounted)
                     setState(() {
                       notificationSearch = v.trim();
-                      _resetOlder();
                     });
                 },
               );
@@ -404,10 +340,8 @@ class _ListPageState extends ConsumerState<ListPage> {
               selected: inbox,
               onChanged: (v) => setState(() {
                 inbox = v;
-                _resetOlder();
               }),
             ),
-          if (resource == 'notifications') const NotificationConnectionStatus(),
           if (resource == 'tasks') ...[
             Wrap(
               spacing: 12,
@@ -477,7 +411,6 @@ class _ListPageState extends ConsumerState<ListPage> {
                         selected: filter == value,
                         onSelected: (_) => setState(() {
                           filter = value;
-                          if (resource == 'notifications') _resetOlder();
                         }),
                       ),
                     ),
@@ -766,11 +699,6 @@ class _ListPageState extends ConsumerState<ListPage> {
             if (data.isLoading) const LinearProgressIndicator(minHeight: 2),
             if (data.hasError)
               RecordFailure(data.error!, retry: _refreshMessages),
-            if (_olderError != null)
-              RecordFailure(
-                _olderError!,
-                retry: () => _loadOlder(data.requireValue),
-              ),
             if (data.requireValue.nextCursor != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -907,49 +835,6 @@ String prettyDate(dynamic value) {
   return date == null
       ? '未设置'
       : '${date.month}月${date.day}日 ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-}
-
-class NotificationConnectionStatus extends ConsumerWidget {
-  const NotificationConnectionStatus({super.key});
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref.watch(liveNotificationsProvider);
-    if (status.connection == NotificationConnection.disabled) {
-      return const SizedBox.shrink();
-    }
-    final label = switch (status.connection) {
-      NotificationConnection.live => '消息实时更新中',
-      NotificationConnection.connecting => '正在连接消息更新',
-      NotificationConnection.reconnecting => '消息连接中断，正在重连；可手动刷新列表',
-      _ => '实时更新已暂停，列表仍可手动刷新',
-    };
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-          if (status.connection == NotificationConnection.stopped) ...[
-            Text(
-              '${status.error ?? "消息连接已关闭"}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            TextButton.icon(
-              onPressed: () =>
-                  ref.read(liveNotificationsProvider.notifier).retry(),
-              icon: const Icon(Icons.sync),
-              label: const Text('重新连接消息'),
-            ),
-          ],
-          if (status.connection != NotificationConnection.live)
-            TextButton(
-              onPressed: () => ref.invalidate(notificationPageProvider),
-              child: const Text('刷新消息列表'),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 class DetailPage extends ConsumerStatefulWidget {

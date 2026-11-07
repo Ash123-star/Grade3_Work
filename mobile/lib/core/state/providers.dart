@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'notification_inbox.dart';
 import 'package:pandora_mobile/data/repositories/calendar_tasks.dart';
 import 'calendar_month_retention.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,7 +43,23 @@ final sessionProvider = StateProvider<Session>(
 );
 int _sessionEpoch = 0;
 final sessionEpochProvider = Provider<int>((ref) {
-  ref.watch(sessionProvider);
+  ref.watch(
+    sessionProvider.select(
+      (s) => (
+        s.id,
+        s.token,
+        s.companyId,
+        s.role,
+        s.departmentId,
+        s.teamId,
+        s.dispatch,
+        s.active,
+        s.status,
+        s.mustChangePassword,
+        s.expired,
+      ),
+    ),
+  );
   return ++_sessionEpoch;
 });
 final calendarTaskReaderProvider = Provider<CalendarTaskReader>(
@@ -133,7 +151,20 @@ Future<void> refreshCurrentSession(
       ref.read(sessionCheckProvider.notifier).state = null;
       throw const ApiFailure(FailureKind.unauthorized, '账号身份已变化，请重新登录');
     }
-    ref.read(sessionProvider.notifier).state = next;
+    final unchanged =
+        next.id == before.id &&
+        next.token == before.token &&
+        next.companyId == before.companyId &&
+        next.name == before.name &&
+        next.role == before.role &&
+        next.departmentId == before.departmentId &&
+        next.teamId == before.teamId &&
+        next.dispatch == before.dispatch &&
+        next.active == before.active &&
+        next.status == before.status &&
+        next.mustChangePassword == before.mustChangePassword &&
+        next.expired == before.expired;
+    if (!unchanged) ref.read(sessionProvider.notifier).state = next;
     ref.read(sessionCheckProvider.notifier).state = null;
   } catch (error, stack) {
     if (ref.context.mounted &&
@@ -204,7 +235,9 @@ final recordsProvider = FutureProvider.autoDispose.family<PageResult, String>((
     throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
   }
   if (resource == 'notifications') {
-    return ref.watch(notificationPageProvider(('', '', false)).future);
+    final page = ref.watch(notificationPageProvider(('', '', false)));
+    if (page.hasValue) return Future.value(page.requireValue);
+    return ref.read(notificationPageProvider(('', '', false)).notifier).ready;
   }
   var active = true;
   ref.onDispose(() => active = false);
@@ -216,24 +249,42 @@ final recordsProvider = FutureProvider.autoDispose.family<PageResult, String>((
   );
 });
 
-/// One bounded first page per server-side filter. Home/profile share the default page.
-final notificationPageProvider = FutureProvider.autoDispose
-    .family<PageResult, (String, String, bool)>((ref, key) {
+final notificationForegroundProvider = StateProvider<bool>((ref) => true);
+
+/// Cache survives route disposal for five minutes, scoped to the current session.
+final notificationPageProvider = StateNotifierProvider.autoDispose
+    .family<NotificationInbox, AsyncValue<PageResult>, (String, String, bool)>((
+      ref,
+      key,
+    ) {
       final user = ref.watch(sessionProvider);
-      if (!user.canReadBusiness) {
-        throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
-      }
-      return ref
-          .watch(repositoryProvider)
-          .list(
-            'notifications',
-            Query(
-              limit: 30,
-              search: key.$1,
-              notificationCategory: key.$2.isEmpty ? null : key.$2,
-              unreadOnly: key.$3,
-            ),
-          );
+      final cache = NotificationInbox(
+        ref.watch(repositoryProvider),
+        Query(
+          limit: 30,
+          search: key.$1,
+          notificationCategory: key.$2.isEmpty ? null : key.$2,
+          unreadOnly: key.$3,
+        ),
+        authorized: user.canReadBusiness,
+        foreground:
+            user.canReadBusiness && ref.read(notificationForegroundProvider),
+      );
+      final retention = ref.keepAlive();
+      Timer? eviction;
+      ref.onCancel(() {
+        cache.observe(false);
+        eviction = Timer(const Duration(minutes: 5), retention.close);
+      });
+      ref.onResume(() {
+        eviction?.cancel();
+        cache.observe(true);
+      });
+      ref.onDispose(() => eviction?.cancel());
+      ref.listen(notificationForegroundProvider, (_, foreground) {
+        cache.foreground(user.canReadBusiness && foreground);
+      });
+      return cache;
     });
 final receivedTaskCardProvider = FutureProvider.autoDispose<PageResult>((ref) {
   final session = ref.watch(sessionProvider);
