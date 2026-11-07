@@ -55,9 +55,12 @@ final liveNotificationsProvider =
           ref.invalidate(recordsProvider('tasks'));
           ref.invalidate(recordsProvider('organization'));
           ref.invalidate(receivedTaskCardProvider);
-          ref.invalidate(calendarMonthTasksProvider);
           ref.invalidate(datedRecordsProvider);
+          ref.invalidate(calendarMonthTasksProvider);
+          ref.invalidate(itemProvider);
+          ref.invalidate(scopedItemProvider);
           ref.invalidate(logDayRecordsProvider);
+          ref.invalidate(recentDiaryRecordsProvider);
           ref.invalidate(memberRecordsProvider);
         });
         // Stop transport immediately when the last UI subscriber disappears,

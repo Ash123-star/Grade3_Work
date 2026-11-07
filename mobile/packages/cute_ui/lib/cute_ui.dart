@@ -6,13 +6,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 @immutable
 class CuteTokens extends ThemeExtension<CuteTokens> {
   const CuteTokens();
-  static const ink = Color(0xFF263238),
-      mint = Color(0xFF75C9B7),
+  static const ink = Color(0xFF3D352B),
+      mint = Color(0xFFFFDA35),
       coral = Color(0xFFFF9D87),
-      canvas = Color(0xFFFAFCFB),
+      canvas = Color(0xFFFFFDF5),
       cream = Color(0xFFFFF9F0),
-      line = Color(0xFFDCE6E1),
-      muted = Color(0xFF5B6D65),
+      line = Color(0xFFEEE4CD),
+      muted = Color(0xFF796F61),
       blue = Color(0xFFE9F2FC),
       yellow = Color(0xFFFFF3C9);
   static const gap = 16.0, radius = 8.0;
@@ -25,9 +25,9 @@ class CuteTokens extends ThemeExtension<CuteTokens> {
 ThemeData cuteTheme() => ThemeData(
   useMaterial3: true,
   colorScheme: ColorScheme.fromSeed(
-    seedColor: const Color(0xFF257D68),
+    seedColor: const Color(0xFF775B10),
     surface: Colors.white,
-    primary: const Color(0xFF257D68),
+    primary: const Color(0xFF775B10),
     onSurface: CuteTokens.ink,
     secondary: CuteTokens.coral,
   ),
@@ -85,7 +85,7 @@ ThemeData cuteTheme() => ThemeData(
   ),
   navigationBarTheme: const NavigationBarThemeData(
     backgroundColor: Colors.white,
-    indicatorColor: Color(0xFFD8EFE6),
+    indicatorColor: Color(0xFFFFF0AC),
     height: 76,
   ),
 );
@@ -141,7 +141,7 @@ class SectionHeader extends StatelessWidget {
     child: Row(
       children: [
         Image.asset(
-          'assets/generated_ui/dog/avatars/avatar_01.png',
+                'assets/generated_ui/sunshine/mascots/welcome.png',
           width: 24,
           height: 24,
           fit: BoxFit.contain,

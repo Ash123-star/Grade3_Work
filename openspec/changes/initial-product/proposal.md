@@ -15,7 +15,7 @@
 ### New Capabilities
 
 - `auth-rbac`: 注册登录、组织、角色数据范围与分层复核。
-- `mindmap`: 默认导图、四象限、个人面板与私人备注。
+- `mindmap`: 默认首页、四象限、个人面板与私人备注。
 - `timeline-log`: 日周月联动、日志提交及上级查看。
 - `task-dispatch`: 任务派发、人员选择、流转和站内通知。
 - `ai-map`: DeepSeek 总结、任务建议与可操作工作地图。

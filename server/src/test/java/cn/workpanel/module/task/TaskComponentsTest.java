@@ -120,6 +120,6 @@ class TaskComponentsTest {
 
     @Test void timelineOrderedBySequence() {
         Db db=mock(Db.class); TaskTimeline.list(db,"task1");
-        verify(db).rows(endsWith("ORDER BY sequence"),eq("task1"));
+        verify(db).rows(endsWith("ORDER BY e.sequence"),eq("task1"));
     }
 }

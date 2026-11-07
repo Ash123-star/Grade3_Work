@@ -1,36 +1,27 @@
-# Flutter 文档索引
+# 移动端文档索引
 
-## 当前设计基线
+先读 [产品基线](../../方案.md)、[核心规则](../../AGENTS.md)、[运行说明](../README.md)。这里只索引客户端专题，全仓范围见 [总索引](../../docs/README.md)。文档优先原位维护，小修改不新建OpenSpec或会话交接。
 
-- [阶段0：需求范围](stage-0-requirements-scope.md)
-- [阶段1：路由与流程](stage-1-route-and-flow-design.md)
-- [团团记账气质 UI 设计基线](tuantuan-ui-design-system.md)
-- [阶段3：页面布局与交互](stage-3-page-layout-and-interaction-design.md)
-- [原始八屏设计稿](../prototypes/ui-direction/)
-- [可运行页面原型](../prototypes/stage-3-pages/README.md)
+## 现行设计与接入
 
-## 实现进度与验收
+| 主题 | 入口 |
+| --- | --- |
+| 视觉与素材 | [团团设计系统](tuantuan-ui-design-system.md)、[品牌开屏/图标](brand-splash-design.md)、[任务表格与人员目录原型](task-management-ui-direction.md) |
+| 首页与个人事项 | [页面设计与卡通主题重构提案](home-daily-todos-direction.md)、[交互原型](../prototypes/home-daily-todos.html)；视觉提案待评审，导航为首页、公司、日志、AI地图、我的，默认首页 |
+| APP验收对齐 | [两轮需求统一验收基准](../../docs/app-requirements-acceptance.md)；含完成情况列、五行折叠、同页人员树的最新确认及合并后回归，不代表已实现 |
+| HTTP与权限 | [接入原则](API_CONTRACT.md)、[页面请求矩阵](api-surface-coverage.md)、[接口状态/待验收](../../docs/backend-interface-gaps.md) |
+| 当前验证 | [统一验证入口](../../docs/backend-validation.md)；记录于2026-11-05，不外推到未验设备或供应商 |
+| 活动需求 | [OpenSpec](../../openspec/changes/)中相关大功能的design/specs/tasks；旧小变更不作为新建先例 |
 
-- [HCJ 远程交付记录](hcj-delivery.md)：提交、Issue、草稿 PR 与遗留验收。
-- [当前完成性审查](stage-3-completion-audit.md)：已实现、未验证与缺失项。
-- [页面验收记录](stage-3-verification.md)：最新结果在前，历史批次在后。
-- [实际 Flutter 截图](evidence/stage3-rebuild/)
-- [安全本地状态验收](secure-local-state-verification.md)
-- [Windows 启动修复验收](windows-startup-repair-verification.md)
-- [重做复盘](stage-3-restart-retrospective.md)
+## 历史验收与限制
 
-## 接口与素材
+| 主题 | 记录及适用边界 |
+| --- | --- |
+| 草稿加密/身份恢复 | [本地状态验收](secure-local-state-verification.md)；真实设备Keystore、跨端等依记录限制核对 |
+| Windows依赖 | [启动修复](windows-startup-repair-verification.md)；保留Android Studio实际启动待验项，操作命令在移动端README |
+| 旧日历阶段 | [2026-10-18视图](calendar-task-view-2026-10-18.md)、[完整行发布历史](../../docs/calendar-task-drag-release.md)；2026-11-05目标恢复五行折叠，按统一验收基准重验，不继承旧布局通过结论 |
+| 旧视觉阶段 | [week5调整](week5-ui-adjustment.md)；只用于相应批次追溯 |
 
-- [接口及契约边界](API_CONTRACT.md)
-- [原创人物与素材记录](sunny-companion-assets.md)
-- [image-2.5 素材生成提示词](image-2.5-ui-asset-generation-prompts.md)
+源码和实际接口优先用于核对实现，设计存在、Mock/夹具通过或截图不能证明真实链路。新日志/截图放忽略的`output/`或PR附件，现有必要证据保留其提交和环境限制，不按批次增加另一套验证报告。
 
-`screenshots/` 是早期截图，不能作为当前重建验收证据。阶段3 SVG/PNG 示意板是设计产物，不能替代实际 Flutter 截图。
-
-## 文件维护约定
-
-源代码放 `lib/`，测试放 `test/`，设计原型放 `prototypes/`，验收文档和截图放 `docs/`。后续命令日志统一输出到 `mobile/.diagnostics/`，如 `.diagnostics/analyze.log`、`.diagnostics/mock.log`、`.diagnostics/http.log`，该目录被Git忽略。只保留正在排查的失败日志和最新结果，排查后可清理；命令、明确退出码、环境、结果与限制必须写入验收文档。
-
-历史阳光纸张/动漫橙视觉方案与命令过程日志、临时诊断输出已清理；当前视觉基线、页面布局、接口边界及验收结论保留在对应文档中。历史报告中的日志名称仅说明当时执行记录，不能作为可读取附件。
-
-`.dart_tool/`、`build/`、`.flutter-plugins-dependencies` 是工具生成内容，`.idea/` 是本地IDE配置，保留。`.native-cache/` 保存已校验的SQLite原生库，用于解决下载超时，保留；Flutter clean后运行仓库`scripts/prepare-flutter-sqlite.ps1`预热钩子缓存。
+奶油黄主题的当前设计与验收范围统一维护在[设计基线](tuantuan-ui-design-system.md)，可直接打开[交互原型](../prototypes/sunshine-workspace.html)。

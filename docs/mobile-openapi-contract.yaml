@@ -3,13 +3,424 @@ info:
   title: 移动端业务接口补充契约
   version: '2026-10-29'
   description: |
-    IMPLEMENTED_UNVERIFIED：P0及剩余接口代码与SpringDoc模式已接入，尚未编译、迁移或HTTP验收。意见反馈已由用户取消，不提供feedback服务；已停用阅读登记不新增人员清单。
-    docs/openapi.json仍为旧快照，统一验收阶段启动服务后重新生成，禁止把本文件当作运行成功证据。
+    历史移动端补充契约快照，不覆盖Controller/运行时SpringDoc。旧IMPLEMENTED_UNVERIFIED状态已过期；当前接入与验证分别见docs/backend-interface-gaps.md、docs/backend-validation.md。意见反馈与阅读登记已停用，不新增对应服务/人员清单。
+    2026-11-04的隔离快照/专项与整库失败属于历史；2026-11-05已有更新的全仓自动化记录。设备及外部供应商限制仍保留，不以本文件代替验收。
 servers:
   - url: /
 security:
   - bearer: []
 paths:
+  /api/personal-todos/{id}:
+    get:
+      tags:
+      - personal-todo-controller
+      summary: 读取本人事项详情
+      description: 其他用户、已删除或不存在统一404；不允许管理员代查。
+      operationId: personalTodoDetail
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PersonalTodo'
+        '400':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags:
+      - personal-todo-controller
+      summary: 编辑或完成本人事项
+      description: 全量title/note/date/completed/version；正整数version，必须提供Idempotency-Key。旧版本或同键异参409；同键同请求返回原结果。
+      operationId: updatePersonalTodo
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonalTodoUpdate'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PersonalTodo'
+        '400':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - personal-todo-controller
+      summary: 删除本人事项
+      description: version为正整数，必须提供Idempotency-Key；成功返回id/deleted/version；同键同请求24小时内重放，旧版本409，越权404。
+      operationId: deletePersonalTodo
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: version
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PersonalTodoDeleted'
+        '400':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/personal-todos:
+    get:
+      tags:
+      - personal-todo-controller
+      summary: 分页读取本人每日事项
+      description: 仅本人，date为自然日；cursor>=0，limit 1–100；末页nextCursor=null；拒绝ownerId代查。
+      operationId: listPersonalTodos
+      parameters:
+      - name: date
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 30
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PersonalTodoPage'
+        '400':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - personal-todo-controller
+      summary: 新增本人事项
+      description: title 1–120字，note最多2000字，date有效1900–2100自然日；必须提供Idempotency-Key，未知字段400，同键异参409。
+      operationId: createPersonalTodo
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonalTodoCreate'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PersonalTodo'
+        '400':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/personal-todos/calendar:
+    get:
+      tags:
+      - personal-todo-controller
+      summary: 读取本人事项月历计数
+      description: month为YYYY-MM，周一开始的完整网格，仅本人；无版本或幂等要求。
+      operationId: personalTodoCalendar
+      parameters:
+      - name: month
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PersonalTodoCalendar'
+        '400':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 错误码及 traceId，详情参见后端接口说明
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/tasks:
     get:
       operationId: mobileListTasks
@@ -174,8 +585,8 @@ paths:
   /api/reviews/{id}/decision:
     post:
       operationId: mobileReviewDecision
-      summary: 当前有效直属审核人或成员确认管理员决定申请
-      description: 禁止自审；驳回需理由；当前申请版本、目标版本及关系均由服务端复核。MEMBERSHIP不适用创始人免审。
+      summary: 当前有效直属审核人、创始人互审审核人或成员确认管理员决定申请
+      description: 禁止自审；驳回需理由；当前申请版本、目标版本及关系均由服务端复核。FOUNDER_PEER复核审核人仍为在职其他创始人。MEMBERSHIP不适用创始人免审。并发或重复决定只生效一次，其余409。
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}
       requestBody:
@@ -200,6 +611,50 @@ paths:
       description: 保留历史步骤并替代待审步骤。有效创始人明确继续本人非MEMBERSHIP申请时按当前权限及目标版本免审应用；重复该已免审请求返回原结果。成员确认仍分配管理员。
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Current review, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/reviews/{id}/reviewer-candidates:
+    get:
+      operationId: mobileReviewerCandidates
+      summary: 创始人互审申请人读取可选审核人
+      description: 仅申请人；申请须PENDING且approval_mode=FOUNDER_PEER，否则409 REVIEWER_SELECTION_UNSUPPORTED。返回本公司申请人以外的在职创始人，current标记当前审核人。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, current]
+                      properties: {id: {type: string}, name: {type: string}, current: {type: boolean}}
+        default: {$ref: '#/components/responses/Error'}
+  /api/reviews/{id}/reviewer:
+    post:
+      operationId: mobileSelectReviewer
+      summary: 创始人互审申请人更换审核人
+      description: 只能选择本公司其他在职创始人（否则400 INVALID_REVIEWER）；非申请人403；已决或目标版本不符409；重复选择当前审核人返回原详情。原步骤SUPERSEDED，新审核人收到REVIEW_PENDING。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reviewerId, expectedVersion]
+              properties:
+                reviewerId: {type: string, minLength: 1}
+                expectedVersion: {type: integer, minimum: 0}
       responses:
         '200': {description: Current review, content: {application/json: {schema: {type: object, additionalProperties: true}}}}
         default: {$ref: '#/components/responses/Error'}
@@ -296,6 +751,123 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
   schemas:
+    PersonalTodoUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 120
+          minLength: 1
+        note:
+          type: string
+          maxLength: 2000
+        date:
+          type: string
+          format: date
+        completed:
+          type: boolean
+        version:
+          type: integer
+          format: int32
+          minimum: 1
+      required:
+      - completed
+      - date
+      - title
+      - version
+    PersonalTodo:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        note:
+          type: string
+        date:
+          type: string
+          format: date
+        completed:
+          type: boolean
+        completedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PersonalTodoCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 120
+          minLength: 1
+        note:
+          type: string
+          maxLength: 2000
+        date:
+          type: string
+          format: date
+      required:
+      - date
+      - title
+    PersonalTodoPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonalTodo'
+        total:
+          type: integer
+          format: int64
+        nextCursor:
+          type: string
+    PersonalTodoCalendar:
+      type: object
+      properties:
+        month:
+          type: string
+        fromDate:
+          type: string
+          format: date
+        toDate:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonalTodoDayCount'
+    PersonalTodoDayCount:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        total:
+          type: integer
+          format: int64
+        completed:
+          type: integer
+          format: int64
+    PersonalTodoDeleted:
+      type: object
+      properties:
+        id:
+          type: string
+        deleted:
+          type: boolean
+        version:
+          type: integer
+          format: int32
     Error:
       type: object
       required: [code, message, traceId]

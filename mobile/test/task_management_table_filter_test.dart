@@ -60,7 +60,28 @@ void main() {
           (ref) => const Session(role: UserRole.employee, dispatch: false),
         ),
         recordsProvider.overrideWith(
-          (ref, resource) async => PageResult(tasks, total: tasks.length),
+          (ref, resource) async => PageResult(
+            tasks
+                .map(
+                  (r) => Record(
+                    id: r.id,
+                    title: r.title,
+                    fields: r.fields.map(
+                      (key, value) => MapEntry(
+                        key,
+                        value is String
+                            ? value.replaceAll(
+                                '2026-10',
+                                '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
+                              )
+                            : value,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+            total: tasks.length,
+          ),
         ),
       ],
     );
@@ -75,7 +96,7 @@ void main() {
       container.dispose();
     });
     await tester.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: container,
         child: MaterialApp.router(theme: appTheme(), routerConfig: router),
       ),

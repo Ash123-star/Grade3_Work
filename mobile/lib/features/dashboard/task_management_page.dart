@@ -20,44 +20,80 @@ bool isReceivedTask(Record item, String id) {
 }
 
 /// Dashboard company-task records have no management toolbar.
-class ReceivedTasksPage extends ConsumerWidget {
+class ReceivedTasksPage extends ConsumerStatefulWidget {
   const ReceivedTasksPage({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReceivedTasksPage> createState() => _ReceivedTasksPageState();
+}
+
+class _ReceivedTasksPageState extends ConsumerState<ReceivedTasksPage> {
+  List<String> cursors = ['0'];
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(sessionProvider);
-    final state = ref.watch(receivedTaskCardProvider);
+    ref.listen(sessionProvider, (_, next) {
+      if (mounted) setState(() => cursors = ['0']);
+    });
+    final pages = [
+      for (final cursor in cursors) ref.watch(receivedTaskPageProvider(cursor)),
+    ];
+    final items = <String, Record>{};
+    for (final page in pages) {
+      if (page.isLoading || page.hasError) continue;
+      for (final item in page.valueOrNull?.items ?? <Record>[]) {
+        if (isReceivedTask(item, user.id)) items[item.id] = item;
+      }
+    }
+    final last = pages.last.valueOrNull;
+    final next = last?.nextCursor;
+    final more =
+        last != null &&
+        last.items.isNotEmpty &&
+        next != null &&
+        !cursors.contains(next) &&
+        (int.tryParse(next) ?? 0) > (int.tryParse(cursors.last) ?? 0) &&
+        (int.tryParse(next) ?? 0) < last.total;
     return PageFrame(
-      title: '公司任务',
+      title: '任务看板',
+      actions: [
+        IconButton(
+          tooltip: '刷新任务看板',
+          onPressed: () {
+            setState(() => cursors = ['0']);
+            ref.invalidate(receivedTaskPageProvider);
+            ref.invalidate(homePreviewProvider('tasks/received-card'));
+          },
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
       child: PageBody(
         children: [
-          state.when(
-            loading: () => const LoadingSkeleton(),
-            error: (error, _) => RecordFailure(
-              error,
-              retry: () => ref.invalidate(receivedTaskCardProvider),
+          if (items.isEmpty && pages.every((p) => p.hasValue))
+            const EmptyIllustration(title: '暂无参与任务'),
+          for (final item in items.values)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _TaskRecordCard(
+                item: item,
+                compact: false,
+                received: true,
+                onTap: () => openItem(context, 'tasks', item.id),
+              ),
             ),
-            data: (page) {
-              final rows = page.items
-                  .where((r) => isReceivedTask(r, user.id))
-                  .toList();
-              if (rows.isEmpty) return const EmptyIllustration(title: '暂无接收任务');
-              return Column(
-                children: [
-                  for (final item in rows)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _TaskRecordCard(
-                        item: item,
-                        compact: false,
-                        received: true,
-                        onTap: () => openItem(context, 'tasks', item.id),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-          const DemoLabel(),
+          for (var i = 0; i < pages.length; i++)
+            if (pages[i].isLoading)
+              const LoadingSkeleton()
+            else if (pages[i].hasError)
+              RecordFailure(
+                pages[i].error!,
+                retry: () =>
+                    ref.invalidate(receivedTaskPageProvider(cursors[i])),
+              ),
+          if (more && !pages.any((p) => p.hasError))
+            OutlinedButton(
+              onPressed: () => setState(() => cursors = [...cursors, next]),
+              child: const Text('加载更多任务'),
+            ),
         ],
       ),
     );
@@ -301,7 +337,7 @@ class _TaskManagementPageState extends ConsumerState<TaskManagementPage> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-              const DogAvatar(index: DogAssets.friendly, size: 32),
+              const TuantuanIcon('task', size: 32),
             ],
           ),
           const SizedBox(height: 8),
@@ -473,11 +509,8 @@ class _TaskRecordCard extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 4,
                   children: [
-                    AppLabelBadge(
-                      taskTagLabel(f),
-                      color: tagColor,
-                      compact: true,
-                    ),
+                    for (final label in taskTagNames(f))
+                      AppLabelBadge(label, color: tagColor, compact: true),
                     AppLabelBadge(
                       '${f['status'] ?? '状态未提供'}',
                       color: SunnyPalette.mint,

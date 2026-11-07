@@ -80,7 +80,11 @@ class CalendarAdapter implements HttpClientAdapter {
           : later && failure == 'changed'
           ? 32
           : 31,
-      if (failure != 'missing') 'nextCursor': failure == 'repeat' ? '0' : '30',
+      if (tasks) ...{
+        'snapshotToken': 'calendar-fixture',
+        'nextCursor': null,
+      } else if (failure != 'missing')
+        'nextCursor': failure == 'repeat' ? '0' : '30',
     };
     return ResponseBody.fromString(
       jsonEncode(body),
@@ -102,7 +106,7 @@ HttpRepository repository(CalendarAdapter adapter) {
 }
 
 Widget host(ProviderContainer container, Widget child, {double scale = 1.5}) =>
-    UncontrolledProviderScope(
+    OwnedTestProviderScope(
       container: container,
       child: MaterialApp(
         theme: appTheme(),
@@ -408,7 +412,7 @@ void main() {
       await t.pumpWidget(
         RepaintBoundary(
           key: boundaryKey,
-          child: UncontrolledProviderScope(
+          child: OwnedTestProviderScope(
             container: container,
             child: const PandoraApp(),
           ),

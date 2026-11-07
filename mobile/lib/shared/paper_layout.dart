@@ -33,56 +33,25 @@ class PaperSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final layout = SunnyPaperTokens.of(context);
     final base = color ?? Theme.of(context).colorScheme.surface;
-    final paper =
-        texture ??
-        TuantuanAssets.textures[base == SunnyPalette.purple
-            ? 'lavenderCloud'
-            : base == SunnyPalette.coral
-            ? 'coralDots'
-            : base == SunnyPalette.mint
-            ? 'mintGrid'
-            : 'paper'];
-    final surfaceSkin =
-        skin ?? TuantuanAssets.detailSections[TuantuanAssets.tone(base)]!;
     final surface = Material(
       color: base,
       elevation: onTap == null ? 0 : 1,
-      shadowColor: const Color(0x183E6654),
+      shadowColor: const Color(0x123D352B),
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(layout.cardRadius),
         side: BorderSide(
-          color: borderColor ?? (outlined
-              ? Theme.of(context).colorScheme.outline
-              : const Color(0xFFE1EEE7)),
+          color:
+              borderColor ??
+              (outlined
+                  ? Theme.of(context).colorScheme.outline
+                  : const Color(0xFFEEE4CD)),
           width: outlined ? 1.5 : 1,
         ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          if (decorated) ...[
-            Positioned.fill(child: TuantuanSkin(surfaceSkin)),
-            if (paper != null)
-              Positioned.fill(
-                child: TuantuanArt(
-                  paper,
-                  fit: BoxFit.cover,
-                  opacity: textureOpacity,
-                ),
-              ),
-            if (cornerDecoration != null)
-              Positioned(
-                right: 10,
-                bottom: 8,
-                child: TuantuanArt(
-                  cornerDecoration!,
-                  width: 42,
-                  height: 42,
-                  opacity: .8,
-                ),
-              ),
-          ],
           InkWell(
             onTap: onTap,
             child: Padding(padding: padding, child: child),
@@ -113,9 +82,9 @@ class TuantuanIconTile extends StatelessWidget {
     height: size,
     padding: const EdgeInsets.all(4),
     decoration: BoxDecoration(
-      color: color ?? Theme.of(context).colorScheme.surface,
+      color: color ?? SunnyPalette.primaryContainer,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFD6E9DE)),
+      border: Border.all(color: const Color(0xFFEEE4CD)),
     ),
     child: Center(child: TuantuanIcon(icon, size: size - 14)),
   );
@@ -250,7 +219,7 @@ class PillTabs extends StatelessWidget {
               selected: index == selected,
               child: Material(
                 color: index == selected
-                    ? Theme.of(context).colorScheme.surface
+                    ? SunnyPalette.primary
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(24),
                 child: InkWell(
@@ -271,7 +240,7 @@ class PillTabs extends StatelessWidget {
                               Icon(
                                 Icons.check_rounded,
                                 size: 16,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: SunnyPalette.ink,
                               ),
                               const SizedBox(width: 4),
                             ],
@@ -279,12 +248,14 @@ class PillTabs extends StatelessWidget {
                               child: Text(
                                 label,
                                 textAlign: TextAlign.center,
-                                overflow: wrapLabels ? TextOverflow.visible : TextOverflow.ellipsis,
+                                overflow: wrapLabels
+                                    ? TextOverflow.visible
+                                    : TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   color: index == selected
-                                      ? Theme.of(context).colorScheme.primary
-                                      : SunnyPalette.ink,
+                                      ? SunnyPalette.ink
+                                      : SunnyPalette.muted,
                                 ),
                               ),
                             ),
@@ -330,16 +301,50 @@ class TuantuanFilterChip extends StatelessWidget {
 
 /// Material confirmation retains native focus, semantics and scroll handling.
 class TuantuanDialog extends StatelessWidget {
-  const TuantuanDialog({super.key, this.title, this.content, this.actions});
+  const TuantuanDialog({
+    super.key,
+    this.title,
+    this.content,
+    this.actions,
+    this.insetPadding,
+    this.constraints,
+    this.titlePadding,
+    this.contentPadding,
+    this.actionsPadding,
+    this.scrollable = false,
+  });
   final Widget? title, content;
   final List<Widget>? actions;
+  final EdgeInsets? insetPadding, titlePadding, contentPadding, actionsPadding;
+  final BoxConstraints? constraints;
+  final bool scrollable;
   @override
   Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: const Color(0xFFFFFAF0),
     surfaceTintColor: Colors.transparent,
     elevation: 8,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    title: title,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(28),
+      side: const BorderSide(color: Color(0xFFEADBB9)),
+    ),
+    insetPadding:
+        insetPadding ??
+        const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+    constraints: constraints ?? const BoxConstraints(maxWidth: 480),
+    scrollable: scrollable,
+    titlePadding: titlePadding ?? const EdgeInsets.fromLTRB(24, 20, 24, 16),
+    contentPadding: contentPadding ?? const EdgeInsets.fromLTRB(24, 0, 24, 20),
+    actionsPadding: actionsPadding ?? const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    actionsOverflowButtonSpacing: 8,
+    title: title == null
+        ? null
+        : Row(
+            children: [
+              const SunshineMascot(size: 44),
+              const SizedBox(width: 12),
+              Expanded(child: title!),
+            ],
+          ),
     content: content,
     actions: actions,
     titleTextStyle: Theme.of(context).textTheme.titleLarge,
@@ -385,8 +390,8 @@ class TuantuanSheet extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surface,
-    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+    color: const Color(0xFFFFFAF0),
+    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
     clipBehavior: Clip.antiAlias,
     child: child,
   );
@@ -424,6 +429,8 @@ Future<T?> showTuantuanFocusSheet<T>({
                 padding: const EdgeInsets.fromLTRB(20, 14, 8, 10),
                 child: Row(
                   children: [
+                    const SunshineMascot(size: 36),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         title,
@@ -439,7 +446,10 @@ Future<T?> showTuantuanFocusSheet<T>({
                   ],
                 ),
               ),
-              Divider(height: 1, color: Theme.of(dialogContext).colorScheme.outlineVariant),
+              Divider(
+                height: 1,
+                color: Theme.of(dialogContext).colorScheme.outlineVariant,
+              ),
               Expanded(
                 child: Stack(
                   children: [
@@ -462,9 +472,10 @@ Future<T?> showTuantuanFocusSheet<T>({
   transitionBuilder: (context, animation, _, child) => FadeTransition(
     opacity: animation,
     child: ScaleTransition(
-      scale: Tween<double>(begin: .96, end: 1).animate(
-        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-      ),
+      scale: Tween<double>(
+        begin: .96,
+        end: 1,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
       child: child,
     ),
   ),

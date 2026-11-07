@@ -1,3 +1,4 @@
+import 'calendar_tasks.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'repository.dart';
@@ -9,6 +10,13 @@ Future<PageResult> readCompleteList(
   Query query, {
   bool Function()? isActive,
 }) async {
+  if (resource == 'tasks' && query.from != null && query.to != null) {
+    return sharedCalendarTaskReader.read(
+      repository,
+      query,
+      isActive: isActive ?? () => true,
+    );
+  }
   final all = <Record>[], ids = <String>{}, cursors = <String>{};
   String? cursor = query.cursor;
   int? expectedTotal;
@@ -28,6 +36,7 @@ Future<PageResult> readCompleteList(
         from: query.from,
         to: query.to,
         cursor: cursor,
+        limit: query.limit,
       ),
     );
     if (isActive?.call() == false) {

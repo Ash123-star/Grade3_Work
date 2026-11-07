@@ -13,12 +13,14 @@ import java.util.*;
 @Configuration
 public class OpenApi {
     static ObjectSchema object(String... required) { var s=new ObjectSchema(); s.setAdditionalProperties(false); if(required.length>0) s.setRequired(List.of(required)); return s; }
+    static Schema<String> nullableText() { return new Schema<String>().types(new LinkedHashSet<>(List.of("string","null"))); }
+    static Schema<String> nullableDateTime() { return nullableText().format("date-time"); }
     static Schema<?> ref(String name) { return new Schema<>().$ref("#/components/schemas/"+name); }
     static StringSchema text() { var s=new StringSchema(); s.setMaxLength(20000); return s; }
     static IntegerSchema version() { var s=new IntegerSchema(); s.setMinimum(java.math.BigDecimal.ZERO); return s; }
     static ArraySchema ids() { var s=new ArraySchema(); s.setItems(new StringSchema()); s.setMaxItems(100); s.setUniqueItems(true); return s; }
     static ObjectSchema revision(String content,String key) { var s=object("version","reason",key); s.addProperty("version",version()); s.addProperty("reason",text().minLength(1)); s.addProperty(key,ref(content)); return s; }
-    @Bean OpenAPI contract() {
+    OpenAPI contract() {
         var c=new Components().addSecuritySchemes("bearer",new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").description("登录获取的不透明会话；改密或停用后撤销"));
         var registration=object("account","password","phone","name","departmentId");
         registration.addProperty("account",new StringSchema().pattern("^[a-zA-Z0-9_.-]{3,64}$")); registration.addProperty("password",text().minLength(12).description("UTF-8 编码不超过 72 字节")); registration.addProperty("phone",new StringSchema().pattern("^1[3-9][0-9]{9}$")); registration.addProperty("name",text().minLength(1)); registration.addProperty("departmentId",text().minLength(1)); c.addSchemas("Registration",registration);
@@ -28,7 +30,7 @@ public class OpenApi {
         for(String field:List.of("group","content","labelId")) task.addProperty(field,text()); task.addProperty("attachments",ids().description("仅本人上传且未关联任务的附件，已关联其他任务返回 ATTACHMENT_BOUND")); task.setDescription("创建返回审核申请，批准后才生成正式任务。参与人无主负责人/协作人语义；不接受 phase、status、completion、progress 等服务端字段。"); c.addSchemas("TaskDraft",task);
         var participant=object("id","name"); participant.addProperty("id",text()); participant.addProperty("name",text()); participant.addProperty("avatar_id",text()); c.addSchemas("TaskParticipant",participant);
         var label=object("name","category","color"); label.addProperty("name",text().minLength(1).maxLength(100)); label.addProperty("category",text().minLength(1).maxLength(100)); label.addProperty("color",new StringSchema().pattern("^#[0-9a-fA-F]{6}$")); label.addProperty("departmentId",text()); label.addProperty("status",new StringSchema()._enum(List.of("ACTIVE","DISABLED"))); label.addProperty("version",version()); c.addSchemas("TaskLabel",label);
-        var taskListItem=object("id","issuer_id","title","deadline","version","created_at"); taskListItem.addProperty("id",text()); taskListItem.addProperty("issuer_id",text()); taskListItem.addProperty("title",text()); taskListItem.addProperty("start_at",new DateTimeSchema().nullable(true)); taskListItem.addProperty("deadline",new DateTimeSchema()); taskListItem.addProperty("participants",new ArraySchema().items(ref("TaskParticipant"))); taskListItem.addProperty("label",ref("TaskLabel")); taskListItem.addProperty("version",version()); taskListItem.addProperty("created_at",new DateTimeSchema()); taskListItem.setDescription("任务列表安全投影；不返回 owner、collaborator、phase、status、completion、progress、正文、事件或任何替代状态字段。"); c.addSchemas("TaskListItem",taskListItem);
+        var taskListItem=object("id","issuer_id","title","deadline","version","created_at"); taskListItem.addProperty("id",text()); taskListItem.addProperty("issuer_id",text()); taskListItem.addProperty("title",text()); taskListItem.addProperty("start_at",nullableDateTime()); taskListItem.addProperty("deadline",new DateTimeSchema()); taskListItem.addProperty("participants",new ArraySchema().items(ref("TaskParticipant"))); taskListItem.addProperty("label",ref("TaskLabel")); taskListItem.addProperty("labels",new ArraySchema().items(ref("TaskLabel"))); taskListItem.addProperty("version",version()); taskListItem.addProperty("created_at",new DateTimeSchema()); taskListItem.addProperty("pinned",new BooleanSchema().description("当前用户个人置顶")); taskListItem.addProperty("pinnedAt",nullableDateTime()); taskListItem.addProperty("phase",nullableText()._enum(Arrays.asList("DISPATCHED","RECEIVED","FEEDBACK","ACCEPTED","ARCHIVED","WITHDRAWN",null)).description("只读正式流转：待接收/进行中/待验收/已验收/已归档/已撤回；未知值按情况未知展示，退回事件回到RECEIVED")); taskListItem.addProperty("dispatchAt",nullableDateTime().description("最早真实DISPATCHED事件时间，缺失为null，不能用created_at补造")); taskListItem.setDescription("任务列表授权投影；phase供任务管理完成情况只读展示，不返回 owner、collaborator、status、completion、progress、正文或事件；派发表单不接受任何状态字段。"); c.addSchemas("TaskListItem",taskListItem);
         c.addSchemas("TaskRevision",revision("TaskDraft","candidate"));
         var event=object("type","version"); event.addProperty("type",new StringSchema()._enum(List.of("RECEIVED","FEEDBACK","ACCEPTED","RETURNED","ARCHIVED","WITHDRAWN"))); event.addProperty("version",version()); event.addProperty("text",text().maxLength(2000).description("反馈、退回、撤回必填（1–2000 字）")); event.addProperty("attachments",new ArraySchema().items(text()).maxItems(5).description("仅FEEDBACK可传；本人上传同公司材料")); c.addSchemas("TaskEvent",event);
         var reassignment=object("ownerId","version","reason"); reassignment.addProperty("ownerId",text().minLength(1)); reassignment.addProperty("version",version()); reassignment.addProperty("reason",text().minLength(1)); c.addSchemas("TaskReassignment",reassignment);
@@ -103,6 +105,20 @@ public class OpenApi {
         var indexRetry=object("id","type","state");indexRetry.addProperty("id",text());indexRetry.addProperty("type",new StringSchema()._enum(List.of("KNOWLEDGE_INDEX")));indexRetry.addProperty("state",new StringSchema()._enum(List.of("QUEUED")));c.addSchemas("KnowledgeIndexRetry",indexRetry);
         var forgetJob=object("id","state");forgetJob.addProperty("id",text());forgetJob.addProperty("state",new StringSchema()._enum(List.of("PENDING","SUCCEEDED","FAILED")));forgetJob.addProperty("error",text());forgetJob.addProperty("message",text());c.addSchemas("MemoryForgetJob",forgetJob);
         var error=object("code","message","traceId"); for(String field:List.of("code","message","traceId")) error.addProperty(field,text()); c.addSchemas("Error",error);
+        MobileP0OpenApi.register(c);
+        CalendarOpenApi.register(c);
+        return new OpenAPI().servers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/"))).info(new Info().title("企业协作智能面板 API").version("1.0.0").description("UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表以只读phase反映正式完成情况，派发表单不接受状态。分页 cursor 是非负偏移量。" )).components(c).addSecurityItem(new SecurityRequirement().addList("bearer"));
+    }
+    @Bean OpenAPI initialContract() {
+        var api=contract();
+        // Register typed maps after springdoc's plain-Jackson clone.
+        api.getComponents().setSchemas(new LinkedHashMap<>());
+        return api;
+    }
+    @Bean OpenApiCustomizer reviewDetailContract() {
+        return api -> {
+        var c=api.getComponents();
+        contract().getComponents().getSchemas().forEach(c::addSchemas);
         var reviewDetail=object("id","kind","status","expected_version","before_value","candidate","display_references");
         for(String field:List.of("id","kind","status")) reviewDetail.addProperty(field,text());
         reviewDetail.addProperty("expected_version",new IntegerSchema().minimum(java.math.BigDecimal.ZERO));
@@ -110,11 +126,17 @@ public class OpenApi {
         reviewDetail.addProperty("candidate",new ObjectSchema().additionalProperties(true));
         var references=new ObjectSchema();
         for(String category:List.of("people","labels","departments","teams"))
-            references.addProperty(category,new ObjectSchema().additionalProperties(text()));
+            references.addProperty(category,new MapSchema().additionalProperties(text()));
         reviewDetail.addProperty("display_references",references.description("已授权审核快照引用的同公司ID到当前名称映射；名称非历史快照，缺失引用不返回"));
+        reviewDetail.addProperty("approval_mode",new StringSchema()._enum(List.of("DIRECT_MANAGER","ADMIN_MEMBERSHIP","FOUNDER_PEER","LEGACY")));
+        reviewDetail.addProperty("decision_source",new StringSchema()._enum(List.of("DIRECT_MANAGER","ADMIN_MEMBERSHIP","FOUNDER_PEER","FOUNDER_EXEMPT")).nullable(true));
+        reviewDetail.addProperty("reviewer_selectable",new BooleanSchema().description("仅本人 PENDING 的 FOUNDER_PEER 申请为 true"));
         reviewDetail.additionalProperties(true); c.addSchemas("ReviewDetail",reviewDetail);
-        MobileP0OpenApi.register(c);
-        return new OpenAPI().servers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/"))).info(new Info().title("企业协作智能面板 API").version("1.0.0").description("UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表不提供完成情况。分页 cursor 是非负偏移量。" )).components(c).addSecurityItem(new SecurityRequirement().addList("bearer"));
+        var reviewerSelection=object("reviewerId","expectedVersion"); reviewerSelection.addProperty("reviewerId",text().minLength(1)); reviewerSelection.addProperty("expectedVersion",version()); c.addSchemas("ReviewerSelection",reviewerSelection);
+        var candidate=object("id","name","current"); candidate.addProperty("id",text()); candidate.addProperty("name",text()); candidate.addProperty("current",new BooleanSchema());
+        var candidates=object("items"); candidates.addProperty("items",new ArraySchema().items(candidate)); c.addSchemas("ReviewerCandidates",candidates);
+        var taskPin=object("taskId","pinned"); taskPin.addProperty("taskId",text()); taskPin.addProperty("pinned",new BooleanSchema()); taskPin.addProperty("pinnedAt",new DateTimeSchema().nullable(true)); c.addSchemas("TaskPin",taskPin);
+        };
     }
     @Bean OpenApiCustomizer requestModels() {
         return api->{
@@ -122,14 +144,14 @@ public class OpenApi {
                 Map.entry("POST /api/auth/register","Registration"),Map.entry("POST /api/auth/login","Login"),Map.entry("POST /api/auth/password","PasswordChange"),
                 Map.entry("POST /api/tasks","TaskDraft"),Map.entry("POST /api/tasks/{id}/events","TaskEvent"),Map.entry("POST /api/tasks/{id}/reassignments","TaskReassignment"),Map.entry("POST /api/tasks/{id}/reschedules","TaskReschedule"),Map.entry("POST /api/tasks/{id}/revisions","TaskRevision"),Map.entry("POST /api/tasks/{id}/deletions","TaskDeletion"),Map.entry("POST /api/tasks/{taskId}/comments","TaskComment"),Map.entry("POST /api/task-labels","TaskLabel"),Map.entry("PUT /api/task-labels/{id}","TaskLabel"),
                 Map.entry("PUT /api/logs/draft","LogDraft"),Map.entry("PUT /api/logs/{id}/content","LogContentUpdate"),Map.entry("POST /api/logs/{id}/submit","Version"),Map.entry("POST /api/logs/{id}/comments","LogComment"),
-                Map.entry("POST /api/reviews/{id}/decision","ReviewDecision"),Map.entry("POST /api/organization/membership-application","MembershipApplication"),Map.entry("POST /api/organization/reviewer-application","ReviewerApplication"),Map.entry("POST /api/organization/review-policy/revisions","ReviewPolicy"),Map.entry("POST /api/organization/users/{id}/revisions","UserRevision"),Map.entry("POST /api/organization/{kind}/revisions","UnitRevision"),
+                Map.entry("POST /api/reviews/{id}/decision","ReviewDecision"),Map.entry("POST /api/reviews/{id}/reviewer","ReviewerSelection"),Map.entry("POST /api/organization/membership-application","MembershipApplication"),Map.entry("POST /api/organization/reviewer-application","ReviewerApplication"),Map.entry("POST /api/organization/review-policy/revisions","ReviewPolicy"),Map.entry("POST /api/organization/users/{id}/revisions","UserRevision"),Map.entry("POST /api/organization/{kind}/revisions","UnitRevision"),
                 Map.entry("POST /api/dashboard/company/revisions","CompanyItemRevision"),Map.entry("POST /api/dashboard/personal","PersonalItem"),Map.entry("PUT /api/private-notes","PrivateNote"),Map.entry("PUT /api/profiles/me","Profile"),
                 Map.entry("POST /api/ai/jobs","AiJobRequest"),Map.entry("PUT /api/ai/jobs/{id}/draft","AiDraftEdit"),Map.entry("POST /api/ai/jobs/{id}/confirm-task","ConfirmTask"),Map.entry("POST /api/ai-maps/edges","MapEdge"),
                 Map.entry("POST /api/ai-maps/development/jobs","DevelopmentRequest"),Map.entry("POST /api/ai-memories","MemoryCreate"),Map.entry("POST /api/ai-memories/{id}/revisions","MemoryRevision"),Map.entry("POST /api/ai-memories/{id}/confirm","MemoryConfirm"),Map.entry("PUT /api/ai-memories/preferences/me","MemoryPreferences"),Map.entry("POST /api/ai-maps/development/{id}/feedback","DevelopmentFeedback"));
             var responses=Map.ofEntries(
-                Map.entry("GET /api/reviews/{id}","ReviewDetail"),
+                Map.entry("GET /api/reviews/{id}","ReviewDetail"),Map.entry("POST /api/reviews/{id}/reviewer","ReviewDetail"),Map.entry("GET /api/reviews/{id}/reviewer-candidates","ReviewerCandidates"),
                 Map.entry("POST /api/ai/jobs/{id}/confirm-task","AiTaskConfirmationResult"),Map.entry("GET /api/organization/teams","TeamDirectory"),
-                Map.entry("GET /api/tasks","TaskPage"),Map.entry("GET /api/tasks/received-card","ReceivedTaskPage"),Map.entry("GET /api/logs/subordinates/calendar","MemberLogCalendar"),Map.entry("GET /api/organization/people","OrganizationPeoplePage"),
+                Map.entry("GET /api/tasks","TaskPage"),Map.entry("PUT /api/tasks/{id}/pin","TaskPin"),Map.entry("DELETE /api/tasks/{id}/pin","TaskPin"),Map.entry("GET /api/tasks/received-card","ReceivedTaskPage"),Map.entry("GET /api/logs/subordinates/calendar","MemberLogCalendar"),Map.entry("GET /api/organization/people","OrganizationPeoplePage"),
                 Map.entry("GET /api/analytics","AnalyticsSummary"),Map.entry("GET /api/analytics/details","AnalyticsDetailsPage"),Map.entry("GET /api/profiles/{id}","ProfileView"),Map.entry("PUT /api/profiles/me","ProfileView"),
                 Map.entry("GET /api/ai-maps/development","DevelopmentLatest"),Map.entry("POST /api/ai-maps/development/jobs","DevelopmentJob"),
                 Map.entry("GET /api/ai-maps/development/jobs/{id}","DevelopmentJob"),Map.entry("POST /api/ai-maps/development/jobs/{id}/retry","DevelopmentJob"),
@@ -146,10 +168,10 @@ public class OpenApi {
                 var op=dispatch.getPost(); op.setDescription("提交任务创建审核。同一派发人同一 Idempotency-Key 重放相同内容返回同一审核申请，内容不同返回 409 IDEMPOTENCY_CONFLICT；审核批准前不是正式任务；附件已关联其他任务返回 409 ATTACHMENT_BOUND。");
                 if(op.getParameters()!=null) op.getParameters().stream().filter(p->"Idempotency-Key".equals(p.getName())).forEach(p->{ p.setRequired(true); p.setSchema(new StringSchema().minLength(1).maxLength(128)); p.setDescription("1–128 位，按派发人隔离"); });
             }
-            if(dispatch!=null&&dispatch.getGet()!=null) dispatch.getGet().setDescription("在服务端组织数据范围内分页查询已生效任务。列表项仅为 TaskListItem，永不返回负责人、协作人、阶段、完成情况、进度、正文或事件。");
+            if(dispatch!=null&&dispatch.getGet()!=null) dispatch.getGet().setDescription("在服务端公司和组织数据范围内分页查询已生效任务。列表项为TaskListItem，phase只读反映正式流转，dispatchAt为真实派发事件时间；不返回历史负责人、协作人、正文或事件，未生效候选不改变正式phase。");
             var taskEvents=api.getPaths().get("/api/tasks/{id}/events"); if(taskEvents!=null&&taskEvents.getPost()!=null) taskEvents.getPost().setDescription("生命周期动作。非法状态转换返回 409 INVALID_TRANSITION；旧版本返回 409 VERSION_CONFLICT；未知动作返回 400 INVALID_EVENT。反馈、退回、撤回必须提供 text。");
             var reassignment=api.getPaths().get("/api/tasks/{id}/reassignments"); if(reassignment!=null&&reassignment.getPost()!=null) reassignment.getPost().setDescription("提交转派复核申请；申请不会立即更换负责人。新旧负责人相同返回 400 SAME_OWNER，终态返回 409 INVALID_TRANSITION。");
-            var reschedule=api.getPaths().get("/api/tasks/{id}/reschedules"); if(reschedule!=null&&reschedule.getPost()!=null) reschedule.getPost().setDescription("提交改期复核申请；申请不会立即改期。必须提供带时区、不同于当前值的 deadline。");
+            var reschedule=api.getPaths().get("/api/tasks/{id}/reschedules"); if(reschedule!=null&&reschedule.getPost()!=null) reschedule.getPost().setDescription("提交改期复核申请，返回审核 ID 和实际审核状态。旧模式 deadline/version/reason 仅改截止时间；MOVE 模式仅接受 version/moveDays/reason，必须携带 Idempotency-Key 和 If-Schedule-Constraints-Match。MOVE 保持时长、非日期字段及旧排期直到审核生效。相同键和内容重放原申请；版本、内容、约束或同版本待审冲突返回409。模式关闭仍允许同键确认已存在申请。");
             var deletion=api.getPaths().get("/api/tasks/{id}/deletions"); if(deletion!=null&&deletion.getPost()!=null) deletion.getPost().setDescription("提交任务删除审核申请。批准后仅归档，保留原任务摘要、申请、审核、理由和时间审计；不得物理删除。");
             var comments=api.getPaths().get("/api/tasks/{taskId}/comments"); if(comments!=null&&comments.getPost()!=null) comments.getPost().setDescription("公开任务评论与回复。要求 Idempotency-Key；空评论400、错误父评论400、重复键409、范围外任务404。评论、审计和 outbox 通知同一事务写入，评论不可编辑删除。");
             var logDraft=api.getPaths().get("/api/logs/draft"); if(logDraft!=null&&logDraft.getPut()!=null) logDraft.getPut().setDescription("保存本人每日唯一日报草稿。草稿仅本人可读；version过期返回409，已提交日报须使用content直接更新。");

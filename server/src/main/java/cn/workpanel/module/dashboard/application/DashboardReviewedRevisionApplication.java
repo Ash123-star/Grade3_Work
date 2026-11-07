@@ -24,6 +24,7 @@ public class DashboardReviewedRevisionApplication implements ReviewedRevisionApp
         if(!applicant.company().equals(approver.company())) throw ApiError.forbidden();
         switch(kind) {
             case "COMPANY_ITEM" -> {
+                cn.workpanel.module.dashboard.domain.CompanyItemPolicy.validate(c);
                 if(!applicant.global()) throw ApiError.forbidden(); db.one("SELECT id FROM companies WHERE id=? FOR UPDATE",approver.company());
                 boolean pinned=Boolean.TRUE.equals(c.get("pinned")),archived=Boolean.TRUE.equals(c.get("archived"));
                 if(pinned&&!archived&&db.count("SELECT count(*) FROM dashboard_items WHERE company_id=? AND kind='COMPANY' AND pinned AND NOT archived AND id<>?",approver.company(),target)>=10) throw ApiError.bad("PIN_LIMIT","最多置顶十项");

@@ -210,10 +210,7 @@ void main() {
     await t.pumpWidget(
       RepaintBoundary(
         key: capture,
-        child: UncontrolledProviderScope(
-          container: c,
-          child: const PandoraApp(),
-        ),
+        child: OwnedTestProviderScope(container: c, child: const PandoraApp()),
       ),
     );
     await settleLocalIo(t);
@@ -332,10 +329,7 @@ void main() {
     (t) async {
       for (final (family, path) in [
         ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
-        (
-          'MaterialIcons',
-          materialIconsFontPath,
-        ),
+        ('MaterialIcons', materialIconsFontPath),
       ]) {
         await (FontLoader(family)..addFont(
               Future.value(ByteData.sublistView(File(path).readAsBytesSync())),

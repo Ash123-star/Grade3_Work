@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: 可连续演示的移动端 UI
-The application SHALL order navigation as 导图、视图、日志、AI地图、我的 and preserve demo business data across role changes.
+The application SHALL order navigation as 首页、公司、日志、AI地图、我的 and preserve demo business data across role changes.
 
 #### Scenario: Complete a task demonstration
 - **WHEN** a manager dispatches a task and switches to its employee owner

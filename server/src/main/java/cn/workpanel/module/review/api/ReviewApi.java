@@ -5,7 +5,7 @@ import java.util.Map;
 
 /** 审核模块公共接口；其他模块通过该接口提交候选，不直接操作审核表。 */
 public interface ReviewApi {
-    /** 创建候选申请；直属单级审核，MEMBERSHIP为管理员例外，创始人仅在已有权限内免审。 */
+    /** 创建候选申请；直属单级审核，MEMBERSHIP为管理员例外；创始人在公司另有在职创始人时由其互审，仅一位时在已有权限内免审。 */
     Map<String, Object> create(ActorContext actor, Map<String, Object> command);
 
     /** 读取申请人或当前审核步骤可见的审核详情。 */

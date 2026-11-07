@@ -10,6 +10,7 @@ import 'package:pandora_mobile/data/models/ai_work.dart';
 import 'package:pandora_mobile/data/repositories/ai_work_repository.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
+import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'work_management_pages.dart' show WorkTargetPicker;
 
@@ -76,7 +77,13 @@ class _WorkbenchPageState extends ConsumerState<WorkbenchPage>
       child: Scaffold(
         backgroundColor: SunnyPalette.paper,
         appBar: AppBar(
-          title: const Text('AI地图'),
+          title: const Row(
+            children: [
+              TuantuanIcon('ai', size: 28),
+              SizedBox(width: 10),
+              Text('AI地图'),
+            ],
+          ),
           actions: [
             IconButton(
               tooltip: '办事设置',
@@ -119,15 +126,16 @@ class _WorkbenchPageState extends ConsumerState<WorkbenchPage>
                         ? ListView(
                             padding: const EdgeInsets.all(24),
                             children: [
-                              const SizedBox(height: 70),
-                              const Icon(
-                                Icons.auto_awesome_rounded,
-                                color: SunnyPalette.primaryStrong,
-                                size: 46,
+                              const SizedBox(height: 32),
+                              const Center(
+                                child: SunshineMascot(
+                                  pose: 'assistant',
+                                  size: 108,
+                                ),
                               ),
                               const SizedBox(height: 20),
                               Text(
-                                '把事情交给我',
+                                '下一步，一起理清楚',
                                 style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
                                       fontFamily: AppTypography.displayFamily,
@@ -461,7 +469,12 @@ class _WorkComposerState extends ConsumerState<WorkComposer> {
             padding: const EdgeInsets.only(bottom: 10),
             child: Semantics(
               liveRegion: true,
-              child: Text(error!, style: const TextStyle(fontSize: 15)),
+              child: Column(
+                children: [
+                  Text(error!, style: const TextStyle(fontSize: 15)),
+                  if (!error!.contains('内容已保留')) const Text('内容已保留，可重试'),
+                ],
+              ),
             ),
           ),
         AnimatedSize(
@@ -739,7 +752,7 @@ class _WorkDetailPageState extends ConsumerState<WorkDetailPage>
     final approved = await showDialog<bool>(
       context: context,
       animationStyle: WorkMotion.dialog(context),
-      builder: (context) => AlertDialog(
+      builder: (context) => TuantuanDialog(
         title: const Text('清除私人记录？'),
         content: const Text('这件事的对话和私人材料将被清除，已经办理的任务与交付会保留。'),
         actions: [
@@ -892,6 +905,35 @@ class _WorkDetailPageState extends ConsumerState<WorkDetailPage>
                           ),
                           padding: const EdgeInsets.all(16),
                           children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 8, 4, 22),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TuantuanStatusPill(
+                                    value.label,
+                                    color: SunnyPalette.primaryContainer,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    value.title,
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'AI 协助办理 · 执行前请核对',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: SunnyPalette.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             for (final message in value.messages)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 12),

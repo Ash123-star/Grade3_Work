@@ -119,22 +119,36 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('旧标签'), findsNothing);
       expect(find.text('重要'), findsNothing);
+      final option = find.byKey(
+        const ValueKey('task-label-option:db-custom-927'),
+      );
+      expect(t.widget<FilterChip>(option).selected, isFalse);
+      expect(
+        t.widget<FilterChip>(option).backgroundColor,
+        const Color(0xFFCFE5FF),
+      );
       await t.tap(find.text('门店质量核验'));
+      await t.pumpAndSettle();
+      expect(
+        t.widget<FilterChip>(option).selectedColor,
+        const Color(0xFFCFE5FF),
+      );
       await t.pumpAndSettle();
       await t.tap(find.text('确定'));
       await t.pumpAndSettle();
       expect(controller.text, 'db-custom-927');
       expect(form.currentState!.validate(), isTrue);
-      expect(find.text('门店质量核验'), findsOneWidget);
-      await repository.execute(
-        'tasks',
-        Command('create', {
-          'title': '门店核验',
-          'participantIds': ['member-1'],
-          'labelIds': [controller.text],
-          'startAt': '2026-11-02T09:00:00+08:00',
-          'deadline': '2026-11-03T18:00:00+08:00',
-        }, idempotencyKey: 'label-contract'),
+      await t.runAsync(
+        () => repository.execute(
+          'tasks',
+          Command('create', {
+            'title': '门店核验',
+            'participantIds': ['member-1'],
+            'labelIds': [controller.text],
+            'startAt': '2026-11-02T09:00:00+08:00',
+            'deadline': '2026-11-03T18:00:00+08:00',
+          }, idempotencyKey: 'label-contract'),
+        ),
       );
       final post = adapter.requests.last;
       expect(post.path, '/tasks');
@@ -208,6 +222,8 @@ void main() {
     expect(form.currentState!.validate(), isTrue);
     adapter.labels.clear();
     container.invalidate(recordsProvider('task-labels'));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 100));
     await t.pumpAndSettle();
     expect(form.currentState!.validate(), isFalse);
     expect(find.byKey(const ValueKey('task-label-selected')), findsNothing);

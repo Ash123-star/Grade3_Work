@@ -118,18 +118,33 @@ public class TaskRevisionService {
     /** 应用已通过的改期：状态不变，只更新截止时间、版本和时间线。 */
     public void applyReschedule(Db db, Actor applicant, Map<String, Object> task, int expectedVersion,
             Map<String, Object> candidate, String reason) {
-        String taskId = Db.str(task, "id"), deadline = Db.required(candidate, "deadline");
+        String taskId = Db.str(task,"id"), deadline = Db.required(candidate,"deadline");
         requireNotTerminal(task);
+        boolean move="MOVE".equals(candidate.get("scheduleMode"));
+        if(candidate.containsKey("scheduleMode")&&!move) throw ApiError.bad("INVALID_RESCHEDULE_MODE","未知排期模式");
+        if(move) {
+            applicant.requireDispatch();
+            TaskAccess.readable(db,applicant,taskId,false);
+            if(((Number)task.get("version")).intValue()!=expectedVersion) throw ApiError.conflict();
+        }
         var body = new LinkedHashMap<>(db.read(task.get("body")));
-        String oldDeadline = Db.str(body, "deadline");
-        body.put("deadline", deadline);
-        int nextVersion = expectedVersion + 1;
-        Db.conflict(db.update("UPDATE tasks SET deadline=?::timestamptz,body=?::jsonb,version=? WHERE id=? AND version=?",
-                deadline, db.write(body), nextVersion, taskId, expectedVersion));
-        String phase = Db.str(task, "phase");
-        TaskTimeline.append(db, applicant, taskId, "RESCHEDULED", Map.of("oldDeadline", oldDeadline, "deadline", deadline, "reason", reason),
-                phase, phase, nextVersion);
-        notifyParticipants(db, applicant, taskId, nextVersion, "TASK_RESCHEDULED");
+        var event = new LinkedHashMap<String,Object>();
+        event.put("oldDeadline",body.get("deadline"));event.put("deadline",deadline);event.put("reason",reason);
+        body.put("deadline",deadline);
+        int nextVersion=TaskSchedule.nextVersion(expectedVersion);
+        if(move) {
+            int days=TaskSchedule.integer(candidate.get("moveDays"),false,"INVALID_MOVE_DAYS");
+            var expected=TaskSchedule.move(TaskSchedule.instant(task.get("start_at")),TaskSchedule.instant(task.get("deadline")),days);
+            if(!sameDeadline(expected.deadline(),deadline) || !Objects.equals(expected.startAt(),candidate.get("startAt"))) throw ApiError.bad("INVALID_DATE","候选排期不匹配");
+            event.put("oldStartAt",body.get("startAt"));event.put("startAt",expected.startAt());event.put("moveDays",days);
+            if(expected.startAt()==null)body.remove("startAt");else body.put("startAt",expected.startAt());
+            Db.conflict(db.update("UPDATE tasks SET start_at=?::timestamptz,deadline=?::timestamptz,body=?::jsonb,version=? WHERE id=? AND version=?",expected.startAt(),deadline,db.write(body),nextVersion,taskId,expectedVersion));
+        } else {
+            Db.conflict(db.update("UPDATE tasks SET deadline=?::timestamptz,body=?::jsonb,version=? WHERE id=? AND version=?",deadline,db.write(body),nextVersion,taskId,expectedVersion));
+        }
+        String phase=Db.str(task,"phase");
+        TaskTimeline.append(db,applicant,taskId,"RESCHEDULED",event,phase,phase,nextVersion);
+        notifyParticipants(db,applicant,taskId,nextVersion,"TASK_RESCHEDULED");
     }
 
     /** 审核通过的删除申请只归档，不物理删除任务及其审计历史。 */

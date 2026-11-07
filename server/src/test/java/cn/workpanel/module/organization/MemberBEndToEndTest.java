@@ -29,6 +29,7 @@ class MemberBEndToEndTest extends MemberBHttpSupport {
         db.update("UPDATE users SET password_hash=?,must_change_password=true,department_id=NULL WHERE id=?", encoder.encode("Initial-test-password-2026"), admin);
         reviewer = user(company, department, "", "ADMIN", true);
         db.update("UPDATE users SET password_hash=? WHERE id=?", encoder.encode(PASSWORD), reviewer);
+        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",admin,reviewer,company);
     }
     @AfterEach void restoreReviewers() {
         db.update("UPDATE users SET company_reviewer=false WHERE id IN (?,?)", admin, reviewer);
@@ -59,7 +60,6 @@ class MemberBEndToEndTest extends MemberBHttpSupport {
                 Map.of("approve", true, "reason", "独立确认", "expectedVersion", membershipVersion));
         call(200, "GET", "/organization", employee, null);
         // 人员变更申请由管理员提出，因此审核人应是管理员的直属上级，而不是被修改员工的直属上级。
-        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)", admin, reviewer, company);
         String revision = revision(employee, Map.of("departmentId", otherDepartment)).get("id").asText();
         assertEquals(department, call(200, "GET", "/auth/me", employee, null).get("department_id").asText());
         int revisionVersion = ((Number) db.one("SELECT expected_version FROM review_requests WHERE id=?", revision).get("expected_version")).intValue();

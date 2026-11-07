@@ -2,6 +2,7 @@ import 'support/flutter_sdk_assets.dart';
 import 'support/local_test_state.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:dio/dio.dart';
@@ -25,6 +26,9 @@ class AttachmentAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   final receivedMultipart = <List<int>>[];
   int uploadStatus = 200, downloadStatus = 200, profileStatus = 200;
+  int peopleStatus = 200;
+  List<Map<String, dynamic>>? peopleFixture;
+  Completer<void>? peopleHold;
   bool missingId = false;
   Completer<void>? hold;
   final png = base64Decode(
@@ -76,6 +80,9 @@ class AttachmentAdapter implements HttpClientAdapter {
       }
       status = downloadStatus;
     } else if (o.path == '/organization/people') {
+      final waiting = peopleHold;
+      if (waiting != null) await waiting.future;
+      status = peopleStatus;
       final later = o.queryParameters['cursor'] == '30';
       data = {
         'items': [
@@ -109,6 +116,19 @@ class AttachmentAdapter implements HttpClientAdapter {
         'total': 3,
         'nextCursor': later ? '60' : '30',
       };
+      if (peopleFixture != null) {
+        final search = '${o.queryParameters['search'] ?? ''}';
+        final matches = peopleFixture!
+            .where(
+              (person) => [
+                person['name'],
+                person['department'],
+                person['team_name'],
+              ].any((value) => '$value'.contains(search)),
+            )
+            .toList();
+        data = {'items': matches, 'total': matches.length};
+      }
     } else if (o.path == '/profiles/u1') {
       data = profile;
     } else if (o.path == '/profiles/me') {
@@ -366,7 +386,7 @@ void main() {
     );
     addTearDown(c.dispose);
     c.read(routerProvider).go(route);
-    Widget app = UncontrolledProviderScope(
+    Widget app = OwnedTestProviderScope(
       container: c,
       child: const PandoraApp(),
     );
@@ -379,6 +399,39 @@ void main() {
   Future<void> close(WidgetTester t) async {
     await t.pumpWidget(const SizedBox.shrink());
     await t.pumpAndSettle();
+  }
+
+  Future<ProviderContainer> mountPicker(
+    WidgetTester t, {
+    bool multiSelect = true,
+    List<Record> initialSelected = const [],
+    bool waitForLoad = true,
+  }) async {
+    final c = await launch(t, '/form/dispatch');
+    await t.pumpWidget(
+      OwnedTestProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: appTheme(),
+          home: Scaffold(
+            body: PersonPicker(
+              dispatch: true,
+              multiSelect: multiSelect,
+              initialSelected: initialSelected,
+            ),
+          ),
+        ),
+      ),
+    );
+    if (waitForLoad) {
+      await settle(t);
+    } else {
+      await t.pump();
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 80)),
+      );
+    }
+    return c;
   }
 
   Future<void> choose(WidgetTester t, {bool avatar = false}) async {
@@ -557,11 +610,11 @@ void main() {
     },
   );
   testWidgets(
-    'organization picker pages through department, team and person and searches path',
+    'organization picker expands the same tree, pages members and searches full paths',
     (t) async {
       final c = await launch(t, '/form/dispatch');
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: MaterialApp(
             theme: appTheme(),
@@ -572,14 +625,15 @@ void main() {
       await settle(t);
       expect(find.text('待确认成员'), findsNothing);
       expect(find.text('产品部'), findsOneWidget);
-      // 每页只展示一层：部门 → 团队 → 人员，返回入口逐级回退。
+      // 目录在原面板展开和收起，部门节点始终保留。
       expect(find.text('任务组'), findsNothing);
       expect(find.text('第一页成员'), findsNothing);
       await t.tap(find.text('产品部'));
       await t.pumpAndSettle();
+      expect(find.text('产品部'), findsOneWidget);
       expect(find.text('任务组'), findsOneWidget);
       expect(find.text('第一页成员'), findsNothing);
-      await t.tap(find.byTooltip('返回上一级'));
+      await t.tap(find.text('产品部'));
       await t.pumpAndSettle();
       expect(find.text('任务组'), findsNothing);
       await t.tap(find.text('产品部'));
@@ -587,14 +641,9 @@ void main() {
       await t.tap(find.text('任务组'));
       await t.pumpAndSettle();
       expect(find.text('第一页成员'), findsOneWidget);
-      await t.tap(find.byTooltip('返回上一级'));
+      await t.tap(find.text('任务组'));
       await t.pumpAndSettle();
       expect(find.text('第一页成员'), findsNothing);
-      await t.tap(find.byTooltip('返回上一级'));
-      await t.pumpAndSettle();
-      expect(find.text('任务组'), findsNothing);
-      await t.tap(find.text('产品部'));
-      await t.pumpAndSettle();
       await t.tap(find.text('任务组'));
       await t.pumpAndSettle();
       await t.ensureVisible(find.text('加载更多成员'));
@@ -614,10 +663,168 @@ void main() {
       expect(find.text('产品部'), findsOneWidget);
       expect(find.text('任务组'), findsOneWidget);
       expect(find.text('第一页成员'), findsOneWidget);
+      expect(find.text('产品部 / 任务组'), findsOneWidget);
       await t.tap(find.text('产品部'));
       await settle(t);
-      expect(find.text('任务组'), findsOneWidget);
+      expect(find.text('任务组'), findsNothing);
       expect(find.text('第一页成员'), findsNothing);
+      expect(find.byTooltip('返回上一级'), findsNothing);
+      await close(t);
+    },
+  );
+  testWidgets(
+    'tree selection keeps same-name identities across departments, search and collapse',
+    (t) async {
+      adapter.peopleFixture = [
+        for (final entry in [('a', '产品部'), ('b', '市场部')])
+          {
+            'id': entry.$1,
+            'name': '同名成员',
+            'status': 'ACTIVE',
+            'department': entry.$2,
+            'departmentId': 'department-${entry.$1}',
+            'team_name': '协作组',
+            'teamId': 'team-${entry.$1}',
+            'taskSelectable': true,
+          },
+        {
+          'id': 'disabled',
+          'name': '停用人员',
+          'status': 'DISABLED',
+          'department': '产品部',
+        },
+        {
+          'id': 'out-of-scope',
+          'name': '不可选人员',
+          'status': 'ACTIVE',
+          'taskSelectable': false,
+          'department': '产品部',
+        },
+      ];
+      await mountPicker(t);
+      for (final entry in [('a', '产品部'), ('b', '市场部')]) {
+        await t.tap(find.text(entry.$2));
+        await t.pumpAndSettle();
+        await t.tap(find.text('协作组'));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(ValueKey('picker-person-${entry.$1}')));
+        await t.pumpAndSettle();
+        await t.tap(find.text(entry.$2));
+        await t.pumpAndSettle();
+      }
+      expect(find.text('确定（2人）'), findsOneWidget);
+      expect(find.text('停用人员'), findsNothing);
+      expect(find.text('不可选人员'), findsNothing);
+      await t.enterText(find.byType(TextField), '同名成员');
+      await t.pump(const Duration(milliseconds: 350));
+      await settle(t);
+      expect(find.text('产品部 / 协作组'), findsOneWidget);
+      expect(find.text('市场部 / 协作组'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, '同名成员'), findsNWidgets(2));
+      for (final id in ['a', 'b']) {
+        expect(
+          t
+              .widget<ListTile>(find.byKey(ValueKey('picker-person-$id')))
+              .selected,
+          isTrue,
+        );
+      }
+      await t.tap(find.byTooltip('清空人员搜索'));
+      await settle(t);
+      expect(find.text('确定（2人）'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('picker-person-b')));
+      await t.pumpAndSettle();
+      expect(find.text('确定（1人）'), findsOneWidget);
+      expect(t.takeException(), isNull);
+      await close(t);
+    },
+  );
+  testWidgets(
+    'tree loading failure remains retryable and does not become an empty directory',
+    (t) async {
+      adapter.peopleStatus = 503;
+      await mountPicker(t);
+      expect(find.text('暂无匹配成员'), findsNothing);
+      expect(find.text('产品部'), findsNothing);
+      expect(find.text('重新加载'), findsOneWidget);
+      adapter.peopleStatus = 200;
+      await t.tap(find.text('重新加载'));
+      await settle(t);
+      expect(find.text('产品部'), findsOneWidget);
+      expect(find.text('重新加载'), findsNothing);
+      await close(t);
+    },
+  );
+  testWidgets(
+    'tree rejects delayed results after the same account starts a new session',
+    (t) async {
+      adapter.peopleHold = Completer<void>();
+      final c = await mountPicker(t, waitForLoad: false);
+      c.read(sessionProvider.notifier).state = const Session(
+        id: 'u1',
+        name: '小橙',
+        role: UserRole.admin,
+        token: 'replacement-token',
+      );
+      await t.pump();
+      adapter.peopleHold!.complete();
+      await settle(t);
+      expect(find.text('账号状态已变化，请重新选择'), findsOneWidget);
+      expect(find.text('产品部'), findsNothing);
+      expect(find.byKey(const ValueKey('person-picker-confirm')), findsNothing);
+      await close(t);
+    },
+  );
+  testWidgets(
+    'tree invalidates existing selection when only the session epoch changes',
+    (t) async {
+      final c = await mountPicker(t);
+      expect(find.text('产品部'), findsOneWidget);
+      c.invalidate(sessionEpochProvider);
+      await t.pumpAndSettle();
+      expect(find.text('账号状态已变化，请重新选择'), findsOneWidget);
+      expect(find.text('产品部'), findsNothing);
+      expect(find.byKey(const ValueKey('person-picker-confirm')), findsNothing);
+      await close(t);
+    },
+  );
+  testWidgets(
+    'tree search keeps confirmation reachable with a keyboard at360dp1.5 text',
+    (t) async {
+      adapter.peopleFixture = [
+        {
+          'id': 'member',
+          'name': '已有成员',
+          'status': 'ACTIVE',
+          'department': '产品部',
+          'team_name': '任务组',
+          'taskSelectable': true,
+        },
+      ];
+      await launch(t, '/form/dispatch', scale: 1.5);
+      t.view.physicalSize = const Size(360, 640);
+      addTearDown(t.view.resetViewInsets);
+      await t.pumpAndSettle();
+      final add = find.widgetWithText(ActionChip, '添加');
+      await t.ensureVisible(add);
+      await t.pumpAndSettle();
+      await t.tap(add);
+      await settle(t);
+      final search = find.descendant(
+        of: find.byType(PersonPicker),
+        matching: find.byType(TextField),
+      );
+      await t.tap(search);
+      t.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await t.pumpAndSettle();
+      await t.enterText(search, '没有对应人员');
+      await t.pump(const Duration(milliseconds: 350));
+      await settle(t);
+      expect(find.text('暂无匹配成员'), findsOneWidget);
+      final confirm = find.byKey(const ValueKey('person-picker-confirm'));
+      expect(confirm.hitTestable(), findsOneWidget);
+      expect(t.getRect(confirm).bottom, lessThanOrEqualTo(340));
+      expect(t.takeException(), isNull);
       await close(t);
     },
   );
@@ -631,8 +838,8 @@ void main() {
       expect(find.text('下载并保存附件'), findsOneWidget);
       c.read(routerProvider).go('/form/feedback?id=task&version=3');
       await settle(t);
-      expect(find.text('附件关联暂不可用'), findsOneWidget);
-      expect(find.text('选择并上传附件'), findsNothing);
+      expect(find.text('附件关联暂不可用'), findsNothing);
+      expect(find.text('选择并上传附件'), findsOneWidget);
       await close(t);
     },
   );
@@ -646,6 +853,28 @@ void main() {
           SelectedAttachment('说明.txt', Uint8List.fromList([65, 66])),
         ],
       );
+      for (final label in ['任务名称', '任务内容', '标签', '开始时间', '截止时间', '参与人', '附件']) {
+        final row = find.byKey(ValueKey('dispatch-field:$label'));
+        await t.ensureVisible(row);
+        await t.pumpAndSettle();
+        final icon = find.descendant(
+          of: row,
+          matching: find.byType(TuantuanIconTile),
+        );
+        final titleLabel = find.descendant(
+          of: row,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                widget.textSpan?.toPlainText().replaceFirst('* ', '') == label,
+          ),
+        );
+        expect(
+          (t.getCenter(icon).dy - t.getCenter(titleLabel).dy).abs(),
+          lessThan(1),
+          reason: label,
+        );
+      }
       final title = find.byWidgetPredicate(
         (w) => w is TextField && w.decoration?.hintText == '输入任务名称',
       );
@@ -695,6 +924,8 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('person-picker-confirm')));
+      await t.pumpAndSettle();
       for (var i = 0; i < 2; i++) {
         await t.ensureVisible(primary);
         await t.pumpAndSettle();
@@ -707,14 +938,44 @@ void main() {
         await t.ensureVisible(find.text('加载更多成员'));
         await t.tap(find.text('加载更多成员'));
         await settle(t);
-        await t.tap(
-          find.descendant(
-            of: find.byType(PersonPicker),
-            matching: find.text('第二页负责人'),
-          ),
-        );
+        final secondPerson = find.byKey(const ValueKey('picker-person-second'));
+        if (i == 0) {
+          await t.tap(secondPerson);
+        } else {
+          expect(t.widget<ListTile>(secondPerson).selected, isTrue);
+          expect(
+            t
+                .widget<ListTile>(
+                  find.byKey(const ValueKey('picker-person-first')),
+                )
+                .selected,
+            isTrue,
+          );
+        }
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('person-picker-confirm')));
         await t.pumpAndSettle();
       }
+      expect(find.widgetWithText(InputChip, '第二页负责人'), findsOneWidget);
+      // 弹窗内更改后取消，不能提前改动派发表单的参与人集合。
+      await t.ensureVisible(primary);
+      await t.pumpAndSettle();
+      await t.tap(primary);
+      await settle(t);
+      await t.tap(find.text('产品部'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('任务组'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('picker-person-first')));
+      await t.pumpAndSettle();
+      await t.tap(
+        find.descendant(
+          of: find.byType(PersonPicker),
+          matching: find.text('取消'),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(find.widgetWithText(InputChip, '第一页成员'), findsOneWidget);
       expect(find.widgetWithText(InputChip, '第二页负责人'), findsOneWidget);
       await t.ensureVisible(find.byKey(const ValueKey('task-label-select')));
       await t.tap(find.byKey(const ValueKey('task-label-select')));

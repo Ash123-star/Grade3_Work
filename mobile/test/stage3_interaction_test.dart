@@ -10,7 +10,6 @@ import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
-import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/features/ai_map/ai_map_page.dart';
 
 void main() {
@@ -24,13 +23,22 @@ void main() {
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.resetPhysicalSize);
     addTearDown(t.view.resetDevicePixelRatio);
+    final fixture = workflowFixture();
+    if (logDate != null) {
+      fixture.records['logs']!.removeWhere(
+        (r) =>
+            r.ownerId == 'u1' &&
+            r.fields['businessDate'] ==
+                logDate.toIso8601String().split('T').first,
+      );
+    }
     final c = testContainer(
-      overrides: [demoStoreProvider.overrideWithValue(workflowFixture())],
+      overrides: [demoStoreProvider.overrideWithValue(fixture)],
     );
     addTearDown(c.dispose);
     c.read(logDateProvider.notifier).state = logDate ?? DateTime(2025, 2, 3);
     await t.pumpWidget(
-      UncontrolledProviderScope(container: c, child: const PandoraApp()),
+      OwnedTestProviderScope(container: c, child: const PandoraApp()),
     );
     c.read(routerProvider).go(route);
     await t.pumpAndSettle();
@@ -43,7 +51,8 @@ void main() {
       final now = DateTime.now();
       final day = DateTime(now.year, now.month, now.day);
       final c = await launch(t, '/form/log-edit', logDate: day);
-      expect(find.byType(BottomActions), findsOneWidget);
+      await settleLocalIo(t);
+      expect(find.text('提交'), findsOneWidget);
       expect(find.byType(TextFormField), findsNothing);
       expect(find.text('工时'), findsNothing);
       await t.enterText(find.byType(TextField).first, '核对移动端验收范围');
@@ -73,7 +82,11 @@ void main() {
       ))!;
       expect(
         records.items
-            .where((r) => r.fields['businessDate'] == day.toIso8601String().split('T').first)
+            .where(
+              (r) =>
+                  r.fields['businessDate'] ==
+                  day.toIso8601String().split('T').first,
+            )
             .single
             .fields['今日工作'],
         '核对移动端验收范围',
@@ -86,8 +99,8 @@ void main() {
     'review requires a rejection reason and does not show self decisions',
     (t) async {
       final c = await launch(t, '/me/reviews/1');
-      expect(find.text('当前生效 · v1'), findsOneWidget);
-      expect(find.text('候选版本 · v2'), findsOneWidget);
+      expect(find.text('申请前内容'), findsOneWidget);
+      expect(find.text('申请修改后的内容'), findsOneWidget);
       expect(find.text('通过申请'), findsOneWidget);
       await t.tap(find.text('驳回'));
       await t.pumpAndSettle();
@@ -123,7 +136,9 @@ void main() {
             'businessDate': day.toIso8601String().split('T').first,
             '今日工作': '服务器最新内容',
             'status': '已提交',
-            'submittedAt': now.subtract(const Duration(hours: 1)).toIso8601String(),
+            'submittedAt': now
+                .subtract(const Duration(hours: 1))
+                .toIso8601String(),
           },
         ),
       ];
@@ -141,9 +156,10 @@ void main() {
       expect(updated!.fields['今日工作'], '直接修改后的工作');
       expect(updated.version, 3);
       expect(
-        c.read(demoStoreProvider).records['reviews']!.any(
-          (review) => review.fields['targetId'] == 'stale',
-        ),
+        c
+            .read(demoStoreProvider)
+            .records['reviews']!
+            .any((review) => review.fields['targetId'] == 'stale'),
         isFalse,
       );
       await t.pumpWidget(const SizedBox.shrink());

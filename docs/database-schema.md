@@ -70,7 +70,8 @@
 | `review_requests` | `kind`, `target_id`, `applicant_id` | 被审核对象、对象 ID 和申请人 |
 | `review_requests` | `expected_version`, `before_value`, `candidate` | 版本基线、原值和候选值 |
 | `review_requests` | `reason`, `status` | 变更理由和 `PENDING/APPROVED/REJECTED/SUPERSEDED` 状态 |
-| `review_requests` | `approval_mode`, `decision_source` | V22增加DIRECT_MANAGER/ADMIN_MEMBERSHIP/LEGACY模式和DIRECT_MANAGER/ADMIN_MEMBERSHIP/FOUNDER_EXEMPT决定来源；历史待审迁移不应用候选 |
+| `task_pins` | `user_id`, `task_id`, `company_id`, `pinned_at` | V29个人任务置顶；主键(user_id,task_id)，租户外键随用户/任务级联删除；不影响任务version |
+| `review_requests` | `approval_mode`, `decision_source` | V22增加DIRECT_MANAGER/ADMIN_MEMBERSHIP/LEGACY模式和DIRECT_MANAGER/ADMIN_MEMBERSHIP/FOUNDER_EXEMPT决定来源；V28增加FOUNDER_PEER模式与决定来源，创始人存量待审在公司另有在职创始人时转为互审，失效审核步骤SUPERSEDED并重新分配，仍无审核人写REVIEW_UNASSIGNED；历史待审迁移不应用候选，已决记录不变 |
 | `review_steps` | `request_id`, `applicant_id`, `reviewer_id`, `position` | 审核申请人、审核人和审核顺序；V4 禁止审核人等于申请人 |
 | `review_steps` | `state`, `reason`, `decided_at` | 步骤结果、驳回理由和决定时间 |
 
@@ -102,3 +103,11 @@ V22将旧待审步骤标记为SUPERSEDED并保留历史，每个申请至多一�
 ## 开发规则
 
 新增字段先判断是否是稳定关系。跨表引用、统计维度、权限边界和需要唯一性的内容应使用列或关系表；仅用于展示且结构变化频繁的内容才放入 JSONB。已发布迁移不可修改，必须追加新的 `V` 版本，并同步 OpenSpec、后端代码、字段字典和集成测试。
+
+## 私人每日事项增量（Issue #63）
+
+`server` Flyway V26 新增 personal_todos 与 personal_todo_commands。前者保存公司、本人、自然日、标题/备注、完成时间、版本、时间戳与软删除标记；后者以公司/本人/幂等键为主键保存请求哈希、原响应及24小时有效期。两表均通过 `(company_id, owner_id)` 复合外键约束归属；未删除事项有按公司/本人/日期/完成状态/创建时间/id 的部分索引。
+
+删除会清除事项正文，但24小时幂等响应可能仍含原正文；过期回执在该用户后续写入时清理，不宣称物理立即擦除。未接入审计正文、AI、导出或组织面板。
+
+V26 原为避开待合并 PR 的 V24/V25 编号选择。五个 PR 整合后，已发布 V26/V27 保持原样，原待发布的创始人互审、任务置顶、多标签迁移分别调整为 V28/V29/V30；不启用 out-of-order。已验证空库与历史基线向 V30 升级。代码回滚可暂保留新增表，不删除历史数据；若确需删表，先备份本人事项和回执并安排独立维护迁移。

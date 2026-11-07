@@ -74,7 +74,7 @@ class WorkTargetPickerState extends ConsumerState<WorkTargetPicker> {
   @override
   Widget build(BuildContext context) {
     ref.watch(sessionProvider);
-    return AlertDialog(
+    return TuantuanDialog(
       title: Text(widget.action == 'CREATE_TASK' ? '选择人员' : '选择任务'),
       content: SizedBox(
         width: 420,
@@ -202,7 +202,7 @@ class _WorkSettingsPageState extends ConsumerState<WorkSettingsPage> {
       context: context,
       animationStyle: WorkMotion.dialog(context),
       builder: (context) => StatefulBuilder(
-        builder: (context, state) => AlertDialog(
+        builder: (context, state) => TuantuanDialog(
           title: const Text('添加自动授权'),
           content: SingleChildScrollView(
             child: Column(
@@ -332,7 +332,7 @@ class _WorkSettingsPageState extends ConsumerState<WorkSettingsPage> {
       context: context,
       animationStyle: WorkMotion.dialog(context),
       builder: (context) => StatefulBuilder(
-        builder: (context, state) => AlertDialog(
+        builder: (context, state) => TuantuanDialog(
           title: const Text('公司自动授权范围'),
           content: SingleChildScrollView(
             child: Column(
@@ -737,7 +737,7 @@ class _ProcedurePageState extends ConsumerState<ProcedurePage> {
     final candidate = await showDialog<Map<String, dynamic>>(
       context: context,
       animationStyle: WorkMotion.dialog(context),
-      builder: (context) => AlertDialog(
+      builder: (context) => TuantuanDialog(
         title: Text(old == null ? '新增公司资料' : '修订公司资料'),
         content: SizedBox(
           width: 420,
@@ -863,7 +863,7 @@ class _ProcedurePageState extends ConsumerState<ProcedurePage> {
       await showDialog<void>(
         context: context,
         animationStyle: WorkMotion.dialog(context),
-        builder: (context) => AlertDialog(
+        builder: (context) => TuantuanDialog(
           title: const Text('版本对比'),
           content: SingleChildScrollView(
             child: Column(
@@ -897,7 +897,7 @@ class _ProcedurePageState extends ConsumerState<ProcedurePage> {
     final value = await showDialog<String>(
       context: context,
       animationStyle: WorkMotion.dialog(context),
-      builder: (context) => AlertDialog(
+      builder: (context) => TuantuanDialog(
         title: const Text('申请撤回资料'),
         content: TextField(
           controller: reason,
@@ -948,7 +948,7 @@ class _ProcedurePageState extends ConsumerState<ProcedurePage> {
     final value = await showDialog<String>(
       context: context,
       animationStyle: WorkMotion.dialog(context),
-      builder: (context) => AlertDialog(
+      builder: (context) => TuantuanDialog(
         title: const Text('填写模板'),
         content: TextField(
           controller: reason,
@@ -984,7 +984,7 @@ class _ProcedurePageState extends ConsumerState<ProcedurePage> {
       await showDialog<void>(
         context: context,
         animationStyle: WorkMotion.dialog(context),
-        builder: (context) => AlertDialog(
+        builder: (context) => TuantuanDialog(
           title: Text('${result['title']}'),
           content: SingleChildScrollView(
             child: Column(
@@ -1483,7 +1483,7 @@ class _DeliveryCheckPageState extends ConsumerState<DeliveryCheckPage>
       final ok = await showDialog<bool>(
         context: context,
         animationStyle: WorkMotion.dialog(context),
-        builder: (context) => AlertDialog(
+        builder: (context) => TuantuanDialog(
           title: const Text('提交人工核对'),
           content: const Text('未核实的项目会随反馈保留，请确认已检查材料，并在反馈中说明。'),
           actions: [

@@ -1,5 +1,8 @@
 import 'dart:math' as math;
-import 'dart:async';
+import '../home/home_summary_card.dart';
+import '../../theme/home_paper_theme.dart';
+import '../../shared/calendar/civil_date.dart';
+import '../personal_todos/presentation/daily_todos_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,364 +12,198 @@ import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
-import 'task_management_page.dart';
-import 'diary_composer_sheet.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(sessionProvider);
-    final draft = ref.watch(todayDraftProvider(user.id));
-    final unread = ref
-        .watch(recordsProvider('notifications'))
-        .valueOrNull
-        ?.items
-        .where((r) => r.fields['read'] != true)
-        .length;
-    final scale = MediaQuery.textScalerOf(context).scale(1);
-    const specs = [
-      ('公司重点', 'dashboard/company', 'mindmap', 'blue', SunnyPalette.blue),
-      ('公司任务', 'tasks', 'task', 'warm', SunnyPalette.orange),
-      ('个人重点', 'dashboard/personal', 'ai', 'lavender', SunnyPalette.purple),
-      ('个人日志', 'logs', 'log', 'warm', SunnyPalette.primaryContainer),
-    ];
-    return PageFrame(
-      title: '导图',
-      showTitle: false,
-      child: LayoutBuilder(
-        builder: (context, viewport) {
-          final tileHeight = math.max(
-            240 * scale,
-            (viewport.maxHeight - 134) / 2,
-          );
-          Widget tile(int index) {
-            final spec = specs[index];
-            final resource = index == 1 ? 'tasks/received-card' : spec.$2;
-            final state = index >= 2
-                ? ref.watch(memberRecordsProvider((spec.$2, user.id)))
-                : index == 1
-                ? ref.watch(receivedTaskCardProvider)
-                : ref.watch(recordsProvider(resource));
-            void open() => index == 3
-                ? context.go('/logs')
-                : index == 1
-                ? context.push('/tasks/received')
-                : openList(context, spec.$2);
-            void continueDiary() => unawaited(
-              showDiaryComposer(context, ref, date: DateTime.now()),
-            );
-            return SizedBox(
-              height: tileHeight,
-              child: PaperSurface(
-                key: ValueKey('dashboard-tile:$index'),
-                skin: TuantuanAssets.surfaces[spec.$4],
-                decorated: true,
-                padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
-                onTap: index == 0 || index == 2
-                    ? () => _showFocusCollection(
-                        context,
-                        ref,
-                        title: spec.$1,
-                        resource: spec.$2,
-                        ownerId: index == 2 ? user.id : null,
-                      )
-                    : index == 3 && draft.valueOrNull != null
-                    ? continueDiary
-                    : open,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    DogBackground(
-                      index: const [2, 3, 6, 7][index],
-                      opacity: 1,
-                      fit: BoxFit.contain,
-                    ),
-                    Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: spec.$5.withValues(alpha: .28),
-                          ),
-                          child: DogAvatar(
-                            index: const [0, 7, 10, 15][index],
-                            size: 37,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            spec.$1,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: state.when(
-                        loading: () =>
-                            const Center(child: SunnyLoadingIndicator()),
-                        error: (_, _) => TextButton(
-                          onPressed: () => index == 1
-                              ? ref.invalidate(receivedTaskCardProvider)
-                              : ref.invalidate(recordsProvider(resource)),
-                          child: const Text('加载失败，重试'),
-                        ),
-                        data: (page) {
-                          final items = (index == 1
-                              ? page.items.where(
-                                  (r) => isReceivedTask(r, user.id),
-                                )
-                              : page.items).toList();
-                          if (index == 1) {
-                            items.sort((a, b) {
-                              final aTime = DateTime.tryParse(
-                                '${a.fields['dispatchAt'] ?? ''}',
-                              );
-                              final bTime = DateTime.tryParse(
-                                '${b.fields['dispatchAt'] ?? ''}',
-                              );
-                              if (aTime == null || bTime == null) {
-                                if (aTime == null && bTime != null) return 1;
-                                if (bTime == null && aTime != null) return -1;
-                                return a.id.compareTo(b.id);
-                              }
-                              final byDispatch = bTime.compareTo(aTime);
-                              return byDispatch != 0
-                                  ? byDispatch
-                                  : a.id.compareTo(b.id);
-                            });
-                            if (items.length > 10) {
-                              items.removeRange(10, items.length);
-                            }
-                          }
-                          final titles = [
-                            if (index == 3 && draft.valueOrNull != null)
-                              '本机草稿 · 继续写',
-                            ...items.map((r) => r.title),
-                          ];
-                          if (titles.isEmpty) {
-                            return Text(
-                              draft.hasError && index == 3
-                                  ? '草稿暂不可用，请重试'
-                                  : index == 1
-                                  ? '暂无任务记录'
-                                  : '暂无记录',
-                            );
-                          }
-                          return LayoutBuilder(
-                            builder: (context, space) {
-                              final count = math.max(
-                                1,
-                                ((space.maxHeight + 8 * scale) /
-                                        (50 * scale))
-                                    .floor(),
-                              );
-                              final visibleTitles = titles.take(count).toList();
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  for (var i = 0; i < visibleTitles.length; i++) ...[
-                                    if (i > 0) const SizedBox(height: 8),
-                                    SizedBox(
-                                      height: 42 * scale,
-                                      child: index != 3
-                                          ? InkWell(
-                                              borderRadius: BorderRadius.circular(12),
-                                              onTap: () => index == 1
-                                                  ? open()
-                                                  : index == 0
-                                                  ? _showCompanyItem(context, ref, items[i])
-                                                  : _showFocusDetail(context, items[i]),
-                                              onLongPress: index == 2
-                                                  ? () => _showPersonalItemActions(
-                                                      context,
-                                                      ref,
-                                                      items[i],
-                                                    )
-                                                  : null,
-                                              child: _FocusPreviewRow(
-                                                title: visibleTitles[i],
-                                                scale: scale,
-                                                completed: index == 1 &&
-                                                    _isCompletedTask(items[i]),
-                                              ),
-                                            )
-                                          : _FocusPreviewRow(
-                                              title: visibleTitles[i],
-                                              scale: scale,
-                                            ),
-                                    ),
-                                  ],
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton(
-                              onPressed: index == 0 || index == 2
-                                  ? () => _showFocusCollection(
-                                      context,
-                                      ref,
-                                      title: spec.$1,
-                                      resource: spec.$2,
-                                      ownerId: index == 2 ? user.id : null,
-                                    )
-                                  : open,
-                              child: const Text('查看全部 →'),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          return PageBody(
-            bottomPadding: 12,
-            children: [
-              PaperSurface(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                color: DogBrandPalette.surface,
-                borderColor: DogBrandPalette.line,
-                child: Row(
-                  children: [
-                    const DogPose(index: DogAssets.sitting, size: 64),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '你好，${user.name}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(color: DogBrandPalette.ink),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '把今天的事情，慢慢理清。',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: DogBrandPalette.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: '消息 ${unread ?? '—'}',
-                      onPressed: () => openList(context, 'notifications'),
-                      icon: Badge(
-                        isLabelVisible: unread != null && unread > 0,
-                        label: Text('${unread ?? 0}'),
-                        child: const Icon(Icons.notifications_none_rounded),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              for (var row = 0; row < 2; row++) ...[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: tile(row * 2)),
-                    const SizedBox(width: 12),
-                    Expanded(child: tile(row * 2 + 1)),
-                  ],
-                ),
-                if (row == 0) const SizedBox(height: 12),
-              ],
-              const DemoLabel(),
-            ],
-          );
-        },
-      ),
-    );
-  }
+  Widget build(BuildContext context, WidgetRef ref) =>
+      Theme(data: homePaperTheme(context), child: const _HomeContent());
 }
 
-class _FocusPreviewRow extends StatelessWidget {
-  const _FocusPreviewRow({
-    required this.title,
-    required this.scale,
-    this.completed = false,
-  });
-  final String title;
-  final double scale;
-  final bool completed;
-
+class _HomeContent extends ConsumerWidget {
+  const _HomeContent();
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 4),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: completed
-                ? Theme.of(context).colorScheme.onSurfaceVariant
-                : Theme.of(context).colorScheme.primary,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: completed
-                  ? Theme.of(context).colorScheme.onSurfaceVariant
-                  : null,
-              decoration: completed ? TextDecoration.lineThrough : null,
-              decorationColor: completed
-                  ? Theme.of(context).colorScheme.onSurfaceVariant
-                  : null,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(sessionProvider);
+    final paper = HomePaperTokens.of(context);
+    final date = shanghaiToday();
+    final unread = user.canReadBusiness
+        ? ref
+                  .watch(recordsProvider('notifications'))
+                  .valueOrNull
+                  ?.items
+                  .any((item) => item.fields['read'] != true) ==
+              true
+        : false;
+    return Scaffold(
+      backgroundColor: paper.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: TuantuanPaperBackdrop(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: LayoutBuilder(
+                builder: (context, viewport) {
+                  final narrow = viewport.maxWidth < 375;
+                  final compact = viewport.maxWidth < 340;
+                  final large = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+                  final cards = [
+                    HomeSummaryCard(
+                      title: '事件纪',
+                      resource: 'dashboard/company',
+                      onAll: () => _showFocusCollection(
+                        context,
+                        ref,
+                        title: '事件纪',
+                        resource: 'dashboard/company',
+                      ),
+                      onItem: (item) => _showCompanyItem(context, ref, item),
+                    ),
+                    HomeSummaryCard(
+                      title: '任务看板',
+                      resource: 'tasks/received-card',
+                      onAll: () => context.push('/tasks/received'),
+                      onItem: (item) => openItem(context, 'tasks', item.id),
+                    ),
+                  ];
+                  return ListView(
+                    key: const PageStorageKey('home-scroll'),
+                    padding: const EdgeInsets.only(bottom: 24),
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          narrow ? 12 : 16,
+                          24,
+                          narrow ? 12 : 16,
+                          18,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: SunnyPalette.primaryContainer,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: SunshineMascot(size: compact ? 44 : 52),
+                            ),
+                            SizedBox(width: compact ? 8 : 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '你好，${user.name}',
+                                    style: paper.heading(
+                                      compact ? 23 : 25,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${date.month}月${date.day}日 · 星期${['一', '二', '三', '四', '五', '六', '日'][date.weekday - 1]}',
+                                    style: paper.body(12, color: paper.muted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Material(
+                              color: HomePaperTokens.messageSurface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(17),
+                                side: const BorderSide(
+                                  color: HomePaperTokens.messageEdge,
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: IconButton(
+                                        tooltip: unread ? '消息，有未读消息' : '消息',
+                                        onPressed: () =>
+                                            openList(context, 'notifications'),
+                                        icon: const TuantuanIcon(
+                                          'notification',
+                                          size: 25,
+                                        ),
+                                      ),
+                                    ),
+                                    if (unread)
+                                      Positioned(
+                                        right: 10,
+                                        top: 9,
+                                        child: IgnorePointer(
+                                          child: Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              color: HomePaperTokens.unread,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: HomePaperTokens
+                                                    .messageSurface,
+                                                width: 2,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (user.canReadBusiness)
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: narrow ? 10 : 16,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (compact || large)
+                                Column(
+                                  children: [
+                                    cards[0],
+                                    const SizedBox(height: 10),
+                                    cards[1],
+                                  ],
+                                )
+                              else
+                                IntrinsicHeight(
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(child: cards[0]),
+                                      SizedBox(width: narrow ? 8 : 10),
+                                      Expanded(child: cards[1]),
+                                    ],
+                                  ),
+                                ),
+                              const SizedBox(height: 24),
+                              DailyTodosSection(key: ObjectKey(user)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
-      ],
-    ),
-  );
-}
-
-bool _isCompletedTask(Record item) {
-  const completed = {'已验收', '已归档', 'ACCEPTED', 'ARCHIVED'};
-  return completed.contains('${item.fields['status']}'.toUpperCase()) ||
-      completed.contains('${item.fields['phase']}'.toUpperCase());
+      ),
+    );
+  }
 }
 
 Future<void> _showCompanyItem(
@@ -406,9 +243,8 @@ Future<void> _showCompanyItem(
             loading: () => const Center(child: SunnyLoadingIndicator()),
             error: (error, _) => RecordFailure(
               error,
-              retry: () => dialogRef.invalidate(
-                recordsProvider('dashboard/company'),
-              ),
+              retry: () =>
+                  dialogRef.invalidate(recordsProvider('dashboard/company')),
             ),
             data: (_) {
               if (current == null) {
@@ -425,10 +261,9 @@ Future<void> _showCompanyItem(
                 padding: const EdgeInsets.all(20),
                 child: Text(
                   content.trim().isEmpty ? '暂无可展示内容' : content,
-                  style: Theme.of(dialogContext)
-                      .textTheme
-                      .bodyLarge
-                      ?.copyWith(height: 1.65),
+                  style: Theme.of(
+                    dialogContext,
+                  ).textTheme.bodyLarge?.copyWith(height: 1.65),
                 ),
               );
             },
@@ -437,7 +272,10 @@ Future<void> _showCompanyItem(
         return Center(
           child: SafeArea(
             child: SizedBox(
-              width: math.min(MediaQuery.sizeOf(dialogContext).width - 32, 560.0),
+              width: math.min(
+                MediaQuery.sizeOf(dialogContext).width - 32,
+                560.0,
+              ),
               height: math.min(
                 MediaQuery.sizeOf(dialogContext).height * .72,
                 640.0,
@@ -456,7 +294,9 @@ Future<void> _showCompanyItem(
                           Expanded(
                             child: Text(
                               current?.title ?? '',
-                              style: Theme.of(dialogContext).textTheme.titleLarge,
+                              style: Theme.of(
+                                dialogContext,
+                              ).textTheme.titleLarge,
                             ),
                           ),
                           IconButton(
@@ -518,12 +358,16 @@ Future<void> _showFocusCollection(
             : dialogRef.watch(memberRecordsProvider((resource, ownerId)));
         return state.when(
           loading: () => const Center(child: SunnyLoadingIndicator()),
-          error: (error, _) => Center(child: RecordFailure(
-            error,
-            retry: () => ownerId == null
-                ? dialogRef.invalidate(recordsProvider(resource))
-                : dialogRef.invalidate(memberRecordsProvider((resource, ownerId))),
-          )),
+          error: (error, _) => Center(
+            child: RecordFailure(
+              error,
+              retry: () => ownerId == null
+                  ? dialogRef.invalidate(recordsProvider(resource))
+                  : dialogRef.invalidate(
+                      memberRecordsProvider((resource, ownerId)),
+                    ),
+            ),
+          ),
           data: (page) => page.items.isEmpty
               ? const Center(child: Text('暂无记录'))
               : ListView.separated(
@@ -532,7 +376,9 @@ Future<void> _showFocusCollection(
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final item = page.items[index];
-                    final body = '${item.fields['内容'] ?? item.fields['text'] ?? item.fields['body'] ?? ''}'.trim();
+                    final body =
+                        '${item.fields['内容'] ?? item.fields['text'] ?? item.fields['body'] ?? ''}'
+                            .trim();
                     return InkWell(
                       onTap: () => _showFocusDetail(context, item),
                       onLongPress: ownerId == null
@@ -552,7 +398,9 @@ Future<void> _showFocusCollection(
                             Padding(
                               padding: const EdgeInsets.only(top: 5),
                               child: Icon(
-                                resource == 'dashboard/company' ? Icons.circle : Icons.radio_button_unchecked_rounded,
+                                resource == 'dashboard/company'
+                                    ? Icons.circle
+                                    : Icons.radio_button_unchecked_rounded,
                                 size: resource == 'dashboard/company' ? 10 : 18,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
@@ -566,9 +414,10 @@ Future<void> _showFocusCollection(
                                     item.title,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
                                   ),
                                   if (body.isNotEmpty) ...[
                                     const SizedBox(height: 5),
@@ -576,10 +425,15 @@ Future<void> _showFocusCollection(
                                       body,
                                       maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                        height: 1.4,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                            height: 1.4,
+                                          ),
                                     ),
                                   ],
                                 ],
@@ -598,7 +452,8 @@ Future<void> _showFocusCollection(
 }
 
 Future<void> _showFocusDetail(BuildContext context, Record item) async {
-  final rawBody = item.fields['内容'] ??
+  final rawBody =
+      item.fields['内容'] ??
       item.fields['text'] ??
       item.fields['body'] ??
       item.fields['content'];
@@ -658,14 +513,16 @@ Future<void> _showPersonalItemActions(
   if (action == 'edit') {
     await _showPersonalItem(context, ref, item);
     if (!context.mounted) return;
-    ref.invalidate(memberRecordsProvider((collectionResource, ownerId ?? item.ownerId)));
+    ref.invalidate(
+      memberRecordsProvider((collectionResource, ownerId ?? item.ownerId)),
+    );
     ref.invalidate(recordsProvider(collectionResource));
     return;
   }
 
   final confirmed = await showDialog<bool>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
+    builder: (dialogContext) => TuantuanDialog(
       title: const Text('删除这条个人重点？'),
       content: const Text('删除后会从个人重点列表中移除。'),
       actions: [
@@ -687,23 +544,31 @@ Future<void> _showPersonalItemActions(
   if (confirmed != true || !context.mounted) return;
 
   try {
-    await ref.read(repositoryProvider).execute(
-      collectionResource,
-      Command(
-        'archive',
-        {
-          'id': item.id,
-          'title': item.title,
-          '内容': item.fields['内容'] ?? item.fields['text'] ?? item.fields['body'] ?? '',
-          '排序位置': item.fields['排序位置'] ?? item.fields['position'] ?? 0,
-          'pinned': item.fields['pinned'] ?? false,
-        },
-        version: item.version,
-        idempotencyKey: '${item.id}:${item.version}:archive',
-      ),
-    );
+    await ref
+        .read(repositoryProvider)
+        .execute(
+          collectionResource,
+          Command(
+            'archive',
+            {
+              'id': item.id,
+              'title': item.title,
+              '内容':
+                  item.fields['内容'] ??
+                  item.fields['text'] ??
+                  item.fields['body'] ??
+                  '',
+              '排序位置': item.fields['排序位置'] ?? item.fields['position'] ?? 0,
+              'pinned': item.fields['pinned'] ?? false,
+            },
+            version: item.version,
+            idempotencyKey: '${item.id}:${item.version}:archive',
+          ),
+        );
     refreshBusiness(ref);
-    ref.invalidate(memberRecordsProvider((collectionResource, ownerId ?? item.ownerId)));
+    ref.invalidate(
+      memberRecordsProvider((collectionResource, ownerId ?? item.ownerId)),
+    );
     ref.invalidate(recordsProvider(collectionResource));
   } catch (error) {
     if (context.mounted) {
@@ -719,7 +584,8 @@ Future<void> _showPersonalItem(
 ]) async {
   final title = TextEditingController(text: item?.title ?? '');
   final content = TextEditingController(
-    text: '${item?.fields['内容'] ?? item?.fields['text'] ?? item?.fields['body'] ?? ''}',
+    text:
+        '${item?.fields['内容'] ?? item?.fields['text'] ?? item?.fields['body'] ?? ''}',
   );
   final colors = Theme.of(context).colorScheme;
   var saving = false;
@@ -742,166 +608,204 @@ Future<void> _showPersonalItem(
           bottom: MediaQuery.viewInsetsOf(dialogContext).bottom,
         ),
         child: Center(
-        child: SafeArea(
-          child: SizedBox(
-            width: math.min(MediaQuery.sizeOf(dialogContext).width - 32, 560.0),
-            height: math.max(
-              160.0,
-              math.min(
-                (MediaQuery.sizeOf(dialogContext).height -
-                        MediaQuery.viewInsetsOf(dialogContext).bottom -
-                        32) *
-                    .92,
-                640.0,
+          child: SafeArea(
+            child: SizedBox(
+              width: math.min(
+                MediaQuery.sizeOf(dialogContext).width - 32,
+                560.0,
               ),
-            ),
-            child: PaperSurface(
-              color: colors.surface,
-              borderColor: colors.outlineVariant,
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: title,
-                            enabled: !saving,
-                            maxLength: 80,
-                            decoration: const InputDecoration(
-                              hintText: '标题',
-                              border: InputBorder.none,
-                              counterText: '',
-                            ),
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
+              height: math.max(
+                160.0,
+                math.min(
+                  (MediaQuery.sizeOf(dialogContext).height -
+                          MediaQuery.viewInsetsOf(dialogContext).bottom -
+                          32) *
+                      .92,
+                  640.0,
+                ),
+              ),
+              child: PaperSurface(
+                color: colors.surface,
+                borderColor: colors.outlineVariant,
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: title,
+                              enabled: !saving,
+                              maxLength: 80,
+                              decoration: const InputDecoration(
+                                hintText: '标题',
+                                border: InputBorder.none,
+                                counterText: '',
+                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ),
-                        ),
-                        if (item != null)
+                          if (item != null)
+                            IconButton(
+                              tooltip: '归档个人重点',
+                              onPressed: saving
+                                  ? null
+                                  : () async {
+                                      setDialogState(() {
+                                        saving = true;
+                                        error = null;
+                                      });
+                                      try {
+                                        await ref
+                                            .read(repositoryProvider)
+                                            .execute(
+                                              'dashboard/personal',
+                                              Command(
+                                                'archive',
+                                                {'id': item.id},
+                                                version: item.version,
+                                                idempotencyKey:
+                                                    '${item.id}:${item.version}:archive',
+                                              ),
+                                            );
+                                        refreshBusiness(ref);
+                                        if (dialogContext.mounted) {
+                                          Navigator.pop(dialogContext, true);
+                                        }
+                                      } catch (failure) {
+                                        if (dialogContext.mounted) {
+                                          setDialogState(() {
+                                            saving = false;
+                                            error = '$failure';
+                                          });
+                                        }
+                                      }
+                                    },
+                              icon: const Icon(Icons.archive_outlined),
+                            ),
                           IconButton(
-                            tooltip: '归档个人重点',
+                            tooltip: '关闭',
+                            onPressed: saving
+                                ? null
+                                : () => Navigator.pop(dialogContext, false),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: colors.outlineVariant),
+                    SwitchListTile.adaptive(
+                      value: pinned,
+                      onChanged: saving
+                          ? null
+                          : (value) => setDialogState(() => pinned = value),
+                      title: const Text('置顶'),
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                      ),
+                    ),
+                    Divider(height: 1, color: colors.outlineVariant),
+                    Expanded(
+                      child: TextField(
+                        controller: content,
+                        enabled: !saving,
+                        maxLength: 10000,
+                        expands: true,
+                        minLines: null,
+                        maxLines: null,
+                        textAlignVertical: TextAlignVertical.top,
+                        decoration: const InputDecoration(
+                          hintText: '写下备忘或工作感悟',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.all(20),
+                        ),
+                      ),
+                    ),
+                    if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          error!,
+                          style: TextStyle(color: colors.error),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: saving
+                                ? null
+                                : () => Navigator.pop(dialogContext, false),
+                            child: const Text('取消'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
                             onPressed: saving
                                 ? null
                                 : () async {
-                                    setDialogState(() { saving = true; error = null; });
+                                    if (title.text.trim().isEmpty ||
+                                        content.text.trim().isEmpty) {
+                                      setDialogState(() => error = '标题和内容不能为空');
+                                      return;
+                                    }
+                                    setDialogState(() {
+                                      saving = true;
+                                      error = null;
+                                    });
                                     try {
-                                      await ref.read(repositoryProvider).execute(
-                                        'dashboard/personal',
-                                        Command(
-                                          'archive',
-                                          {'id': item.id},
-                                          version: item.version,
-                                          idempotencyKey: '${item.id}:${item.version}:archive',
-                                        ),
-                                      );
+                                      await ref
+                                          .read(repositoryProvider)
+                                          .execute(
+                                            'dashboard/personal',
+                                            Command(
+                                              'save',
+                                              {
+                                                if (item != null) 'id': item.id,
+                                                'title': title.text.trim(),
+                                                '内容': content.text,
+                                                '排序位置':
+                                                    item?.fields['排序位置'] ??
+                                                    item?.fields['position'] ??
+                                                    0,
+                                                'pinned': pinned,
+                                              },
+                                              version: item?.version ?? 0,
+                                              idempotencyKey: item == null
+                                                  ? 'personal-focus:${ref.read(sessionProvider).id}:${DateTime.now().microsecondsSinceEpoch}'
+                                                  : '${item.id}:${item.version}:save',
+                                            ),
+                                          );
                                       refreshBusiness(ref);
-                                      if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                                      if (dialogContext.mounted) {
+                                        Navigator.pop(dialogContext, true);
+                                      }
                                     } catch (failure) {
                                       if (dialogContext.mounted) {
-                                        setDialogState(() { saving = false; error = '$failure'; });
+                                        setDialogState(() {
+                                          saving = false;
+                                          error = '$failure';
+                                        });
                                       }
                                     }
                                   },
-                            icon: const Icon(Icons.archive_outlined),
+                            child: Text(saving ? '保存中…' : '保存'),
                           ),
-                        IconButton(
-                          tooltip: '关闭',
-                          onPressed: saving ? null : () => Navigator.pop(dialogContext, false),
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Divider(height: 1, color: colors.outlineVariant),
-                  SwitchListTile.adaptive(
-                    value: pinned,
-                    onChanged: saving ? null : (value) => setDialogState(() => pinned = value),
-                    title: const Text('置顶'),
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  ),
-                  Divider(height: 1, color: colors.outlineVariant),
-                  Expanded(
-                    child: TextField(
-                      controller: content,
-                      enabled: !saving,
-                      maxLength: 10000,
-                      expands: true,
-                      minLines: null,
-                      maxLines: null,
-                      textAlignVertical: TextAlignVertical.top,
-                      decoration: const InputDecoration(
-                        hintText: '写下备忘或工作感悟',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(20),
+                        ],
                       ),
                     ),
-                  ),
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(error!, style: TextStyle(color: colors.error)),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: saving ? null : () => Navigator.pop(dialogContext, false),
-                          child: const Text('取消'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: saving
-                              ? null
-                              : () async {
-                                  if (title.text.trim().isEmpty || content.text.trim().isEmpty) {
-                                    setDialogState(() => error = '标题和内容不能为空');
-                                    return;
-                                  }
-                                  setDialogState(() { saving = true; error = null; });
-                                  try {
-                                    await ref.read(repositoryProvider).execute(
-                                      'dashboard/personal',
-                                      Command(
-                                        'save',
-                                        {
-                                          if (item != null) 'id': item.id,
-                                          'title': title.text.trim(),
-                                          '内容': content.text,
-                                          '排序位置': item?.fields['排序位置'] ?? item?.fields['position'] ?? 0,
-                                          'pinned': pinned,
-                                        },
-                                        version: item?.version ?? 0,
-                                        idempotencyKey: item == null
-                                            ? 'personal-focus:${ref.read(sessionProvider).id}:${DateTime.now().microsecondsSinceEpoch}'
-                                            : '${item.id}:${item.version}:save',
-                                      ),
-                                    );
-                                    refreshBusiness(ref);
-                                    if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-                                  } catch (failure) {
-                                    if (dialogContext.mounted) {
-                                      setDialogState(() { saving = false; error = '$failure'; });
-                                    }
-                                  }
-                                },
-                          child: Text(saving ? '保存中…' : '保存'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
     ),
     transitionBuilder: (context, animation, _, child) => FadeTransition(
       opacity: animation,

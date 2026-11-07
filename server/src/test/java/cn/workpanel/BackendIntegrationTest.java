@@ -147,6 +147,14 @@ class BackendIntegrationTest {
         assertEquals("UP",get("/health",null).get("status").asText());
         var contract=get("/openapi",null); assertTrue(contract.has("paths")); assertEquals("#/components/schemas/TaskDraft",contract.at("/paths/~1api~1tasks/post/requestBody/content/application~1json/schema/$ref").asText());
         assertTrue(contract.at("/components/schemas/TaskDraft/properties/title").isObject()); assertEquals("/",contract.at("/servers/0/url").asText());
+        var taskListProperties=contract.at("/components/schemas/TaskListItem/properties");
+        for(String field:List.of("phase","dispatchAt","start_at","pinnedAt")) {
+            var types=taskListProperties.path(field).path("type");
+            assertTrue(types.isArray(),field+" must declare OpenAPI 3.1 nullable types");
+            assertTrue(types.toString().contains("\"string\"")&&types.toString().contains("\"null\""));
+        }
+        assertTrue(taskListProperties.path("phase").path("enum").toString().contains("null"));
+        assertFalse(contract.at("/info/description").asText().contains("任务列表不提供完成情况"));
         assertEquals("#/components/schemas/DevelopmentJob",contract.at("/paths/~1api~1ai-maps~1development~1jobs/post/responses/202/content/application~1json/schema/$ref").asText());
         assertEquals("#/components/schemas/KnowledgeStatus",contract.at("/paths/~1api~1ai-memories~1knowledge-status/get/responses/200/content/application~1json/schema/$ref").asText());
         assertEquals("#/components/schemas/MemoryForgetJob",contract.at("/paths/~1api~1ai-memories~1{id}/delete/responses/202/content/application~1json/schema/$ref").asText());
@@ -197,7 +205,7 @@ class BackendIntegrationTest {
         call(403,"GET","/profiles/"+ids.get("bob"),"leader",null,null);
         call(400,"POST","/auth/register",null,Map.of("account","bad","password","短密码","phone","13800000099","name","bad","departmentId","product"),null);
         call(409,"POST","/auth/register",null,Map.of("account","duplicate","password",PASSWORD,"phone","13800000002","name","重复手机号","departmentId","product"),null);
-        String rejectedMembership=register("pending-retry","product",90); post("/reviews/"+rejectedMembership+"/decision","integration-admin",Map.of("approve",false,"reason","部门申请有误","expectedVersion",0));
+        String rejectedMembership=register("pending-retry","product",90); post("/reviews/"+rejectedMembership+"/decision",ids.entrySet().stream().filter(e->e.getValue().equals(db.one("SELECT reviewer_id FROM review_steps WHERE request_id=?",rejectedMembership).get("reviewer_id"))).findFirst().orElseThrow().getKey(),Map.of("approve",false,"reason","部门申请有误","expectedVersion",db.one("SELECT expected_version FROM review_requests WHERE id=?",rejectedMembership).get("expected_version")));
         var resubmitted=post("/organization/membership-application","pending-retry",Map.of("version",1,"departmentId","marketing","reason","改为市场部重提")); approve(resubmitted.get("id").asText(),"pending-retry"); assertEquals("marketing",get("/auth/me","pending-retry").get("department_id").asText());
     }
     @Test @Order(3) void scopedTasksIdempotencyAndLifecycle() throws Exception {
@@ -206,8 +214,8 @@ class BackendIntegrationTest {
         approve(transitionTask.get("id").asText(),"leader");
         String transitionId=transitionTask.get("target_id").asText();
         var reassignment=post("/tasks/"+transitionId+"/reassignments","leader",Map.of("ownerId",ids.get("reviewer"),"version",1,"reason","调整负责人"));
-        assertEquals(ids.get("alice"),get("/tasks/"+transitionId,"leader").get("owner_id").asText()); approve(reassignment.get("id").asText(),"leader");
-        var transferred=get("/tasks/"+transitionId,"leader"); assertEquals(ids.get("reviewer"),transferred.get("owner_id").asText()); assertEquals(2,transferred.get("version").asInt());
+        assertEquals(ids.get("alice"),get("/tasks/"+transitionId,"leader").at("/participants/0/id").asText()); approve(reassignment.get("id").asText(),"leader");
+        var transferred=get("/tasks/"+transitionId,"leader"); assertEquals(ids.get("reviewer"),transferred.at("/participants/0/id").asText()); assertEquals(2,transferred.get("version").asInt());
         String revisedDeadline=LocalDate.now().plusDays(2).atTime(18,0).atZone(ZoneId.of("Asia/Shanghai")).toOffsetDateTime().toString();
         var reschedule=post("/tasks/"+transitionId+"/reschedules","leader",Map.of("deadline",revisedDeadline,"version",transferred.get("version").asInt(),"reason","调整期限"));
         assertEquals(2,get("/tasks/"+transitionId,"leader").get("version").asInt()); approve(reschedule.get("id").asText(),"leader");
@@ -221,7 +229,7 @@ class BackendIntegrationTest {
         call(404,"GET","/tasks/"+task,"bob",null,null);
         var candidate=taskBody("产品任务修订","alice"); var revision=post("/tasks/"+task+"/revisions","leader",Map.of("version",1,"reason","调整关键内容","candidate",candidate));
         assertEquals("产品任务",get("/tasks/"+task,"alice").get("title").asText()); approve(revision.get("id").asText(),"leader"); assertEquals("产品任务修订",get("/tasks/"+task,"alice").get("title").asText());
-        var row=get("/tasks","alice").get("items").get(0); assertFalse(row.has("phase")); assertFalse(row.has("status")); assertFalse(row.has("completion")); assertFalse(row.has("events"));
+        var row=get("/tasks","alice").get("items").get(0); assertTrue(row.hasNonNull("phase")); assertFalse(row.has("status")); assertFalse(row.has("completion")); assertFalse(row.has("events"));
         var received=post("/tasks/"+task+"/events","alice",Map.of("type","RECEIVED","version",2));
         call(409,"POST","/tasks/"+task+"/events","alice",Map.of("type","FEEDBACK","text","成果","version",1),null);
         var feedback=post("/tasks/"+task+"/events","alice",Map.of("type","FEEDBACK","text","提交成果","version",received.get("version").asInt()));
@@ -302,7 +310,7 @@ class BackendIntegrationTest {
         var edited=JSON.convertValue(result.get("output"),new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){}); edited.remove("generatedAt"); edited.remove("draft"); edited.put("version",result.get("version").asInt()); edited.put("summary","人工确认的摘要");
         assertEquals("人工确认的摘要",call(200,"PUT","/ai/jobs/"+successfulJob+"/draft","leader",edited,null).at("/output/summary").asText()); call(409,"PUT","/ai/jobs/"+successfulJob+"/draft","leader",edited,null);
         var task=call(200,"POST","/ai/jobs/"+successfulJob+"/confirm-task","leader",Map.of("version",get("/ai/jobs/"+successfulJob,"leader").get("version").asInt(),"actionIndex",0,"task",taskBody("人工确认任务","alice")),"confirmed-ai-task");
-        assertTrue(task.hasNonNull("id")); assertEquals(tasksBefore+1,db.count("SELECT count(*) FROM tasks"));
+        assertTrue(task.hasNonNull("id")); assertEquals("PENDING",task.get("status").asText()); assertEquals(tasksBefore,db.count("SELECT count(*) FROM tasks")); approve(task.get("id").asText(),"leader"); assertEquals(tasksBefore+1,db.count("SELECT count(*) FROM tasks"));
         var stream=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/ai/jobs/"+successfulJob+"/stream")).header("Authorization","Bearer "+tokens.get("leader")).GET().build(),HttpResponse.BodyHandlers.ofString()); assertEquals(200,stream.statusCode()); assertTrue(stream.body().contains("event:result"));
         assertTrue(get("/ai/usage","leader").get("usage").get(0).get("tokens").asInt()>=100);
     }
@@ -326,6 +334,7 @@ class BackendIntegrationTest {
         call(400,"POST","/organization/users/"+ids.get("leader")+"/revisions","integration-admin",Map.of("version",get("/auth/me","leader").get("version").asInt(),"reason","构成循环","managerId",ids.get("alice")),null);
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",ids.get("leader"),ids.get("alice"),"default"));
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->db.update("INSERT INTO review_steps(request_id,reviewer_id,applicant_id,position,company_id) VALUES (?,?,?,?,?)",review,ids.get("alice"),ids.get("alice"),99,"default"));
+        configure("alice",Map.of("managerId",ids.get("reviewer")));
         configure("leader",Map.of("role","DIRECTOR","departmentId","marketing","teamId",""));
         call(404,"GET","/logs/"+log,"leader",null,null); call(404,"GET","/ai/jobs/"+successfulJob,"leader",null,null);
         assertTrue(get("/ai-maps","leader").get("nodes").isEmpty());
@@ -387,7 +396,7 @@ class BackendIntegrationTest {
         post("/ai-memories/"+candidate.get("id").asText()+"/confirm","alice",Map.of("version",1));memory.process();
         assertEquals("OBSERVATION",memory.item(alice,candidate.get("id").asText()).get("claim_type"));
         var org=post("/ai-memories","founder",Map.of("domain","ORGANIZATION","content","产品化交付方向","category","GOAL","claimType","FACT","reason","建立业务方向"));
-        String review=org.get("id").asText();assertEquals("PENDING",org.get("status").asText());call(403,"POST","/reviews/"+review+"/decision","founder",Map.of("approve",true),null);approve(review,"founder");
+        String review=org.get("id").asText();assertEquals("APPROVED",org.get("status").asText());call(403,"POST","/reviews/"+review+"/decision","founder",Map.of("approve",true,"expectedVersion",org.get("expected_version").asInt()),null);
         assertEquals("ACTIVE",db.one("SELECT status FROM memory_items WHERE id=?",org.get("target_id").asText()).get("status"));
         var excluded=memory.eligible(alice,personal,false).stream().filter(m->m.get("source_type").equals("LOG")).findFirst().orElseThrow();
         memory.forget(alice,Db.str(excluded,"id"),((Number)excluded.get("version")).intValue());memory.process();
@@ -402,9 +411,10 @@ class BackendIntegrationTest {
         assertTrue(memoryGraph.paths(alice.company(),Set.of(mid),List.of(mid)).isEmpty());
     }
     @Test @Order(12) void extractedCandidatesNeedLiteralEvidenceAndConfirmation() throws Exception {
-        String day=LocalDate.parse(date).minusDays(3).toString();
-        String source=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",day,"version",0,"body",Map.of("work","独立设计订单模块并通过评审")),null).get("id").asText();
-        post("/logs/"+source+"/submit","alice",Map.of("version",1));
+        String day=LocalDate.parse(date).minusDays(1).toString();
+        int draftVersion=((Number)db.one("SELECT version FROM daily_logs WHERE owner_id=? AND business_date=?::date",ids.get("alice"),day).get("version")).intValue();
+        String source=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",day,"version",draftVersion,"body",Map.of("work","独立设计订单模块并通过评审")),null).get("id").asText();
+        post("/logs/"+source+"/submit","alice",Map.of("version",draftVersion+1));
         memory.process();
         var job=db.one("SELECT * FROM memory_extraction_jobs WHERE source_id=?",source);
         providerMode.set("EXTRACT_INVALID"); extraction.extract(job);
@@ -430,7 +440,7 @@ class BackendIntegrationTest {
         providerMode.set("OK");
     }
     @Test @Order(13) void developmentOutputExpiresWhenAccountOrSourceChanges() throws Exception {
-        String source=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",LocalDate.parse(date).minusDays(5).toString(),"version",0,"body",Map.of("work","设计订单模块并完成接口评审")),null).get("id").asText();
+        String source=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",LocalDate.parse(date).minusDays(2).toString(),"version",0,"body",Map.of("work","设计订单模块并完成接口评审")),null).get("id").asText();
         post("/logs/"+source+"/submit","alice",Map.of("version",1)); memory.process();
         var preference=get("/ai-memories/preferences/me","alice");
         call(200,"PUT","/ai-memories/preferences/me","alice",Map.of("version",preference.get("version").asInt(),"explicitGoals","订单模块设计","responsePreferences",""),null);

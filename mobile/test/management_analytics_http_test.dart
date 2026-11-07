@@ -394,7 +394,7 @@ void main() {
     );
     addTearDown(c.dispose);
     c.read(routerProvider).go(route);
-    Widget app = UncontrolledProviderScope(
+    Widget app = OwnedTestProviderScope(
       container: c,
       child: const PandoraApp(),
     );
@@ -491,14 +491,16 @@ void main() {
       expect(find.textContaining('直属上级单级审核'), findsOneWidget);
       final before = adapter.requests.length;
       await expectLater(
-        c.read(repositoryProvider).execute(
-          'organization/admin',
-          const Command('policy', {
-            'taskTeamReview': true,
-            'taskDepartmentReview': false,
-            'reason': '不应写入旧策略',
-          }, version: 9),
-        ),
+        c
+            .read(repositoryProvider)
+            .execute(
+              'organization/admin',
+              const Command('policy', {
+                'taskTeamReview': true,
+                'taskDepartmentReview': false,
+                'reason': '不应写入旧策略',
+              }, version: 9),
+            ),
         throwsA(isA<ApiFailure>()),
       );
       expect(adapter.requests.length, before);
@@ -511,7 +513,7 @@ void main() {
     (t) async {
       final c = await launch(t, '/export');
       await t.pumpWidget(
-        UncontrolledProviderScope(
+        OwnedTestProviderScope(
           container: c,
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
@@ -586,7 +588,16 @@ void main() {
     'personnel includes later pages and rejected management has no company resubmit',
     (t) async {
       final c = await launch(t, '/me/people');
+      // Data still includes later pages; records become visible after expanding
+      // their department and team in the approved inline directory.
+      expect(find.text('第二页成员'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('personnel-department-id:dept')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('personnel-team-id:dept-id:team')));
+      await t.pumpAndSettle();
       expect(find.text('第二页成员'), findsOneWidget);
+      expect(adapter.requests.any((r) => r.path == '/organization/people' &&
+          r.queryParameters['cursor'] == '30'), isTrue);
       c.read(routerProvider).go('/me/reviews/rejected');
       await settle(t);
       expect(find.text('修改后重新提交'), findsNothing);
@@ -609,11 +620,7 @@ void main() {
       final icons = FontLoader('MaterialIcons')
         ..addFont(
           Future.value(
-            ByteData.sublistView(
-              File(
-                materialIconsFontPath,
-              ).readAsBytesSync(),
-            ),
+            ByteData.sublistView(File(materialIconsFontPath).readAsBytesSync()),
           ),
         );
       await icons.load();
@@ -635,9 +642,7 @@ void main() {
         await t.runAsync(() async {
           final img = await render.toImage(pixelRatio: 1);
           final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-          final output = File(
-            '../output/flutter-evidence/$label.png',
-          );
+          final output = File('../output/flutter-evidence/$label.png');
           output.parent.createSync(recursive: true);
           output.writeAsBytesSync(bytes!.buffer.asUint8List());
           img.dispose();
@@ -646,7 +651,7 @@ void main() {
       await t.pumpWidget(
         RepaintBoundary(
           key: key,
-          child: UncontrolledProviderScope(
+          child: OwnedTestProviderScope(
             container: c,
             child: MaterialApp(
               debugShowCheckedModeBanner: false,

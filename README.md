@@ -2,7 +2,7 @@
 
 企业内部协作系统，目标包含 Flutter Android 客户端、Web 管理端、Spring Boot 后端、PostgreSQL、Redis 和服务端 AI 助手。
 
-产品基线见 [方案.md](方案.md)。当前仓库以 Spring Boot 后端和跨端界面基础工程为主，Android 联网接入、独立 Web 工作台和生产部署仍属于后续工作，不能将规划内容当作已交付功能。
+产品基线见 [方案.md](方案.md)。仓库包含 Spring Boot、Flutter 客户端和独立 Web 工作台；实际接入范围、部署版本与验收结论须分别核对源码、目标环境及最新验证记录，不能将规划或历史通过结果当作当前交付状态。
 
 ## 当前状态
 
@@ -11,7 +11,7 @@
 - 架构：按 `module/<feature>/{api,application,controller,domain,infrastructure,dto}` 分模块，公共契约位于 `contract` 和 `shared`。
 - 权限：管理员/创始人全公司，部门负责人本部门，团队长本团队，员工本人；查询、导出、附件和 AI 输入均由服务端校验范围。
 - 客户端：`mobile/` 为 Flutter 工程，部分页面仍使用演示数据。
-- 验证：OpenSpec 严格校验通过；完整集成测试需要 Docker、PostgreSQL、Redis 和 Maven 依赖环境。
+- 验证：按各次验收记录区分通过、失败和未验证项；完整集成测试需要 Docker、PostgreSQL、Redis 和 Maven 依赖环境。
 
 ## 仓库结构
 
@@ -28,6 +28,8 @@
 
 ## 文档入口
 
+日常开发先从 [统一文档索引](docs/README.md) 和 [移动端入口](mobile/README.md) 阅读。历史交付记录、旧截图及被替代原型已清理，必要时从 Git 历史查询；最近失败与验收限制见 [2026-10-30 联调记录](docs/frontend-backend-integration-validation-2026-10-30.md)。
+
 | 内容 | 文档 |
 | --- | --- |
 | 产品需求和导航基线 | [方案.md](方案.md) |
@@ -37,7 +39,7 @@
 | 后端分层、模块职责和依赖 | [docs/backend-architecture.md](docs/backend-architecture.md) |
 | REST、SSE、附件和 AI 接口 | [docs/backend-interface.md](docs/backend-interface.md) |
 | 数据库表和迁移说明 | [docs/database-schema.md](docs/database-schema.md) |
-| 后端验证结果和环境限制 | [docs/backend-validation.md](docs/backend-validation.md) |
+| 最新前后端验证与限制 | [docs/backend-validation.md](docs/backend-validation.md) |
 | 组员开发流程和 PR 约定 | [docs/development-workflow.md](docs/development-workflow.md) |
 | OpenSpec 变更列表 | [openspec/changes](openspec/changes) |
 
@@ -65,9 +67,13 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1
 
 测试脚本会创建独立的随机容器和端口，并清理自己创建的资源。Docker 不可用时，不能把测试报告为通过，应在 [docs/backend-validation.md](docs/backend-validation.md) 记录阻塞原因。
 
+## 核心维护规则
+
+不要随意创建文档：先复用已有主题，只有必要且有长期独立价值时才新建并加入 [总索引](docs/README.md)。小修改不创建OpenSpec；PR描述依据Git目标分支到HEAD的完整差异，更新时核对上次提交到HEAD的增量，禁止依赖会话历史。执行步骤见 [协作流程](docs/development-workflow.md)。
+
 ## 开发约束
 
-- 新能力先澄清需求、权限、数据、状态、异常、非目标和验收条件，再建立 OpenSpec 变更。
+- 新能力先澄清需求、权限、数据、状态、异常、非目标和验收条件，仅具体大功能且无合适现有 change 时新建 OpenSpec，小修改不创建。
 - Controller 只负责协议映射和输入校验；应用层负责事务和用例编排；领域层负责规则；基础设施层负责数据库、缓存、消息和外部服务。
 - 数据库变更只能新增 Flyway 迁移，不能修改已发布迁移。
 - 任务列表不得出现完成情况字段；下属日志入口固定在日志模块。

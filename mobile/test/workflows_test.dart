@@ -144,9 +144,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('完成情况'), findsNothing);
     expect(find.text('带 * 的为必填项'), findsNothing);
-    for (final label in ['任务名称', '开始时间', '截止时间', '参与人']) {
+    for (final label in ['任务名称', '截止时间', '参与人']) {
       expect(find.text('* $label'), findsOneWidget);
     }
+    expect(find.text('* 开始时间'), findsNothing);
+    expect(find.text('开始时间'), findsOneWidget);
     expect(find.text('* 任务内容'), findsNothing);
     expect(find.text('标签'), findsOneWidget);
     expect(find.text('附件'), findsOneWidget);

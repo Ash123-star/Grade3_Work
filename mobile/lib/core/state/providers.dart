@@ -1,3 +1,5 @@
+import 'package:pandora_mobile/data/repositories/calendar_tasks.dart';
+import 'calendar_month_retention.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
@@ -37,6 +39,21 @@ final sessionProvider = StateProvider<Session>(
       ? const Session()
       : const Session(active: false, role: UserRole.employee, dispatch: false),
 );
+int _sessionEpoch = 0;
+final sessionEpochProvider = Provider<int>((ref) {
+  ref.watch(sessionProvider);
+  return ++_sessionEpoch;
+});
+final calendarTaskReaderProvider = Provider<CalendarTaskReader>(
+  (ref) => sharedCalendarTaskReader,
+);
+final calendarMonthRetentionProvider = Provider<CalendarMonthRetention>((ref) {
+  ref.watch(sessionEpochProvider);
+  final retention = CalendarMonthRetention();
+  ref.onDispose(retention.dispose);
+  return retention;
+});
+
 final scenarioProvider = StateProvider<DemoScenario>(
   (ref) => DemoScenario.normal,
 );
@@ -154,7 +171,20 @@ Future<void> logoutCurrentSession(WidgetRef ref) async {
       return;
     }
   }
-  ref.read(sessionStorageErrorProvider.notifier).state = null;
+  String? calendarCleanupError;
+  if (before.companyId.isNotEmpty && before.id.isNotEmpty) {
+    final cleanupEpoch = ref.read(sessionEpochProvider);
+    try {
+      await ref.read(calendarCommandStoreProvider).clear(before);
+    } catch (_) {
+      calendarCleanupError = '已退出，改期记录清理失败；重新登录后请先确认旧申请';
+    }
+    if (!ref.context.mounted ||
+        ref.read(sessionEpochProvider) != cleanupEpoch) {
+      return;
+    }
+  }
+  ref.read(sessionStorageErrorProvider.notifier).state = calendarCleanupError;
   ref.read(sessionCheckProvider.notifier).state = null;
   ref.read(sessionProvider.notifier).state = const Session(
     id: '',
@@ -196,6 +226,28 @@ final receivedTaskCardProvider = FutureProvider.autoDispose<PageResult>((ref) {
     isActive: () => active,
   );
 });
+
+/// Home reads bounded previews; full task board loads pages on demand.
+final homePreviewProvider = FutureProvider.autoDispose
+    .family<PageResult, String>((ref, resource) {
+      final session = ref.watch(sessionProvider);
+      if (!session.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
+      }
+      return ref
+          .watch(repositoryProvider)
+          .list(resource, const Query(limit: 2));
+    });
+final receivedTaskPageProvider = FutureProvider.autoDispose
+    .family<PageResult, String>((ref, cursor) {
+      final session = ref.watch(sessionProvider);
+      if (!session.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '请先确认账号业务访问权限');
+      }
+      return ref
+          .watch(repositoryProvider)
+          .list('tasks/received-card', Query(cursor: cursor));
+    });
 final itemProvider = FutureProvider.autoDispose
     .family<Record, (String, String)>(
       (ref, key) => ref.watch(repositoryProvider).detail(key.$1, key.$2),
@@ -267,25 +319,34 @@ final datedRecordsProvider = FutureProvider.autoDispose
 
 final calendarMonthTasksProvider = FutureProvider.autoDispose
     .family<PageResult, (String?, int)>((ref, key) {
-      if (!ref.watch(sessionProvider).canReadBusiness) return const PageResult([]);
+      if (!ref.watch(sessionProvider).canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '账号权限已变化，请重新登录');
+      }
       var active = true;
       ref.onDispose(() => active = false);
       final monthIndex = key.$2;
-      final year = monthIndex >= 0
-          ? monthIndex ~/ 12
-          : (monthIndex - 11) ~/ 12;
+      final year = monthIndex >= 0 ? monthIndex ~/ 12 : (monthIndex - 11) ~/ 12;
       final first = DateTime(year, monthIndex - year * 12 + 1);
       final range = _calendarMonthRange(first);
-      return readCompleteList(
-        ref.watch(repositoryProvider),
-        'tasks',
-        Query(
-          ownerId: key.$1 ?? ref.watch(sessionProvider).id,
-          from: range.from,
-          to: range.to,
-        ),
-        isActive: () => active,
-      );
+      ref.watch(sessionEpochProvider);
+      final retention = ref.watch(calendarMonthRetentionProvider);
+      return ref
+          .read(calendarTaskReaderProvider)
+          .read(
+            ref.watch(repositoryProvider),
+            Query(
+              ownerId: key.$1 ?? ref.watch(sessionProvider).id,
+              from: range.from,
+              to: range.to,
+            ),
+            isActive: () => active,
+          ).then((page) {
+            if (active) {
+              final keep = ref.keepAlive();
+              ref.onDispose(retention.retain(key, keep.close));
+            }
+            return page;
+          });
     });
 
 final memberCalendarDateProvider = StateProvider.family<DateTime, String>((
@@ -338,6 +399,8 @@ final memberLogMonthProvider = FutureProvider.autoDispose
 void refreshBusiness(WidgetRef ref) {
   ref.invalidate(recordsProvider);
   ref.invalidate(receivedTaskCardProvider);
+  ref.invalidate(homePreviewProvider);
+  ref.invalidate(receivedTaskPageProvider);
   ref.invalidate(datedRecordsProvider);
   ref.invalidate(calendarMonthTasksProvider);
   ref.invalidate(itemProvider);
@@ -347,6 +410,7 @@ void refreshBusiness(WidgetRef ref) {
   ref.invalidate(analyticsSummaryProvider);
   ref.invalidate(memberRecordsProvider);
   ref.invalidate(logDayRecordsProvider);
+  ref.invalidate(recentDiaryRecordsProvider);
 }
 
 /// Each member date belongs to the current account, independent of own diary/calendar.
@@ -374,6 +438,31 @@ final memberRecordsProvider = FutureProvider.autoDispose
     });
 
 final logDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+
+/// Read the current account's three Shanghai business dates as one range.
+/// [today] carries a calendar date, not the device's current timezone.
+final recentDiaryRecordsProvider = FutureProvider.autoDispose
+    .family<PageResult, DateTime>((ref, today) {
+      final session = ref.watch(sessionProvider);
+      ref.watch(sessionEpochProvider);
+      if (!session.canReadBusiness) {
+        throw const ApiFailure(FailureKind.forbidden, '账号权限已变化，请重新登录');
+      }
+      var active = true;
+      ref.onDispose(() => active = false);
+      final first = BusinessRange(
+        DateTime.utc(today.year, today.month, today.day - 2),
+        '日',
+      );
+      final last = BusinessRange(today, '日');
+      return readCompleteList(
+        ref.watch(repositoryProvider),
+        'logs',
+        Query(ownerId: session.id, from: first.from, to: last.to),
+        isActive: () => active,
+      );
+    });
+
 final logDayRecordsProvider = FutureProvider.autoDispose
     .family<PageResult, (String, String?)>((ref, key) {
       var active = true;

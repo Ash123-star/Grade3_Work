@@ -1,7 +1,9 @@
+import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/tenure.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
@@ -93,27 +95,29 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
       final introductionValue = saveFields
           ? introduction.text.trim()
           : '${profile.fields['个人介绍'] ?? profile.fields['body'] ?? ''}';
-      await ref.read(repositoryProvider).execute(
-        'organization/profile',
-        Command(
-          'update',
-          {
-            'id': accountId,
-            '个人介绍': introductionValue,
-            if (saveFields) ...{
-              '手机号': phone.text.trim(),
-              '邮箱': email.text.trim(),
-              '性别': gender.text.trim(),
-              '年龄': age.text.trim().isEmpty
-                  ? null
-                  : int.parse(age.text.trim()),
-            },
-            'avatarAttachmentId': avatarId,
-          },
-          version: profile.version,
-          idempotencyKey: 'profile:$accountId:${profile.version}:update',
-        ),
-      );
+      await ref
+          .read(repositoryProvider)
+          .execute(
+            'organization/profile',
+            Command(
+              'update',
+              {
+                'id': accountId,
+                '个人介绍': introductionValue,
+                if (saveFields) ...{
+                  '手机号': phone.text.trim(),
+                  '邮箱': email.text.trim(),
+                  '性别': gender.text.trim(),
+                  '年龄': age.text.trim().isEmpty
+                      ? null
+                      : int.parse(age.text.trim()),
+                },
+                'avatarAttachmentId': avatarId,
+              },
+              version: profile.version,
+              idempotencyKey: 'profile:$accountId:${profile.version}:update',
+            ),
+          );
       if (!mounted || ref.read(sessionProvider).id != accountId) return;
       ref.invalidate(itemProvider(('organization/profile', accountId)));
       refreshBusiness(ref);
@@ -194,7 +198,9 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                                   child: Text(
                                     avatarError,
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.error,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
                                     ),
                                   ),
                                 ),
@@ -213,7 +219,8 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: FilledButton(
-                                      onPressed: avatarSaving ||
+                                      onPressed:
+                                          avatarSaving ||
                                               !uploading.ready ||
                                               uploading.files.isEmpty
                                           ? null
@@ -232,11 +239,12 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                                                     dialogContext.mounted &&
                                                     error == null) {
                                                   Navigator.pop(dialogContext);
-                                                } else if (dialogContext.mounted) {
+                                                } else if (dialogContext
+                                                    .mounted) {
                                                   setDialogState(() {
                                                     avatarSaving = false;
-                                                    avatarError = error ??
-                                                        '资料未保存，请重试';
+                                                    avatarError =
+                                                        error ?? '资料未保存，请重试';
                                                   });
                                                 }
                                               } catch (failure) {
@@ -273,7 +281,12 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                                 selecting = true;
                                 avatarError = '';
                               }),
-                              icon: const Icon(Icons.edit_outlined),
+                              icon: Image.asset(
+                                'assets/generated_ui/sunshine/icons/edit.png',
+                                width: 26,
+                                height: 26,
+                                excludeFromSemantics: true,
+                              ),
                             ),
                           IconButton(
                             tooltip: '关闭',
@@ -304,102 +317,187 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
     );
   }
 
-  Widget infoField(String label, dynamic value) => PaperSurface(
-    color: DogBrandPalette.surface,
-    borderColor: DogBrandPalette.line,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    child: Row(
-      children: [
-        SizedBox(
-          width: 54,
-          child: Text(
-            label,
-            style: const TextStyle(color: DogBrandPalette.muted, fontSize: 12),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value == null || '$value'.trim().isEmpty ? '未提供' : '$value',
-            style: const TextStyle(fontSize: 13, color: DogBrandPalette.muted),
-          ),
-        ),
-      ],
-    ),
-  );
-
   Widget _profileOverview(BuildContext context, Record value, Session user) {
     final department = value.fields['departmentName'] ?? value.fields['部门'];
     final position = value.fields['position'] ?? value.fields['职位'];
-    final intro = '${value.fields['个人介绍'] ?? value.fields['body'] ?? ''}'.trim();
-    final contact = [
-      ('电话', value.fields['phone'] ?? value.fields['手机号'], Icons.phone_outlined),
-      ('邮箱', value.fields['email'] ?? value.fields['邮箱'], Icons.mail_outline_rounded),
-      ('性别', value.fields['gender'] ?? value.fields['性别'], Icons.wc_outlined),
-      ('年龄', value.fields['age'] ?? value.fields['年龄'], Icons.cake_outlined),
-    ];
+    final intro = '${value.fields['个人介绍'] ?? value.fields['body'] ?? ''}'
+        .trim();
+    final entries =
+        <(String, String, dynamic, TextEditingController?, TextInputType?)>[
+          (
+            '电话',
+            'phone',
+            value.fields['phone'] ?? value.fields['手机号'],
+            phone,
+            TextInputType.phone,
+          ),
+          (
+            '邮箱',
+            'email',
+            value.fields['email'] ?? value.fields['邮箱'],
+            email,
+            TextInputType.emailAddress,
+          ),
+          (
+            '性别',
+            'person',
+            value.fields['gender'] ?? value.fields['性别'],
+            gender,
+            null,
+          ),
+          (
+            '年龄',
+            'birthday',
+            value.fields['age'] ?? value.fields['年龄'],
+            age,
+            TextInputType.number,
+          ),
+          (
+            '入职日期',
+            'employment',
+            employmentDateLabel(value.fields['employmentStartDate']),
+            null,
+            null,
+          ),
+          (
+            '工龄',
+            'tenure',
+            tenureLabel(
+              parseEmploymentDate(value.fields['employmentStartDate']),
+              shanghaiWallTime(DateTime.now()),
+            ),
+            null,
+            null,
+          ),
+        ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PaperSurface(
-          decorated: true,
-          skin: TuantuanAssets.surfaces['warm'],
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-          child: Stack(
+          color: SunnyPalette.primaryContainer,
+          child: Row(
             children: [
-              const Positioned(right: 0, top: 0, child: DogPose(index: DogAssets.sitting, size: 66)),
-              Row(
-                children: [
-                  Semantics(
-                    button: true,
-                    label: '查看${user.name}的头像详情',
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => showAvatarDetails(value, user.name),
-                      child: ProtectedAvatar(
-                        name: user.name,
-                        attachmentId: value.fields['avatarAttachmentId'] as String?,
-                        radius: 42,
-                      ),
-                    ),
+              Semantics(
+                button: true,
+                label: '查看${user.name}的头像详情',
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: saving
+                      ? null
+                      : () => showAvatarDetails(value, user.name),
+                  child: ProtectedAvatar(
+                    name: user.name,
+                    attachmentId: value.fields['avatarAttachmentId'] as String?,
+                    radius: 32,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(user.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 6),
-                        Text('${department ?? '部门未提供'} · ${position ?? '职位未提供'}', style: const TextStyle(color: DogBrandPalette.muted)),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
-              if (intro.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 112),
-                  child: Text(intro, maxLines: 3, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.45)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.name,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      [department, position]
+                          .where((v) => v != null && '$v'.trim().isNotEmpty)
+                          .join(' · '),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    AppLabelBadge(
+                      user.role.label,
+                      color: SunnyPalette.surface,
+                      compact: true,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        PaperSurface(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('个人介绍', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              if (editing)
+                TextField(
+                  controller: introduction,
+                  enabled: !saving,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 500,
+                  decoration: const InputDecoration(hintText: '介绍你的工作方向与经历'),
+                )
+              else
+                Text(
+                  intro.isEmpty ? '暂无个人介绍' : intro,
+                  style: const TextStyle(height: 1.6),
                 ),
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        Text('联系与资料', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
+        Text('联系与资料', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
         PaperSurface(
-          color: DogBrandPalette.surface,
-          borderColor: DogBrandPalette.line,
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
-              for (var i = 0; i < contact.length; i++) ...[
-                ListTile(
-                  leading: Icon(contact[i].$3, color: SunnyPalette.primaryStrong),
-                  title: Text(contact[i].$1, style: const TextStyle(color: DogBrandPalette.muted, fontSize: 12)),
-                  subtitle: Text(contact[i].$2 == null || '${contact[i].$2}'.trim().isEmpty ? '未提供' : '${contact[i].$2}'),
-                  dense: true,
+              for (var i = 0; i < entries.length; i++) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        'assets/generated_ui/sunshine/icons/${entries[i].$2}.png',
+                        width: 36,
+                        height: 36,
+                        excludeFromSemantics: true,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              entries[i].$1,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 5),
+                            if (editing && entries[i].$4 != null)
+                              TextField(
+                                controller: entries[i].$4,
+                                keyboardType: entries[i].$5,
+                                enabled: !saving,
+                                decoration: InputDecoration(
+                                  hintText: '未提供',
+                                  labelText: entries[i].$1,
+                                  floatingLabelBehavior:
+                                      FloatingLabelBehavior.never,
+                                ),
+                              )
+                            else
+                              Text(
+                                entries[i].$3 == null ||
+                                        '${entries[i].$3}'.trim().isEmpty
+                                    ? '未提供'
+                                    : '${entries[i].$3}',
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                if (i < contact.length - 1) const Divider(height: 1),
+                if (i < entries.length - 1) const Divider(height: 1),
               ],
             ],
           ),
@@ -407,31 +505,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
       ],
     );
   }
-
-  Widget editableInfoField(
-    String label,
-    TextEditingController controller, {
-    TextInputType? keyboardType,
-  }) => SizedBox(
-    width: 150,
-    child: TextField(
-      controller: controller,
-      enabled: !saving,
-      keyboardType: keyboardType,
-      maxLength: switch (label) {
-        '电话' => 32,
-        '邮箱' => 254,
-        '性别' => 20,
-        _ => null,
-      },
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: '未提供',
-        counterText: '',
-        isDense: true,
-      ),
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -457,7 +530,12 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
             onPressed: profile.valueOrNull == null
                 ? null
                 : () => beginEdit(profile.valueOrNull!),
-            icon: const Icon(Icons.edit_outlined),
+            icon: Image.asset(
+              'assets/generated_ui/sunshine/icons/edit.png',
+              width: 26,
+              height: 26,
+              excludeFromSemantics: true,
+            ),
           ),
       ],
       bottom: editing
@@ -497,140 +575,14 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
             data: (value) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!editing) _profileOverview(context, value, user) else PaperSurface(
-                  color: DogBrandPalette.surface,
-                  borderColor: DogBrandPalette.line,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Semantics(
-                            button: true,
-                            label: '查看${user.name}的头像详情',
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: () => showAvatarDetails(value, user.name),
-                              child: ProtectedAvatar(
-                                name: user.name,
-                                attachmentId:
-                                    value.fields['avatarAttachmentId']
-                                        as String?,
-                                radius: 36,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  user.name,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${value.fields['departmentName'] ?? value.fields['部门'] ?? '部门未提供'} · ${value.fields['position'] ?? value.fields['职位'] ?? '职位未提供'}',
-                                  style: const TextStyle(
-                                    color: DogBrandPalette.muted,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          SizedBox(
-                            width: 150,
-                            child: infoField(
-                              '职位',
-                              value.fields['position'] ?? value.fields['职位'],
-                            ),
-                          ),
-                          SizedBox(
-                            width: 150,
-                            child: infoField(
-                              '部门',
-                              value.fields['departmentName'] ??
-                                  value.fields['部门'],
-                            ),
-                          ),
-                          if (editing) ...[
-                            editableInfoField('电话', phone, keyboardType: TextInputType.phone),
-                            editableInfoField('邮箱', email, keyboardType: TextInputType.emailAddress),
-                            editableInfoField('性别', gender),
-                            editableInfoField('年龄', age, keyboardType: TextInputType.number),
-                          ] else ...[
-                            SizedBox(
-                              width: 150,
-                              child: infoField(
-                                '电话',
-                                value.fields['phone'] ?? value.fields['手机号'],
-                              ),
-                            ),
-                            SizedBox(
-                              width: 150,
-                              child: infoField(
-                                '邮箱',
-                                value.fields['email'] ?? value.fields['邮箱'],
-                              ),
-                            ),
-                            SizedBox(
-                              width: 150,
-                              child: infoField(
-                                '性别',
-                                value.fields['gender'] ?? value.fields['性别'],
-                              ),
-                            ),
-                            SizedBox(
-                              width: 150,
-                              child: infoField(
-                                '年龄',
-                                value.fields['age'] ?? value.fields['年龄'],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '个人简介',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      if (editing)
-                        TextField(
-                          controller: introduction,
-                          enabled: !saving,
-                          maxLength: 500,
-                          minLines: 3,
-                          maxLines: 6,
-                          decoration: const InputDecoration(
-                            hintText: '介绍你的工作方向与经历',
-                          ),
-                        )
-                      else
-                        Text(
-                          '${value.fields['个人介绍'] ?? value.fields['body'] ?? '暂无个人简介'}',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            height: 1.6,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                _profileOverview(context, value, user),
                 if (error != null) ...[
                   const SizedBox(height: 12),
                   Text(
                     error!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
               ],

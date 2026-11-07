@@ -368,7 +368,7 @@ void main() {
           }),
         ],
       );
-      Widget root(ProviderContainer container) => UncontrolledProviderScope(
+      Widget root(ProviderContainer container) => OwnedTestProviderScope(
         container: container,
         child: const SessionBootstrap(child: PandoraApp()),
       );
@@ -440,7 +440,7 @@ void main() {
       c.read(sessionProvider.notifier).state = const Session();
       final store = c.read(draftStoreProvider);
       await t.pumpWidget(
-        UncontrolledProviderScope(container: c, child: const PandoraApp()),
+        OwnedTestProviderScope(container: c, child: const PandoraApp()),
       );
       c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await t.pumpAndSettle();
@@ -559,7 +559,7 @@ void main() {
       c.read(sessionProvider.notifier).state = const Session();
       c.read(logDateProvider.notifier).state = DateTime(2026, 10, 13);
       await t.pumpWidget(
-        UncontrolledProviderScope(container: c, child: const PandoraApp()),
+        OwnedTestProviderScope(container: c, child: const PandoraApp()),
       );
       c.read(routerProvider).go('/form/log-edit?draftSource=diary');
       await settleLocalIo(t);
@@ -599,7 +599,7 @@ void main() {
     final store = c.read(sessionStoreProvider);
     await store.save(session());
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: c,
         child: const SessionBootstrap(
           child: MaterialApp(home: Text('SAFE NEW ACCOUNT')),

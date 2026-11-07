@@ -47,19 +47,22 @@ class TaskQueryServiceTest {
         return task;
     }
 
-    @Test void listUsesExplicitProjectionAndNeverLeaksLifecycleFields() {
+    @Test void listProjectsCanonicalPhaseWithoutLeakingBodyOrSyntheticCompletion() {
         when(db.count(anyString(),any(Object[].class))).thenReturn(1L);
         when(db.rows(startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at"),any(Object[].class))).thenReturn(List.of(row()));
         var result=service.list(LEADER,new TaskQueryService.Query(0,20,"查询",null,null,null));
         @SuppressWarnings("unchecked") var item=((List<Map<String,Object>>)result.get("items")).getFirst();
-        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","created_at","participants","label"),item.keySet());
-        for(String hidden:List.of("phase","status","completion","progress","done","body","events")) assertFalse(item.containsKey(hidden),hidden);
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","created_at","phase","dispatchAt","participants","labels","label","capabilities"),item.keySet());
+        assertEquals("ACCEPTED",item.get("phase"));
+        assertNull(item.get("dispatchAt"));
+        for(String hidden:List.of("status","completion","progress","done","body","events")) assertFalse(item.containsKey(hidden),hidden);
         verify(db).count(contains("FROM tasks t WHERE"),any(Object[].class));
         verify(db).rows(startsWith("SELECT t.id,t.issuer_id,t.title,t.start_at,t.deadline,t.version,t.created_at"),any(Object[].class));
     }
 
     @Test void explicitFromToSerializesHalfOpenIntersection() {
         record();
+        when(db.write(any())).thenAnswer(call -> new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(call.getArgument(0)));
         service.list(LEADER,new TaskQueryService.Query(0,20,"",null,null,null,"2026-10-01T00:00:00+08:00","2026-11-01T00:00:00+08:00"));
         String countSql=sql.getFirst(); assertTrue(countSql.contains("COALESCE(t.start_at,t.deadline)<?::timestamptz"),countSql);
         assertTrue(countSql.contains("t.deadline>=?::timestamptz"),countSql);
@@ -103,8 +106,19 @@ class TaskQueryServiceTest {
     @Test void taskListViewCopiesOnlyContractColumns() {
         var item=TaskListView.of(row());
         assertEquals("task-1",item.get("id"));
-        assertFalse(item.containsKey("phase"));
+        assertEquals("ACCEPTED",item.get("phase"));
         assertFalse(item.containsKey("body"));
+    }
+
+    @Test void completionKeepsAllRealPhasesAndMissingDispatchIsNotCreationTime() {
+        for(String phase:List.of("DISPATCHED","RECEIVED","FEEDBACK","ACCEPTED","ARCHIVED","WITHDRAWN","FUTURE_PHASE")) {
+            var task=row();task.put("phase",phase);
+            assertEquals(phase,TaskListView.of(task).get("phase"));
+            assertNull(TaskListView.of(task).get("dispatchAt"));
+        }
+        var task=row();task.remove("phase");task.put("dispatch_at","2026-10-12T01:00:00Z");
+        assertNull(TaskListView.of(task).get("phase"));
+        assertEquals("2026-10-12T01:00:00Z",TaskListView.of(task).get("dispatchAt"));
     }
 
     @Test void receivedCardKeepsPhasesAndSortsByEarliestRealDispatch() {
@@ -117,7 +131,7 @@ class TaskQueryServiceTest {
         assertTrue(cardSql.contains("personal.user_id=?"),cardSql);
         assertTrue(cardSql.contains("personal.company_id=t.company_id"),cardSql);
         @SuppressWarnings("unchecked") var item=((List<Map<String,Object>>)result.get("items")).getFirst();
-        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","label"),item.keySet());
+        assertEquals(Set.of("id","issuer_id","title","start_at","deadline","version","phase","created_at","dispatchAt","participants","labels","label"),item.keySet());
         assertEquals("WITHDRAWN",item.get("phase"));
         assertEquals("2026-10-12T01:00:00Z",item.get("dispatchAt"));
         assertEquals("1",result.get("nextCursor"));
@@ -128,5 +142,19 @@ class TaskQueryServiceTest {
         assertThrows(ApiError.class,()->service.receivedCard(LEADER,-1,30,""));
         assertThrows(ApiError.class,()->service.receivedCard(LEADER,0,0,""));
         verifyNoInteractions(db);
+    }
+
+    @Test void listSortsCurrentUserPinsFirstAndExposesPinFields() {
+        var pinned=row(); pinned.put("pinned",true); pinned.put("pinned_at","2026-10-21T01:00:00Z");
+        record(statement->statement.startsWith("SELECT t.id")?List.of(pinned):List.of());
+        var result=service.list(LEADER,new TaskQueryService.Query(0,20,"",null,null,null));
+        String listSql=sql.get(1);
+        assertTrue(listSql.contains("LEFT JOIN task_pins tp ON tp.task_id=t.id AND tp.user_id=?"),listSql);
+        assertTrue(listSql.contains("ORDER BY (tp.task_id IS NOT NULL) DESC,tp.pinned_at DESC,t.deadline,t.id"),listSql);
+        assertEquals("leader",args.get(1).getFirst());
+        assertFalse(sql.getFirst().contains("task_pins"),"count 不受置顶影响");
+        @SuppressWarnings("unchecked") var item=((List<Map<String,Object>>)result.get("items")).getFirst();
+        assertEquals(true,item.get("pinned")); assertEquals("2026-10-21T01:00:00Z",item.get("pinnedAt"));
+        assertFalse(item.containsKey("pinned_at"));
     }
 }

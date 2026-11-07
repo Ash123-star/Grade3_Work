@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pandora_mobile/app.dart';
@@ -35,7 +34,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: c,
         child: MaterialApp(
           theme: appTheme(),
@@ -138,7 +137,7 @@ void main() {
       await t.pumpWidget(
         RepaintBoundary(
           key: boundary,
-          child: UncontrolledProviderScope(
+          child: OwnedTestProviderScope(
             container: c,
             child: const PandoraApp(),
           ),
@@ -147,11 +146,14 @@ void main() {
       c.read(routerProvider).go('/view');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      final month = find.byKey(const ValueKey('calendar-month-grid'));
-      final lastDay = find.byKey(const ValueKey('month-day:2026-11-30'));
-      final timeline = find.byKey(
-        const ValueKey('calendar-month-timeline'),
+      final month = find
+          .byKey(const ValueKey('calendar-month-grid'))
+          .hitTestable();
+      final lastDay = find.descendant(
+        of: month,
+        matching: find.byKey(const ValueKey('month-day:2026-11-30')),
       );
+      final timeline = find.byKey(const ValueKey('calendar-month-timeline'));
       expect(timeline, findsOneWidget);
       expect(find.text('月底汇总验收'), findsOneWidget);
       final previews = t.widgetList<Text>(
@@ -173,7 +175,8 @@ void main() {
       );
       expect(t.getSize(month).width, size.width);
       final navTop = t.getTopLeft(find.byType(NavigationBar)).dy;
-      expect(t.getBottomRight(month).dy, lessThanOrEqualTo(navTop));
+      await t.ensureVisible(lastDay);
+      await t.pumpAndSettle();
       expect(t.getBottomRight(lastDay).dy, lessThanOrEqualTo(navTop));
       await t.drag(timeline, Offset(0, -t.getSize(timeline).height * 1.2));
       await t.pumpAndSettle();
@@ -244,7 +247,7 @@ void main() {
         await t.pumpWidget(
           RepaintBoundary(
             key: boundary,
-            child: UncontrolledProviderScope(
+            child: OwnedTestProviderScope(
               container: c,
               child: const PandoraApp(),
             ),

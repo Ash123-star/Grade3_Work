@@ -66,8 +66,7 @@ class _SunnyPrimaryButtonState extends State<SunnyPrimaryButton> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = SunnyPaperTokens.of(context),
-        scheme = Theme.of(context).colorScheme;
+    final tokens = SunnyPaperTokens.of(context);
     final pressed = enabled && states.value.contains(WidgetState.pressed);
     final focused = states.value.contains(WidgetState.focused);
     final duration = MediaQuery.disableAnimationsOf(context)
@@ -124,12 +123,12 @@ class _SunnyPrimaryButtonState extends State<SunnyPrimaryButton> {
                     ? tokens.disabled
                     : s.contains(WidgetState.pressed)
                     ? tokens.pressed
-                    : scheme.primary,
+                    : SunnyPalette.primary,
               ),
               foregroundColor: WidgetStateProperty.resolveWith(
                 (s) => s.contains(WidgetState.disabled)
                     ? tokens.disabledInk
-                    : scheme.onPrimary,
+                    : SunnyPalette.onPrimary,
               ),
               overlayColor: const WidgetStatePropertyAll(Colors.transparent),
               shape: WidgetStatePropertyAll(

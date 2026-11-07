@@ -19,12 +19,16 @@ dependencies:
   drift: ^2.35.2
   sqlite3: 3.5.1
   cryptography: ^2.9.0
+  timezone: ^0.10.1
   flutter_secure_storage: 10.0.0
   path_provider: ^2.1.6
   path: ^1.9.1
   forui: 0.17.0
   flutter_svg: ^2.3.0
+  lunar: 1.7.8
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
@@ -44,7 +48,8 @@ flutter:
     - assets/generated_ui/backgrounds/
     - assets/generated_ui/decorations/
     - assets/generated_ui/icons/
-    - assets/generated_ui/references/
+    - assets/generated_ui/sunshine/icons/
+    - assets/generated_ui/sunshine/mascots/
     - assets/generated_ui/new_pack/textures/
     - assets/generated_ui/new_pack/decorations/
     - assets/generated_ui/new_pack/surfaces/cards/

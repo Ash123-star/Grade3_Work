@@ -6,6 +6,8 @@ category: "Workflow"
 tags: ["workflow", "artifacts", "experimental"]
 ---
 
+先遵守根目录 AGENTS.md：只有具体大功能且现有 change 无法承载时新建；小修复、样式、配置和文档维护不创建 OpenSpec。
+
 Propose a new change - create the change and generate all artifacts in one step.
 
 **Planning boundary**: This workflow creates planning artifacts only. The user request that selected or triggered this workflow authorizes planning only, even if it asks to build or fix something. Do not edit project code. After the planning artifacts are complete, stop. Do not start implementation in the same response, even if the initial request asks for it. Wait for a new user request after the artifacts are presented; then start the apply workflow.

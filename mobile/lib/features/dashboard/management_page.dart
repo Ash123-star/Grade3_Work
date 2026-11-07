@@ -342,7 +342,7 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                 children: [
                   if (!policy)
                     PaperSurface(
-                      color: const Color(0xFFFFF0DA),
+                      color: const Color(0xFFFFF6D5),
                       child: const Text('修改申请与当前配置分开展示。提交不会立即更改组织或成员权限。'),
                     ),
                   if (!policy) const SectionHeader('选择修改对象'),
@@ -413,7 +413,9 @@ class _ManagementPageState extends ConsumerState<ManagementPage> {
                             '非创始人的关键修改由组织中配置的直属上级单级审核，通过后生效，不再逐级转审。直属上级未配置或关系失效时，申请保持待审，不自动批准。',
                           ),
                           SizedBox(height: 12),
-                          Text('创始人已获授权的操作自动批准；管理员身份本身不构成免审。'),
+                          Text(
+                            '创始人的关键修改由公司其他在职创始人审核，申请人可更换审核人；公司仅一位在职创始人时，已获授权的操作自动批准。管理员身份本身不构成免审，也不获得审批权。',
+                          ),
                         ],
                       ),
                     ),

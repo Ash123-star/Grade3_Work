@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
@@ -246,7 +245,7 @@ void main() {
     );
     addTearDown(c.dispose);
     await t.pumpWidget(
-      UncontrolledProviderScope(
+      OwnedTestProviderScope(
         container: c,
         child: host(const SingleChildScrollView(child: CalendarContent())),
       ),

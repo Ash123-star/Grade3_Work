@@ -1,6 +1,6 @@
 # 加密草稿与安全会话恢复验收（2026-10-13）
 
-关联 OpenSpec `flutter-secure-local-state`、本地 Issue `docs/issues/flutter-secure-local-state.md` 与阶段3 task3.6。沿用阶段2阳光纸张/动漫橙和原阶段3连续日志布局，未改变五栏/默认导图、日历与日志日期独立、派发禁状态、下属日志入口及服务端权限规则。
+关联 OpenSpec `flutter-secure-local-state`、本地 Issue [历史文件](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/docs/issues/flutter-secure-local-state.md) 与阶段3 task3.6。沿用阶段2阳光纸张/动漫橙和原阶段3连续日志布局，未改变五栏/默认导图、日历与日志日期独立、派发禁状态、下属日志入口及服务端权限规则。
 
 ## 已实现
 
@@ -17,7 +17,7 @@
 
 原`command_http_contract_test.dart`重试用例增加页面销毁/重新进入，验证加密保存的服务器草稿version9恢复后PUT仍为9，响应version10再提交。原日志交互用例改为验证真实加密store，不保留明文写入断言。测试注入安全存储替身及内存Driftexecutor；SQL与加密实现仍为生产类，不用测试假存储代替它们。
 
-实际Flutter新增[启动恢复失败](evidence/stage3-rebuild/40-session-recovery.png)，360×800/字号1.5已检查：人物、说明、重试、清除及不删除草稿提示完整可达。原16屏及其余认证/附件/AI渲染随回归更新，累计40张单页证据；原日志编辑图06已重新对照原批准详情板，连续纸张/关联任务/分节/底部双按钮保持一致。
+实际Flutter新增[启动恢复失败](https://github.com/Ash123-star/Grade3_Work/blob/05d6c25b24d7b4304d8e4b1414adebee1f85fc38/mobile/docs/evidence/stage3-rebuild/40-session-recovery.png)，360×800/字号1.5已检查：人物、说明、重试、清除及不删除草稿提示完整可达。原16屏及其余认证/附件/AI渲染随回归更新，累计40张单页证据；原日志编辑图06已重新对照原批准详情板，连续纸张/关联任务/分节/底部双按钮保持一致。
 
 环境Windows、Flutter3.38.7/Dart3.10.7。直接使用Dart运行flutter_tools.snapshot以避免flutter.bat版本检查执行器不稳定：
 

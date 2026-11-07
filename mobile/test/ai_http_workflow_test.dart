@@ -565,7 +565,7 @@ void main() {
       c.read(latestAiJobProvider(user.id).notifier).state = latest;
     }
     c.read(routerProvider).go(route);
-    Widget app = UncontrolledProviderScope(
+    Widget app = OwnedTestProviderScope(
       container: c,
       child: const PandoraApp(),
     );
@@ -841,11 +841,10 @@ void main() {
   );
   Future<void> fillConfirmation(WidgetTester t) async {
     await tapVisible(t, find.text('选择主负责人'));
-    await t.tap(find.text('技术部'));
+    await t.enterText(find.byType(TextField).last, '实际负责人');
+    await t.pump(const Duration(milliseconds: 500));
     await t.pumpAndSettle();
-    await t.tap(find.text('未分配团队'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('实际负责人'));
+    await t.tap(find.text('实际负责人').last);
     await t.pumpAndSettle();
     await t.ensureVisible(find.text('选择截止时间'));
     await t.pumpAndSettle();

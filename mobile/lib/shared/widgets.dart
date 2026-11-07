@@ -43,13 +43,20 @@ void openForm(
   context.push('/form/$form${query.isEmpty ? '' : '?$query'}');
 }
 
-void notice(BuildContext context, String text, {
+void notice(
+  BuildContext context,
+  String text, {
   bool success = false,
   NoticeTone tone = NoticeTone.info,
   String? actionLabel,
   VoidCallback? onAction,
-}) => showAppNotice(context, text, success ? NoticeTone.success : tone,
-    actionLabel: actionLabel, onAction: onAction);
+}) => showAppNotice(
+  context,
+  text,
+  success ? NoticeTone.success : tone,
+  actionLabel: actionLabel,
+  onAction: onAction,
+);
 
 class PageBody extends StatelessWidget {
   const PageBody({
@@ -108,56 +115,69 @@ class PageFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canGoBack = Navigator.of(context).canPop();
+    final inlineAction = actions?.length == 1;
+    final edgeWidth = inlineAction ? 88.0 : 48.0;
     final headerContent = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (showTitle || canGoBack)
+        if (showTitle || canGoBack || inlineAction)
           ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
+            constraints: const BoxConstraints(minHeight: 52),
             child: Row(
               children: [
                 SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: canGoBack ? const BackButton() : null,
-                ),
-                if (showTitle) ...[
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const DogAvatar(index: DogAssets.friendly, size: 30),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              title,
-                              style: Theme.of(context).textTheme.titleLarge,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  width: edgeWidth,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: canGoBack
+                        ? IconButton(
+                            tooltip: '返回',
+                            icon: const Icon(Icons.chevron_left_rounded),
+                            onPressed: () => Navigator.of(context).maybePop(),
+                          )
+                        : null,
                   ),
-                  const SizedBox(width: 48),
-                ],
+                ),
+                Expanded(
+                  child: showTitle
+                      ? Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                if (inlineAction && !showTitle)
+                  actions!.single
+                else
+                  SizedBox(
+                    width: edgeWidth,
+                    child: inlineAction
+                        ? Align(
+                            alignment: Alignment.centerRight,
+                            child: actions!.single,
+                          )
+                        : null,
+                  ),
               ],
             ),
           ),
-        if (actions?.isNotEmpty ?? false)
+        if (!inlineAction && (actions?.isNotEmpty ?? false))
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ConstrainedBox(
+            child: Wrap(
               key: const ValueKey('page-scroll-actions'),
-              constraints: const BoxConstraints(minHeight: 40),
-              child: Wrap(
-                alignment: WrapAlignment.end,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: actions!,
-              ),
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 4,
+              children: actions!,
             ),
           ),
       ],
@@ -183,7 +203,10 @@ class PageFrame extends StatelessWidget {
                     )
                   : TuantuanPaperBackdrop(
                       child: Column(
-                        children: [header, Expanded(child: content)],
+                        children: [
+                          header,
+                          Expanded(child: content),
+                        ],
                       ),
                     ),
             ),
@@ -199,7 +222,10 @@ class PageFrame extends StatelessWidget {
                   alignment: Alignment.bottomCenter,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 728),
-                    child: FloatingFeedback(key: feedback!.key, child: feedback!),
+                    child: FloatingFeedback(
+                      key: feedback!.key,
+                      child: feedback!,
+                    ),
                   ),
                 ),
               ),
@@ -313,6 +339,7 @@ class DateControls extends ConsumerWidget {
     void todayAction() {
       ref.read(selectedDateProvider.notifier).state = DateTime.now();
     }
+
     final Widget today = showTaskManagement
         ? _DateControlAction(
             label: '今天',
@@ -381,7 +408,7 @@ class DateControls extends ConsumerWidget {
             children: [
               Expanded(
                 child: _DateControlAction(
-                  label: '管理任务',
+                  label: '派发任务',
                   icon: Icons.table_rows_rounded,
                   onPressed: () => context.push('/me/tasks'),
                   emphasized: false,

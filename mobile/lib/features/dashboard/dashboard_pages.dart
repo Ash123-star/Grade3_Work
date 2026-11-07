@@ -7,6 +7,7 @@ import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
+import 'package:pandora_mobile/data/models/tenure.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
@@ -47,7 +48,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final user = ref.watch(sessionProvider);
     final period = ref.watch(periodProvider);
     final page = PageFrame(
-      title: '视图',
+      title: '公司',
       showTitle: false,
       fab: user.manager && user.dispatch
           ? FloatingActionButton(
@@ -68,31 +69,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, viewport) => period == '月'
-                    ? Column(
-                        children: [
-                          Expanded(
-                            child: LayoutBuilder(
-                              builder: (context, monthViewport) =>
-                                  CalendarContent(
-                                    availableHeight: monthViewport.maxHeight,
-                                  ),
-                            ),
-                          ),
-                          SizedBox(
-                            height: user.manager && user.dispatch ? 72 : null,
-                            child: Padding(
-                              padding: EdgeInsets.only(
-                                left: 16,
-                                right: user.manager && user.dispatch ? 88 : 16,
-                              ),
-                              child: const Align(
-                                alignment: Alignment.centerLeft,
-                                child: DemoLabel(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
+                    ? CalendarContent(availableHeight: viewport.maxHeight)
                     : ListView(
                         padding: EdgeInsets.only(
                           bottom: user.manager && user.dispatch ? 80 : 16,
@@ -286,7 +263,23 @@ class ProfilePage extends ConsumerWidget {
                                   ),
                                 ),
                               const SizedBox(height: 8),
-                              AppLabelBadge(user.role.label),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  AppLabelBadge(user.role.label),
+                                  if (profile.valueOrNull != null)
+                                    Text(
+                                      '工龄 ${tenureLabel(parseEmploymentDate(profile.valueOrNull!.fields['employmentStartDate']), shanghaiWallTime(DateTime.now()))}',
+                                      key: const ValueKey('profile-tenure'),
+                                      style: const TextStyle(
+                                        color: CuteTokens.muted,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ],
                           ),
                         ),

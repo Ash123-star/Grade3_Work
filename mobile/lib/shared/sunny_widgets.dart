@@ -290,7 +290,7 @@ class SunnyWelcome extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
-    this.color = const Color(0xFFE6FAEF),
+    this.color = SunnyPalette.primaryContainer,
     this.pose = BuddyPose.welcome,
     this.pet,
     this.action,
