@@ -228,6 +228,51 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (mounted && _recordId == null && _controller.text.trim().isEmpty) {
+      unawaited(_prefillDayTasks());
+    }
+  }
+
+  /// 新建日志且没有草稿时，把当天分配给我的任务标题带入正文，仍可自由编辑。
+  Future<void> _prefillDayTasks() async {
+    final keepAlive = ref.listenManual(receivedTaskCardProvider, (_, _) {});
+    try {
+      final page = await ref.read(receivedTaskCardProvider.future);
+      if (!mounted ||
+          !_isCurrentAccount ||
+          _closing ||
+          _submitted ||
+          _controller.text.trim().isNotEmpty) {
+        return;
+      }
+      final seen = <String>{};
+      final titles = <String>[];
+      for (final record in page.items) {
+        final day = businessEventTime(record.fields['deadline']);
+        if (day == null ||
+            day.year != _date.year ||
+            day.month != _date.month ||
+            day.day != _date.day) {
+          continue;
+        }
+        final title = record.title.trim();
+        if (title.isNotEmpty && seen.add(title)) titles.add(title);
+      }
+      if (titles.isEmpty ||
+          !mounted ||
+          !_isCurrentAccount ||
+          _closing ||
+          _submitted ||
+          _controller.text.trim().isNotEmpty) {
+        return;
+      }
+      _controller.text = titles.map((title) => '· $title').join('\n');
+      _changed('');
+    } catch (_) {
+      // 任务读取失败时保持空白编辑，不阻塞日志填写。
+    } finally {
+      keepAlive.close();
+    }
   }
 
   String get _dayKey =>
