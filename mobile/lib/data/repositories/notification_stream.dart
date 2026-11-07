@@ -5,13 +5,38 @@ import '../../core/errors/api_failure.dart';
 
 /// Metadata only. The stream never substitutes for an authorized list read.
 class NotificationSignal {
-  const NotificationSignal(this.sequence);
+  const NotificationSignal(this.sequence, {this.type, this.objectId});
   final int? sequence;
+  final String? type, objectId;
 }
 
 class NotificationStream {
   NotificationStream(this.dio);
   final Dio dio;
+
+  /// A new session starts at the current head, not by replaying its full history.
+  Future<int> latestSequence(CancelToken cancel) async {
+    try {
+      final response = await dio.get<Map<String, dynamic>>(
+        '/notifications',
+        queryParameters: {'limit': 1},
+        cancelToken: cancel,
+      );
+      final items = response.data?['items'];
+      if (items is! List || items.isEmpty) return 0;
+      return (items.first['sequence'] as num?)?.toInt() ?? 0;
+    } on DioException catch (error) {
+      throw ApiFailure.fromDio(error);
+    }
+  }
+
+  Duration get cooldown {
+    final until = dio.options.extra['rateLimitUntil'];
+    if (until is! DateTime) return Duration.zero;
+    final remaining = until.difference(DateTime.now());
+    return remaining > Duration.zero ? remaining : Duration.zero;
+  }
+
   Stream<NotificationSignal> connect(int after, CancelToken cancel) {
     late StreamController<NotificationSignal> output;
     Future<void> run() async {
@@ -124,7 +149,13 @@ Stream<NotificationSignal> parseNotificationSignals(
             (raw['id'] as String).isEmpty) {
           throw const FormatException('invalid notification sequence');
         }
-        yield NotificationSignal(sequence);
+        yield NotificationSignal(
+          sequence,
+          type: raw['type'] is String ? raw['type'] as String : null,
+          objectId: raw['object_id'] is String
+              ? raw['object_id'] as String
+              : null,
+        );
       }
       event = 'message';
       id = '';

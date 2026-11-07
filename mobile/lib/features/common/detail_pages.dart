@@ -22,7 +22,6 @@ import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'catalog.dart';
 import 'form_page.dart';
 import '../dashboard/diary_composer_sheet.dart';
-import '../../core/state/live_notifications.dart';
 import '../../shared/generated_assets.dart';
 import '../../shared/notification_preview.dart';
 
@@ -80,6 +79,44 @@ class _ListPageState extends ConsumerState<ListPage> {
   bool readingAll = false;
   Object? messageError;
   bool get messageBusy => readingMessage != null || readingAll;
+  String notificationSearch = '';
+  Timer? _messageSearchTimer;
+  bool _loadingOlder = false;
+  (String, String, bool) get _messageQuery =>
+      (notificationSearch, filter == '全部' ? '' : filter, inbox == 1);
+
+  void _refreshMessages() {
+    unawaited(
+      ref
+          .read(notificationPageProvider(_messageQuery).notifier)
+          .refresh(force: true, interactive: true),
+    );
+    if (_messageQuery != ('', '', false)) {
+      unawaited(
+        ref
+            .read(notificationPageProvider(('', '', false)).notifier)
+            .refresh(force: true),
+      );
+    }
+  }
+
+  Future<void> _loadOlder(PageResult _) async {
+    if (_loadingOlder) return;
+    setState(() => _loadingOlder = true);
+    try {
+      await ref
+          .read(notificationPageProvider(_messageQuery).notifier)
+          .loadMore();
+    } finally {
+      if (mounted) setState(() => _loadingOlder = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _messageSearchTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -140,7 +177,7 @@ class _ListPageState extends ConsumerState<ListPage> {
       }
       if (!mounted) return;
       if (!sameSession(session)) return;
-      ref.invalidate(recordsProvider('notifications'));
+      _refreshMessages();
       if (message == null) return;
       final target = message.fields['targetResource'];
       final id = message.fields['targetId'];
@@ -188,6 +225,8 @@ class _ListPageState extends ConsumerState<ListPage> {
         user = ref.watch(sessionProvider),
         data = resource == 'audit'
             ? ref.watch(auditRecordsProvider)
+            : resource == 'notifications'
+            ? ref.watch(notificationPageProvider(_messageQuery))
             : ref.watch(recordsProvider(widget.resource));
     final deniedMessage =
         messageError is ApiFailure &&
@@ -271,7 +310,22 @@ class _ListPageState extends ConsumerState<ListPage> {
               hintText: resource == 'organization' ? '搜索姓名、部门或团队' : '搜索标题或内容',
               prefixIcon: const Icon(Icons.search),
             ),
-            onChanged: (v) => setState(() => search = v),
+            onChanged: (v) {
+              if (resource != 'notifications') {
+                setState(() => search = v);
+                return;
+              }
+              _messageSearchTimer?.cancel();
+              _messageSearchTimer = Timer(
+                const Duration(milliseconds: 400),
+                () {
+                  if (mounted)
+                    setState(() {
+                      notificationSearch = v.trim();
+                    });
+                },
+              );
+            },
           ),
           const SizedBox(height: 12),
           if (resource == 'reviews')
@@ -284,9 +338,10 @@ class _ListPageState extends ConsumerState<ListPage> {
             PillTabs(
               labels: const ['全部', '未读'],
               selected: inbox,
-              onChanged: (v) => setState(() => inbox = v),
+              onChanged: (v) => setState(() {
+                inbox = v;
+              }),
             ),
-          if (resource == 'notifications') const NotificationConnectionStatus(),
           if (resource == 'tasks') ...[
             Wrap(
               spacing: 12,
@@ -354,7 +409,9 @@ class _ListPageState extends ConsumerState<ListPage> {
                       child: TuantuanFilterChip(
                         label: Text(value),
                         selected: filter == value,
-                        onSelected: (_) => setState(() => filter = value),
+                        onSelected: (_) => setState(() {
+                          filter = value;
+                        }),
                       ),
                     ),
                 ],
@@ -401,19 +458,28 @@ class _ListPageState extends ConsumerState<ListPage> {
             TextButton(
               onPressed: () {
                 setState(() => messageError = null);
-                ref.invalidate(recordsProvider('notifications'));
+                _refreshMessages();
               },
               child: const Text('重新检查消息权限'),
             ),
           ] else
             data.when(
-              skipLoadingOnRefresh: false,
+              skipLoadingOnRefresh: resource == 'notifications',
               skipLoadingOnReload: false,
+              skipError:
+                  resource == 'notifications' &&
+                  !(data.error is ApiFailure &&
+                      [
+                        FailureKind.unauthorized,
+                        FailureKind.forbidden,
+                      ].contains((data.error as ApiFailure).kind)),
               loading: () => const LoadingSkeleton(),
               error: (e, _) => RecordFailure(
                 e,
                 retry: () => resource == 'audit'
                     ? ref.invalidate(auditRecordsProvider)
+                    : resource == 'notifications'
+                    ? _refreshMessages()
                     : ref.invalidate(recordsProvider(resource)),
               ),
               data: (page) {
@@ -445,11 +511,6 @@ class _ListPageState extends ConsumerState<ListPage> {
                         (due == null || !due.isBefore(DateTime.now()))) {
                       return false;
                     }
-                  }
-                  if (resource == 'notifications' &&
-                      (inbox == 1 && r.fields['read'] == true ||
-                          filter != '全部' && r.fields['type'] != filter)) {
-                    return false;
                   }
                   if (resource == 'reviews' &&
                       (inbox == 0 &&
@@ -634,6 +695,21 @@ class _ListPageState extends ConsumerState<ListPage> {
               },
             ),
           const DemoLabel(),
+          if (resource == 'notifications' && data.hasValue) ...[
+            if (data.isLoading) const LinearProgressIndicator(minHeight: 2),
+            if (data.hasError)
+              RecordFailure(data.error!, retry: _refreshMessages),
+            if (data.requireValue.nextCursor != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: OutlinedButton(
+                  onPressed: _loadingOlder || data.isLoading
+                      ? null
+                      : () => _loadOlder(data.requireValue),
+                  child: Text(_loadingOlder ? '正在加载…' : '加载更多消息'),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -759,49 +835,6 @@ String prettyDate(dynamic value) {
   return date == null
       ? '未设置'
       : '${date.month}月${date.day}日 ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-}
-
-class NotificationConnectionStatus extends ConsumerWidget {
-  const NotificationConnectionStatus({super.key});
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref.watch(liveNotificationsProvider);
-    if (status.connection == NotificationConnection.disabled) {
-      return const SizedBox.shrink();
-    }
-    final label = switch (status.connection) {
-      NotificationConnection.live => '消息实时更新中',
-      NotificationConnection.connecting => '正在连接消息更新',
-      NotificationConnection.reconnecting => '消息连接中断，正在重连；可手动刷新列表',
-      _ => '实时更新已暂停，列表仍可手动刷新',
-    };
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-          if (status.connection == NotificationConnection.stopped) ...[
-            Text(
-              '${status.error ?? "消息连接已关闭"}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            TextButton.icon(
-              onPressed: () =>
-                  ref.read(liveNotificationsProvider.notifier).retry(),
-              icon: const Icon(Icons.sync),
-              label: const Text('重新连接消息'),
-            ),
-          ],
-          if (status.connection != NotificationConnection.live)
-            TextButton(
-              onPressed: () => ref.invalidate(recordsProvider('notifications')),
-              child: const Text('刷新消息列表'),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 class DetailPage extends ConsumerStatefulWidget {

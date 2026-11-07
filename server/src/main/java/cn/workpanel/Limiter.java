@@ -13,7 +13,11 @@ public class Limiter {
     public void check(String key,long limit,long seconds) {
         try {
             Long n=redis.execute(new DefaultRedisScript<>("local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n",Long.class),List.of("workpanel:"+key),String.valueOf(seconds));
-            if(n!=null&&n>limit) throw new ApiError(429,"RATE_LIMITED","请求过于频繁");
+            if(n!=null&&n>limit) {
+                Long ttl=redis.getExpire("workpanel:"+key);
+                long wait=ttl==null||ttl<0?seconds:Math.max(1,ttl);
+                throw new ApiError(429,"RATE_LIMITED","请求过于频繁",wait);
+            }
         } catch(ApiError e) { throw e; } catch(Exception e) { throw new ApiError(503,"LIMITER_UNAVAILABLE","限流服务不可用"); }
     }
 }

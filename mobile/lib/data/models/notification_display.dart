@@ -1,4 +1,20 @@
 /// Notification protocol codes stay unchanged; only presentation is localized.
+String notificationCategory(Object? type) => switch (type) {
+  'TASK_COMMENT' || 'LOG_COMMENT' => '评论',
+  'DEADLINE' => '截止提醒',
+  'REVIEW_APPROVED' || 'REVIEW_REJECTED' => '审核结果',
+  'REVIEW_PENDING' || 'REVIEW_UNASSIGNED' => '审批',
+  'LOG_SUBMITTED' || 'LOG_UPDATED' => '待阅提醒',
+  'TASK_DISPATCHED' ||
+  'TASK_ASSIGNED' ||
+  'TASK_EVENT' ||
+  'TASK_REVISED' ||
+  'TASK_REASSIGNED' ||
+  'TASK_RESCHEDULED' ||
+  'DELIVERY_CHECKED' => '任务',
+  _ => '其他',
+};
+
 String notificationDisplayTitle(Object? title, Object? type) {
   final text = title is String ? title.trim() : '';
   return text.isEmpty || RegExp(r'^[A-Z][A-Z0-9_]*$').hasMatch(text)

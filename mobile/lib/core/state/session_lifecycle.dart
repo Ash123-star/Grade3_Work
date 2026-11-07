@@ -58,16 +58,16 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
     } else if (state == AppLifecycleState.resumed && backgrounded) {
       backgrounded = false;
       if (ref.read(sessionProvider).token != null) {
-        unawaited(validate());
+        unawaited(validate(blockBusiness: false));
       } else {
         ref.read(notificationForegroundProvider.notifier).state = true;
       }
     }
   }
 
-  Future<void> validate() async {
+  Future<void> validate({bool blockBusiness = true}) async {
     try {
-      await refreshCurrentSession(ref, blockBusiness: true);
+      await refreshCurrentSession(ref, blockBusiness: blockBusiness);
     } catch (_) {
       // The provider retains typed recovery; no credential/body logging.
     } finally {
