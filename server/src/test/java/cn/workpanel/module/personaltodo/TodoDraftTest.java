@@ -17,10 +17,10 @@ class TodoDraftTest {
         b.put("endDate","2028-02-29");assertEquals("2028-02-29",TodoDraft.parse(b,false).endDate().toString());
     }
     @Test void rejectsInvalidRangeAndColor() {
-        var b=body();b.put("endDate","2028-02-28");
-        assertEquals("INVALID_DATE_RANGE",assertThrows(ApiError.class,()->TodoDraft.parse(b,false)).code);
-        b=body();b.put("endDate","2030-03-02");
-        assertEquals("INVALID_DATE_RANGE",assertThrows(ApiError.class,()->TodoDraft.parse(b,false)).code);
+        var early=body();early.put("endDate","2028-02-28");
+        assertEquals("INVALID_DATE_RANGE",assertThrows(ApiError.class,()->TodoDraft.parse(early,false)).code);
+        var far=body();far.put("endDate","2030-03-02");
+        assertEquals("INVALID_DATE_RANGE",assertThrows(ApiError.class,()->TodoDraft.parse(far,false)).code);
         for(Object color:List.of("red","#FFF","#GGGGGG",42)) {
             var c=body();c.put("color",color);
             assertEquals("INVALID_COLOR",assertThrows(ApiError.class,()->TodoDraft.parse(c,false)).code);
