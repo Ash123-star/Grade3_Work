@@ -5,13 +5,13 @@
 | 方法 | 路径 | 输入 | 返回 |
 |---|---|---|---|
 | GET | `/personal-todos/calendar` | month：YYYY-MM | month、fromDate（含）、toDate（不含）、days：date/total/completed；含邻月的周一至周日完整网格 |
-| GET | `/personal-todos` | date；cursor 默认0；limit 默认30、1–100 | items、total、nextCursor；末页为 null |
+| GET | `/personal-todos` | date；cursor 默认0；limit 默认30、1–100 | items、total、nextCursor；返回与该自然日重叠的事项，末页为 null |
 | GET | `/personal-todos/{id}` | id | 当前 Todo |
-| POST | `/personal-todos` | title、date、note（可选） | 201 Todo；version=1、completed=false |
-| PUT | `/personal-todos/{id}` | title、date、note（可选）、completed、version | 更新后的 Todo |
+| POST | `/personal-todos` | title、date、note（可选）、endDate（可选）、color（可选） | 201 Todo；version=1、completed=false |
+| PUT | `/personal-todos/{id}` | title、date、note（可选）、endDate（可选）、color（可选）、completed、version | 更新后的 Todo |
 | DELETE | `/personal-todos/{id}` | query version | id、deleted=true、新 version |
 
-Todo 为 id/title/note/date/completed/completedAt/version/createdAt/updatedAt。date 为上海自然日（1900–2100），时间戳为 UTC。标题去首尾空白后 1–120 Unicode 字符，备注最多2000字符；completed 必须是布尔值，version 必须是正整数。列表按未完成优先、创建时间、id 排序，使用偏移分页；列表变动后客户端回到第一页。
+Todo 为 id/title/note/date/endDate/color/completed/completedAt/version/createdAt/updatedAt。date 为开始日，endDate 为结束日，均为上海自然日（1900–2100）；不传 endDate 时等于 date，且 endDate 不得早于 date、跨度不超过366天。color 为 `#RRGGBB`，默认 `#F3A45D`。时间戳为 UTC。标题去首尾空白后 1–120 Unicode 字符，备注最多2000字符；completed 必须是布尔值，version 必须是正整数。跨天事项在覆盖的每一天都计入月历计数，并在按日列表中出现；列表按未完成优先、开始日、创建时间、id 排序，使用偏移分页；列表变动后客户端回到第一页。
 
 写入必须提供 `Idempotency-Key`（1–128位，字母数字或 `:_.-`）。同一账号同键同请求在24小时内返回原响应，同键异参为409；回执与业务写入同事务。完成/恢复传目标布尔值，不执行盲目翻转。更新、删除按版本原子比较；删除后的原命令重试仍可重放成功。过期键作为新请求处理，客户端只在当前会话保留不确定命令，重启后需先查看服务端结果，不提供离线保存承诺。
 

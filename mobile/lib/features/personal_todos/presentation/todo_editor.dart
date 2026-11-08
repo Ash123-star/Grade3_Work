@@ -9,6 +9,20 @@ import '../../../theme/home_paper_theme.dart';
 import '../application/todo_providers.dart';
 import '../data/personal_todo.dart';
 
+const _todoColors = [
+  '#F3A45D',
+  '#8FC7B0',
+  '#9DBBE8',
+  '#E8A6B8',
+  '#C8B6E2',
+  '#F2D06B',
+  '#D9B48F',
+  '#A9D6C5',
+];
+
+Color _hexColor(String value) =>
+    Color(0xFF000000 | int.parse(value.substring(1), radix: 16));
+
 Future<bool?> showTodoEditor(
   BuildContext context, {
   required String date,
@@ -36,7 +50,7 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
   final form = GlobalKey<FormState>();
   late final TextEditingController title, note;
   late final Session opened;
-  late String date;
+  late String date, endDate, color;
   String? id, error;
   int version = 0;
   bool completed = false, busy = false, conflict = false, deleted = false;
@@ -49,6 +63,12 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
     id = pending?.id ?? widget.todo?.id;
     final body = pending?.body;
     date = body?['date'] as String? ?? widget.todo?.date ?? widget.date;
+    endDate = body?['endDate'] as String? ?? widget.todo?.lastDate ?? date;
+    if (endDate.compareTo(date) < 0) endDate = date;
+    color =
+        body?['color'] as String? ??
+        widget.todo?.color ??
+        PersonalTodo.defaultColor;
     version = body?['version'] as int? ?? widget.todo?.version ?? 0;
     completed =
         body?['completed'] as bool? ??
@@ -109,6 +129,8 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                   'title': title.text.trim(),
                   'note': note.text.trim(),
                   'date': date,
+                  'endDate': endDate,
+                  'color': color,
                   if (id != null) ...{
                     'version': version,
                     'completed': completed,
@@ -180,6 +202,10 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
       );
     }
     final pending = ref.watch(pendingTodoCommandProvider);
+    final colorOptions = [
+      ..._todoColors,
+      if (!_todoColors.contains(color) && color.isNotEmpty) color,
+    ];
     final locked = busy || pending != null || conflict || deleted;
     return PopScope(
       canPop: !busy,
@@ -223,24 +249,142 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                       : null,
                 ),
                 const SizedBox(height: 12),
-                const Text('日期'),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('开始日期'),
+                        const SizedBox(height: 7),
+                        OutlinedButton(
+                          onPressed: locked
+                              ? null
+                              : () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: parseCivilDate(date),
+                                    firstDate: DateTime(1900),
+                                    lastDate: DateTime(2100, 12, 31),
+                                  );
+                                  if (picked != null &&
+                                      mounted &&
+                                      sameSession) {
+                                    final next = civilDate(picked);
+                                    setState(() {
+                                      date = next;
+                                      if (endDate.compareTo(date) < 0) {
+                                        endDate = date;
+                                      }
+                                    });
+                                  }
+                                },
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_today_outlined,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  date,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('结束日期'),
+                        const SizedBox(height: 7),
+                        OutlinedButton(
+                          key: const ValueKey('todo-end-date'),
+                          onPressed: locked
+                              ? null
+                              : () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: parseCivilDate(endDate),
+                                    firstDate: parseCivilDate(date),
+                                    lastDate: DateTime(2100, 12, 31),
+                                  );
+                                  if (picked != null &&
+                                      mounted &&
+                                      sameSession) {
+                                    setState(() => endDate = civilDate(picked));
+                                  }
+                                },
+                          child: Row(
+                            children: [
+                              const Icon(Icons.event_outlined, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  endDate,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('长条颜色'),
                 const SizedBox(height: 7),
-                OutlinedButton.icon(
-                  onPressed: locked
-                      ? null
-                      : () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: parseCivilDate(date),
-                            firstDate: DateTime(1900),
-                            lastDate: DateTime(2100, 12, 31),
-                          );
-                          if (picked != null && mounted && sameSession) {
-                            setState(() => date = civilDate(picked));
-                          }
-                        },
-                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                  label: Text(date),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in colorOptions)
+                      Semantics(
+                        button: true,
+                        selected: color == option,
+                        label: '颜色 $option',
+                        child: InkWell(
+                          key: ValueKey('todo-color:$option'),
+                          onTap: locked
+                              ? null
+                              : () => setState(() => color = option),
+                          borderRadius: BorderRadius.circular(18),
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: _hexColor(option),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: color == option
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.outlineVariant,
+                                width: color == option ? 2 : 1,
+                              ),
+                            ),
+                            child: color == option
+                                ? Icon(
+                                    Icons.check,
+                                    size: 16,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surface,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 const Text('备注（选填）'),
@@ -272,7 +416,7 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                 if (latest != null) ...[
                   const SizedBox(height: 12),
                   Text(
-                    '服务器版本 ${latest!.version}\n${latest!.title}\n${latest!.date}\n${latest!.note}\n${latest!.completed ? '已完成' : '未完成'}',
+                    '服务器版本 ${latest!.version}\n${latest!.title}\n${latest!.date} 至 ${latest!.lastDate}\n${latest!.color}\n${latest!.note}\n${latest!.completed ? '已完成' : '未完成'}',
                   ),
                   TextButton(
                     onPressed: busy

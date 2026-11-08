@@ -12,11 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config.dart';
 import '../../../core/errors/api_failure.dart';
 import '../../../core/state/providers.dart';
-import '../../../data/models/models.dart';
 import '../../../shared/calendar/civil_date.dart';
 import '../../../shared/generated_assets.dart';
-import '../../../shared/widgets.dart';
-import '../../../theme/app_theme.dart';
 import '../../../theme/home_paper_theme.dart';
 import '../application/todo_providers.dart';
 import '../data/personal_todo.dart';
@@ -236,20 +233,26 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
     }
     final paper = HomePaperTokens.of(context);
     final month = ref.watch(todoMonthProvider(civilMonth(selected)));
-    final monthTasks = ref.watch(
-      calendarMonthTasksProvider((
-        null,
-        selected.year * 12 + selected.month - 1,
-      )),
-    );
-    final taskSpans = _homeTaskSpans(
-      monthTasks.valueOrNull?.items ?? const <Record>[],
-    );
     final pending = ref.watch(pendingTodoCommandProvider);
     final pages = [
       for (final cursor in cursors)
         ref.watch(todoDayProvider((civilDate(selected), cursor))),
     ];
+    final monthCounts = month.valueOrNull ?? const <String, TodoCount>{};
+    final itemDays = [
+      for (final entry in monthCounts.entries)
+        if (entry.value.total > 0) entry.key,
+    ];
+    final itemPages = [
+      for (final day in itemDays) ref.watch(todoDayProvider((day, '0'))),
+    ];
+    final todosByDay = <String, List<PersonalTodo>>{};
+    for (var i = 0; i < itemDays.length; i++) {
+      final page = itemPages[i];
+      if (page.isLoading || page.hasError) continue;
+      final value = page.valueOrNull;
+      if (value != null) todosByDay[itemDays[i]] = value.items;
+    }
     final complete = pages.every((page) => !page.isLoading && !page.hasError);
     final loaded = [
       for (final page in pages)
@@ -277,14 +280,16 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
             ? 1
             : -1,
       );
-    final todoBars = rows.take(2).toList();
-    final todoOverflow = rows.length - todoBars.length;
-    final baseLanes = taskSpans.isEmpty
+    final uniqueTodos = <String, PersonalTodo>{};
+    for (final items in todosByDay.values) {
+      for (final todo in items) {
+        uniqueTodos.putIfAbsent(todo.id, () => todo);
+      }
+    }
+    final todoSpans = _todoSpans(uniqueTodos.values);
+    final maxLanes = todoSpans.isEmpty
         ? 0
-        : taskSpans.map((span) => span.lane).reduce(math.max) + 1;
-    final todoLaneCount = rows.isEmpty
-        ? 0
-        : todoBars.length + (todoOverflow > 0 ? 1 : 0);
+        : todoSpans.map((span) => span.lane).reduce(math.max) + 1;
     final seenError = pages.any((p) => p.hasError);
     final next = pages.last.valueOrNull?.nextCursor;
     final total = _stableTotal;
@@ -314,19 +319,6 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
                       const TuantuanIcon('calendar', size: 24),
                       const SizedBox(width: 6),
                       Text('每日事项', style: paper.heading(18)),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.lock_outline_rounded,
-                        size: 11,
-                        color: paper.muted,
-                      ),
-                      const SizedBox(width: 4),
-                      Text('仅自己可见', style: paper.body(11, color: paper.muted)),
                     ],
                   ),
                 ],
@@ -487,10 +479,9 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
                 final scale = MediaQuery.textScalerOf(context).scale(1);
                 final barHeight = 9.5 * scale * 1.15 + 3;
                 final barTop = 13 * scale * 1.15 + 7;
-                final totalLanes = baseLanes + todoLaneCount;
                 final rowHeight = math.max(
                   scale > 1.3 ? 62.0 : 54.0,
-                  barTop + totalLanes * (barHeight + 1) + 3,
+                  barTop + maxLanes * (barHeight + 1) + 3,
                 );
                 return Column(
                   children: [
@@ -499,7 +490,7 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
                         builder: (context) {
                           final weekStart = days[week];
                           final weekEnd = days[week + 6];
-                          final weekSpans = taskSpans
+                          final weekSpans = todoSpans
                               .where(
                                 (span) =>
                                     !span.last.isBefore(weekStart) &&
@@ -537,7 +528,7 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
                                   ),
                                 ),
                                 for (final span in weekSpans)
-                                  ..._weekTaskBars(
+                                  ..._weekTodoBars(
                                     context,
                                     span,
                                     weekStart,
@@ -545,84 +536,8 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
                                     cellWidth,
                                     barTop,
                                     barHeight,
+                                    (todo) => edit(todo: todo),
                                   ),
-                                if (!selected.isBefore(weekStart) &&
-                                    !selected.isAfter(weekEnd)) ...[
-                                  for (var i = 0; i < todoBars.length; i++)
-                                    Positioned(
-                                      left:
-                                          selected
-                                              .difference(weekStart)
-                                              .inDays *
-                                          cellWidth,
-                                      top:
-                                          barTop +
-                                          (baseLanes + i) * (barHeight + 1),
-                                      width: cellWidth,
-                                      height: barHeight,
-                                      child: GestureDetector(
-                                        onTap: () => edit(todo: todoBars[i]),
-                                        child: Container(
-                                          margin: const EdgeInsets.only(
-                                            left: 2,
-                                            right: 1,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 3,
-                                          ),
-                                          alignment: Alignment.centerLeft,
-                                          decoration: BoxDecoration(
-                                            color: HomePaperTokens.mint,
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            todoBars[i].title,
-                                            maxLines: 1,
-                                            softWrap: false,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 9.5,
-                                              height: 1.1,
-                                              color: paper.ink,
-                                              decoration: todoBars[i].completed
-                                                  ? TextDecoration.lineThrough
-                                                  : null,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  if (todoOverflow > 0)
-                                    Positioned(
-                                      left:
-                                          selected
-                                              .difference(weekStart)
-                                              .inDays *
-                                          cellWidth,
-                                      top:
-                                          barTop +
-                                          (baseLanes + todoBars.length) *
-                                              (barHeight + 1),
-                                      width: cellWidth,
-                                      height: barHeight,
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(left: 3),
-                                        child: Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: Text(
-                                            '+$todoOverflow 事项',
-                                            maxLines: 1,
-                                            style: paper.body(
-                                              9,
-                                              color: paper.muted,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
                               ],
                             ),
                           );
@@ -993,32 +908,36 @@ class _DayCell extends StatelessWidget {
                   : BorderSide.none,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${day.day}',
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.15,
-                  fontWeight: selected || today ? FontWeight.w700 : null,
-                  color: currentMonth ? paper.ink : HomePaperTokens.outside,
-                ),
-              ),
-              if (count.total > 0) ...[
-                const SizedBox(width: 3),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.topLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  count.pending > 0 ? '${count.pending}' : '✓',
+                  '${day.day}',
                   maxLines: 1,
-                  style: paper.body(
-                    9,
-                    height: 1.2,
-                    color: selected ? HomePaperTokens.orangeInk : paper.green,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.15,
+                    fontWeight: selected || today ? FontWeight.w700 : null,
+                    color: currentMonth ? paper.ink : HomePaperTokens.outside,
                   ),
                 ),
+                if (count.total > 0) ...[
+                  const SizedBox(width: 3),
+                  Text(
+                    count.pending > 0 ? '${count.pending}' : '✓',
+                    maxLines: 1,
+                    style: paper.body(
+                      9,
+                      height: 1.2,
+                      color: selected ? HomePaperTokens.orangeInk : paper.green,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -1026,33 +945,30 @@ class _DayCell extends StatelessWidget {
   }
 }
 
-class _HomeTaskSpan {
-  _HomeTaskSpan({
-    required this.record,
+class _TodoSpan {
+  _TodoSpan({
+    required this.todo,
     required this.first,
     required this.last,
     required this.color,
   });
-  final Record record;
+  final PersonalTodo todo;
   final DateTime first, last;
   final Color color;
   int lane = 0;
 }
 
-List<_HomeTaskSpan> _homeTaskSpans(Iterable<Record> tasks) {
-  final spans = <_HomeTaskSpan>[];
-  for (final task in tasks) {
-    final end = businessEventTime(task.fields['deadline']);
-    if (end == null) continue;
-    final start = businessEventTime(task.fields['startAt']) ?? end;
-    final endDay = DateTime(end.year, end.month, end.day);
-    final startDay = DateTime(start.year, start.month, start.day);
+List<_TodoSpan> _todoSpans(Iterable<PersonalTodo> todos) {
+  final spans = <_TodoSpan>[];
+  for (final todo in todos) {
+    final start = parseCivilDate(todo.date);
+    final end = parseCivilDate(todo.lastDate);
     spans.add(
-      _HomeTaskSpan(
-        record: task,
-        first: startDay.isBefore(endDay) ? startDay : endDay,
-        last: endDay,
-        color: _taskColor(task),
+      _TodoSpan(
+        todo: todo,
+        first: start.isBefore(end) ? start : end,
+        last: end,
+        color: _todoColor(todo.color),
       ),
     );
   }
@@ -1060,7 +976,7 @@ List<_HomeTaskSpan> _homeTaskSpans(Iterable<Record> tasks) {
     final order = a.first.compareTo(b.first);
     return order == 0 ? a.last.compareTo(b.last) : order;
   });
-  final lanes = <int, List<_HomeTaskSpan>>{};
+  final lanes = <int, List<_TodoSpan>>{};
   for (final span in spans) {
     var lane = 0;
     while (true) {
@@ -1076,19 +992,20 @@ List<_HomeTaskSpan> _homeTaskSpans(Iterable<Record> tasks) {
       lane++;
     }
     span.lane = lane;
-    lanes.putIfAbsent(lane, () => <_HomeTaskSpan>[]).add(span);
+    lanes.putIfAbsent(lane, () => <_TodoSpan>[]).add(span);
   }
   return spans;
 }
 
-List<Widget> _weekTaskBars(
+List<Widget> _weekTodoBars(
   BuildContext context,
-  _HomeTaskSpan span,
+  _TodoSpan span,
   DateTime weekStart,
   DateTime weekEnd,
   double cellWidth,
   double barTop,
   double barHeight,
+  ValueChanged<PersonalTodo> onEdit,
 ) {
   final from = span.first.isBefore(weekStart) ? weekStart : span.first;
   final to = span.last.isAfter(weekEnd) ? weekEnd : span.last;
@@ -1107,9 +1024,9 @@ List<Widget> _weekTaskBars(
       child: Semantics(
         button: true,
         label:
-            '${span.record.title}，${civilDate(span.first)}至${civilDate(span.last)}',
+            '${span.todo.title}，${civilDate(span.first)}至${civilDate(span.last)}',
         child: GestureDetector(
-          onTap: () => openItem(context, 'tasks', span.record.id),
+          onTap: () => onEdit(span.todo),
           child: Container(
             margin: EdgeInsets.only(left: starts ? 2 : 0, right: ends ? 2 : 1),
             padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -1123,14 +1040,17 @@ List<Widget> _weekTaskBars(
             ),
             child: showLabel
                 ? Text(
-                    span.record.title,
+                    span.todo.title,
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9.5,
                       height: 1.1,
-                      color: SunnyPalette.ink,
+                      color: _todoInk(span.color),
+                      decoration: span.todo.completed
+                          ? TextDecoration.lineThrough
+                          : null,
                     ),
                   )
                 : null,
@@ -1141,12 +1061,14 @@ List<Widget> _weekTaskBars(
   ];
 }
 
-Color _taskColor(Record task) {
-  final raw = '${task.fields['tagColor'] ?? task.fields['tag_color'] ?? ''}'
-      .trim();
-  final hex = raw.replaceFirst('#', '');
-  final value = RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)
+Color _todoColor(String value) {
+  final hex = value.replaceFirst('#', '');
+  final parsed = RegExp(r'^[0-9A-Fa-f]{6}$').hasMatch(hex)
       ? int.tryParse(hex, radix: 16)
       : null;
-  return value == null ? SunnyPalette.blue : Color(0xFF000000 | value);
+  return parsed == null ? const Color(0xFFF3A45D) : Color(0xFF000000 | parsed);
 }
+
+Color _todoInk(Color background) => background.computeLuminance() > .55
+    ? const Color(0xFF3D352B)
+    : Colors.white;

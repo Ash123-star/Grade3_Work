@@ -9,7 +9,22 @@ import static org.junit.jupiter.api.Assertions.*;
 class TodoDraftTest {
     Map<String,Object> body() {return new HashMap<>(Map.of("title","  私人安排  ","date","2028-02-29"));}
     @Test void normalizesOnlyTextAndPreservesCivilDate() {
-        var d=TodoDraft.parse(body(),false);assertEquals("私人安排",d.title());assertEquals("2028-02-29",d.date().toString());assertEquals("",d.note());assertFalse(d.completed());
+        var d=TodoDraft.parse(body(),false);assertEquals("私人安排",d.title());assertEquals("2028-02-29",d.date().toString());assertEquals("2028-02-29",d.endDate().toString());assertEquals(TodoDraft.DEFAULT_COLOR,d.color());assertEquals("",d.note());assertFalse(d.completed());
+    }
+    @Test void acceptsBoundedRangeAndHexColor() {
+        var b=body();b.put("endDate","2028-03-02");b.put("color","#8fc7b0");
+        var d=TodoDraft.parse(b,false);assertEquals("2028-03-02",d.endDate().toString());assertEquals("#8FC7B0",d.color());
+        b.put("endDate","2028-02-29");assertEquals("2028-02-29",TodoDraft.parse(b,false).endDate().toString());
+    }
+    @Test void rejectsInvalidRangeAndColor() {
+        var b=body();b.put("endDate","2028-02-28");
+        assertEquals("INVALID_DATE_RANGE",assertThrows(ApiError.class,()->TodoDraft.parse(b,false)).code);
+        b=body();b.put("endDate","2030-03-02");
+        assertEquals("INVALID_DATE_RANGE",assertThrows(ApiError.class,()->TodoDraft.parse(b,false)).code);
+        for(Object color:List.of("red","#FFF","#GGGGGG",42)) {
+            var c=body();c.put("color",color);
+            assertEquals("INVALID_COLOR",assertThrows(ApiError.class,()->TodoDraft.parse(c,false)).code);
+        }
     }
     @Test void rejectsInvalidDatesAndCoercion() {
         for(Object date:List.of("2026-02-29","2026-11-31","2026-1-01","1899-12-31","2101-01-01",42)) {

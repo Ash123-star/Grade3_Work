@@ -17,23 +17,23 @@ public class JdbcTodoRepository implements TodoRepository {
         return todo(db.one("SELECT * FROM personal_todos WHERE "+OWN+" AND id=?",a.company(),a.id(),id));
     }
     @Override public Page page(Actor a,LocalDate date,int cursor,int limit) {
-        long total=db.count("SELECT count(*) FROM personal_todos WHERE "+OWN+" AND business_date=?",a.company(),a.id(),date);
-        var items=db.rows("SELECT * FROM personal_todos WHERE "+OWN+" AND business_date=? ORDER BY completed,created_at,id LIMIT ? OFFSET ?",a.company(),a.id(),date,limit,cursor).stream().map(JdbcTodoRepository::todo).toList();
+        long total=db.count("SELECT count(*) FROM personal_todos WHERE "+OWN+" AND business_date<=? AND end_date>=?",a.company(),a.id(),date,date);
+        var items=db.rows("SELECT * FROM personal_todos WHERE "+OWN+" AND business_date<=? AND end_date>=? ORDER BY completed,business_date,created_at,id LIMIT ? OFFSET ?",a.company(),a.id(),date,date,limit,cursor).stream().map(JdbcTodoRepository::todo).toList();
         return new Page(items,total,cursor+items.size()<total?String.valueOf(cursor+items.size()):null);
     }
     @Override public List<DayCount> counts(Actor a,LocalDate from,LocalDate to) {
-        return db.rows("SELECT business_date,count(*) AS total,count(*) FILTER (WHERE completed) AS completed FROM personal_todos WHERE "+OWN+" AND business_date>=? AND business_date<? GROUP BY business_date ORDER BY business_date",a.company(),a.id(),from,to)
+        return db.rows("SELECT d::date AS business_date,count(t.id) AS total,count(t.id) FILTER (WHERE t.completed) AS completed FROM generate_series(?::timestamp,?::timestamp - interval '1 day',interval '1 day') AS d LEFT JOIN personal_todos t ON t.company_id=? AND t.owner_id=? AND t.deleted_at IS NULL AND t.business_date<=d::date AND t.end_date>=d::date GROUP BY d ORDER BY d",from,to,a.company(),a.id())
             .stream().map(r->new DayCount(LocalDate.parse(r.get("business_date").toString()),((Number)r.get("total")).longValue(),((Number)r.get("completed")).longValue())).toList();
     }
     @Override public Todo create(Actor a,TodoDraft d) {
         String id=Db.id();
-        db.update("INSERT INTO personal_todos(id,company_id,owner_id,business_date,title,note) VALUES (?,?,?,?,?,?)",id,a.company(),a.id(),d.date(),d.title(),d.note());
+        db.update("INSERT INTO personal_todos(id,company_id,owner_id,business_date,end_date,title,note,color) VALUES (?,?,?,?,?,?,?,?)",id,a.company(),a.id(),d.date(),d.endDate(),d.title(),d.note(),d.color());
         return find(a,id);
     }
     @Override public Todo update(Actor a,String id,TodoDraft d) {
         find(a,id); // An unauthorized id must be 404, never a version oracle.
-        Db.conflict(db.update("UPDATE personal_todos SET title=?,note=?,business_date=?,completed=?,completed_at=CASE WHEN ? THEN COALESCE(completed_at,now()) ELSE NULL END,version=version+1,updated_at=now() WHERE "+OWN+" AND id=? AND version=?",
-            d.title(),d.note(),d.date(),d.completed(),d.completed(),a.company(),a.id(),id,d.version()));
+        Db.conflict(db.update("UPDATE personal_todos SET title=?,note=?,business_date=?,end_date=?,color=?,completed=?,completed_at=CASE WHEN ? THEN COALESCE(completed_at,now()) ELSE NULL END,version=version+1,updated_at=now() WHERE "+OWN+" AND id=? AND version=?",
+            d.title(),d.note(),d.date(),d.endDate(),d.color(),d.completed(),d.completed(),a.company(),a.id(),id,d.version()));
         return find(a,id);
     }
     @Override public Deleted delete(Actor a,String id,int version) {
@@ -55,6 +55,6 @@ public class JdbcTodoRepository implements TodoRepository {
     }
     private static Instant instant(Object v) { return v==null?null:((Timestamp)v).toInstant(); }
     private static Todo todo(Map<String,Object> r) {
-        return new Todo(Db.str(r,"id"),Db.str(r,"title"),Db.str(r,"note"),LocalDate.parse(r.get("business_date").toString()),(boolean)r.get("completed"),instant(r.get("completed_at")),((Number)r.get("version")).intValue(),instant(r.get("created_at")),instant(r.get("updated_at")));
+        return new Todo(Db.str(r,"id"),Db.str(r,"title"),Db.str(r,"note"),LocalDate.parse(r.get("business_date").toString()),LocalDate.parse(r.get("end_date").toString()),Db.str(r,"color"),(boolean)r.get("completed"),instant(r.get("completed_at")),((Number)r.get("version")).intValue(),instant(r.get("created_at")),instant(r.get("updated_at")));
     }
 }
