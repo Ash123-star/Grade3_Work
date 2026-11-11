@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** 真实PG/Redis/HTTP与持久队列；模型和OCR仅为受控供应商，不代表真实供应商验收。 */
+@org.springframework.context.annotation.Import(cn.workpanel.storage.StorageTestConfiguration.class)
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"app.admin-account=integration-admin","app.admin-password=Initial-test-password-2026","app.admin-phone=13900000001","app.jobs-enabled=false","app.memory-extract-enabled=false","app.deepseek-key=test-only","app.ai-work-execution-enabled=true","app.ai-ocr-enabled=true","app.ai-work-poll-ms=100","app.ai-daily-tokens=500000"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 // 同库的旧 Spring 测试上下文仍运行定时 worker；隔离其供应商配置，避免领取本夹具的作业。
@@ -366,8 +367,8 @@ class WorkIntegrationTest {
         assertTrue(uploadResult("alice",png,"截图.png","AI_WORK",200).has("id"));String legacy=upload("alice",new byte[]{1},"普通.txt");assertEquals("UNSUPPORTED_FILE",call(415,"POST","/ai/work-items","alice",Map.of("text","整理材料","attachmentIds",List.of(legacy)),Db.id()).get("code").asText());
         assertEquals("FILE_LIMIT",call(400,"POST","/ai/work-items","alice",Map.of("attachmentIds",List.of("a","b","c","d","e","f")),Db.id()).get("code").asText());
         // 存储中遗留超大文件仍须由AI入口拒绝；不依赖通用HTTP上传限额。
-        String large=upload("alice",png,"超限.png");db.update("UPDATE attachments SET data=decode(repeat('00',10485761),'hex') WHERE id=?",large);assertEquals("FILE_LIMIT",call(400,"POST","/ai/work-items","alice",Map.of("attachmentIds",List.of(large)),Db.id()).get("code").asText());
-        String exact=upload("alice",png,"合计.png");byte[] max=Arrays.copyOf(png,10485760);db.update("UPDATE attachments SET data=? WHERE id=?",max,exact);var actor=currentActors.fresh(new Actor(ids.get("alice"),company,"","","",false,false,false,"ACTIVE"));
+        String large=upload("alice",png,"超限.png");db.update("UPDATE attachments SET storage_provider='DATABASE',data=decode(repeat('00',10485761),'hex') WHERE id=?",large);assertEquals("FILE_LIMIT",call(400,"POST","/ai/work-items","alice",Map.of("attachmentIds",List.of(large)),Db.id()).get("code").asText());
+        String exact=upload("alice",png,"合计.png");byte[] max=Arrays.copyOf(png,10485760);db.update("UPDATE attachments SET storage_provider='DATABASE',data=? WHERE id=?",max,exact);var actor=currentActors.fresh(new Actor(ids.get("alice"),company,"","","",false,false,false,"ACTIVE"));
         assertEquals(3,attachmentService.intake(actor,Collections.nCopies(3,exact)).size());assertEquals("FILE_LIMIT",assertThrows(ApiError.class,()->attachmentService.intake(actor,Collections.nCopies(4,exact))).code);
     }
     @Test void aiExplicitCheckThenSubmitProducesOneFeedbackAndWaitsForHumanAcceptance()throws Exception{
@@ -711,7 +712,7 @@ class WorkIntegrationTest {
         var done=approveTaskReviewsAndAwaitSuccess(work);String task=done.at("/receipts/0/result/taskId").asText();
         String privateFile=Db.id(),formalFile=Db.id(),report=Db.id();
         for(String file:List.of(privateFile,formalFile)){
-            db.update("INSERT INTO attachments(id,company_id,owner_id,filename,content_type,data) VALUES (?,?,?,'evidence.txt','text/plain',?::bytea)",file,company,ids.get("leader"),new byte[]{1,2,3});
+            db.update("INSERT INTO attachments(id,company_id,owner_id,filename,content_type,data,size_bytes) VALUES (?,?,?,'evidence.txt','text/plain',?::bytea,3)",file,company,ids.get("leader"),new byte[]{1,2,3});
             db.update("INSERT INTO attachment_bindings(company_id,attachment_id,resource_type,resource_id) VALUES (?,?,'WORK',?)",company,file,work);
         }
         db.update("UPDATE attachments SET task_id=? WHERE id=?",task,formalFile);
@@ -722,7 +723,8 @@ class WorkIntegrationTest {
         db.update("UPDATE ai_work_items SET deleted_at=now() WHERE id=?",work);
         retention.clean();retention.clean();
         assertEquals(0,db.count("SELECT count(*) FROM ai_work_messages WHERE work_id=?",work));assertEquals(0,db.count("SELECT count(*) FROM ai_work_plans WHERE work_id=?",work));
-        assertEquals(0,db.count("SELECT octet_length(data) FROM attachments WHERE id=?",privateFile));assertEquals(3,db.count("SELECT octet_length(data) FROM attachments WHERE id=?",formalFile));
+        assertEquals(1,db.count("SELECT count(*) FROM attachments WHERE id=? AND storage_state IN ('DELETING','DELETED')",privateFile));assertEquals(3,db.count("SELECT size_bytes FROM attachments WHERE id=? AND storage_state='READY'",formalFile));
+        assertArrayEquals(new byte[]{1,2,3},(byte[])db.one("SELECT data FROM attachments WHERE id=?",formalFile).get("data"));
         assertEquals(1,db.count("SELECT count(*) FROM tasks WHERE id=?",task));assertEquals(1,db.count("SELECT count(*) FROM ai_action_receipts WHERE work_id=?",work));
         assertEquals(0,db.count("SELECT count(*) FROM task_delivery_checks WHERE id=?",report));
         var audit=db.one("SELECT * FROM audit_records WHERE object_id=?",marker);assertEquals(Map.of(),db.read(audit.get("after_value")));assertEquals(ids.get("leader"),audit.get("actor_id"));
@@ -767,7 +769,7 @@ class WorkIntegrationTest {
         var bytes=new ByteArrayOutputStream();try(var doc=new XWPFDocument()){doc.createParagraph().createRun().setText("成本：10元");doc.write(bytes);}String file=upload("alice",bytes.toByteArray(),"成本.docx");
         var queued=call(202,"POST","/tasks/"+task+"/delivery-checks","alice",Map.of("taskVersion",1,"attachmentIds",List.of(file)),Db.id());JsonNode report;long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);do{report=call(200,"GET","/tasks/"+task+"/delivery-checks/"+queued.get("id").asText(),"alice",null,null);if(report.get("state").asText().equals("PASS"))break;Thread.sleep(100);}while(System.nanoTime()<until);assertEquals("PASS",report.get("state").asText());assertTrue(report.get("snapshotValid").asBoolean());
         String work=Db.id();var receipt=Map.of("taskId",task,"checkId",report.get("id").asText(),"report",report,"summary","材料已通过检查");db.update("INSERT INTO ai_work_items(id,company_id,owner_id,state,result) VALUES (?,?,?,'SUCCEEDED',?::jsonb)",work,company,ids.get("alice"),db.write(receipt));db.update("INSERT INTO ai_action_receipts(company_id,actor_id,work_id,plan_version,step_key,request_hash,result) VALUES (?,?,?,0,'check',?,?::jsonb)",company,ids.get("alice"),work,Db.hash("fixture"),db.write(receipt));
-        db.update("UPDATE attachments SET data=? WHERE id=?","changed material".getBytes(StandardCharsets.UTF_8),file);
+        db.update("UPDATE attachments SET storage_provider='DATABASE',data=? WHERE id=?","changed material".getBytes(StandardCharsets.UTF_8),file);
         var stale=call(200,"GET","/tasks/"+task+"/delivery-checks/"+report.get("id").asText(),"alice",null,null);assertEquals("STALE",stale.get("state").asText());assertEquals(0,stale.get("findings").size());
         var workView=call(200,"GET","/ai/work-items/"+work,"alice",null,null);assertEquals("STALE",workView.at("/receipts/0/result/report/state").asText());assertEquals("STALE",workView.at("/result/report/state").asText());
         boolean listed=false;for(var item:call(200,"GET","/ai/work-items","alice",null,null).get("items"))if(item.get("id").asText().equals(work)){assertEquals("STALE",item.at("/result/report/state").asText());listed=true;}assertTrue(listed);assertEquals(0,db.count("SELECT count(*) FROM task_deliveries WHERE task_id=?",task));

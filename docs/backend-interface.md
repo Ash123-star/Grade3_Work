@@ -1,5 +1,13 @@
 # 后端接口文档
 
+## OSS文件与公开素材
+
+Issue #79 / OpenSpec `unified-oss-resource-storage`：上传文件正文统一写入私有OSS，历史bytea在迁移前兼容读取，附件ID不变。`POST /api/attachments`原multipart契约及10MB/AI用途限制不变，只有对象写入、读回哈希校验和READY元数据提交后返回成功；`GET /api/attachments/{id}`每次检查当前身份/公司/业务范围，禁止公开URL和共享缓存。503 `STORAGE_UNAVAILABLE`、502 `FILE_INTEGRITY_ERROR`、404 `FILE_NOT_FOUND`均保留统一错误及traceId，不返回供应商异常或凭据。
+
+CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额外响应头 `X-Generated-File-Id`。新增 `GET /api/generated-files/{id}`仅允许同公司本人且来源仍授权/版本有效时下载；默认24小时过期，404过期/不存在、403越权、409 `SOURCE_CHANGED`。附件兼容入口也重验生成文件来源。生成不修改业务版本，重复生成可产生新文件，无幂等键要求。
+
+新增公开只读 `GET /api/assets/manifest`（当前完整版本清单，ETag/304、无版本404）和 `GET /api/assets/{release}/{*path}`（已发布白名单静态文件，内容类型、哈希ETag及不可变缓存）。仅用于产品图片/SVG/纹理/字体/许可证，不接受任意OSS Key、Bucket或URL；非法/未发布/目录穿越路径拒绝，不授予业务文件访问权。原生启动必需资源保留安装副本，运行时客户端经统一资源加载器访问并校验/缓存。部署、历史迁移和回滚见 `docs/oss-storage.md`。
+
 ## 契约来源与通用约定
 
 实现事实以 SpringDoc 运行时文档 `GET /api/openapi` 为准；提交到仓库的 `docs/openapi.json` 是同一份契约快照，本文件只解释调用规则。三者必须同步更新，客户端不得根据旧版本猜测字段。

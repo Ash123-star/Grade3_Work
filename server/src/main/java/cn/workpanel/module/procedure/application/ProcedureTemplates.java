@@ -11,8 +11,8 @@ import java.util.*;
 /** 预填产物即时返回，不建立公开地址或共享原始私有材料。 */
 @Service
 public class ProcedureTemplates {
-    private final ProcedureService procedures;private final ProcedureAccess access;private final AttachmentApplicationService attachments;private final ParserProcess parser;private final CurrentActors actors;
-    public ProcedureTemplates(ProcedureService procedures,ProcedureAccess access,AttachmentApplicationService attachments,ParserProcess parser,CurrentActors actors){this.procedures=procedures;this.access=access;this.attachments=attachments;this.parser=parser;this.actors=actors;}
+    private final ProcedureService procedures;private final ProcedureAccess access;private final AttachmentApplicationService attachments;private final ParserProcess parser;private final CurrentActors actors;private final cn.workpanel.module.attachment.application.GeneratedFiles generated;
+    public ProcedureTemplates(ProcedureService procedures,ProcedureAccess access,AttachmentApplicationService attachments,ParserProcess parser,CurrentActors actors,cn.workpanel.module.attachment.application.GeneratedFiles generated){this.procedures=procedures;this.access=access;this.attachments=attachments;this.parser=parser;this.actors=actors;this.generated=generated;}
     public record Prepared(String filename,byte[] bytes){}
     public Prepared prepare(Actor actor,String id,String file,Map<String,Object> body){
         Actor a=actors.fresh(actor);var source=procedures.prepareTemplate(a,id,body);
@@ -22,6 +22,6 @@ public class ProcedureTemplates {
         // 解析期间发布/撤回、调岗、停用时不再交付旧来源产物。
         Actor current=actors.fresh(a);if(!actors.fingerprint(a).equals(actors.fingerprint(current)))throw ApiError.forbidden();
         var latest=access.get(current,id);if(!Objects.equals(latest.get("version"),source.get("version"))||!Business.strings(latest,"attachmentIds").contains(file))throw new ApiError(409,"SOURCE_CHANGED","模板已更新，请重新准备材料");
-        attachments.read(current,file);return new Prepared("已预填-"+filename,result);
+        attachments.read(current,file);var stored=generated.create(current,"TEMPLATE","已预填-"+filename,result,List.of(Map.of("type","PROCEDURE","id",id,"version",source.get("version"))));return new Prepared(stored.filename(),stored.bytes());
     }
 }

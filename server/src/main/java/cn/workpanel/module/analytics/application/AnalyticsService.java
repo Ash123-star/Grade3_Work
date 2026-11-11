@@ -17,7 +17,8 @@ public class AnalyticsService {
     private final AnalyticsRepository repository;
     private final TaskQueryService tasks;
     private final LogQueryService logs;
-    public AnalyticsService(AnalyticsRepository repository,TaskQueryService tasks,LogQueryService logs) { this.repository=repository; this.tasks=tasks; this.logs=logs; }
+    private final AnalyticsExportService exports;
+    public AnalyticsService(AnalyticsRepository repository,TaskQueryService tasks,LogQueryService logs,AnalyticsExportService exports) { this.repository=repository; this.tasks=tasks; this.logs=logs;this.exports=exports; }
     public Map<String,Object> health() { repository.healthy(); return Map.of("status","UP","time",Instant.now().toString()); }
 
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
@@ -97,18 +98,10 @@ public class AnalyticsService {
         var result=new LinkedHashMap<>(repository.details(repository.facts(actor,query),canonical,phase,groupId,day,cursor,limit));
         result.put("metric",metric); result.put("groupBy",query.groupBy()); result.put("filters",query.view()); result.put("range",query.range()); return result;
     }
-    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public String export(Actor actor,AnalyticsQuery query,String resource) {
-        if(!Set.of("logs","tasks").contains(resource)) throw ApiError.bad("INVALID_RESOURCE","resource: logs/tasks");
-        repository.authorize(actor,query,null); var rows=repository.export(repository.facts(actor,query),resource);
-        if(rows.size()>10000) throw ApiError.bad("EXPORT_TOO_LARGE","导出超过10000条，请缩小范围");
-        var csv=new StringBuilder("\ufeffid,type,title_or_date,owner_id,owner_name,version,group_id,group_name,occurred_at\r\n");
-        for(var row:rows) {
-            var cells=new ArrayList<String>(); for(String field:List.of("id","resource","title","owner_id","owner_name","version","group_id","group_name","occurred_at")) cells.add(csv(row.get(field)));
-            csv.append(String.join(",",cells)).append("\r\n");
-        }
-        return csv.toString();
+        return new String(exportFile(actor,query,resource).bytes(),java.nio.charset.StandardCharsets.UTF_8);
     }
+    public cn.workpanel.module.attachment.application.GeneratedFiles.Result exportFile(Actor actor,AnalyticsQuery query,String resource){return exports.export(actor,query,resource);}
     /** 所有字段加引号；前导空白后的公式字符也防护，多行文本不绕过检测。 */
     public static String csv(Object value) {
         String text=value==null?"":value.toString(); String probe=text.stripLeading();

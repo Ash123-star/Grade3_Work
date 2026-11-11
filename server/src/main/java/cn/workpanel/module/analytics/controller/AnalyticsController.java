@@ -28,8 +28,8 @@ public class AnalyticsController {
     /** 同范围CSV：resource=logs/tasks，最多10000条，超限400不截断，公式转义、UTF-8。授权及错误同汇总；无版本和幂等键。 */
     @GetMapping(value="/analytics/export",produces="text/csv")
     public ResponseEntity<String> export(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="week") String period,@RequestParam(defaultValue="logs") String resource,@RequestParam(defaultValue="department") String groupBy,@RequestParam(required=false) String departmentId,@RequestParam(required=false) String teamId,@RequestParam(required=false) String ownerId) {
-        String body=service.export(Actor.current(r),new AnalyticsQuery(date,period,groupBy,departmentId,teamId,ownerId),resource);
-        return ResponseEntity.ok().contentType(new MediaType("text","csv",java.nio.charset.StandardCharsets.UTF_8)).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+resource+".csv\"").body(body);
+        var stored=service.exportFile(Actor.current(r),new AnalyticsQuery(date,period,groupBy,departmentId,teamId,ownerId),resource);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(new MediaType("text","csv",java.nio.charset.StandardCharsets.UTF_8)).header("X-Generated-File-Id",stored.id()).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+resource+".csv\"").body(new String(stored.bytes(),java.nio.charset.StandardCharsets.UTF_8));
     }
     public static String csv(Object value) { return AnalyticsService.csv(value); }
     /** 当前授权范围时间线；ownerId须可见，date/period同列表；只读、无版本或幂等键。 */

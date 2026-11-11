@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.admin-account=integration-admin", "app.admin-password=Initial-test-password-2026",
     "app.admin-phone=13900000001", "app.jobs-enabled=false", "app.deepseek-key=local-mock-only"
 })
+@org.springframework.context.annotation.Import(cn.workpanel.storage.StorageTestConfiguration.class)
 class MobileDataContractIntegrationTest extends MemberBHttpSupport {
     final String today=LocalDate.now(ZoneId.of("Asia/Shanghai")).toString();
 

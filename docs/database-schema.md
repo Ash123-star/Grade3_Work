@@ -45,7 +45,12 @@
 | `tasks` | `phase`, `version` | 后台流转阶段和并发版本 |
 | `task_assignees` | `task_id`, `user_id`, `kind` | 主负责人或协作者；主负责人由唯一索引保证只有一名 |
 | `task_events` | `sequence`, `type`, `actor_id`, `body` | 任务事件时间线，包含派发、接收、反馈、验收、撤回、归档和修订 |
-| `attachments` | `owner_id`, `filename`, `content_type`, `data` | 附件元数据和二进制内容；授权由服务端再次判断 |
+| `attachments` | `owner_id`, `filename`, `content_type`, `data` | 元数据及历史数据库副本；新文件正文写私有OSS，授权由服务端再次判断 |
+| `attachments` | `storage_provider`, `object_key`, `size_bytes`, `file_hash`, `storage_state`, `storage_version`, `storage_updated_at` | V31新增存储来源、完整性和PENDING/READY/DELETING/DELETED状态；仅READY未过期文件可读/绑定 |
+| `storage_delete_jobs` | `object_key`, `attachment_id`, `attempts`, `available_at` | 持久化、幂等的外部对象删除与重试 |
+| `generated_files` | `owner_id`, `attachment_id`, `kind`, `sources` | 临时CSV/模板产物的全部来源及版本；沿附件有效期拒读，不能作为长期附件绑定 |
+| `asset_releases`, `asset_current` | `manifest`, `manifest_hash`, `release_id`, `version` | 不可变全量静态清单与原子激活指针，不含私有用户文件 |
+| `attachment_migrations` | `attachment_id`, `object_key`, `file_hash`, `expected_version`, `state` | 历史迁移意图、断点恢复及版本核对；备份/清除/回滚见[OSS说明](oss-storage.md) |
 | `attachments` | `task_id` | 已关联任务；未关联时只有上传者可见 |
 | `attachments` | `expires_at` | 已有附件有效期；成果反馈引用要求有实际文件且未过期，单次最多5个、任务累计最多100个，绑定与事件同事务 |
 

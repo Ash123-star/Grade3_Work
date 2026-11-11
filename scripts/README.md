@@ -5,6 +5,7 @@
 | 用途 | 脚本 |
 | --- | --- |
 | 后端启动、隔离验收及镜像冒烟 | `start-backend.ps1`、`test-backend.ps1`（可加 `-DockerMaven`）、`smoke-backend-image.ps1` |
+| OSS素材、私有文件迁移与探针 | `prepare-oss-assets.ps1`、`oss-resources.ps1`；见 [存储与回滚](../docs/oss-storage.md) |
 | 核心 HTTP 场景与客户端专项 | `e2e-smoke.ps1`、`verify-scenario-runtime.py`、`test-member-b-live.ps1` |
 | 备份与旧开发库副本升级 | `backup-backend.ps1`、`upgrade-legacy-lyb-clone.ps1`、`upgrade-ai-work-clone.py` |
 | 独立本地展示环境 | `start-stage-demo.ps1`；真实客户端专项仍依赖该环境，不能按旧命名直接删除 |

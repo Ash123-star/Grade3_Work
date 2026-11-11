@@ -50,7 +50,7 @@ public class ProcedureRepository {
     public void audit(Actor a,String type,String id,Object body) { db.audit(a,type,id,Map.of(),body,"维护公司资料"); }
     public Map<String,Object> json(Object body) { return db.read(body); }
     public void bind(Actor a,String id,String attachment) {
-        var f=db.one("SELECT owner_id FROM attachments WHERE company_id=? AND id=?",a.company(),attachment);
+        var f=db.one("SELECT owner_id FROM attachments WHERE company_id=? AND id=? AND storage_state='READY' AND (expires_at IS NULL OR expires_at>now()) AND NOT EXISTS(SELECT 1 FROM generated_files g WHERE g.attachment_id=attachments.id) FOR UPDATE",a.company(),attachment);
         if(!a.id().equals(f.get("owner_id"))) throw ApiError.forbidden();
         db.update("INSERT INTO attachment_bindings(company_id,attachment_id,resource_type,resource_id) VALUES (?,?,'PROCEDURE',?) ON CONFLICT DO NOTHING",a.company(),attachment,id);
     }
