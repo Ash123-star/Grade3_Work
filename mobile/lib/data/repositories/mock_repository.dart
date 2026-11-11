@@ -7,6 +7,7 @@ import 'package:pandora_mobile/data/models/attachments.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/models/log_edit_window.dart';
 import 'package:pandora_mobile/data/models/task_display.dart';
+import 'package:pandora_mobile/data/models/notification_display.dart';
 import 'package:pandora_mobile/data/repositories/repository.dart';
 
 enum DemoScenario { normal, empty, offline, forbidden }
@@ -1307,6 +1308,10 @@ class MockRepository implements Repository {
     }
     if (resource == 'notifications') {
       items = items.where((r) => r.ownerId == session.id);
+      if (query.unreadOnly) items = items.where((r) => r.fields['read'] != true);
+      if (query.notificationCategory != null) {
+        items = items.where((r) => notificationCategory(r.fields['notificationType']) == query.notificationCategory || r.fields['type'] == query.notificationCategory);
+      }
     }
     if (query.from != null && query.to != null) {
       var rangeFrom = query.from!;
@@ -1430,6 +1435,14 @@ class MockRepository implements Repository {
           return a.$1.compareTo(b.$1);
         });
       result = [for (final entry in ordered) entry.$2];
+    }
+    if (resource == 'notifications') {
+      final offset = int.tryParse(query.cursor ?? '0') ?? 0;
+      result.sort((a,b) => '${b.fields['createdAt']}'.compareTo('${a.fields['createdAt']}'));
+      final page = result.skip(offset).take(query.limit).toList();
+      final next = offset + page.length;
+      return PageResult(page, total: result.length, nextCursor: next < result.length ? '$next' : null,
+        unread: rows('notifications').where((r) => r.ownerId == session.id && r.fields['read'] != true).length);
     }
     if (resource == 'tasks/received-card' || resource == 'dashboard/company') {
       final offset = int.tryParse(query.cursor ?? '0') ?? 0;

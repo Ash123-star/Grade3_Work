@@ -316,7 +316,7 @@ class ProfilePage extends ConsumerWidget {
               '消息中心',
               () => openList(context, 'notifications'),
               badge:
-                  '${unread.valueOrNull?.items.where((r) => r.fields['read'] != true).length ?? '—'}',
+                  '${unread.valueOrNull?.unread ?? unread.valueOrNull?.items.where((r) => r.fields['read'] != true).length ?? '—'}',
             ),
             if (user.manager)
               link('工作统计', () => context.push('/me/statistics')),

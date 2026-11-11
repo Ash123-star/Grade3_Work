@@ -44,6 +44,25 @@ class HttpRepository implements Repository {
            headers: {if (token != null) 'Authorization': 'Bearer $token'},
          ),
        ) {
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (error, handler) {
+          final failure = ApiFailure.fromDio(error);
+          if (!error.requestOptions.path.startsWith('/auth/') &&
+              failure.statusCode == 429 &&
+              failure.code == 'RATE_LIMITED') {
+            final until = DateTime.now().add(
+              failure.retryAfter ?? const Duration(seconds: 60),
+            );
+            if (_rateLimitUntil == null || until.isAfter(_rateLimitUntil!)) {
+              _rateLimitUntil = until;
+              dio.options.extra['rateLimitUntil'] = until;
+            }
+          }
+          handler.next(error);
+        },
+      ),
+    );
     if (!businessAllowed) {
       dio.interceptors.add(
         InterceptorsWrapper(
@@ -93,6 +112,48 @@ class HttpRepository implements Repository {
     }
   }
   final Dio dio;
+  DateTime? _rateLimitUntil;
+  Duration get rateLimitRemaining {
+    final remaining =
+        _rateLimitUntil?.difference(DateTime.now()) ?? Duration.zero;
+    return remaining > Duration.zero ? remaining : Duration.zero;
+  }
+
+  final _notificationCache = <String, (String?, PageResult)>{};
+  final _notificationReads = <String, Future<PageResult>>{};
+
+  Future<PageResult> _notificationPage(Map<String, dynamic> parameters) {
+    final key = jsonEncode(parameters);
+    final running = _notificationReads[key];
+    if (running != null) return running;
+    return _notificationReads[key] = _readNotificationPage(
+      key,
+      parameters,
+    ).whenComplete(() => _notificationReads.remove(key));
+  }
+
+  Future<PageResult> _readNotificationPage(
+    String key,
+    Map<String, dynamic> parameters,
+  ) async {
+    final cached = _notificationCache[key];
+    final response = await dio.get<dynamic>(
+      '/notifications',
+      queryParameters: parameters,
+      options: Options(
+        headers: {if (cached?.$1 != null) 'If-None-Match': cached!.$1},
+        validateStatus: (status) => status == 304 || status == 200,
+      ),
+    );
+    if (response.statusCode == 304 && cached != null) return cached.$2;
+    final page = _page(response.data);
+    _notificationCache.remove(key);
+    _notificationCache[key] = (response.headers.value('etag'), page);
+    while (_notificationCache.length > 32) {
+      _notificationCache.remove(_notificationCache.keys.first);
+    }
+    return page;
+  }
 
   Future<Response<T>> _getWithRetry<T>(
     String path, {
@@ -268,6 +329,9 @@ class HttpRepository implements Repository {
     if (query.departmentId != null) 'departmentId': query.departmentId,
     'limit': query.limit,
     if (query.search.isNotEmpty) 'search': query.search,
+    if (resource == 'notifications' && query.notificationCategory != null)
+      'category': query.notificationCategory,
+    if (resource == 'notifications' && query.unreadOnly) 'unreadOnly': true,
     if (query.from != null) 'date': _date(query),
     if (query.from != null) 'period': _period(query),
   };
@@ -612,6 +676,7 @@ class HttpRepository implements Repository {
     if (raw.containsKey('recipient_id')) {
       fields['type'] = notificationTitle(raw['type']);
       fields['notificationType'] = raw['type'];
+      if (raw['summary'] is String) fields['summary'] = raw['summary'];
       final target = notificationResource(raw['type']);
       if (target != null && raw['object_id'] != null) {
         fields['targetResource'] = target;
@@ -660,6 +725,7 @@ class HttpRepository implements Repository {
           .map((item) => _record(Map<String, dynamic>.from(item as Map)))
           .toList(),
       total: (map['total'] as num?)?.toInt() ?? rawItems.length,
+      unread: (map['unread'] as num?)?.toInt(),
       nextCursor: map['nextCursor']?.toString(),
       snapshotToken: map['snapshotToken'] as String?,
       scheduleConstraints: map['scheduleConstraints'] is Map
@@ -693,6 +759,8 @@ class HttpRepository implements Repository {
         return _page(response.data);
       }
       final parameters = _query(query, resource: resource);
+      if (resource == 'notifications')
+        return await _notificationPage(parameters);
       if (resource == 'tasks' && query.from != null && query.to != null) {
         parameters
           ..remove('date')

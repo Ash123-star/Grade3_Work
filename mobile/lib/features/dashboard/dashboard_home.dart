@@ -27,14 +27,16 @@ class _HomeContent extends ConsumerWidget {
     final user = ref.watch(sessionProvider);
     final paper = HomePaperTokens.of(context);
     final date = shanghaiToday();
-    final unread = user.canReadBusiness
-        ? ref
-                  .watch(recordsProvider('notifications'))
-                  .valueOrNull
-                  ?.items
-                  .any((item) => item.fields['read'] != true) ==
-              true
-        : false;
+    final messages = user.canReadBusiness
+        ? ref.watch(recordsProvider('notifications')).valueOrNull
+        : null;
+    final unread =
+        messages != null &&
+        (messages.unread ??
+                messages.items
+                    .where((item) => item.fields['read'] != true)
+                    .length) >
+            0;
     return Scaffold(
       backgroundColor: paper.canvas,
       body: SafeArea(
