@@ -22,6 +22,7 @@
 | 数据库 | [server Flyway结构](database-schema.md)；[独立数据设施](data-infrastructure.md)不得混入业务迁移 |
 | 初始化与场景 | [年度场景重建](annual-scenario-rebuild.md)、[本地种子](local-scenario-data.md)；不可当真实业务数据 |
 | 云端运维 | [systemd部署/备份/回滚](cloud-systemd-deployment.md)；旧Compose环境须明确隔离 |
+| OSS资源 | [私有文件、静态素材发布、历史迁移与回滚](oss-storage.md) |
 | 认证/组织/审核 | [认证](member-b-auth.md)、[组织](member-b-organization.md)、[审核](member-b-review.md)；后续权限增量以当前契约与对应规格为准 |
 | 个人事项 | [接口与权限](personal-todos-interface.md)、[客户端设计](../mobile/docs/home-daily-todos-direction.md) |
 | 任务与月历发布 | [任务生命周期](task-lifecycle-release.md)、[月历移动/完整行/证据/回滚](calendar-task-drag-release.md)；不再分散维护批次发布文件 |

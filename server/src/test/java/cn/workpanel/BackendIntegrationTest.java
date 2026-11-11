@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.admin-account=integration-admin", "app.admin-password=Initial-test-password-2026",
     "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.ai-timeout-seconds=2", "app.memory-extract-enabled=false"
 })
+@org.springframework.context.annotation.Import(cn.workpanel.storage.StorageTestConfiguration.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

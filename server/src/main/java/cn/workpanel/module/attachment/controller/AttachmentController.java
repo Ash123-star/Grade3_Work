@@ -24,6 +24,6 @@ public class AttachmentController {
     /** 下载附件。所有者、头像授权范围或任务参与者可读；越权返回 403，响应禁止嗅探。 */
     @GetMapping("/{id}") public ResponseEntity<byte[]> download(HttpServletRequest r,@PathVariable String id) {
         var f=service.read(Actor.current(r),id);
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).header("X-Content-Type-Options","nosniff").header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(Db.str(f,"filename"),java.nio.charset.StandardCharsets.UTF_8).build().toString()).body((byte[])f.get("data"));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_OCTET_STREAM).header("X-Content-Type-Options","nosniff").header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(Db.str(f,"filename"),java.nio.charset.StandardCharsets.UTF_8).build().toString()).body((byte[])f.get("data"));
     }
 }

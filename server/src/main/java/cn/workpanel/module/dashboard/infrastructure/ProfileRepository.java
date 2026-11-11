@@ -16,7 +16,7 @@ public class ProfileRepository {
     public Map<String,Object> json(Object value) { return db.read(value); }
     public boolean phoneTaken(String phone,String id) { return db.count("SELECT count(*) FROM users WHERE phone=? AND id<>?",phone,id)>0; }
     public void lockPhone(String phone) { if(phone!=null) db.one("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","profile-phone:"+phone); }
-    public void requireOwnAvatar(Actor actor,String id) { db.one("SELECT id FROM attachments WHERE id=? AND owner_id=? AND company_id=?",id,actor.id(),actor.company()); }
+    public void requireOwnAvatar(Actor actor,String id) { db.one("SELECT id FROM attachments WHERE id=? AND owner_id=? AND company_id=? AND storage_state='READY' AND (expires_at IS NULL OR expires_at>now()) AND NOT EXISTS(SELECT 1 FROM generated_files g WHERE g.attachment_id=attachments.id) FOR UPDATE",id,actor.id(),actor.company()); }
     public Map<String,Object> unit(String table,String company,Object id) {
         if(id==null) return Map.of();
         var rows=db.rows("SELECT id,name FROM "+table+" WHERE id=? AND company_id=?",id,company); return rows.isEmpty()?Map.of():rows.getFirst();

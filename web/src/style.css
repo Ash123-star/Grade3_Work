@@ -3,7 +3,7 @@
 body { margin: 0; }
 main { max-width: 1120px; margin: auto; padding: 28px; }
 header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; border-bottom: 1px solid #cddbd5; padding-bottom: 12px; }
-h1 { margin: 5px 0; font-size: 30px; }
+h1 { margin: 5px 0; font-size: 30px; font-family: var(--product-heading-font, inherit); }
 h2 { font-size: 20px; line-height: 1.35; }
 h3 { font-size: 16px; }
 small { color: #5d6a72; }

@@ -20,7 +20,7 @@ public class Security {
     @Bean BCryptPasswordEncoder passwords() { return new BCryptPasswordEncoder(12); }
     @Bean SecurityFilterChain apiSecurityChain(HttpSecurity http, CorsConfigurationSource cors) throws Exception { return http.csrf(c->c.disable()).cors(c->c.configurationSource(cors)).authorizeHttpRequests(a->a.anyRequest().permitAll()).sessionManagement(s->s.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)).build(); }
     @Bean CorsConfigurationSource cors(@Value("${app.cors-origins}") String origins) {
-        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(Arrays.asList(origins.split(","))); c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS")); c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key","Last-Event-ID","If-Match","If-None-Match")); c.setExposedHeaders(List.of("X-Trace-Id","Content-Disposition","Retry-After","ETag"));
+        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(Arrays.asList(origins.split(","))); c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS")); c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key","Last-Event-ID","If-Match","If-None-Match")); c.setExposedHeaders(List.of("X-Trace-Id","Content-Disposition","Retry-After","ETag","X-Generated-File-Id"));
         UrlBasedCorsConfigurationSource source=new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**",c); return source;
     }
     @Bean FilterRegistrationBean<OncePerRequestFilter> authentication(Db db,Limiter limiter,WorkspaceAccessAudit accessAudit) {
@@ -29,7 +29,7 @@ public class Security {
                 String trace=Db.id(); r.setAttribute("traceId",trace); s.setHeader("X-Trace-Id",trace);
                 try {
                     String path=r.getRequestURI();
-                    if(path.startsWith("/api/")&&!path.equals("/api/health")&&!path.startsWith("/api/openapi")&&!path.startsWith("/api/docs")&&!path.equals("/api/auth/departments")&&!path.equals("/api/auth/register")&&!path.equals("/api/auth/login")&&!r.getMethod().equals("OPTIONS")) {
+                    if(path.startsWith("/api/")&&!path.equals("/api/health")&&!(r.getMethod().equals("GET")&&path.startsWith("/api/assets/"))&&!path.startsWith("/api/openapi")&&!path.startsWith("/api/docs")&&!path.equals("/api/auth/departments")&&!path.equals("/api/auth/register")&&!path.equals("/api/auth/login")&&!r.getMethod().equals("OPTIONS")) {
                         Actor a=authenticate(db,r.getHeader("Authorization")); r.setAttribute("actor",a);
                         if(a.mustChange()&&!Set.of("/api/auth/password","/api/auth/me","/api/auth/logout").contains(path)) throw new ApiError(403,"PASSWORD_CHANGE_REQUIRED","首次登录请修改密码");
                         // 待确认账号仅可读取本人审核或重路由本人确认申请；对象归属由审核应用服务再校验。

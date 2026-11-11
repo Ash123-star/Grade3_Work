@@ -27,6 +27,16 @@ spring:
     async:
       request-timeout: 60000
 app:
+  oss:
+    bucket: ${OSS_BUCKET:panduola-work}
+    region: ${OSS_REGION:cn-beijing}
+    endpoint: ${OSS_ENDPOINT:https://oss-cn-beijing.aliyuncs.com}
+    prefix: ${OSS_PREFIX:workpanel}
+    access-key-id: ${OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+    security-token: ${OSS_SECURITY_TOKEN:}
+    role-name: ${OSS_ROLE_NAME:}
+  generated-file-hours: ${GENERATED_FILE_HOURS:24}
   admin-account: ${ADMIN_ACCOUNT:}
   admin-password: ${ADMIN_PASSWORD:}
   admin-phone: ${ADMIN_PHONE:}
@@ -63,3 +73,6 @@ springdoc:
 workpanel:
   calendar:
     move-enabled: ${CALENDAR_MOVE_ENABLED:false}
+logging:
+  level:
+    com.aliyun.oss: "OFF"

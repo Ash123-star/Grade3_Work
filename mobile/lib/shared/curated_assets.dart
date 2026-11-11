@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
+import 'package:pandora_mobile/core/assets/oss_asset_bundle.dart';
 
 /// Local Phosphor assets inherit the Material icon theme.
 class AppArtworkIcon extends StatelessWidget {
@@ -102,7 +102,9 @@ void registerCuratedAssetLicenses() {
     for (final entry in [('Phosphor Icons', 'phosphor'), ('Forui', 'forui')]) {
       yield LicenseEntryWithLineBreaks(
         [entry.$1],
-        await rootBundle.loadString('assets/licenses/${entry.$2}-LICENSE.txt'),
+        await OssAssetBundle.instance.loadString(
+          'assets/licenses/${entry.$2}-LICENSE.txt',
+        ),
       );
     }
   });

@@ -7,5 +7,7 @@ import '@vue-flow/core/dist/style.css';
 import '@vue-flow/core/dist/theme-default.css';
 import './style.css';
 import './admin/admin.css';
+import { initializeProductAssets } from './assets';
+void initializeProductAssets();
 const app = createApp(AdminApp).use(createPinia()).use(router);
 void router.isReady().then(() => app.mount('#app'));

@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.jobs-enabled=false", "workpanel.calendar.move-enabled=true"
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@org.springframework.context.annotation.Import(cn.workpanel.storage.StorageTestConfiguration.class)
 class TaskDispatchIntegrationTest {
     static final class CalendarTestClock extends Clock {
         volatile Clock delegate = Clock.systemUTC();

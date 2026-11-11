@@ -1,4 +1,4 @@
-﻿param([switch]$KeepContainers,[switch]$DockerMaven)
+﻿param([switch]$KeepContainers,[switch]$DockerMaven,[string]$Tests)
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testSuffix = [Guid]::NewGuid().ToString('N').Substring(0, 10)
@@ -6,6 +6,8 @@ $dataName = "workpanel-it-data-$testSuffix"
 $testPassword = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
 $variables = @('DB_URL','DB_USER','DB_PASSWORD','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','NEO4J_URI','NEO4J_PASSWORD','MAVEN_OPTS')
 $saved = @{}
+if($Tests -and $Tests -notmatch '^[A-Za-z0-9_.,*#]+$'){throw 'Invalid test selector'}
+$testSelector=if($Tests){"-Dtest=$Tests"}else{''}
 foreach ($name in $variables) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 try {
     $redisScripts = Join-Path $repoRoot 'deploy/redis'
@@ -42,10 +44,10 @@ try {
             $mavenCache = Join-Path $env:USERPROFILE '.m2'
             # PowerShell 5 的 NativeCommandError 不代表进程失败；以 Maven 退出码为准。
             $ErrorActionPreference = 'Continue'
-            docker run --rm --memory 1g --cpus 2 --volume "${repoRoot}:/workspace" --volume "${mavenCache}:/root/.m2" --workdir /workspace --env DB_URL --env DB_USER --env DB_PASSWORD --env REDIS_HOST --env REDIS_PORT --env REDIS_PASSWORD --env NEO4J_URI --env NEO4J_PASSWORD --env MAVEN_OPTS maven:3.9.9-eclipse-temurin-21 mvn -B -f server/pom.xml clean verify
+            docker run --rm --memory 1g --cpus 2 --volume "${repoRoot}:/workspace" --volume "${mavenCache}:/root/.m2" --workdir /workspace --env DB_URL --env DB_USER --env DB_PASSWORD --env REDIS_HOST --env REDIS_PORT --env REDIS_PASSWORD --env NEO4J_URI --env NEO4J_PASSWORD --env MAVEN_OPTS maven:3.9.9-eclipse-temurin-21 mvn -B -f server/pom.xml clean verify $testSelector
             $mavenExit = $LASTEXITCODE
             $ErrorActionPreference = 'Stop'
-        } else { & cmd.exe /d /c 'mvn.cmd -B -f server/pom.xml clean verify 2>&1'; $mavenExit = $LASTEXITCODE }
+        } else { & cmd.exe /d /c "mvn.cmd -B -f server/pom.xml clean verify $testSelector 2>&1"; $mavenExit = $LASTEXITCODE }
         if ($mavenExit -ne 0) { throw '后端验证失败，见 server/target/surefire-reports' }
     } finally { Pop-Location }
 } finally {

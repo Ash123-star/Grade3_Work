@@ -202,8 +202,8 @@ public class OpenApi {
                 if(method==PathItem.HttpMethod.GET&&path.equals("/api/logs/{id}")||method==PathItem.HttpMethod.PUT&&path.equals("/api/logs/draft")||method==PathItem.HttpMethod.POST&&path.equals("/api/logs/{id}/submit")) logResponse="LogAccessView";
                 if(method==PathItem.HttpMethod.PUT&&path.equals("/api/logs/{id}/content")) logResponse="LogAccessView";
                 if(logResponse!=null) op.getResponses().addApiResponse("200",new ApiResponse().description("当前日志及操作能力").content(new Content().addMediaType("application/json",new MediaType().schema(ref(logResponse)))));
-                if(Set.of("/api/health","/api/auth/login","/api/auth/register","/api/auth/departments").contains(path)) op.setSecurity(List.of());
-                for(String status:List.of("400","401","403","404","409","429","503")) op.getResponses().addApiResponse(status,new ApiResponse().description("错误码及 traceId，详情参见后端接口说明").content(new Content().addMediaType("application/json",new MediaType().schema(ref("Error")))));
+                if(Set.of("/api/health","/api/auth/login","/api/auth/register","/api/auth/departments").contains(path)||path.startsWith("/api/assets/")) op.setSecurity(List.of());
+                for(String status:List.of("400","401","403","404","409","429","502","503")) op.getResponses().addApiResponse(status,new ApiResponse().description("错误码及 traceId，详情参见后端接口说明").content(new Content().addMediaType("application/json",new MediaType().schema(ref("Error")))));
             }));
             // 显式记录管理别名，避免前端依靠未登记路径；复制对象不改变普通业务接口。
             var adminPaths=new LinkedHashMap<String,PathItem>();
