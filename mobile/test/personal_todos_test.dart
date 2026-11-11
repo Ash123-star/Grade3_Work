@@ -313,11 +313,11 @@ void main() {
       await waitForRepair(tester);
       container.read(sessionProvider.notifier).state = const Session(id: 'bob');
       await tester.pumpAndSettle();
-      expect(find.text('Bob独立事项'), findsOneWidget);
+      expect(find.text('Bob独立事项'), findsNWidgets(2));
       expect(find.text('并发事项0'), findsNothing);
       alice.repairGate!.complete();
       await tester.pumpAndSettle();
-      expect(find.text('Bob独立事项'), findsOneWidget);
+      expect(find.text('Bob独立事项'), findsNWidgets(2));
       expect(find.textContaining('并发事项'), findsNothing);
       expect(find.byKey(const ValueKey('todo-list-repair')), findsNothing);
       expect(tester.takeException(), isNull);
@@ -356,7 +356,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Alice private'), findsOneWidget);
+    expect(find.text('Alice private'), findsNWidgets(2));
     container.read(pendingTodoCommandProvider.notifier).state = TodoCommand(
       'POST',
       null,

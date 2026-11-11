@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart'
     show
@@ -236,6 +238,21 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
       for (final cursor in cursors)
         ref.watch(todoDayProvider((civilDate(selected), cursor))),
     ];
+    final monthCounts = month.valueOrNull ?? const <String, TodoCount>{};
+    final itemDays = [
+      for (final entry in monthCounts.entries)
+        if (entry.value.total > 0) entry.key,
+    ];
+    final itemPages = [
+      for (final day in itemDays) ref.watch(todoDayProvider((day, '0'))),
+    ];
+    final todosByDay = <String, List<PersonalTodo>>{};
+    for (var i = 0; i < itemDays.length; i++) {
+      final page = itemPages[i];
+      if (page.isLoading || page.hasError) continue;
+      final value = page.valueOrNull;
+      if (value != null) todosByDay[itemDays[i]] = value.items;
+    }
     final complete = pages.every((page) => !page.isLoading && !page.hasError);
     final loaded = [
       for (final page in pages)
@@ -263,6 +280,16 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
             ? 1
             : -1,
       );
+    final uniqueTodos = <String, PersonalTodo>{};
+    for (final items in todosByDay.values) {
+      for (final todo in items) {
+        uniqueTodos.putIfAbsent(todo.id, () => todo);
+      }
+    }
+    final todoSpans = _todoSpans(uniqueTodos.values);
+    final maxLanes = todoSpans.isEmpty
+        ? 0
+        : todoSpans.map((span) => span.lane).reduce(math.max) + 1;
     final seenError = pages.any((p) => p.hasError);
     final next = pages.last.valueOrNull?.nextCursor;
     final total = _stableTotal;
@@ -292,19 +319,6 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
                       const TuantuanIcon('calendar', size: 24),
                       const SizedBox(width: 6),
                       Text('每日事项', style: paper.heading(18)),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.lock_outline_rounded,
-                        size: 11,
-                        color: paper.muted,
-                      ),
-                      const SizedBox(width: 4),
-                      Text('仅自己可见', style: paper.body(11, color: paper.muted)),
                     ],
                   ),
                 ],
@@ -416,10 +430,21 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
             children: [
               for (final day in ['一', '二', '三', '四', '五', '六', '日'])
                 Expanded(
-                  child: Text(
-                    day,
-                    textAlign: TextAlign.center,
-                    style: paper.body(11, color: paper.muted),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SunshineMascot(size: 14),
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: Text(
+                          day,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: paper.body(11, color: paper.muted),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
@@ -448,25 +473,79 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
           ),
           data: (counts) {
             final days = monthDays(selected);
-            return Column(
-              children: [
-                for (var week = 0; week < days.length; week += 7)
-                  Row(
-                    children: [
-                      for (final day in days.skip(week).take(7))
-                        Expanded(
-                          child: _DayCell(
-                            day: day,
-                            selected: day == selected,
-                            count:
-                                counts[civilDate(day)] ?? const TodoCount(0, 0),
-                            currentMonth: day.month == selected.month,
-                            onTap: () => select(day),
-                          ),
-                        ),
-                    ],
-                  ),
-              ],
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final cellWidth = constraints.maxWidth / 7;
+                final scale = MediaQuery.textScalerOf(context).scale(1);
+                final barHeight = 9.5 * scale * 1.15 + 3;
+                final barTop = 13 * scale * 1.15 + 7;
+                final rowHeight = math.max(
+                  scale > 1.3 ? 62.0 : 54.0,
+                  barTop + maxLanes * (barHeight + 1) + 3,
+                );
+                return Column(
+                  children: [
+                    for (var week = 0; week < days.length; week += 7)
+                      Builder(
+                        builder: (context) {
+                          final weekStart = days[week];
+                          final weekEnd = days[week + 6];
+                          final weekSpans = todoSpans
+                              .where(
+                                (span) =>
+                                    !span.last.isBefore(weekStart) &&
+                                    !span.first.isAfter(weekEnd),
+                              )
+                              .toList();
+                          return SizedBox(
+                            height: rowHeight,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      for (var col = 0; col < 7; col++)
+                                        Expanded(
+                                          child: _DayCell(
+                                            day: days[week + col],
+                                            selected:
+                                                days[week + col] == selected,
+                                            count:
+                                                counts[civilDate(
+                                                  days[week + col],
+                                                )] ??
+                                                const TodoCount(0, 0),
+                                            currentMonth:
+                                                days[week + col].month ==
+                                                selected.month,
+                                            onTap: () =>
+                                                select(days[week + col]),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                for (final span in weekSpans)
+                                  ..._weekTodoBars(
+                                    context,
+                                    span,
+                                    weekStart,
+                                    weekEnd,
+                                    cellWidth,
+                                    barTop,
+                                    barHeight,
+                                    (todo) => edit(todo: todo),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                );
+              },
             );
           },
         ),
@@ -804,7 +883,6 @@ class _DayCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final paper = HomePaperTokens.of(context);
     final today = civilDate(day) == civilDate(shanghaiToday());
-    final large = MediaQuery.textScalerOf(context).scale(1) > 1.3;
     return Semantics(
       button: true,
       selected: selected,
@@ -813,63 +891,51 @@ class _DayCell extends StatelessWidget {
       excludeSemantics: true,
       child: InkWell(
         onTap: day.year < 1900 || day.year > 2100 ? null : onTap,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: large ? 60 : 48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
+          padding: const EdgeInsets.only(left: 3, top: 3, right: 2),
+          alignment: Alignment.topLeft,
+          decoration: BoxDecoration(
+            color: selected ? paper.accent.withValues(alpha: .18) : null,
+            border: Border(
+              right: BorderSide(color: paper.line),
+              bottom: BorderSide(color: paper.line),
+              top: today
+                  ? const BorderSide(
+                      color: HomePaperTokens.todayEdge,
+                      width: 1.5,
+                    )
+                  : BorderSide.none,
+            ),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.topLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: large ? 35 : 30,
-                  constraints: BoxConstraints(minHeight: large ? 34 : 29),
-                  decoration: BoxDecoration(
-                    color: selected ? paper.accent : null,
-                    borderRadius: BorderRadius.circular(10),
-                    border: today && !selected
-                        ? Border.all(
-                            color: HomePaperTokens.todayEdge,
-                            width: 1.5,
-                          )
-                        : null,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${day.day}',
-                    style: paper
-                        .body(
-                          14,
-                          height: 1.2,
-                          color: selected
-                              ? HomePaperTokens.accentInk
-                              : currentMonth
-                              ? paper.ink
-                              : HomePaperTokens.outside,
-                        )
-                        .copyWith(
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                        ),
+                Text(
+                  '${day.day}',
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.15,
+                    fontWeight: selected || today ? FontWeight.w700 : null,
+                    color: currentMonth ? paper.ink : HomePaperTokens.outside,
                   ),
                 ),
-                SizedBox(
-                  height: large ? 18 : 13,
-                  child: Text(
-                    count.pending > 0
-                        ? '${count.pending}'
-                        : count.total > 0
-                        ? '✓'
-                        : '',
+                if (count.total > 0) ...[
+                  const SizedBox(width: 3),
+                  Text(
+                    count.pending > 0 ? '${count.pending}' : '✓',
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: paper.body(
-                      10,
-                      height: 1.3,
+                      9,
+                      height: 1.2,
                       color: selected ? HomePaperTokens.orangeInk : paper.green,
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -878,3 +944,131 @@ class _DayCell extends StatelessWidget {
     );
   }
 }
+
+class _TodoSpan {
+  _TodoSpan({
+    required this.todo,
+    required this.first,
+    required this.last,
+    required this.color,
+  });
+  final PersonalTodo todo;
+  final DateTime first, last;
+  final Color color;
+  int lane = 0;
+}
+
+List<_TodoSpan> _todoSpans(Iterable<PersonalTodo> todos) {
+  final spans = <_TodoSpan>[];
+  for (final todo in todos) {
+    final start = parseCivilDate(todo.date);
+    final end = parseCivilDate(todo.lastDate);
+    spans.add(
+      _TodoSpan(
+        todo: todo,
+        first: start.isBefore(end) ? start : end,
+        last: end,
+        color: _todoColor(todo.color),
+      ),
+    );
+  }
+  spans.sort((a, b) {
+    final order = a.first.compareTo(b.first);
+    return order == 0 ? a.last.compareTo(b.last) : order;
+  });
+  final lanes = <int, List<_TodoSpan>>{};
+  for (final span in spans) {
+    var lane = 0;
+    while (true) {
+      final occupied = lanes[lane];
+      if (occupied == null ||
+          occupied.every(
+            (other) =>
+                span.last.isBefore(other.first) ||
+                span.first.isAfter(other.last),
+          )) {
+        break;
+      }
+      lane++;
+    }
+    span.lane = lane;
+    lanes.putIfAbsent(lane, () => <_TodoSpan>[]).add(span);
+  }
+  return spans;
+}
+
+List<Widget> _weekTodoBars(
+  BuildContext context,
+  _TodoSpan span,
+  DateTime weekStart,
+  DateTime weekEnd,
+  double cellWidth,
+  double barTop,
+  double barHeight,
+  ValueChanged<PersonalTodo> onEdit,
+) {
+  final from = span.first.isBefore(weekStart) ? weekStart : span.first;
+  final to = span.last.isAfter(weekEnd) ? weekEnd : span.last;
+  if (from.isAfter(to)) return const [];
+  final col = from.difference(weekStart).inDays;
+  final days = to.difference(from).inDays + 1;
+  final starts = civilDate(from) == civilDate(span.first);
+  final ends = civilDate(to) == civilDate(span.last);
+  final showLabel = starts || civilDate(from) == civilDate(weekStart);
+  return [
+    Positioned(
+      left: col * cellWidth,
+      top: barTop + span.lane * (barHeight + 1),
+      width: days * cellWidth,
+      height: barHeight,
+      child: Semantics(
+        button: true,
+        label:
+            '${span.todo.title}，${civilDate(span.first)}至${civilDate(span.last)}',
+        child: GestureDetector(
+          onTap: () => onEdit(span.todo),
+          child: Container(
+            margin: EdgeInsets.only(left: starts ? 2 : 0, right: ends ? 2 : 1),
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              color: span.color,
+              borderRadius: BorderRadius.horizontal(
+                left: starts ? const Radius.circular(4) : Radius.zero,
+                right: ends ? const Radius.circular(4) : Radius.zero,
+              ),
+            ),
+            child: showLabel
+                ? Text(
+                    span.todo.title,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      height: 1.1,
+                      color: _todoInk(span.color),
+                      decoration: span.todo.completed
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  )
+                : null,
+          ),
+        ),
+      ),
+    ),
+  ];
+}
+
+Color _todoColor(String value) {
+  final hex = value.replaceFirst('#', '');
+  final parsed = RegExp(r'^[0-9A-Fa-f]{6}$').hasMatch(hex)
+      ? int.tryParse(hex, radix: 16)
+      : null;
+  return parsed == null ? const Color(0xFFF3A45D) : Color(0xFF000000 | parsed);
+}
+
+Color _todoInk(Color background) => background.computeLuminance() > .55
+    ? const Color(0xFF3D352B)
+    : Colors.white;

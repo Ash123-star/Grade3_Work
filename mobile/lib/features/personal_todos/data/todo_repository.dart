@@ -67,7 +67,9 @@ class HttpTodoRepository implements TodoRepository {
     final total = body['total'] as int;
     final next = body['nextCursor'] as String?;
     if (total < 0 ||
-        items.any((t) => t.date != date) ||
+        items.any(
+          (t) => t.date.compareTo(date) > 0 || t.lastDate.compareTo(date) < 0,
+        ) ||
         (next != null &&
             (int.tryParse(next) == null ||
                 int.parse(next) <= int.parse(cursor)))) {
@@ -121,23 +123,35 @@ class DemoTodoRepository implements TodoRepository {
   @override
   Future<Map<String, TodoCount>> calendar(String month) async => {
     for (final day in monthDays(parseCivilDate('$month-01')))
-      civilDate(day): TodoCount(
-        _items.values.where((t) => t.date == civilDate(day)).length,
-        _items.values
-            .where((t) => t.date == civilDate(day) && t.completed)
-            .length,
-      ),
+      civilDate(day): () {
+        final overlapping = _items.values.where(
+          (t) =>
+              t.date.compareTo(civilDate(day)) <= 0 &&
+              t.lastDate.compareTo(civilDate(day)) >= 0,
+        );
+        return TodoCount(
+          overlapping.length,
+          overlapping.where((t) => t.completed).length,
+        );
+      }(),
   };
   @override
   Future<TodoPage> day(String date, String cursor) async {
-    final rows = _items.values.where((t) => t.date == date).toList()
-      ..sort(
-        (a, b) => a.completed == b.completed
-            ? a.id.compareTo(b.id)
-            : a.completed
-            ? 1
-            : -1,
-      );
+    final rows =
+        _items.values
+            .where(
+              (t) =>
+                  t.date.compareTo(date) <= 0 &&
+                  t.lastDate.compareTo(date) >= 0,
+            )
+            .toList()
+          ..sort(
+            (a, b) => a.completed == b.completed
+                ? a.id.compareTo(b.id)
+                : a.completed
+                ? 1
+                : -1,
+          );
     final offset = int.parse(cursor),
         items = rows.skip(offset).take(30).toList();
     return TodoPage(

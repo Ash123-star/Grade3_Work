@@ -103,7 +103,7 @@ void main() {
         }
         await t.drag(find.byType(Scrollable).first, const Offset(0, -700));
         await t.pumpAndSettle();
-        expect(find.text('整理本周的阅读笔记'), findsOneWidget);
+        expect(find.text('整理本周的阅读笔记'), findsNWidgets(2));
         expect(t.takeException(), isNull);
       });
     }

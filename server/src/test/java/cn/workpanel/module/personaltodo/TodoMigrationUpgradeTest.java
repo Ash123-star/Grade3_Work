@@ -20,7 +20,7 @@ class TodoMigrationUpgradeTest {
                 sql.execute("INSERT INTO companies(id,name) VALUES ('upgrade-company','upgrade')");
                 sql.execute("INSERT INTO users(id,company_id,account,password_hash,name,phone,role,status) VALUES ('upgrade-owner','upgrade-company','upgrade-owner','x','owner','upgrade-phone','EMPLOYEE','ACTIVE')");
                 Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema).load().migrate();
-                sql.execute("INSERT INTO personal_todos(id,company_id,owner_id,business_date,title) VALUES ('todo','upgrade-company','upgrade-owner','2028-02-29','private')");
+                sql.execute("INSERT INTO personal_todos(id,company_id,owner_id,business_date,end_date,title) VALUES ('todo','upgrade-company','upgrade-owner','2028-02-29','2028-02-29','private')");
                 try(var rows=sql.executeQuery("SELECT count(*) FROM users WHERE id='upgrade-owner'")){rows.next();assertEquals(1,rows.getInt(1));}
                 try(var rows=sql.executeQuery("SELECT version FROM personal_todos WHERE id='todo'")){rows.next();assertEquals(1,rows.getInt(1));}
                 Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema).load().validate();

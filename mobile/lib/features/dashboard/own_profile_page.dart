@@ -268,34 +268,33 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                         ),
                       ),
                     ),
+                    if (!selecting)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        child: IconButton(
+                          tooltip: '更换头像',
+                          onPressed: () => setDialogState(() {
+                            selecting = true;
+                            avatarError = '';
+                          }),
+                          icon: Image.asset(
+                            'assets/generated_ui/sunshine/icons/edit.png',
+                            width: 26,
+                            height: 26,
+                            excludeFromSemantics: true,
+                          ),
+                        ),
+                      ),
                     Positioned(
                       top: 0,
                       right: 0,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (!selecting)
-                            IconButton(
-                              tooltip: '更换头像',
-                              onPressed: () => setDialogState(() {
-                                selecting = true;
-                                avatarError = '';
-                              }),
-                              icon: Image.asset(
-                                'assets/generated_ui/sunshine/icons/edit.png',
-                                width: 26,
-                                height: 26,
-                                excludeFromSemantics: true,
-                              ),
-                            ),
-                          IconButton(
-                            tooltip: '关闭',
-                            onPressed: avatarSaving
-                                ? null
-                                : () => Navigator.pop(dialogContext),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                        ],
+                      child: IconButton(
+                        tooltip: '关闭',
+                        onPressed: avatarSaving
+                            ? null
+                            : () => Navigator.pop(dialogContext),
+                        icon: const Icon(Icons.close_rounded),
                       ),
                     ),
                   ],

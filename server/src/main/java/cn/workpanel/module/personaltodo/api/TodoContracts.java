@@ -8,7 +8,7 @@ import java.util.List;
 public final class TodoContracts {
     private TodoContracts() {}
     @Schema(name="PersonalTodo")
-    public record Todo(String id,String title,String note,LocalDate date,boolean completed,
+    public record Todo(String id,String title,String note,LocalDate date,LocalDate endDate,String color,boolean completed,
                        Instant completedAt,int version,Instant createdAt,Instant updatedAt) {}
     @Schema(name="PersonalTodoDayCount") public record DayCount(LocalDate date,long total,long completed) {}
     @Schema(name="PersonalTodoCalendar") public record Calendar(String month,LocalDate fromDate,LocalDate toDate,List<DayCount> days) {}
@@ -17,11 +17,15 @@ public final class TodoContracts {
     @Schema(name="PersonalTodoCreate",additionalProperties=Schema.AdditionalPropertiesValue.FALSE)
     public record Create(@Schema(minLength=1,maxLength=120,requiredMode=Schema.RequiredMode.REQUIRED) String title,
                          @Schema(maxLength=2000) String note,
-                         @Schema(format="date",requiredMode=Schema.RequiredMode.REQUIRED) String date) {}
+                         @Schema(format="date",requiredMode=Schema.RequiredMode.REQUIRED) String date,
+                         @Schema(format="date") String endDate,
+                         @Schema(pattern="^#[0-9A-Fa-f]{6}$") String color) {}
     @Schema(name="PersonalTodoUpdate",additionalProperties=Schema.AdditionalPropertiesValue.FALSE)
     public record Update(@Schema(minLength=1,maxLength=120,requiredMode=Schema.RequiredMode.REQUIRED) String title,
                          @Schema(maxLength=2000) String note,
                          @Schema(format="date",requiredMode=Schema.RequiredMode.REQUIRED) String date,
+                         @Schema(format="date") String endDate,
+                         @Schema(pattern="^#[0-9A-Fa-f]{6}$") String color,
                          @Schema(requiredMode=Schema.RequiredMode.REQUIRED) boolean completed,
                          @Schema(minimum="1",requiredMode=Schema.RequiredMode.REQUIRED) int version) {}
 }

@@ -8,15 +8,26 @@ class PersonalTodo {
     required this.title,
     required this.note,
     required this.date,
+    this.endDate = '',
+    this.color = defaultColor,
     required this.completed,
     required this.version,
   });
-  final String id, title, note, date;
+  static const defaultColor = '#F3A45D';
+  final String id, title, note, date, endDate, color;
   final bool completed;
   final int version;
+  String get lastDate => endDate.isEmpty ? date : endDate;
   factory PersonalTodo.fromJson(Map<String, dynamic> json) {
     final date = json['date'] as String;
     parseCivilDate(date);
+    final endDate = (json['endDate'] as String?) ?? date;
+    parseCivilDate(endDate);
+    if (endDate.compareTo(date) < 0) throw const FormatException('无效事项日期范围');
+    final color = (json['color'] as String?) ?? defaultColor;
+    if (!RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(color)) {
+      throw const FormatException('无效事项颜色');
+    }
     final version = json['version'] as int;
     if (version < 1 || (json['id'] as String).isEmpty) {
       throw const FormatException('无效事项');
@@ -26,6 +37,8 @@ class PersonalTodo {
       title: json['title'] as String,
       note: json['note'] as String,
       date: date,
+      endDate: endDate,
+      color: color.toUpperCase(),
       completed: json['completed'] as bool,
       version: version,
     );
@@ -34,6 +47,8 @@ class PersonalTodo {
     'title': title,
     'note': note,
     'date': date,
+    'endDate': lastDate,
+    'color': color,
     'completed': completed,
     'version': version,
   };
