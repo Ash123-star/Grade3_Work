@@ -33,3 +33,5 @@
 2026-11-06：6.1–6.3已实施并定向验证。后端31项通过（MultiFounderReviewIntegrationTest、FounderReviewRetirementMigrationTest、MobileP0MigrationUpgradeTest、BackendIntegrationTest），客户端审核/通知5项通过，OpenSpec46项通过。6.4全量仍未通过：首次后端510项含2失败/2错误/1跳过；2项本次夹具/迁移期望失败已修正并由31项专项复验通过，年度场景V1空reviewer_id的2错误未处理，未重跑全仓。Flutter安装main已有lunar依赖后无error，仍有其他页面3warning/9info。证据见output/founder-rule-focused3.log、founder-rule-flutter-final.log、founder-rule-spec-final.log、founder-rule-backend2.log、founder-rule-analyze2.log。未对展示库执行迁移、未真机验收、未提交或推送；个人.idea和指标混合改动仍保留，按仓库自动推送规则停止发布。关联既有multi-founder-review主题（PR #57历史上下文），本轮未发送远端消息。
 
 2026-11-11 复验：后端专项31项0失败0错误且构建成功，Flutter审核/通知5项全部通过，OpenSpec严格校验46项通过。证据：output/founder-rule-recheck-20261111.log、output/founder-rule-flutter-20261111.log；全仓年度初始化问题跟踪 #73，本次未重跑全仓，展示库未执行V31。按用户明确授权提交推送，个人配置和指标排除；关联 #56。
+
+2026-11-11 全分支整合（#82）：当前迁移顺序为每日事项 V31、停用创始人互审 V32、OSS V33，原独立分支验收中的 V31 为历史编号。已发布迁移正文不变；本轮集中验收与合并条件统一维护在 docs/backend-validation.md，不根据历史通过勾选未完成任务。

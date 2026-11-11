@@ -319,10 +319,11 @@ class _ListPageState extends ConsumerState<ListPage> {
               _messageSearchTimer = Timer(
                 const Duration(milliseconds: 400),
                 () {
-                  if (mounted)
+                  if (mounted) {
                     setState(() {
                       notificationSearch = v.trim();
                     });
+                  }
                 },
               );
             },

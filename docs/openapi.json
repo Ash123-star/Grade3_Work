@@ -772,7 +772,7 @@
       "put" : {
         "tags" : [ "personal-todo-controller" ],
         "summary" : "编辑或完成本人事项",
-        "description" : "全量title/note/date/completed/version；正整数version，必须提供Idempotency-Key。旧版本或同键异参409；同键同请求返回原结果。",
+        "description" : "全量title/note/date/endDate/color/completed/version；endDate不早于date且跨度≤366天；正整数version，必须提供Idempotency-Key。旧版本或同键异参409；同键同请求返回原结果。",
         "operationId" : "updatePersonalTodo",
         "parameters" : [ {
           "name" : "id",
@@ -4400,7 +4400,7 @@
       "get" : {
         "tags" : [ "personal-todo-controller" ],
         "summary" : "分页读取本人每日事项",
-        "description" : "仅本人，date为自然日；cursor>=0，limit 1–100；末页nextCursor=null；拒绝ownerId代查。",
+        "description" : "仅本人；date为自然日，返回与该日重叠的事项（跨天事项在覆盖的每一天都返回）；cursor>=0，limit 1–100；末页nextCursor=null；拒绝ownerId代查。",
         "operationId" : "listPersonalTodos",
         "parameters" : [ {
           "name" : "date",
@@ -4524,7 +4524,7 @@
       "post" : {
         "tags" : [ "personal-todo-controller" ],
         "summary" : "新增本人事项",
-        "description" : "title 1–120字，note最多2000字，date有效1900–2100自然日；必须提供Idempotency-Key，未知字段400，同键异参409。",
+        "description" : "title 1–120字，note最多2000字，date有效1900–2100自然日；endDate不早于date且跨度≤366天，默认等于date；color为#RRGGBB，默认#F3A45D；必须提供Idempotency-Key，未知字段400，同键异参409。",
         "operationId" : "createPersonalTodo",
         "parameters" : [ {
           "name" : "Idempotency-Key",
@@ -22660,6 +22660,14 @@
             "type" : "string",
             "format" : "date"
           },
+          "endDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "color" : {
+            "type" : "string",
+            "pattern" : "^#[0-9A-Fa-f]{6}$"
+          },
           "completed" : {
             "type" : "boolean"
           },
@@ -22686,6 +22694,13 @@
           "date" : {
             "type" : "string",
             "format" : "date"
+          },
+          "endDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "color" : {
+            "type" : "string"
           },
           "completed" : {
             "type" : "boolean"
@@ -22724,6 +22739,14 @@
           "date" : {
             "type" : "string",
             "format" : "date"
+          },
+          "endDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "color" : {
+            "type" : "string",
+            "pattern" : "^#[0-9A-Fa-f]{6}$"
           }
         },
         "required" : [ "date", "title" ]
@@ -23387,16 +23410,16 @@
           "aiWorkSubmitAuthorization" : {
             "type" : "boolean"
           },
-          "aiWorkAuthorizationMaxDays" : {
-            "type" : "integer",
-            "format" : "int32",
-            "maximum" : 30,
-            "minimum" : 1
-          },
           "aiWorkAuthorizationMaxObjects" : {
             "type" : "integer",
             "format" : "int32",
             "maximum" : 100,
+            "minimum" : 1
+          },
+          "aiWorkAuthorizationMaxDays" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 30,
             "minimum" : 1
           },
           "aiWorkAuthorizationMaxActions" : {

@@ -7,7 +7,6 @@ import 'package:pandora_mobile/data/models/tenure.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
-import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 
 class OwnProfilePage extends ConsumerStatefulWidget {

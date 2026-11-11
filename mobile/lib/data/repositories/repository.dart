@@ -129,7 +129,9 @@ class HttpRepository implements Repository {
     return _notificationReads[key] = _readNotificationPage(
       key,
       parameters,
-    ).whenComplete(() => _notificationReads.remove(key));
+    ).whenComplete(() {
+      _notificationReads.remove(key);
+    });
   }
 
   Future<PageResult> _readNotificationPage(
@@ -759,8 +761,9 @@ class HttpRepository implements Repository {
         return _page(response.data);
       }
       final parameters = _query(query, resource: resource);
-      if (resource == 'notifications')
+      if (resource == 'notifications') {
         return await _notificationPage(parameters);
+      }
       if (resource == 'tasks' && query.from != null && query.to != null) {
         parameters
           ..remove('date')

@@ -110,18 +110,20 @@ class _ServerAnalyticsPageState extends ConsumerState<ServerAnalyticsPage> {
         initial: ref.read(analyticsFiltersProvider(user.id)),
       ),
     );
-    if (next != null && mounted && ref.read(sessionProvider).id == user.id)
+    if (next != null && mounted && ref.read(sessionProvider).id == user.id) {
       ref.read(analyticsFiltersProvider(user.id).notifier).state = next;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(sessionProvider);
-    if (!user.manager || !user.canReadBusiness)
+    if (!user.manager || !user.canReadBusiness) {
       return const PageFrame(
         title: '工作统计',
         child: EmptyIllustration(showCharacter: false, title: '暂无查看权限'),
       );
+    }
     final filter = ref.watch(analyticsFiltersProvider(user.id));
     return PageFrame(
       title: '工作统计',
@@ -186,12 +188,13 @@ class _ServerAnalyticsPageState extends ConsumerState<ServerAnalyticsPage> {
                   final trend = _statRows(f['trend'] ?? f['dailyTrend']);
                   final unit = metric == 'diarySubmitted' ? '篇' : '项';
                   void groupDetails(Map<String, dynamic> row) {
-                    if (row['groupId'] != null)
+                    if (row['groupId'] != null) {
                       details(
                         '${row['groupName'] ?? '分组'} · ${_statMetrics[metric]}',
                         metric,
                         groupId: '${row['groupId']}',
                       );
+                    }
                   }
 
                   final cards = [
@@ -308,7 +311,7 @@ class _ServerAnalyticsPageState extends ConsumerState<ServerAnalyticsPage> {
                                           filter.groupBy,
                                           _statGroups,
                                         );
-                                        if (next != null && mounted)
+                                        if (next != null && mounted) {
                                           ref
                                               .read(
                                                 analyticsFiltersProvider(
@@ -318,6 +321,7 @@ class _ServerAnalyticsPageState extends ConsumerState<ServerAnalyticsPage> {
                                               .state = filter.copyWith(
                                             groupBy: next,
                                           );
+                                        }
                                       },
                                       child: Text(
                                         '${_statGroups[filter.groupBy] ?? '分组'} ▾',
@@ -495,8 +499,9 @@ class _StatisticsDateControls extends ConsumerWidget {
                     helpText: '选择统计日期',
                     initialEntryMode: DatePickerEntryMode.calendarOnly,
                   );
-                  if (picked != null && context.mounted)
+                  if (picked != null && context.mounted) {
                     ref.read(selectedDateProvider.notifier).state = picked;
+                  }
                 },
                 label: Text(
                   '$label ▾',
@@ -628,11 +633,12 @@ class _StatisticsPhases extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = rows.fold<num>(0, (v, r) => v + ((r['count'] as num?) ?? 0));
-    if (total <= 0)
+    if (total <= 0) {
       return const Padding(
         padding: EdgeInsets.all(32),
         child: Text('所选范围暂无派发任务', textAlign: TextAlign.center),
       );
+    }
     final ring = SizedBox(
       width: 130,
       height: 130,
@@ -806,8 +812,9 @@ class _StatisticsTrendState extends State<_StatisticsTrend> {
   @override
   Widget build(BuildContext context) {
     final rows = widget.rows;
-    if (rows.isEmpty)
+    if (rows.isEmpty) {
       return const Padding(padding: EdgeInsets.all(32), child: Text('暂无每日数据'));
+    }
     final index = selected.clamp(0, rows.length - 1), row = rows[index];
     final max = rows.fold<num>(
       0,
@@ -1180,9 +1187,10 @@ class _StatisticsFilterSheetState
     final teams = <String, String>{};
     for (final p in people) {
       final d = department(p), t = team(p);
-      if (d.isNotEmpty)
+      if (d.isNotEmpty) {
         departments[d] =
             '${p.fields['departmentName'] ?? p.fields['部门'] ?? '部门名称暂不可用'}';
+      }
       if (t.isNotEmpty &&
           (draft.departmentId.isEmpty || draft.departmentId == d)) {
         final data = (tree?.fields['teams'] as List? ?? [])
@@ -1292,8 +1300,9 @@ String _statRate(Map<String, dynamic> value) {
   if (value['denominatorKnown'] == false ||
       value['denominator'] is! num ||
       value['denominator'] <= 0 ||
-      value['rate'] is! num)
+      value['rate'] is! num) {
     return '暂无';
+  }
   return '${((value['rate'] as num) * 100).toStringAsFixed(1)}%';
 }
 

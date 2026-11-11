@@ -1,4 +1,4 @@
-> 当前审核规则（2026-11-06）：创始人权限内非MEMBERSHIP新操作免审，不因多创始人互审；部门经理仅由当前有效直属上级审批，其他创始人不可代审。V31作废旧FOUNDER_PEER待审及待审步骤并留审计/通知，必须重新提交，禁止reroute恢复或更换审核人；已决历史保留。MEMBERSHIP继续管理员确认。下文V28互审描述仅为历史，当前规格见openspec/changes/multi-founder-review/specs/multi-founder-review/spec.md。
+> 当前审核规则（2026-11-06）：创始人权限内非MEMBERSHIP新操作免审，不因多创始人互审；部门经理仅由当前有效直属上级审批，其他创始人不可代审。V32作废旧FOUNDER_PEER待审及待审步骤并留审计/通知，必须重新提交，禁止reroute恢复或更换审核人；已决历史保留。MEMBERSHIP继续管理员确认。下文V28互审描述仅为历史，当前规格见openspec/changes/multi-founder-review/specs/multi-founder-review/spec.md。
 
 # 后端接口文档
 

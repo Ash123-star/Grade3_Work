@@ -64,13 +64,17 @@ class InboxSyncAdapter implements HttpClientAdapter {
       '/organization/audit',
     ].contains(o.path)) {
       if (cursor > 0 && lateForbidden) status = 403;
+      final search = o.path == '/notifications'
+          ? '${o.queryParameters['search'] ?? ''}'
+          : '';
+      final indices = [
+        for (var i = 0; i < total; i++)
+          if ((i == 30 ? '后页唯一记录' : '工作消息$i').contains(search)) i,
+      ];
+      final pageIndices = indices.skip(cursor).take(30).toList();
       body = {
         'items': [
-          for (
-            var i = cursor;
-            i < (cursor == 0 && total > 30 ? 30 : total);
-            i++
-          )
+          for (final i in pageIndices)
             {
               'id': 'item-$i',
               'title': i == 30 ? '后页唯一记录' : '工作消息$i',
@@ -93,8 +97,12 @@ class InboxSyncAdapter implements HttpClientAdapter {
               'body': {'content': '已有授权内容'},
             },
         ],
-        'total': total,
-        if (!badCursor) 'nextCursor': '30',
+        'total': indices.length,
+        if (o.path == '/notifications') 'unread': read ? 0 : total,
+        if (!badCursor)
+          'nextCursor': cursor + pageIndices.length < indices.length
+              ? '${cursor + pageIndices.length}'
+              : null,
       };
     } else if (o.path == '/logs') {
       if (diaryGate != null) await diaryGate!.future;
@@ -236,7 +244,7 @@ void main() {
     'common providers include all scoped pages and reject partial data',
     () async {
       SharedPreferences.setMockInitialValues({});
-      for (final resource in ['tasks', 'reviews', 'notifications', 'audit']) {
+      for (final resource in ['tasks', 'reviews', 'audit']) {
         final a = InboxSyncAdapter(),
             c = testContainer(
               overrides: [
@@ -264,6 +272,42 @@ void main() {
     },
   );
 
+  test(
+    'notification pages load explicitly and retain the global unread count',
+    () async {
+      final adapter = InboxSyncAdapter();
+      final container = testContainer(
+        overrides: [
+          sessionProvider.overrideWith((ref) => const Session()),
+          repositoryProvider.overrideWithValue(inboxRepo(adapter)),
+        ],
+      );
+      final provider = notificationPageProvider(('', '', false));
+      final subscription = container.listen(provider, (_, _) {});
+      try {
+        final inbox = container.read(provider.notifier);
+        final first = await inbox.ready;
+        expect(first.items, hasLength(30));
+        expect(first.total, 31);
+        expect(first.unread, 31);
+        expect(first.nextCursor, '30');
+        await inbox.loadMore();
+        final all = container.read(provider).requireValue;
+        expect(all.items, hasLength(31));
+        expect(all.items.last.title, '后页唯一记录');
+        expect(all.nextCursor, isNull);
+        expect(all.unread, 31);
+        expect(
+          adapter.requests.where((r) => r.path == '/notifications'),
+          hasLength(2),
+        );
+      } finally {
+        subscription.close();
+        container.dispose();
+      }
+    },
+  );
+
   testWidgets('late task/review/message records participate in search', (
     t,
   ) async {
@@ -272,11 +316,26 @@ void main() {
       await launchInbox(t, a, '/list/$resource');
       await t.enterText(find.byType(TextField).first, '后页唯一');
       await t.pumpAndSettle();
+      if (resource == 'notifications') {
+        await t.pump(const Duration(milliseconds: 450));
+        await settleLocalIo(t);
+      }
       expect(find.text('后页唯一记录'), findsOneWidget);
-      expect(
-        a.requests.where((o) => o.queryParameters['cursor'] == '30'),
-        isNotEmpty,
-      );
+      if (resource == 'notifications') {
+        expect(
+          a.requests.where((o) => o.queryParameters['search'] == '后页唯一'),
+          isNotEmpty,
+        );
+        expect(
+          a.requests.where((o) => o.queryParameters['cursor'] == '30'),
+          isEmpty,
+        );
+      } else {
+        expect(
+          a.requests.where((o) => o.queryParameters['cursor'] == '30'),
+          isNotEmpty,
+        );
+      }
       expect(find.text('已完成'), findsNothing);
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox.shrink());
@@ -452,7 +511,11 @@ void main() {
       );
       a.unknownTarget = false;
       a.removedTarget = true;
-      c.invalidate(recordsProvider('notifications'));
+      await t.runAsync(
+        () => c
+            .read(notificationPageProvider(('', '', false)).notifier)
+            .refresh(force: true, interactive: true),
+      );
       await t.pumpAndSettle();
       await t.tap(find.text('工作消息0'));
       await t.pumpAndSettle();

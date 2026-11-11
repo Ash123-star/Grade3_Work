@@ -17,7 +17,7 @@ RAM用户只授予Bucket的 `workpanel/*` 对象读写删除权限；用于迁�
 
 ## 运维工具
 
-先完成后端构建并启动新版本，Flyway执行新增V31；不能直接在未升级数据库上调用发布/迁移命令。线上已存在V22–V30，不能占用这些编号，也不能用旧分支应用覆盖线上新功能；上线前须将本次变更整合到实际部署基线并验证。工具读取指定环境文件，不启动业务定时任务，不输出密钥。输出报告保存在Git忽略的 `output/oss`。
+先完成后端构建并启动新版本，Flyway执行新增V33；不能直接在未升级数据库上调用发布/迁移命令。线上已存在V22–V30，不能占用这些编号，也不能用旧分支应用覆盖线上新功能；上线前须将本次变更整合到实际部署基线并验证。工具读取指定环境文件，不启动业务定时任务，不输出密钥。输出报告保存在Git忽略的 `output/oss`。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/prepare-oss-assets.ps1 -Flutter D:/flutter/bin/flutter.bat
@@ -48,7 +48,9 @@ powershell -ExecutionPolicy Bypass -File scripts/oss-resources.ps1 -Command purg
 
 ## 验收要求与限制
 
-本次整合工作树基于GitHub主分支3f9eb2d及线上已使用的消息优化分支aa70b35，新增迁移V31。原19db6f3工作区和其中用户改动保持原样；旧分支的测试失败不应直接套用为新基线结果。新版统计导出仍经AnalyticsQuery/Repository生成一致快照，关闭快照事务后才写OSS并重新鉴权；资料更新沿ProfileService/Repository，保留新版手机号/组织范围规则。
+跨分支整合（Issue #82）：保留每日事项范围/颜色迁移V31，创始人审核停用迁移为V32，OSS迁移为V33，避免三个分支的V31发生碰撞。已发布V30及之前迁移正文不变。若某个开发库已执行分支独立版本的V31，必须先核对flyway_schema_history的脚本和校验和，再从已验证备份安排升级；禁止自动repair、删除历史或将三个同号迁移混用。
+
+本次整合工作树基于GitHub主分支3f9eb2d及线上已使用的消息优化分支aa70b35，新增迁移V33。原19db6f3工作区和其中用户改动保持原样；旧分支的测试失败不应直接套用为新基线结果。新版统计导出仍经AnalyticsQuery/Repository生成一致快照，关闭快照事务后才写OSS并重新鉴权；资料更新沿ProfileService/Repository，保留新版手机号/组织范围规则。
 
 后端单元及真实HTTP/PostgreSQL测试显式注入可控对象供应商替身，验证权限、完整性、失败恢复、历史迁移和原子发布；替身不代表真实OSS通过。`probe`使用独立verification随机对象，验证真实写入/读回一致、匿名读取403和删除，最后清理测试对象。
 

@@ -81,8 +81,9 @@ final liveNotificationsProvider =
             ref.invalidate(recentDiaryRecordsProvider);
             ref.invalidate(datedRecordsProvider('logs'));
           }
-          if (taskChanged || logChanged || decision)
+          if (taskChanged || logChanged || decision) {
             ref.invalidate(memberRecordsProvider);
+          }
           if (decision) {
             ref.invalidate(organizationTreeProvider);
             ref.invalidate(recordsProvider('organization'));

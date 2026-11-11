@@ -171,7 +171,8 @@ void main() {
         );
         await tester.tap(find.text('保存'));
         await tester.pumpAndSettle();
-        final todo = find.text('布局验收新增事项');
+        // 月历长条与当天清单都显示标题，滚动定位清单的独立操作入口。
+        final todo = find.byTooltip('编辑或删除：布局验收新增事项');
         await tester.scrollUntilVisible(
           todo,
           240,
@@ -183,6 +184,7 @@ void main() {
               .first,
         );
         expect(todo, findsOneWidget);
+        expect(find.text('布局验收新增事项'), findsNWidgets(2));
         expect(tester.takeException(), isNull);
         if (width == 390 && scale == 1) await capture(tester, '390-agenda');
       });

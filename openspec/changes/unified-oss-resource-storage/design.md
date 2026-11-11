@@ -2,6 +2,8 @@
 
 实施基线更新：2026-11-11 已从GitHub获取最新 `origin/main`（3f9eb2d），并快进至包含其全部提交且与线上一致的 `origin/fix/53-notification-refresh`（aa70b35），保留消息缓存/条件请求优化。独立工作树分支 `feature/79-unified-oss-latest` 只承载OSS变更，原工作区用户改动保留。以下现状调查来自最初19db6f3基线；实际整合保留新版AnalyticsQuery/Repository同范围导出与ProfileService/Repository分层，新增迁移采用V31，不占用已发布V22–V30。
 
+整合编号更新（#82）：上述 V31 是独立 OSS 分支的历史编号。三条功能分支整合后，当前 OSS 迁移为 V33；V31 用于每日事项范围/颜色，V32 停用创始人互审。已发布 V1–V30 不变，升级及开发库历史核对要求见 docs/database-schema.md，本轮验收见 docs/backend-validation.md。
+
 2026-11-11 用户确认使用已有私有业务 Bucket `panduola-work`，地域华北2北京（`cn-beijing`），Endpoint `https://oss-cn-beijing.aliyuncs.com`，范围包含内置图标和插画。凭据、Bucket 实际 ACL、网络与 RAM 权限尚未验证。
 
 现有 `AttachmentApplicationService` 用数据库保存并返回二进制，下载在读取时重新鉴权；`FileExtractor`、`DeliveryService`、`WorkService` 和 `ProcedureTemplates` 经该服务读取字节，但依赖 `data` 形态。`WorkRetention` 用 `octet_length(data)` 识别已清理材料。统计 CSV 和模板预填文件即时返回，没有持久化。Flutter 两个共享素材组件文件集中使用 `Image.asset`、`AssetImage`、`SvgPicture.asset`；许可证通过 `rootBundle` 注册。迁移最高 V21，不能改动已有迁移。

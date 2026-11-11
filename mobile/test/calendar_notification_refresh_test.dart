@@ -71,6 +71,7 @@ void main() {
         reason:
             'surface listener must not perform an immediate second global refresh',
       );
+      await t.pump(const Duration(seconds: 2));
       await settleLocalIo(t);
       final reads = adapter.requests.where((r) => r.path == '/tasks').toList();
       final refreshed = reads.skip(before).toList();

@@ -135,8 +135,9 @@ class NotificationInbox extends StateNotifier<AsyncValue<PageResult>> {
           List.generate(
             combined.length,
             (i) => i,
-          ).every((i) => identical(previous.items[i], combined[i])))
+          ).every((i) => identical(previous.items[i], combined[i]))) {
         return;
+      }
       state = AsyncData(
         PageResult(
           combined,
@@ -177,8 +178,9 @@ class NotificationInbox extends StateNotifier<AsyncValue<PageResult>> {
   Future<void> loadMore() {
     if (_pending != null) return _pending!;
     final page = state.valueOrNull;
-    if (!mounted || page == null || page.nextCursor == null)
+    if (!mounted || page == null || page.nextCursor == null) {
       return Future.value();
+    }
     return _pending = _readMore(page).whenComplete(() => _pending = null);
   }
 

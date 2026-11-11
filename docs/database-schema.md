@@ -1,4 +1,4 @@
-> 当前审核规则（2026-11-06）：创始人权限内非MEMBERSHIP新操作免审，不因多创始人互审；部门经理仅由当前有效直属上级审批，其他创始人不可代审。V31作废旧FOUNDER_PEER待审及待审步骤并留审计/通知，必须重新提交，禁止reroute恢复或更换审核人；已决历史保留。MEMBERSHIP继续管理员确认。下文V28互审描述仅为历史，当前规格见openspec/changes/multi-founder-review/specs/multi-founder-review/spec.md。
+> 当前审核规则（2026-11-06）：创始人权限内非MEMBERSHIP新操作免审，不因多创始人互审；部门经理仅由当前有效直属上级审批，其他创始人不可代审。V32作废旧FOUNDER_PEER待审及待审步骤并留审计/通知，必须重新提交，禁止reroute恢复或更换审核人；已决历史保留。MEMBERSHIP继续管理员确认。下文V28互审描述仅为历史，当前规格见openspec/changes/multi-founder-review/specs/multi-founder-review/spec.md。
 
 # 后端数据库字段说明
 
@@ -48,7 +48,7 @@
 | `task_assignees` | `task_id`, `user_id`, `kind` | 主负责人或协作者；主负责人由唯一索引保证只有一名 |
 | `task_events` | `sequence`, `type`, `actor_id`, `body` | 任务事件时间线，包含派发、接收、反馈、验收、撤回、归档和修订 |
 | `attachments` | `owner_id`, `filename`, `content_type`, `data` | 元数据及历史数据库副本；新文件正文写私有OSS，授权由服务端再次判断 |
-| `attachments` | `storage_provider`, `object_key`, `size_bytes`, `file_hash`, `storage_state`, `storage_version`, `storage_updated_at` | V31新增存储来源、完整性和PENDING/READY/DELETING/DELETED状态；仅READY未过期文件可读/绑定 |
+| `attachments` | `storage_provider`, `object_key`, `size_bytes`, `file_hash`, `storage_state`, `storage_version`, `storage_updated_at` | V33新增存储来源、完整性和PENDING/READY/DELETING/DELETED状态；仅READY未过期文件可读/绑定 |
 | `storage_delete_jobs` | `object_key`, `attachment_id`, `attempts`, `available_at` | 持久化、幂等的外部对象删除与重试 |
 | `generated_files` | `owner_id`, `attachment_id`, `kind`, `sources` | 临时CSV/模板产物的全部来源及版本；沿附件有效期拒读，不能作为长期附件绑定 |
 | `asset_releases`, `asset_current` | `manifest`, `manifest_hash`, `release_id`, `version` | 不可变全量静态清单与原子激活指针，不含私有用户文件 |
@@ -118,3 +118,5 @@ V22将旧待审步骤标记为SUPERSEDED并保留历史，每个申请至多一�
 删除会清除事项正文，但24小时幂等响应可能仍含原正文；过期回执在该用户后续写入时清理，不宣称物理立即擦除。未接入审计正文、AI、导出或组织面板。
 
 V26 原为避开待合并 PR 的 V24/V25 编号选择。五个 PR 整合后，已发布 V26/V27 保持原样，原待发布的创始人互审、任务置顶、多标签迁移分别调整为 V28/V29/V30；不启用 out-of-order。已验证空库与历史基线向 V30 升级。代码回滚可暂保留新增表，不删除历史数据；若确需删表，先备份本人事项和回执并安排独立维护迁移。
+
+2026-11-11 全分支整合（#82）协调三条未进入 main 的 V31：每日事项日期范围/颜色保留 V31，停用创始人互审调整为 V32，OSS 资源调整为 V33；已发布 V1–V30 正文不变。部署前停止旧写入并备份，按顺序升级，不启用 out-of-order 或自动 repair。已经独立运行任一分支 V31 的开发库须先核对 `flyway_schema_history` 的脚本和校验和，再从已验证备份制定升级方案，不能直接运行整合版或删除历史记录。V32 作废操作不自动撤销，禁止回退到仍创建互审的旧版本；OSS 数据迁移及恢复另见 [OSS 运维](oss-storage.md)。本轮实际验证以 [验证入口](backend-validation.md) 为准。

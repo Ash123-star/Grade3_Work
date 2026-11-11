@@ -499,25 +499,29 @@ void main() {
   );
 
   testWidgets(
-    'foreground validation blocks stale content, retries failure and refreshes pending state',
+    'foreground validation stays silent, retries on resume and refreshes pending state',
     (t) async {
       final c = await launch(t, route: '/dashboard', session: active);
       adapter.holdMe = Completer<void>();
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await t.pump();
-      expect(find.text('正在确认登录状态'), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
+      expect(find.text('正在确认登录状态'), findsNothing);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(c.read(sessionCheckProvider), isNull);
       adapter.meStatus = 503;
       await t.runAsync(() async {
         adapter.holdMe!.complete();
       });
       await settle(t);
-      expect(find.text('暂时无法确认登录状态'), findsOneWidget);
+      expect(find.text('暂时无法确认登录状态'), findsNothing);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(c.read(sessionProvider), same(active));
       expect(c.read(sessionProvider).token, 'token-1');
       adapter.holdMe = null;
       adapter.meStatus = 200;
-      await t.tap(find.text('重新验证登录'));
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await settle(t);
       expect(find.text('你的员工申请已登记。管理员确认部门后，才能查看公司内部内容。'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
@@ -528,7 +532,8 @@ void main() {
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await t.pump();
-      expect(find.text('正在确认登录状态'), findsOneWidget);
+      expect(find.text('正在确认登录状态'), findsNothing);
+      expect(find.byType(NavigationBar), findsOneWidget);
       c.read(sessionProvider.notifier).state = const Session(
         id: 'account-2',
         name: '新账号',

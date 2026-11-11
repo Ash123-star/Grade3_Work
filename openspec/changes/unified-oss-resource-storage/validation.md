@@ -2,6 +2,8 @@
 
 日期：2026-11-11，Windows PowerShell，Flutter SDK `D:/flutter`、Java 21、Maven 3.9.9、Docker隔离PostgreSQL/Redis/Neo4j。Issue [#79](https://github.com/Ash123-star/Grade3_Work/issues/79)。
 
+本文件以下记录对应独立 OSS 分支。后续全分支整合 #82 已将 OSS 迁移协调为 V33，并在整合分支纳入消息自等待补修；本轮实际命令、完整失败范围及合并条件统一见 [后端验证入口](../../../docs/backend-validation.md)。保留下面独立分支的 V31 编号及验收历史，不将其外推到整合版或生产。
+
 ## 基线与保留边界
 
 - 原工作区19db6f3及全部用户改动保留。原分支隔离源码后端409项中91失败、6错误；OSS整合后的旧基线420项仍为同一97项失败，无新增失败。此结果不代表新基线。

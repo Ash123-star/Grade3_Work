@@ -47,7 +47,9 @@ void main() {
     container = ProviderContainer(
       overrides: [
         repositoryProvider.overrideWithValue(repository),
-        sessionProvider.overrideWith((ref) => const Session(token: 'test-token')),
+        sessionProvider.overrideWith(
+          (ref) => const Session(token: 'test-token'),
+        ),
       ],
     );
   });
@@ -68,15 +70,18 @@ void main() {
   );
 
   testWidgets(
-    'notification subtitle resolves authorized task name and shares reads',
+    'server-authorized summaries render without per-notification detail reads',
     (t) async {
-      await mount(t, [message('one'), message('two')]);
+      await mount(t, [
+        message('one', fields: {'summary': '整理客户交付材料'}),
+        message('two', fields: {'summary': '整理客户交付材料'}),
+      ]);
       await t.pumpAndSettle();
       expect(find.text('整理客户交付材料'), findsNWidgets(2));
-      expect(repository.reads, 1);
+      expect(repository.reads, 0);
       container.invalidate(itemProvider(('tasks', 'task')));
       await t.pumpAndSettle();
-      expect(repository.reads, 2);
+      expect(repository.reads, 0);
     },
   );
 
@@ -97,27 +102,34 @@ void main() {
     'forbidden target does not leak a name or hide the notification',
     (t) async {
       repository.forbidden = true;
-      await mount(t, [message('one')]);
+      await mount(t, [
+        message('one', fields: {'summary': '关联内容已不可用或无权查看'}),
+      ]);
       await t.pumpAndSettle();
       expect(find.text('关联内容已不可用或无权查看'), findsOneWidget);
       expect(find.text('整理客户交付材料'), findsNothing);
+      expect(repository.reads, 0);
       expect(t.takeException(), isNull);
     },
   );
 
-  testWidgets('identity change discards late detail response', (t) async {
-    final pending = Completer<Record>();
-    repository.pending = pending;
-    await mount(t, [message('one')]);
-    await t.pump();
-    container.read(sessionProvider.notifier).state = const Session(
-      id: 'other',
-      status: 'PENDING',
-    );
-    await t.pump();
-    pending.complete(const Record(id: 'task', title: '旧账号敏感任务'));
-    await t.pumpAndSettle();
-    expect(find.text('旧账号敏感任务'), findsNothing);
-    expect(find.text('关联内容已不可用或无权查看'), findsOneWidget);
-  });
+  testWidgets(
+    'missing summary never fetches a detail across identity changes',
+    (t) async {
+      final pending = Completer<Record>();
+      repository.pending = pending;
+      await mount(t, [message('one')]);
+      await t.pump();
+      container.read(sessionProvider.notifier).state = const Session(
+        id: 'other',
+        status: 'PENDING',
+      );
+      await t.pump();
+      pending.complete(const Record(id: 'task', title: '旧账号敏感任务'));
+      await t.pumpAndSettle();
+      expect(find.text('旧账号敏感任务'), findsNothing);
+      expect(find.text('打开查看具体内容'), findsOneWidget);
+      expect(repository.reads, 0);
+    },
+  );
 }

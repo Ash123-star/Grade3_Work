@@ -327,16 +327,28 @@ void main() {
     );
   } else {
     testWidgets(
-      'real signals debounce full list refresh, skip duplicates and reconnect with cursor',
+      'signals keep inbox cached until the bounded poll and reconnect with cursor',
       (t) async {
         final a = LiveAdapter();
         final c = await launchLive(t, a);
-        expect(find.text('消息实时更新中'), findsOneWidget);
+        expect(
+          c.read(liveNotificationsProvider).connection,
+          NotificationConnection.live,
+        );
         final initial = a.requests
             .where((o) => o.path == '/notifications')
             .length;
         a.notices = 2;
         a.send(event(4) + event(5));
+        await t.pump(const Duration(seconds: 2));
+        await settleLocalIo(t);
+        expect(
+          a.requests.where((o) => o.path == '/notifications').length,
+          initial,
+        );
+        // Freshness uses DateTime.now; fake timer pumping alone cannot age it.
+        await t.runAsync(() => Future<void>.delayed(const Duration(seconds: 30)));
+        await t.pump(const Duration(seconds: 30));
         await settleLocalIo(t);
         expect(find.text('实际通知1'), findsOneWidget);
         expect(
@@ -352,7 +364,12 @@ void main() {
         await a.streams.last.close();
         await t.pump();
         await t.pump();
-        expect(find.textContaining('正在重连'), findsOneWidget);
+        expect(
+          c.read(liveNotificationsProvider).connection,
+          NotificationConnection.reconnecting,
+        );
+        c.read(liveNotificationsProvider.notifier).retryAt = DateTime.now()
+            .subtract(const Duration(seconds: 1));
         await t.pump(const Duration(seconds: 1));
         await settleLocalIo(t);
         final stream = a.requests
@@ -372,18 +389,30 @@ void main() {
       (t) async {
         final a = LiveAdapter()..jsonStream = true;
         final c = await launchLive(t, a);
-        expect(find.text('重新连接消息'), findsOneWidget);
-        expect(find.textContaining('格式无效'), findsOneWidget);
+        expect(
+          c.read(liveNotificationsProvider).connection,
+          NotificationConnection.stopped,
+        );
+        expect('${c.read(liveNotificationsProvider).error}', contains('格式无效'));
         a.jsonStream = false;
-        await t.tap(find.text('重新连接消息'));
+        c.read(liveNotificationsProvider.notifier).retry();
         await settleLocalIo(t);
-        expect(find.text('消息实时更新中'), findsOneWidget);
+        expect(
+          c.read(liveNotificationsProvider).connection,
+          NotificationConnection.live,
+        );
         a.streams.last.addError(
           const ApiFailure(FailureKind.forbidden, '无权连接消息'),
         );
         await settleLocalIo(t);
-        expect(find.text('重新连接消息'), findsOneWidget);
-        expect(find.textContaining('无权连接消息'), findsOneWidget);
+        expect(
+          c.read(liveNotificationsProvider).connection,
+          NotificationConnection.stopped,
+        );
+        expect(
+          '${c.read(liveNotificationsProvider).error}',
+          contains('无权连接消息'),
+        );
         expect(a.requests.where((o) => o.method != 'GET'), isEmpty);
         c.dispose();
         await t.pumpWidget(const SizedBox.shrink());
@@ -407,7 +436,8 @@ void main() {
         t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
         await settleLocalIo(t);
         expect(a.streams.length, 1);
-        expect(c.read(sessionCheckProvider), isNotNull);
+        expect(c.read(sessionCheckProvider), isNull);
+        expect(c.read(notificationForegroundProvider), isFalse);
         a.meGate!.complete();
         await settleLocalIo(t);
         expect(a.streams.length, 2);
@@ -475,6 +505,9 @@ void main() {
           await t.pump();
           await t.pump();
           if (i < 4) {
+            // Timer.pump advances fake time; DateTime.now uses the wall clock.
+            c.read(liveNotificationsProvider.notifier).retryAt = DateTime.now()
+                .subtract(const Duration(seconds: 1));
             await t.pump(Duration(seconds: 1 << i));
             await settleLocalIo(t);
           }
@@ -485,7 +518,9 @@ void main() {
           NotificationConnection.stopped,
         );
         expect(a.streams.length, 5);
-        await t.tap(find.text('重新连接消息'));
+        c.read(liveNotificationsProvider.notifier).retryAt = DateTime.now()
+            .subtract(const Duration(seconds: 1));
+        c.read(liveNotificationsProvider.notifier).retry();
         await settleLocalIo(t);
         expect(a.streams.length, 6);
         a.streams.last.addError(

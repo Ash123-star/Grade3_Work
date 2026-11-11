@@ -83,6 +83,36 @@ class PersonalTodoIntegrationTest {
         call(401,"GET","/personal-todos?date=2026-11-04","disabled",null,null);
         call(401,"GET","/personal-todos?date=2026-11-04",null,null,null);
     }
+    @Test void multiDayRangeSurvivesCompletionAndKeepsOwnerIsolation()throws Exception{
+        var body=createBody();body.put("date","2026-10-31");body.put("endDate","2026-11-02");body.put("color","#8fc7b0");
+        var todo=call(201,"POST","/personal-todos","alice",body,"range-create");
+        String path="/personal-todos/"+todo.get("id").asText();
+        assertEquals("2026-11-02",todo.get("endDate").asText());assertEquals("#8FC7B0",todo.get("color").asText());
+        for(String date:List.of("2026-10-31","2026-11-01","2026-11-02")){
+            var page=call(200,"GET","/personal-todos?date="+date,"alice",null,null);
+            assertEquals(todo,page.get("items").get(0));assertEquals(1,page.get("total").asInt());
+            assertEquals(0,call(200,"GET","/personal-todos?date="+date,"bob",null,null).get("total").asInt());
+        }
+        for(String date:List.of("2026-10-30","2026-11-03"))assertEquals(0,call(200,"GET","/personal-todos?date="+date,"alice",null,null).get("total").asInt());
+        var completed=update(todo,true);completed.put("endDate",todo.get("endDate").asText());completed.put("color",todo.get("color").asText());
+        todo=call(200,"PUT",path,"alice",completed,"range-complete");
+        assertEquals("2026-11-02",todo.get("endDate").asText());assertEquals("#8FC7B0",todo.get("color").asText());
+        var calendar=call(200,"GET","/personal-todos/calendar?month=2026-11","alice",null,null);
+        for(var day:calendar.get("days")){
+            String date=day.get("date").asText();int count=date.compareTo("2026-10-31")>=0&&date.compareTo("2026-11-02")<=0?1:0;
+            assertEquals(count,day.get("total").asInt(),date);assertEquals(count,day.get("completed").asInt(),date);
+        }
+        call(404,"GET",path,"other",null,null);
+    }
+    @Test void invalidRangeAndColorNeverPersist()throws Exception{
+        for(Object end:List.of("2026-11-03","2027-12-31",true)){
+            var body=createBody();body.put("endDate",end);call(400,"POST","/personal-todos","alice",body,UUID.randomUUID().toString());
+        }
+        for(Object color:List.of("red","#12345",true)){
+            var body=createBody();body.put("color",color);call(400,"POST","/personal-todos","alice",body,UUID.randomUUID().toString());
+        }
+        assertEquals(0,db.count("SELECT count(*) FROM personal_todos WHERE company_id=?",company));
+    }
     @Test void invalidWritesNeverPersist()throws Exception{
         for(Object date:List.of("2026-02-30","1899-01-01",true)){var b=createBody();b.put("date",date);call(400,"POST","/personal-todos","alice",b,UUID.randomUUID().toString());}
         for(String key:List.of("ownerId","companyId","taskId")){var b=createBody();b.put(key,"x");call(400,"POST","/personal-todos","alice",b,key);}

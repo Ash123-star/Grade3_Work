@@ -8,7 +8,6 @@ import 'package:cute_ui/cute_ui.dart'
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
-import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';

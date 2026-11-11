@@ -22,7 +22,7 @@ P0；部门经理等非创始人的申请 SHALL 只分配当前有效直属上�
 - **THEN** 待审步骤 SHALL 在同一事务内按新关系更新，旧审核人失去决定权；组织变更失败不改派
 
 ### Requirement: Retire pending founder peer requests
-P0；V31前向迁移 SHALL 将旧FOUNDER_PEER待审申请及其待审步骤设为SUPERSEDED，保留已决历史和候选，写审计和通知。MUST NOT 应用候选或修改目标业务对象。旧申请必须重新提交，不能继续或更换审核人。
+P0；V32前向迁移 SHALL 将旧FOUNDER_PEER待审申请及其待审步骤设为SUPERSEDED，保留已决历史和候选，写审计和通知。MUST NOT 应用候选或修改目标业务对象。旧申请必须重新提交，不能继续或更换审核人。
 #### Scenario: Upgrade pending and decided records
 - **WHEN** 数据库包含互审待审、已批准和直属审核申请
 - **THEN** 仅互审待审 SHALL 作废，已决和直属申请不变，业务版本不变
