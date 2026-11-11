@@ -23065,7 +23065,7 @@
           },
           "reviewer_selectable" : {
             "type" : "boolean",
-            "description" : "仅本人 PENDING 的 FOUNDER_PEER 申请为 true"
+            "description" : "当前规则恒为 false；历史 FOUNDER_PEER 仅供读取，不再支持更换审核人"
           }
         },
         "required" : [ "before_value", "candidate", "display_references", "expected_version", "id", "kind", "status" ]

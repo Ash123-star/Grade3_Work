@@ -650,9 +650,7 @@ class MockRepository implements Repository {
     if (review.fields['reviewState'] != '待审') {
       throw const ApiFailure(FailureKind.conflict, '该申请已处理或已失效');
     }
-    if (review.fields['approvalMode'] != 'FOUNDER_PEER') {
-      throw const ApiFailure(FailureKind.conflict, '仅创始人互审申请可以更换审核人');
-    }
+    throw const ApiFailure(FailureKind.conflict, '审核人由直属关系确定，不支持更换');
   }
 
   DemoAccount _account(String id) => demoAccounts.firstWhere(
@@ -2159,16 +2157,6 @@ class MockRepository implements Repository {
       )
       .toList();
 
-  DemoAccount? _defaultFounderPeer(String applicantId) {
-    final peers = _founderPeers(applicantId);
-    if (peers.isEmpty) return null;
-    final manager = _directManager(applicantId);
-    return peers.firstWhere(
-      (peer) => peer.id == manager?.id,
-      orElse: () => peers.first,
-    );
-  }
-
   DemoAccount? _directManager(String ownerId) {
     final owner = demoAccounts
         .where((account) => account.id == ownerId)
@@ -2654,6 +2642,9 @@ class MockRepository implements Repository {
       notify('有新的修改申请待审核', 'reviews', changed.id, peer.id, '审批');
       return changed;
     }
+    if (resource == 'reviews' && previous?.fields['approvalMode'] == 'FOUNDER_PEER') {
+      throw const ApiFailure(FailureKind.conflict, '旧创始人互审申请已作废，请重新提交');
+    }
     if (resource == 'reviews' && action != 'request-review') {
       if (previous?.fields['reviewState'] != '待审') {
         throw const ApiFailure(FailureKind.conflict, '该申请已处理或已失效');
@@ -2711,10 +2702,7 @@ class MockRepository implements Repository {
     }
     if (action == 'request-review') {
       final applicant = previous?.ownerId ?? session.id;
-      final founderPeer = session.role == UserRole.founder
-          ? _defaultFounderPeer(session.id)
-          : null;
-      if (session.role == UserRole.founder && founderPeer == null) {
+      if (session.role == UserRole.founder) {
         if (applicant != session.id) {
           throw const ApiFailure(FailureKind.forbidden, '创始人免审仅适用于本人有权发起的操作');
         }
@@ -2753,7 +2741,7 @@ class MockRepository implements Repository {
         if (key != null) store.responses[key] = approved;
         return approved;
       }
-      final reviewer = founderPeer ?? _directManager(applicant);
+      final reviewer = _directManager(applicant);
       final request = Record(
         id: 'r${DateTime.now().microsecondsSinceEpoch}',
         title: '${v['title'] ?? previous?.title ?? '内容'} · 修改申请',
@@ -2762,8 +2750,8 @@ class MockRepository implements Repository {
         fields: {
           'reviewState': '待审',
           'step': 0,
-          'approvalMode': founderPeer == null ? 'DIRECT_MANAGER' : 'FOUNDER_PEER',
-          'reviewerSelectable': founderPeer != null,
+          'approvalMode': 'DIRECT_MANAGER',
+          'reviewerSelectable': false,
           'reviewerId': reviewer?.id,
           'reviewerName': reviewer?.name,
           'reviewerConfigured': reviewer != null,

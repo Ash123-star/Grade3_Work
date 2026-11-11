@@ -130,7 +130,7 @@ public class OpenApi {
         reviewDetail.addProperty("display_references",references.description("已授权审核快照引用的同公司ID到当前名称映射；名称非历史快照，缺失引用不返回"));
         reviewDetail.addProperty("approval_mode",new StringSchema()._enum(List.of("DIRECT_MANAGER","ADMIN_MEMBERSHIP","FOUNDER_PEER","LEGACY")));
         reviewDetail.addProperty("decision_source",new StringSchema()._enum(List.of("DIRECT_MANAGER","ADMIN_MEMBERSHIP","FOUNDER_PEER","FOUNDER_EXEMPT")).nullable(true));
-        reviewDetail.addProperty("reviewer_selectable",new BooleanSchema().description("仅本人 PENDING 的 FOUNDER_PEER 申请为 true"));
+        reviewDetail.addProperty("reviewer_selectable",new BooleanSchema().description("当前规则恒为 false；历史 FOUNDER_PEER 仅供读取，不再支持更换审核人"));
         reviewDetail.additionalProperties(true); c.addSchemas("ReviewDetail",reviewDetail);
         var reviewerSelection=object("reviewerId","expectedVersion"); reviewerSelection.addProperty("reviewerId",text().minLength(1)); reviewerSelection.addProperty("expectedVersion",version()); c.addSchemas("ReviewerSelection",reviewerSelection);
         var candidate=object("id","name","current"); candidate.addProperty("id",text()); candidate.addProperty("name",text()); candidate.addProperty("current",new BooleanSchema());
