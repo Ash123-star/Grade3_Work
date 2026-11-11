@@ -156,7 +156,9 @@ void main() {
     t,
   ) async {
     await t.pumpWidget(host(const EmptyIllustration()));
-    expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
+    expect(find.byType(SunshineMascot), findsOneWidget);
+    expect(t.widget<SunshineMascot>(find.byType(SunshineMascot)).pose, 'empty');
+    expect(find.text('这里还没有记录'), findsOneWidget);
     await t.pumpWidget(
       host(
         RecordFailure(
@@ -193,12 +195,23 @@ void main() {
     );
     notice(context, '草稿已加密保存到此设备', success: true);
     await t.pump();
-    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    expect(
+      find.image(AssetImage(TuantuanAssets.icons['success']!)),
+      findsOneWidget,
+    );
+    expect(find.text('草稿已加密保存到此设备'), findsOneWidget);
     expect(find.byType(TuantuanSkin), findsNothing);
     notice(context, '修订已提交，等待复核');
     await t.pump();
-    expect(find.byIcon(Icons.info_outline), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle_outline), findsNothing);
+    expect(
+      find.image(AssetImage(TuantuanAssets.icons['help']!)),
+      findsOneWidget,
+    );
+    expect(
+      find.image(AssetImage(TuantuanAssets.icons['success']!)),
+      findsNothing,
+    );
+    expect(find.text('修订已提交，等待复核'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
     expect(find.byType(DogPose), findsNothing);
     await t.tap(find.byTooltip('关闭提示'));
@@ -257,26 +270,30 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('illustration layers are opt-in for selected surfaces', (
-    t,
-  ) async {
-    await t.pumpWidget(
-      host(
-        const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PaperSurface(child: Text('plain')),
-            PaperSurface(
-              decorated: true,
-              skin: 'mint',
-              child: Text('illustrated'),
-            ),
-          ],
+  testWidgets(
+    'paper surfaces preserve content without legacy illustration layers',
+    (t) async {
+      await t.pumpWidget(
+        host(
+          const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PaperSurface(child: Text('plain')),
+              PaperSurface(
+                decorated: true,
+                skin: 'mint',
+                child: Text('illustrated'),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-    expect(find.byType(TuantuanSkin), findsOneWidget);
-  });
+      );
+      expect(find.byType(TuantuanSkin), findsNothing);
+      expect(find.text('plain'), findsOneWidget);
+      expect(find.text('illustrated'), findsOneWidget);
+      expect(find.byType(Material), findsWidgets);
+    },
+  );
 
   testWidgets('render component states and all six original poses', (t) async {
     final font = FontLoader('Roboto')

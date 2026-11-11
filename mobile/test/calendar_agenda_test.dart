@@ -205,7 +205,7 @@ void main() {
       expect(find.byType(AppBar), findsNothing);
       await t.tap(find.text('打开'));
       await t.pumpAndSettle();
-      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.byTooltip('返回'), findsOneWidget);
       expect(find.text('二级页名'), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
       await t.pumpWidget(

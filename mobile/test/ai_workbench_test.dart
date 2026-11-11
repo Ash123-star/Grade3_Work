@@ -526,7 +526,10 @@ void main() {
       );
       container.read(routerProvider).go('/ai');
       await settleLocalIo(t);
-      expect(find.text('把事情交给我'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('AI地图')),
+        findsOneWidget,
+      );
       for (final label in ['首页', '公司', '日志', 'AI地图', '我的']) {
         expect(find.text(label), findsWidgets);
       }

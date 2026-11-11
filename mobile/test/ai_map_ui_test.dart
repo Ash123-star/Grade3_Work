@@ -92,7 +92,10 @@ void main() {
     'new workbench keeps composer above five tabs and removes analysis decoration',
     (tester) async {
       await launch(tester, WorkAdapter());
-      expect(find.text('把事情交给我'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('AI地图')),
+        findsOneWidget,
+      );
       expect(find.text('发展分析'), findsNothing);
       expect(find.text('开始分析'), findsNothing);
       expect(find.text('把下一步想清楚'), findsNothing);

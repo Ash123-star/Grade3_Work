@@ -11,6 +11,7 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/features/calendar/calendar_content.dart';
+import 'package:pandora_mobile/features/calendar/calendar_interaction.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'calendar_agenda_test.dart' show agendaStore;
 import 'support/local_test_state.dart';
@@ -146,9 +147,12 @@ void main() {
       c.read(routerProvider).go('/view');
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      final month = find
-          .byKey(const ValueKey('calendar-month-grid'))
-          .hitTestable();
+      final month = find.descendant(
+        of: find.byWidgetPredicate(
+          (w) => w is CalendarLoadedMonth && w.month == DateTime.utc(2026, 11),
+        ),
+        matching: find.byKey(const ValueKey('calendar-month-grid')),
+      );
       final lastDay = find.descendant(
         of: month,
         matching: find.byKey(const ValueKey('month-day:2026-11-30')),
@@ -170,8 +174,16 @@ void main() {
         expect(preview.maxLines, 1);
       }
       expect(
-        find.descendant(of: month, matching: find.byType(FittedBox)),
+        find.ancestor(
+          of: find.descendant(
+            of: month,
+            matching: find.byType(CalendarTaskHandle),
+          ),
+          matching: find.byType(FittedBox),
+        ),
         findsNothing,
+        reason:
+            'task previews keep their defined text size; date headers may scale down',
       );
       expect(t.getSize(month).width, size.width);
       final navTop = t.getTopLeft(find.byType(NavigationBar)).dy;
@@ -185,7 +197,7 @@ void main() {
         isNot(11),
         reason: 'vertical scrolling selects a neighboring month',
       );
-      expect(month, findsWidgets);
+      expect(find.byKey(const ValueKey('calendar-month-grid')), findsWidgets);
       expect(t.takeException(), isNull, reason: '$size scale=$scale');
       await t.runAsync(() async {
         final render =

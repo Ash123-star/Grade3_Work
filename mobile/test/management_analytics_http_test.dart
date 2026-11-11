@@ -527,10 +527,14 @@ void main() {
       expect(find.text('75.0%'), findsOneWidget);
       expect(find.text('暂无'), findsOneWidget);
       expect(find.textContaining('授权任务按期验收'), findsNothing);
-      await t.ensureVisible(find.text('按期验收率'));
-      await t.tap(find.text('按期验收率'));
+      await t.scrollUntilVisible(
+        find.text('统计口径 ⓘ'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.tap(find.text('统计口径 ⓘ'));
       await t.pumpAndSettle();
-      expect(find.textContaining('按期 3 / 已验收 4'), findsOneWidget);
+      expect(find.textContaining('按期验收：3 / 验收 4'), findsOneWidget);
       await t.tapAt(const Offset(10, 10));
       await t.pumpAndSettle();
       adapter.summaryStatus = 403;
@@ -596,8 +600,14 @@ void main() {
       await t.tap(find.byKey(const ValueKey('personnel-team-id:dept-id:team')));
       await t.pumpAndSettle();
       expect(find.text('第二页成员'), findsOneWidget);
-      expect(adapter.requests.any((r) => r.path == '/organization/people' &&
-          r.queryParameters['cursor'] == '30'), isTrue);
+      expect(
+        adapter.requests.any(
+          (r) =>
+              r.path == '/organization/people' &&
+              r.queryParameters['cursor'] == '30',
+        ),
+        isTrue,
+      );
       c.read(routerProvider).go('/me/reviews/rejected');
       await settle(t);
       expect(find.text('修改后重新提交'), findsNothing);

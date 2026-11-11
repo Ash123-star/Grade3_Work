@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/core/errors/api_failure.dart';
@@ -232,7 +233,14 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       container.dispose();
       container = await openDetail(tester, repo);
-      expect(find.text('已停止'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(TuantuanStatusPill),
+          matching: find.text('已停止'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('已停止'), findsNWidgets(2));
       expect(find.text('已创建一项任务'), findsOneWidget);
       expect(repo.actions, ['cancel']);
       await tester.pumpWidget(const SizedBox.shrink());

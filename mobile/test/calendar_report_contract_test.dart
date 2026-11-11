@@ -140,8 +140,10 @@ void main() {
       expect(page.items.last.title, '最后一页正式日报');
       expect(adapter.requests.length, 2);
       for (final request in adapter.requests) {
-        expect(request.queryParameters['date'], '2026-01-01');
-        expect(request.queryParameters['period'], 'month');
+        expect(request.queryParameters['from'], '2025-12-31T16:00:00.000Z');
+        expect(request.queryParameters['to'], '2026-01-31T16:00:00.000Z');
+        expect(request.queryParameters, isNot(contains('date')));
+        expect(request.queryParameters, isNot(contains('period')));
         expect(request.queryParameters['ownerId'], 'u1');
         expect(request.queryParameters['search'], '工作');
         expect(request.queryParameters['limit'], 30);
@@ -259,13 +261,21 @@ void main() {
         diarySubscription.close();
         reportSubscription.close();
       });
-      expect(adapter.requests.map((e) => e.queryParameters['date']), [
-        '2026-01-01',
-        '2026-01-01',
-        '2025-12-31',
-        '2025-12-31',
-        '2026-01-01',
-        '2026-01-01',
+      expect(adapter.requests.map((e) => e.queryParameters['from']), [
+        '2025-12-31T16:00:00.000Z',
+        '2025-12-31T16:00:00.000Z',
+        '2025-12-30T16:00:00.000Z',
+        '2025-12-30T16:00:00.000Z',
+        '2025-12-31T16:00:00.000Z',
+        '2025-12-31T16:00:00.000Z',
+      ]);
+      expect(adapter.requests.map((e) => e.queryParameters['to']), [
+        '2026-01-31T16:00:00.000Z',
+        '2026-01-31T16:00:00.000Z',
+        '2025-12-31T16:00:00.000Z',
+        '2025-12-31T16:00:00.000Z',
+        '2026-01-31T16:00:00.000Z',
+        '2026-01-31T16:00:00.000Z',
       ]);
       expect(adapter.requests[2].queryParameters['ownerId'], 'u2');
       expect(adapter.requests.last.queryParameters['ownerId'], 'u1');

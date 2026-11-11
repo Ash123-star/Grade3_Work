@@ -145,9 +145,7 @@ void main() {
       final peopleBadges = badges.where((badge) => names.contains(badge.label));
       expect(peopleBadges.map((badge) => badge.label), names.take(2));
       expect(
-        peopleBadges.every(
-          (badge) => badge.color == SunnyPalette.primaryContainer,
-        ),
+        peopleBadges.every((badge) => badge.color == const Color(0xFFF5EDDA)),
         isTrue,
       );
       await tester.tap(find.byKey(const ValueKey('task-expand:task:标签')));

@@ -1,6 +1,7 @@
 package cn.workpanel.bootstrap;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -49,11 +50,27 @@ public class ScenarioDataBootstrap implements ApplicationRunner {
         boolean annual = dataset.equals("annual-2026");
         if (annual && password.length() < 12)
             throw new IllegalArgumentException("annual-2026测试密码至少12字符，满足现有前后端校验");
-        Flyway.configure().dataSource(dataSource)
+        var configuration = Flyway.configure().dataSource(dataSource)
                 .locations(annual ? "classpath:db/scenario-annual2026" : "classpath:db/scenario")
                 .table(annual ? "flyway_annual2026_history" : "flyway_scenario_history")
                 .baselineOnMigrate(true).baselineVersion("0")
-                .placeholders(Map.of("scenarioPasswordHash", passwords.encode(password)))
-                .load().migrate();
+                .placeholders(Map.of("scenarioPasswordHash", passwords.encode(password)));
+        (annual ? annualMigrations(configuration) : configuration.load()).migrate();
+    }
+
+    /**
+     * 年度数据使用独立空历史表，使新库可执行 B1，而旧库继续校验、执行 V1–V6。
+     * 正式表已存在，自动 baseline(0) 会禁用 B1；因此仅在没有任何历史时让 Flyway
+     * 创建元数据表。元数据阶段不加载任何脚本，不登记或跳过任何业务迁移。
+     * B1 自身仍锁表并拒绝非空业务库；不 repair、不删除或修改已有历史。
+     */
+    static Flyway annualMigrations(FluentConfiguration configuration) {
+        var flyway = configuration.baselineOnMigrate(false).load();
+        if (flyway.info().applied().length == 0) {
+            Flyway.configure().configuration(flyway.getConfiguration())
+                    .locations(new String[0]).target("0?")
+                    .skipExecutingMigrations(true).load().migrate();
+        }
+        return flyway;
     }
 }

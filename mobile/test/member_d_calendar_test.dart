@@ -80,7 +80,7 @@ void main() {
         mode == 'first-offline' ? findsNothing : findsOneWidget,
       );
       if (mode == 'first-offline') {
-        expect(find.textContaining('暂无放假调休信息'), findsOneWidget);
+        expect(find.byTooltip(RegExp('暂无放假调休公告')), findsOneWidget);
       }
       expect(t.takeException(), isNull);
     });

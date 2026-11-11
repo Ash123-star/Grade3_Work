@@ -111,7 +111,15 @@ class InboxSyncAdapter implements HttpClientAdapter {
           : failDiary
           ? 503
           : 200;
-      final date = o.queryParameters['date'] ?? '2026-10-13';
+      final from = o.queryParameters['from'];
+      final date = from == null
+          ? o.queryParameters['date'] ?? '2026-10-13'
+          : DateTime.parse('$from')
+                .toUtc()
+                .add(const Duration(hours: 8))
+                .toIso8601String()
+                .split('T')
+                .first;
       body = {
         'items': emptyDiary
             ? []
@@ -541,8 +549,10 @@ void main() {
           .firstWhere((o) => o.path == '/logs')
           .queryParameters;
       expect(query['ownerId'], 'u1');
-      expect(query['date'], '2026-10-13');
-      expect(query['period'], 'day');
+      expect(query['from'], '2026-10-12T16:00:00.000Z');
+      expect(query['to'], '2026-10-13T16:00:00.000Z');
+      expect(query, isNot(contains('date')));
+      expect(query, isNot(contains('period')));
       a.serverVersion = 6;
       await t.tap(find.text('重新检查'));
       await settleLocalIo(t);

@@ -149,7 +149,7 @@ void main() {
           }
           expect(t.takeException(), isNull, reason: '$name $width');
           if (name == 'dashboard') {
-            expect(find.byType(DogAvatar), findsWidgets);
+            expect(find.byType(SunshineMascot), findsWidgets);
             expect(
               find.byType(TuantuanIcon).evaluate().length,
               greaterThanOrEqualTo(2),

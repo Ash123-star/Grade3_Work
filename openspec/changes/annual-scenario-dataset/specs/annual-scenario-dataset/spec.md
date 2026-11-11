@@ -18,6 +18,14 @@ P0：系统 SHALL 在显式启用annual-2026数据集时，通过同一DataSourc
 - **WHEN** 新库完成正式迁移并配置合格密码，随后启动两次
 - **THEN** SHALL 首次生成关联场景，第二次跳过且不重复或重置密码
 
+#### Scenario: Existing versioned history
+- **WHEN** 已有年度 V1 或 V6 的历史库加载新增 B1
+- **THEN** SHALL 校验原脚本并仅执行后续增量，不能执行 B1、修改历史校验和、重置密码或覆盖人工修改
+
+#### Scenario: Reschedule examples need an independent reviewer
+- **WHEN** 新库为年度场景生成待审及驳回的改期样本
+- **THEN** SHALL 仅选择有效非创始人申请人与同公司有效非本人直属上级；不能把无上级创始人的免审操作伪造为待审或写入空审核人
+
 #### Scenario: Nonempty or invalid target
 - **WHEN** 已有业务/其他人员/旧场景或账号冲突，或者密码未满足12字符和72字节限制
 - **THEN** MUST 拒绝场景初始化，不能删除或覆盖已有业务

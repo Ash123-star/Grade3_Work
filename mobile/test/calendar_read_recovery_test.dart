@@ -339,7 +339,8 @@ void main() {
     'detail 429 does not refresh all months and blocks repeated move attempts',
     (t) async {
       final repo = CountingCalendarRepository();
-      await mount(t, repo, CalendarTaskReader());
+      final now = DateTime.utc(2026);
+      await mount(t, repo, CalendarTaskReader(now: () => now));
       final state = await readyInteraction(t);
       final handle = t.widget<CalendarTaskHandle>(
         find.byType(CalendarTaskHandle).first,

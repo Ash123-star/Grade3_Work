@@ -437,13 +437,14 @@ class _StableMonthPageState extends ConsumerState<_StableMonthPage> {
     if (failure is ApiFailure &&
         (failure.statusCode == 429 || failure.code == 'RATE_LIMITED')) {
       final previous = _lastComplete;
-      return SizedBox(
-        height: widget.availableHeight,
-        child: Stack(
-          children: [
-            if (previous != null)
-              Positioned.fill(child: render(previous, readOnly: true)),
-            Align(
+      return Stack(
+        children: [
+          if (previous != null)
+            render(previous, readOnly: true)
+          else
+            SizedBox(height: widget.availableHeight),
+          Positioned.fill(
+            child: Align(
               alignment: previous == null
                   ? Alignment.center
                   : Alignment.topCenter,
@@ -454,8 +455,8 @@ class _StableMonthPageState extends ConsumerState<_StableMonthPage> {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
     if (state.hasError) _lastComplete = null;
@@ -894,13 +895,15 @@ class _MonthGrid extends StatelessWidget {
                     1.15 +
                 6,
           );
+          // Keep the compact badge while reserving an unobstructed touch area.
+          final overflowTapHeight = math.max(48.0, overflowBadgeHeight);
           // Every week reserves the same five slots, regardless of task count.
           // Crowded dates use the last slot for a badge instead of growing a row.
           final cellHeight = math.max(
             viewportCellHeight,
             recordTop +
                 4 * (barHeight + 1) +
-                math.max(barHeight, overflowBadgeHeight) +
+                math.max(barHeight, overflowTapHeight) +
                 8,
           );
           final gridLast = start.add(Duration(days: weeks * 7 - 1));
@@ -971,7 +974,7 @@ class _MonthGrid extends StatelessWidget {
               cellHeight,
               recordTop +
                   (previewLane + 1) * (barHeight + 1) +
-                  (hasOverflow(week) ? overflowBadgeHeight + 4 : 0) +
+                  (hasOverflow(week) ? overflowTapHeight + 4 : 0) +
                   4,
             );
           }
@@ -1259,7 +1262,7 @@ class _MonthGrid extends StatelessWidget {
                             right: (6 - col) * cellWidth + 4,
                             bottom: 5,
                             width: cellWidth - 8,
-                            height: overflowBadgeHeight,
+                            height: overflowTapHeight,
                             child: Semantics(
                               label:
                                   '${dayHeading(start.add(Duration(days: week * 7 + col)))}，另有${folded[start.add(Duration(days: week * 7 + col))]!.remaining}项任务，查看当天全部任务',

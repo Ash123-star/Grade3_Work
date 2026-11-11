@@ -6,7 +6,15 @@
 
 这套数据仅用于用户要求的整库重建，采用**原PostgreSQL实例内新建空库并切换连接**。旧库保留但不再供新版业务使用；不新建Docker数据库、不执行DROP DATABASE、不清表，也不混用deploy/postgresql独立模型。待新库确认可用后，再由运维按保留策略决定旧库是否删除。
 
-正式结构继续使用 `server/src/main/resources/db/migration` V1–V23；场景选项为 `SCENARIO_DATASET=annual-2026`，使用 `db/scenario-annual2026/V1__annual_workplace.sql` 和独立 `flyway_annual2026_history`。旧 `db/scenario` V1/V2/V3未修改。默认legacy保留旧行为；不能只把新选项用于旧库，SQL会明确拒绝已有业务。
+正式结构使用 `server/src/main/resources/db/migration` 当前版本；场景选项为 `SCENARIO_DATASET=annual-2026`，使用独立 `flyway_annual2026_history`。新空库通过 `B1__annual_workplace.sql` 初始化后执行 V2–V6；已有 V1–V6 历史继续按原脚本校验升级，已发布 V1 不改写。旧 `db/scenario` V1/V2/V3未修改。默认legacy保留旧行为；不能只把新选项用于旧库，SQL会明确拒绝已有业务。
+
+## 新库初始化兼容修复（#73）
+
+已发布 V1 的两条改期候选按机器当前日期挑选任务，可能选中无直属上级的创始人，导致 reviewer_id 非空约束失败。B1 保留原场景数据生成，仅为这两条候选选择同公司、当前有效且非本人的直属上级及非创始人申请人；不改变正式审核规则，不伪造创始人待审。
+
+现有业务结构不为空，自动 baseline(0) 会使 Flyway 忽略 B1。年度入口先检查独立历史：没有任何应用记录时，以不加载任何脚本的仅元数据模式和 `target=0?` 创建空历史表，随后关闭跳过执行并正常运行 B1/V2–V6。此流程不登记虚假已执行版本，不删除、repair 或改写已有历史，legacy 数据集保持原初始化路径。B1 仍锁定用户表并拒绝已有业务，冲突事务回滚；重试只使用同一空历史，不重置密码。
+
+旧库已有 V1 或 V6 时不会运行 B1；隔离迁移测试覆盖历史校验、人工修改保留及重复运行。若历史只有先前失败初始化遗留的 baseline(0)，不要手工删除历史或自动 repair；保留该库并在明确的新空库上初始化。本次未连接生产或重播种子，验证结果见[统一入口](backend-validation.md)。
 
 ## 数据清单和时间规则
 

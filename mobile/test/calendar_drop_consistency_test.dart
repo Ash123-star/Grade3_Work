@@ -5,6 +5,7 @@ import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/features/calendar/calendar_interaction.dart';
 import 'support/local_test_state.dart';
+import 'calendar_drag_widget_test.dart' show revealCalendarDay;
 import 'calendar_drag_integration_widget_test.dart'
     show mountCalendar, taskBar, dayCell;
 
@@ -28,7 +29,7 @@ void main() {
     await gesture.moveTo(t.getCenter(dayCell(11, 11)));
     await gesture.up();
     await t.pumpAndSettle();
-    expect(find.textContaining('新排期：2026-11-09 09:00'), findsOneWidget);
+    expect(find.textContaining('2026-11-09 09:00'), findsOneWidget);
     await t.tap(find.text('取消'));
     await t.pumpAndSettle();
     expect(store.records['reviews'], isEmpty);
@@ -61,6 +62,7 @@ void main() {
       final gesture = await t.startGesture(point);
       await t.pump(const Duration(milliseconds: 600));
       expect(state.drag.intent!.anchor, DateTime.utc(2026, 11, 11));
+      await revealCalendarDay(t, state.widget.scroll, DateTime(2026, 11, 18));
       await gesture.moveTo(t.getCenter(dayCell(11, 18)));
       await t.pump();
       expect(
@@ -83,7 +85,7 @@ void main() {
       );
       await gesture.up();
       await t.pumpAndSettle();
-      expect(find.textContaining('新排期：2026-11-09 09:00'), findsOneWidget);
+      expect(find.textContaining('2026-11-09 09:00'), findsOneWidget);
       expect(find.textContaining('2026-11-27 18:00'), findsOneWidget);
       await t.enterText(find.byType(TextFormField), '续段跨周整体移动');
       await t.tap(find.text('提交审核'));

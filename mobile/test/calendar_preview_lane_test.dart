@@ -5,12 +5,13 @@ import 'package:pandora_mobile/data/models/models.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
 import 'package:pandora_mobile/features/calendar/calendar_interaction.dart';
 import 'package:pandora_mobile/features/calendar/calendar_preview_lane.dart';
-import 'calendar_drag_widget_test.dart' show dragStore;
+import 'calendar_drag_widget_test.dart'
+    show dragStore, realCalendarDay, revealCalendarDay;
 import 'calendar_drag_integration_widget_test.dart' show mountCalendar;
 import 'support/local_test_state.dart';
 
 Finder dayCell(int month, int day) =>
-    find.byKey(ValueKey('month-day:2026-$month-$day'));
+    realCalendarDay(DateTime(2026, month, day));
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -104,7 +105,11 @@ void main() {
         if (count > 5) {
           expect(find.text('+${count - 4}'), findsWidgets);
         }
-        expect(beforeHeight, greaterThan(emptyHeight));
+        expect(
+          beforeHeight,
+          emptyHeight,
+          reason: 'formal weeks reserve the same five slots',
+        );
         final cellBefore = t.getRect(dayCell(11, 10));
         final rectangles = [
           for (final node in existing.evaluate())
@@ -117,6 +122,7 @@ void main() {
           }
         }
         final followingTop = t.getTopLeft(dayCell(11, 16)).dy;
+        final scrollBefore = state.widget.scroll.offset;
         final source = find
             .byWidgetPredicate(
               (w) => w is CalendarTaskHandle && w.record.id == original.id,
@@ -127,6 +133,7 @@ void main() {
           Offset(t.getCenter(dayCell(11, 3)).dx, t.getCenter(source).dy),
         );
         await t.pump(const Duration(milliseconds: 600));
+        await revealCalendarDay(t, state.widget.scroll, DateTime(2026, 11, 10));
         await gesture.moveTo(t.getCenter(dayCell(11, 10)));
         await t.pump();
         await t.pump();
@@ -159,9 +166,12 @@ void main() {
         }
         final afterHeight = t.getSize(dayCell(11, 10)).height;
         if (height < 500) {
-          expect(afterHeight, greaterThan(beforeHeight));
+          expect(afterHeight, greaterThanOrEqualTo(beforeHeight));
           expect(
-            t.getTopLeft(dayCell(11, 16)).dy - followingTop,
+            t.getTopLeft(dayCell(11, 16)).dy -
+                followingTop +
+                state.widget.scroll.offset -
+                scrollBefore,
             closeTo(afterHeight - beforeHeight, .1),
           );
         }
@@ -177,7 +187,7 @@ void main() {
         );
         await gesture.up();
         await t.pumpAndSettle();
-        expect(find.textContaining('新排期：2026-11-09 09:00'), findsOneWidget);
+        expect(find.textContaining('2026-11-09 09:00'), findsOneWidget);
         await t.tap(find.text('取消'));
         await t.pumpAndSettle();
         expect(t.getSize(dayCell(11, 10)).height, beforeHeight);
@@ -250,6 +260,8 @@ void main() {
         Offset(t.getCenter(dayCell(11, 11)).dx, t.getCenter(continuation).dy),
       );
       await t.pump(const Duration(milliseconds: 600));
+      await t.ensureVisible(dayCell(11, 30));
+      await t.pump();
       final landing = t.getCenter(dayCell(11, 30));
       await gesture.moveTo(landing);
       for (var i = 0; i < 6; i++) {
@@ -260,7 +272,7 @@ void main() {
       expect(state.drag.hit(landing)!.day, day(30));
       await gesture.up();
       await t.pumpAndSettle();
-      expect(find.textContaining('新排期：2026-11-21 09:00'), findsOneWidget);
+      expect(find.textContaining('2026-11-21 09:00'), findsOneWidget);
       await t.tap(find.text('取消'));
       await t.pumpAndSettle();
       expect(store.records['reviews'], isEmpty);
@@ -272,19 +284,20 @@ void main() {
     'external month selection and reverse scrolling retain the timeline position',
     (t) async {
       final (state, _) = await mountCalendar(t, height: 430);
-      state.ref.read(selectedDateProvider.notifier).state = DateTime(
-        2026,
-        12,
-        10,
-      );
+      final dateController = state.ref.read(selectedDateProvider.notifier);
+      dateController.state = DateTime(2026, 12, 10);
       await settleLocalIo(t);
       await t.pumpAndSettle();
       expect(dayCell(12, 10).hitTestable(), findsOneWidget);
       state.widget.scroll.jumpTo(-430);
       await settleLocalIo(t);
       await t.pumpAndSettle();
-      expect(state.ref.read(selectedDateProvider).month, 11);
+      expect(dateController.state.month, 11);
       expect(state.widget.scroll.offset, -430);
+      // Five reserved slots make November taller than the old adaptive grid.
+      // Scroll to the actual date instead of assuming a 430px month extent.
+      await t.ensureVisible(dayCell(11, 10));
+      await t.pumpAndSettle();
       expect(dayCell(11, 10).hitTestable(), findsOneWidget);
       final period = state.ref.read(periodProvider.notifier);
       period.state = '周';
@@ -292,6 +305,9 @@ void main() {
       period.state = '月';
       await settleLocalIo(t);
       await t.pumpAndSettle();
+      await t.ensureVisible(dayCell(11, 10));
+      await t.pumpAndSettle();
+      expect(dateController.state.month, 11);
       expect(dayCell(11, 10).hitTestable(), findsOneWidget);
     },
   );

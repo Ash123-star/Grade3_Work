@@ -114,7 +114,7 @@ void main() {
           expect(
             t
                 .getBottomRight(
-                  find.byKey(const ValueKey('calendar-month-grid')),
+                  find.byKey(const ValueKey('calendar-month-timeline')),
                 )
                 .dy,
             lessThan(t.view.physicalSize.height - 60),
@@ -193,20 +193,34 @@ void main() {
         await capture('08-profile');
         router.push('/me/people');
         await settle();
-        final department = find.byWidgetPredicate((w) =>
-            w.key is ValueKey<String> &&
-            (w.key as ValueKey<String>).value.startsWith('personnel-department-'));
+        final department = find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key as ValueKey<String>).value.startsWith(
+                'personnel-department-',
+              ),
+        );
         expect(department, findsWidgets);
         await t.tap(department.first);
         await settle();
-        final team = find.byWidgetPredicate((w) =>
-            w.key is ValueKey<String> &&
-            (w.key as ValueKey<String>).value.startsWith('personnel-team-'));
+        final team = find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key as ValueKey<String>).value.startsWith('personnel-team-'),
+        );
         expect(team, findsWidgets);
         await t.tap(team.first);
         await settle();
-        expect(find.byWidgetPredicate((w) => w.key is ValueKey<String> &&
-            (w.key as ValueKey<String>).value.startsWith('personnel-record-')), findsWidgets);
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w.key is ValueKey<String> &&
+                (w.key as ValueKey<String>).value.startsWith(
+                  'personnel-record-',
+                ),
+          ),
+          findsWidgets,
+        );
         await capture('09-personnel');
         router.go('/me/tasks');
         await settle();

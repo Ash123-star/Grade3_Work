@@ -2,37 +2,34 @@
 
 需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
 
-## 全分支整合（2026-11-11，#82，尚未合入 main）
+## 全分支整合（2026-11-11，#82，自动验收通过，待非作者审阅）
 
-基线 `origin/main=3f9eb2d561e17a41f91fb22c80cbfd23da2361ff`，独立分支 `chore/integrate-all-branches`。逐个合并所有未被 main 包含的分支，保留原提交及合并记录；原工作区混合未提交修改完整保留。本批不部署、不重播生产场景、不归档未完成 OpenSpec。
+基线 `origin/main=3f9eb2d561e17a41f91fb22c80cbfd23da2361ff`，分支 `chore/integrate-all-branches`；上一已推送提交 `cf710dd5ed2a058491e86884fcc9a7b8cf2a256e`，本批补修的最终 head 以 [PR #83](https://github.com/Ash123-star/Grade3_Work/pull/83) 为准。原有七个未被 main 包含的分支逐个保留 merge 历史；全部原分支 tip 已包含。原工作区混合修改、原分支均保留，不向 #77 推送补修。
 
-| 原分支 | 整合处理 |
-| --- | --- |
-| `codex/merge-pr33`、`fix/24-integrate-open-prs` | 旧补丁已等价吸收；补齐祖先关系，Flutter 冲突保留 main 的多标签、分页快照和日志现行实现，两个 merge 均未改变 tree |
-| `chore/annual-scenario-dataset` | 补齐 2026-10-30 历史部署证据，保留 main 后续任务；不把历史部署记作本次结果 |
-| `fix/53-notification-refresh`（#77） | 保留消息分页、ETag、缓存/定时再验证及限流；仅在整合分支修复清理回调返回自身 Future 导致请求挂起的问题，未推送 #77 原分支 |
-| `good`（#78） | 保留头像入口、首页事项布局、日期范围/颜色及新日志任务标题预填 |
-| `lyb`（#80） | 创始人权限内免审、其他人当前直属上级审核；旧互审待审作废，成员确认与历史审计保留 |
-| `feature/79-unified-oss-latest`（#81） | 保留 OSS 业务文件、生成文件、静态清单与双端加载，并沿用现行导出和资料模块权限 |
+- #77：通知分页/条件 GET/30秒再验证、静默身份检查；修复清理回调返回自身 Future 导致200/304/错误挂起，保留账号及查询隔离。
+- #78：本人事项日期范围/颜色/月历条、头像入口及无草稿日志预填；本人事项HTTP9项覆盖正向、跨月、非法输入及本人隔离。
+- #80：创始人权限内免审、其他人当前直属上级审核；旧互审待审作废，保留已决定历史及审计/outbox。
+- #81：业务/生成文件与全量静态资源接入OSS，沿用现行导出、资料及数据范围校验；旧整合冲突保留main的多标签、快照分页和日志规则。
+- 迁移碰撞统一为 V31本人事项、V32退休互审、V33 OSS；已发布V1–V30及年度场景V1不改写。开发库若运行过某条独立V31，先核对脚本/校验和，禁止自动repair，见[数据库说明](database-schema.md)。
+- 经用户追加授权修复既有回归：年度空库使用新增B1，旧V1/V6继续校验与增量升级，不伪造创始人上级；原理、失败baseline(0)库的保留方式见[年度场景说明](annual-scenario-rebuild.md)。Flutter修复429缓存月历裁切，保留小徽标外观并为剩余任务入口单独保留48dp高的触控区。旧标题、from/to日期契约、提示入口及五行固定布局的断言按现行规则更新；手势使用实际月份、滚动位置和真实日期，仍验证预览/确认/提交同日期、任务数量及取消恢复。
 
-迁移碰撞按 V31 每日事项、V32 退休互审、V33 OSS 解决；已发布 V1–V30 正文不变。升级测试覆盖 V30→V33、三组新增字段、旧互审作废/审计/通知、业务对象不变及重复迁移无副作用。开发库若已运行某个独立分支 V31，须先核对脚本/校验和，禁止自动 repair，详见 [数据库说明](database-schema.md)。Flutter 静态整理仅删除三处未用导入及补全十四处 if 花括号，不改变控制流。
+环境：Windows/PowerShell、Java21、Maven3.9.9、Flutter3.38.7、Docker隔离PostgreSQL/Redis/Neo4j。日志、Surefire和截图均在忽略目录 `output/integration/`、`output/flutter-evidence/`；凭据仅从本机忽略环境配置读取，真实OSS使用随机验收前缀并清理对象。
 
-环境为 Windows/PowerShell、Java 21、Maven 3.9.9、Flutter 3.38.7、Docker 隔离 PostgreSQL/Redis/Neo4j。真实 OSS 凭据仅从原工作区忽略环境文件读取，使用随机验收前缀并清理测试对象。原始证据统一放在 Git 忽略的 `output/integration/`，旧报告已另外保存，未用测试生成的指标覆盖原文件。
-
-| 检查 | 本批实际结果 | 证据（均相对 output/integration） |
+| 最终检查 | 实际结果 | 证据（相对 output/integration） |
 | --- | --- | --- |
-| `scripts/test-backend.ps1`，启用 `OSS_REAL_ACCEPTANCE=true` | 退出1；527项，524通过、0断言失败、2错误、1跳过。两错误均为 #73 年度 V1 生成改期候选时 reviewer_id 为空，已在无 OSS 原代码隔离复现；没有修改已发布种子迁移或放宽审核约束 | `backend.log`、`backend-exit.json`、`backend-reports/` |
-| 同次后端重点链路 | 本人事项真实HTTP9项、旧互审退休迁移1项、现行多创始人审核7项、模拟OSS6项、真实OSS2项均0失败0错误；真实发布321项、80583656字节，覆盖上传/授权读取/生成文件/历史迁移/恢复/删除/公开素材网关 | 对应Surefire XML及 `real-publication.json` |
-| `flutter analyze --no-pub` / `scripts/prepare-oss-assets.ps1 -Flutter D:/flutter/bin/flutter.bat` | 均退出0；全项目无分析问题，整合版bundle编译及17个依赖资源暂存成功 | `flutter-analyze.log`、`mobile-build-bundle.log`、`mobile-{exit,build-exit}.json` |
-| `scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat -ResultsDirectory output/integration/flutter` | 退出1；HTTP68通过/3失败，Mock407通过/50失败/6跳过。新增消息HTTP与真实模式SSE测试已纳入脚本，SSE亦保留Mock分组；不以局部通过宣称全项目通过 | `flutter/{http,mock}.log`、`flutter/exit-codes.json` |
-| `git archive origin/main mobile` 隔离基线回归 | main `3f9eb2d` 的 HTTP54通过/2失败，Mock416通过/35失败/6跳过，均退出1；AI旧标题、日历、布局及日志同步等既有失败可独立复现 | `main-baseline-results/{http,mock}.log`、`exit-codes.json`、`flutter-baseline-difference.json` |
-| 首页/消息/身份定向复验 | 三文件39项中38通过、1失败；剩余为 main 已复现的日志同步日期断言。已修复本次新增的16项旧测试不兼容：日历条/清单双标题定位10项、消息显式分页/搜索/总未读及强制再验证4项、前台静默身份检查和异常退出的级联2项。保留权限、错误及账号隔离检查，仅改测试；初次定向运行因测试假时钟等待Dio而中断，修正runAsync后拿到本行明确结果 | `flutter-integration-recheck.log`、`flutter-recheck-exit.json`；初次为 `flutter-integration-initial.log` |
-| 最终三份测试定向 `dart analyze` / 日志截止单例复验 | 均退出0；三份测试无分析问题；初轮在冷启动负载下失败的日志截止用例单独1项通过，未改日志业务实现 | `flutter-tests-analyze.log`、`diary-deadline-recheck.log`、`flutter-final-targeted-exit.json` |
-| `npm run build` / `openspec.cmd validate --all --strict` | Web类型检查和构建退出0；规范47项通过、退出0 | `web-build.log`、`openspec.log`、对应exit JSON |
+| `scripts/test-backend.ps1`，`OSS_REAL_ACCEPTANCE=true` | 退出0；528项，527通过、0失败、0错误、1条件跳过；verify与JAR打包通过 | `repaired-backend.log`、`repaired-backend-exit.json`、`repaired-backend-reports/` |
+| 同次真实OSS | 2项通过，321素材/80583656字节；上传、授权读取、生成、迁移、恢复、删除、公开网关通过，测试对象清理；不表示生产激活 | `repaired-real-publication.json`及对应Surefire |
+| `scripts/test-backend.ps1 -Tests AnnualScenarioMultiFounderMigrationTest` | 退出0；最终5项通过，包含当前日期、新库、旧V1/V6历史、重复执行、冲突不覆盖；新增用例在临时B1副本固定2026-11-04/05/06，三日均有两条合法独立审核候选，生产SQL字节不改动。与全套中的4项重叠，不累加成独立全套次数 | `annual-final-boundaries.log`、`annual-final-boundaries-exit.json`、`annual-final-reports/` |
+| `scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat -ResultsDirectory output/integration/final-flutter` | 退出0；HTTP71通过；Mock458通过、6条件跳过，均无失败 | `final-flutter/{http,mock}.log`、`exit-codes.json`、`final-acceptance-exit.json` |
+| `flutter analyze --no-pub` / `flutter build bundle --no-pub --dart-define=USE_MOCK=false` | 均退出0；全项目无分析问题，资源包编译通过 | `final-flutter-analyze.log`、`final-analyze-exit.json`、`final-mobile-bundle.log` |
+| `openspec.cmd validate --all --strict` | 退出0；47通过、0失败 | `final-openspec.log`、`final-acceptance-exit.json` |
+| Web `npm run build` | 整合提交cf710dd阶段退出0；本批补修无Web代码变化，未无故重复构建 | `web-build.log`、`web-exit.json` |
 
-安全/隐私由本人事项及跨公司文件隔离、当前审核权限、切号清缓存和匿名私有对象拒读覆盖；可靠性由幂等/版本冲突、200/304完成与请求合并、失败重试、迁移重放及OSS恢复/删除覆盖。不外推为全部性能、RAM最小权限审计或实体设备验收。三份测试适配后仅运行受影响复验，没有重新宣称完整套件全绿。
+历史失败证据保留：原完整后端527项中2错误；初轮Flutter HTTP3失败/Mock50失败；隔离main `3f9eb2d` 本身HTTP2失败/Mock35失败。用户随后明确授权修复既有失败，以上最终结果取代旧阻塞结论。诊断探测的失败、临时夹具及定向复验保留在忽略目录，不以其替代最终通过。测试生成的AI指标已恢复，OpenAPI仅属性排序变化且语义相等，未提交无关快照变动。
 
-**合并条件尚未满足**：#73 的两项后端错误、main 中既有 Flutter 回归问题继续由 #82 记录；非作者审阅未取得。根据仓库规则，本批仅准备整合分支和草稿PR，main尚未更新。OSS生产配置/迁移/激活、双端实际远程渲染、Android拖动及完整人工验收仍未完成，不部署、不自动归档或豁免门禁。
+非功能覆盖：安全/隐私（服务端本人/跨公司文件隔离、私有对象匿名拒读、当前审核人及账号缓存隔离）；可靠性（幂等/版本冲突、失败重试、304完成、迁移重放与OSS恢复/删除）；无障碍组件几何（大字体、替代移动操作及48dp触控高度）。自动化截图仅为组件证据，不冒充设备验收。
+
+边界：后端跳过项是外部真实节假日公告源可选验收；Flutter6项依赖独立真实服务/设备环境或在Mock模式主动跳过。日志中的既有非阻塞手势命中提示保留。OSS生产配置/迁移/激活、RAM最小权限审计、双端真实远程渲染、Android/TalkBack/性能矩阵尚未完成，相关OpenSpec不归档。本批不部署、不重播生产种子、不重置数据库；自动化门禁已通过，仍须非作者在GitHub保留审阅结论后才能通过PR合入main。
 
 ## 消息缓存与定时再验证（2026-11-07，已部署，设备待验收）
 
@@ -153,7 +150,7 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 
 脚本使用隔离资源，不应将实际业务数据库作为测试目标。镜像冒烟、真实 HTTP 场景、专项验证和灾备工具见 [脚本索引](../scripts/README.md)。需要维护 OpenSpec 时执行规范校验；简单修改按 [开发流程](development-workflow.md) 选择受影响检查，不为验证过程单独创建文档或 change。
 
-## 当前待处理项
+## 前批验证与遗留设备范围
 
 ### 前批草稿 PR 验证记录（2026-11-06，69f6c60）
 
@@ -165,7 +162,7 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 - PR整理时再次严格校验：46项通过、退出0，证据 `output/pr-openspec.log`。全项目分析首轮退出1，仅发现首页及其测试3处缺少if花括号的info；已补充花括号，不改变分支行为。`flutter analyze --no-pub` 复验无问题、退出0，证据 `output/pr-flutter-analyze-final.log`；该纯样式补修后未重跑业务测试或重建APK。
 - 人员展示保留原记录条与导航，选择器沿用服务端授权分页和资格筛选；没有新增数据库迁移。此次最新UI未重新构建安装APK、未完成设备人工验收；后端95项重点复验、年度初始化#73、真实Android拖动阻塞仍按前文范围记录。
 
-2026-10-30 的 442 项、49 失败、1 错误，以及此前整合批次的511项、零失败零错误均为历史结果。本批完整回归与重点复验以文首APP验收对齐记录为准，年度初始化#73和Android月历链路尚有阻塞；目标设备、外部DeepSeek/OCR、性能与无障碍仍有未验收范围，保留对应历史记录中的具体限制。
+2026-10-30 的 442 项、49 失败、1 错误，以及此前整合批次的511项、零失败零错误均为历史结果。当前整合的完整回归以文首“全分支整合”为准，年度初始化#73已通过新增B1和真实PostgreSQL回归修复；历史Android月历链路、目标设备、外部DeepSeek/OCR、性能与无障碍仍有未验收范围，保留对应记录中的具体限制。
 
 历史测试 JVM 等待退出后被强制结束的诊断仍见 [专项安全回归](member-b-security-regression.md)；构建成功不能据此宣称优雅退出已验证。旧数据库转换只允许按工具支持的已知历史先备份、恢复副本再校验，不改写已发布 Flyway 脚本或直接 repair 业务库。
 

@@ -10,6 +10,53 @@ import 'package:pandora_mobile/features/common/form_page.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
 import 'support/local_test_state.dart';
 
+/// Select the real writable month, excluding duplicated neighboring dates.
+Finder realCalendarDay(DateTime day) => find.descendant(
+  of: find.byWidgetPredicate(
+    (w) =>
+        w is CalendarDayTarget &&
+        w.day == DateTime.utc(day.year, day.month, day.day) &&
+        w.constraints != null,
+  ),
+  matching: find.byKey(
+    ValueKey('month-day:${day.year}-${day.month}-${day.day}'),
+  ),
+);
+
+/// Scroll by actual layout rather than assuming each month has a fixed height.
+Future<void> revealCalendarDay(
+  WidgetTester tester,
+  ScrollController scroll,
+  DateTime day,
+) async {
+  final date = DateTime.utc(day.year, day.month, day.day);
+  for (var i = 0; i < 24; i++) {
+    final target = realCalendarDay(day);
+    if (target.evaluate().isNotEmpty) {
+      await tester.ensureVisible(target);
+      await tester.pump();
+      return;
+    }
+    final loaded =
+        tester
+            .widgetList<CalendarDayTarget>(find.byType(CalendarDayTarget))
+            .where((w) => w.constraints != null)
+            .map((w) => w.day)
+            .toList()
+          ..sort();
+    final direction = loaded.isEmpty || date.isAfter(loaded.last) ? 1 : -1;
+    scroll.jumpTo(
+      scroll.offset + direction * scroll.position.viewportDimension * .8,
+    );
+    await settleLocalIo(tester);
+  }
+  expect(
+    realCalendarDay(day),
+    findsOneWidget,
+    reason: 'date must be loaded before a gesture uses its geometry',
+  );
+}
+
 DemoStore dragStore() {
   final store = DemoStore();
   store.records['tasks'] = [
@@ -103,7 +150,7 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
       expect(find.text('确认移动排期'), findsOneWidget);
-      expect(find.textContaining('新排期：2026-11-04 09:00'), findsOneWidget);
+      expect(find.textContaining('2026-11-04 09:00'), findsOneWidget);
       await tester.enterText(find.byType(TextFormField), '项目排期调整');
       await tester.tap(find.text('提交审核'));
       await settleLocalIo(tester);
@@ -313,23 +360,27 @@ void main() {
         await settleLocalIo(tester);
         await tester.pumpAndSettle();
         final state = await readyInteraction(tester);
+        await revealCalendarDay(tester, state.widget.scroll, day);
+        final month = find.ancestor(
+          of: realCalendarDay(day),
+          matching: find.byKey(const ValueKey('calendar-month-grid')),
+        );
         final handle = find
-            .byWidgetPredicate(
-              (w) =>
-                  w is CalendarTaskHandle &&
-                  w.record.id == 'move-task' &&
-                  w.constraints != null,
+            .descendant(
+              of: month,
+              matching: find.byWidgetPredicate(
+                (w) =>
+                    w is CalendarTaskHandle &&
+                    w.record.id == 'move-task' &&
+                    w.constraints != null,
+              ),
             )
             .hitTestable()
             .first;
         final rect = tester.getRect(handle);
         final point = rect.center;
         expect(state.drag.hit(point)?.day.month, day.month);
-        final dateCell = tester.getRect(
-          find
-              .byKey(ValueKey('month-day:${day.year}-${day.month}-${day.day}'))
-              .hitTestable(),
-        );
+        final dateCell = tester.getRect(realCalendarDay(day));
         if (day.month == 12) {
           expect(rect.right, lessThanOrEqualTo(dateCell.right));
         } else {

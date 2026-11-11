@@ -8,7 +8,8 @@ import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/features/calendar/calendar_content.dart';
 import 'package:pandora_mobile/features/calendar/calendar_interaction.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
-import 'calendar_drag_widget_test.dart' show dragStore, readyInteraction;
+import 'calendar_drag_widget_test.dart'
+    show dragStore, readyInteraction, realCalendarDay, revealCalendarDay;
 import 'support/local_test_state.dart';
 
 Future<(CalendarInteractionSurfaceState, DemoStore)> mountCalendar(
@@ -173,7 +174,7 @@ void main() {
       );
       await gesture.up();
       await t.pumpAndSettle();
-      expect(find.textContaining('新排期：2026-11-09 09:00'), findsOneWidget);
+      expect(find.textContaining('2026-11-09 09:00'), findsOneWidget);
       await t.tap(find.text('取消'));
       await t.pumpAndSettle();
       expect(replica, findsNothing);
@@ -199,9 +200,8 @@ void main() {
         findsNothing,
       );
       expect(state.drag.active, isTrue);
-      final target = find
-          .byKey(const ValueKey('month-day:2027-3-10'))
-          .hitTestable(at: const Alignment(0, .9));
+      await revealCalendarDay(t, pager, DateTime(2027, 3, 10));
+      final target = realCalendarDay(DateTime(2027, 3, 10));
       await gesture.moveTo(t.getCenter(target));
       await t.pump();
       expect(state.drag.target!.day, DateTime.utc(2027, 3, 10));

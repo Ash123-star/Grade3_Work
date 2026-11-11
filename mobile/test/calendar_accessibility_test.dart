@@ -80,7 +80,7 @@ void main() {
             );
             await tester.pumpAndSettle();
             expect(state.message, isNull);
-            expect(find.text('移动到日期（上海）'), findsOneWidget);
+            expect(find.text('移动到日期'), findsOneWidget);
             await tester.tap(
               find.text('取消').hitTestable(at: const Alignment(0, .9)).last,
             );
@@ -98,7 +98,7 @@ void main() {
             expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
             await tester.tap(button);
             await tester.pumpAndSettle();
-            expect(find.text('移动到日期（上海）'), findsOneWidget);
+            expect(find.text('移动到日期'), findsOneWidget);
             await tester.tap(
               find.text('取消').hitTestable(at: const Alignment(0, .9)).last,
             );
