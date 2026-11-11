@@ -203,8 +203,8 @@ class MobileP0MigrationUpgradeTest {
             flyway(schema, null).validate();
 
             assertEquals("FOUNDER_PEER", jdbc.queryForObject("SELECT approval_mode FROM " + s + "review_requests WHERE id='founder-pending'", String.class));
-            assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM " + s + "review_requests WHERE id='founder-pending'", String.class));
-            assertEquals("f2", jdbc.queryForObject("SELECT reviewer_id FROM " + s + "review_steps WHERE request_id='founder-pending' AND state='PENDING'", String.class));
+            assertEquals("SUPERSEDED", jdbc.queryForObject("SELECT status FROM " + s + "review_requests WHERE id='founder-pending'", String.class));
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_steps WHERE request_id='founder-pending' AND state='PENDING'", Integer.class));
             assertEquals("FOUNDER_EXEMPT", jdbc.queryForObject("SELECT decision_source FROM " + s + "review_requests WHERE id='founder-done'", String.class));
             assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM " + s + "review_requests WHERE id='founder-done'", String.class));
 

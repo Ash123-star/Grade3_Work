@@ -8,7 +8,7 @@ import cn.workpanel.module.review.api.ReviewedRevisionApplication;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
-/** 审核应用服务：MEMBERSHIP 保留管理员确认；创始人在有其他有效创始人时互审，仅一位时免审；其余关键变更使用直属单级审核。 */
+/** 审核应用服务：MEMBERSHIP 保留管理员确认；创始人在业务权限内免审，不按创始人数互审；其余关键变更使用直属单级审核。 */
 @org.springframework.stereotype.Service
 public class ReviewApplicationService {
     final ReviewRepository repository;
@@ -47,18 +47,18 @@ public class ReviewApplicationService {
         return get(actor,id);
     }
 
-    /** 申请人当前适用的审核模式；null 表示公司仅一位有效创始人时的权限内免审。 */
+    /** 申请人当前适用的审核模式；null 表示创始人权限内免审。 */
     String mode(Actor applicant,String kind) {
         if(kind.equals("MEMBERSHIP")) return "ADMIN_MEMBERSHIP";
         if(!applicant.role().equals("FOUNDER")) return "DIRECT_MANAGER";
-        return repository.defaultFounderPeer(applicant.company(),applicant.id()).isBlank()?null:"FOUNDER_PEER";
+        return null;
     }
 
     /** 按模式只创建一个当前有效审核人；找不到时保持待审并提醒申请人和管理员。返回是否已分配。 */
     boolean route(Actor actor,String id,String mode) {
         String reviewer=switch(mode) {
             case "ADMIN_MEMBERSHIP" -> repository.membershipReviewer(actor.company(),actor.id());
-            case "FOUNDER_PEER" -> repository.defaultFounderPeer(actor.company(),actor.id());
+            case "FOUNDER_PEER" -> throw new ApiError(409,"REVIEW_RULE_RETIRED","旧创始人互审已停用，请重新提交");
             default -> repository.directManager(actor.company(),actor.id());
         };
         int position=(int)repository.lastPosition(id)+1;
@@ -89,7 +89,7 @@ public class ReviewApplicationService {
         result.put("reviewer_id",current.getOrDefault("reviewer_id",null));
         result.put("reviewer_name",current.getOrDefault("reviewer_name",null));
         result.put("reviewer_configured",!current.isEmpty());
-        result.put("reviewer_selectable",Db.str(row,"status").equals("PENDING")&&Db.str(row,"approval_mode").equals("FOUNDER_PEER"));
+        result.put("reviewer_selectable",false);
         return result;
     }
 
@@ -106,7 +106,7 @@ public class ReviewApplicationService {
         if(mode.equals("ADMIN_MEMBERSHIP")) {
             if(!Db.str(row,"kind").equals("MEMBERSHIP")||!actor.admin()||!actor.reviewer()) throw ApiError.forbidden();
         } else if(mode.equals("FOUNDER_PEER")) {
-            if(!repository.founderPeer(Db.str(row,"company_id"),Db.str(row,"applicant_id"),actor.id())) throw ApiError.forbidden();
+            throw new ApiError(409,"REVIEW_RULE_RETIRED","旧创始人互审已停用，请重新提交");
         } else if(!repository.directManager(Db.str(row,"company_id"),Db.str(row,"applicant_id")).equals(actor.id())) {
             throw ApiError.forbidden();
         }
@@ -129,6 +129,7 @@ public class ReviewApplicationService {
         var row=repository.request(actor.company(),id,true);
         if(!actor.id().equals(row.get("applicant_id"))) throw ApiError.forbidden();
         if(Db.str(row,"status").equals("APPROVED")&&Db.str(row,"decision_source").equals("FOUNDER_EXEMPT")) return view(row,id);
+        if(Db.str(row,"approval_mode").equals("FOUNDER_PEER")) throw new ApiError(409,"REVIEW_RULE_RETIRED","旧创始人互审已作废，请重新提交");
         if(!row.get("status").equals("PENDING")) throw ApiError.conflict();
         // 历史已决定步骤只作为审计保留，不阻止仍待审的申请按当前关系重新路由。
         if(Db.str(row,"kind").equals("LOG")) throw new ApiError(409,"DIRECT_CONTENT_REQUIRED","历史日报审核候选已停用");
@@ -171,8 +172,7 @@ public class ReviewApplicationService {
     private Map<String,Object> selectable(Actor actor,Map<String,Object> row) {
         if(!actor.id().equals(row.get("applicant_id"))) throw ApiError.forbidden();
         if(!Db.str(row,"status").equals("PENDING")) throw ApiError.conflict();
-        if(!Db.str(row,"approval_mode").equals("FOUNDER_PEER")) throw new ApiError(409,"REVIEWER_SELECTION_UNSUPPORTED","仅创始人互审申请可以更换审核人");
-        return row;
+        throw new ApiError(409,"REVIEWER_SELECTION_UNSUPPORTED","审核人由直属关系确定，不支持更换");
     }
 
     /**
@@ -186,6 +186,7 @@ public class ReviewApplicationService {
             if(row==null) continue;
             Actor applicant=repository.actor(actor.company(),Db.str(row,"applicant_id"));
             String kind=Db.str(row,"kind"),current=Db.str(row,"approval_mode");
+            if(current.equals("FOUNDER_PEER")) continue; // 已由前向迁移作废，旧候选不得重新路由。
             if(!kind.equals("MEMBERSHIP")&&(!applicant.status().equals("ACTIVE")||applicant.mustChange())) continue;
             // 仅剩一位创始人时不自动免审：保持原模式，等待申请人显式 reroute。
             String desired=Objects.requireNonNullElse(mode(applicant,kind),current);

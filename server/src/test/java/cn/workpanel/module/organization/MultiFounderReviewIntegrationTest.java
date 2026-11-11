@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** 多创始人互审：路由、自审、审核人更换、并发、失效改派与无审核人提醒。夹具与组织验收共用。 */
+/** 多创始人免审与部门经理直属审批：禁止创始人池兜底及越权。夹具与组织验收共用。 */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
     "app.admin-account=integration-admin", "app.admin-password=Initial-test-password-2026", "app.admin-phone=13900000001"
 })
@@ -36,110 +36,59 @@ class MultiFounderReviewIntegrationTest extends MemberBHttpSupport {
         assertTrue(applied("单创始人免审"));
     }
 
-    @Test void peerFounderReviewsAndSelfReviewIsRejected() throws Exception {
-        String peer = user(company, department, "", "FOUNDER", false);
-        String id = founderRequest(founder, "互审通过");
-        var detail = call(200, "GET", "/reviews/" + id, founder, null);
-        assertEquals("FOUNDER_PEER", detail.get("approval_mode").asText());
-        assertTrue(detail.get("reviewer_selectable").asBoolean());
-        assertEquals(peer, detail.get("reviewer_id").asText());
-        assertFalse(applied("互审通过"));
-        assertEquals(1, db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND recipient_id=? AND type='REVIEW_PENDING'", id, peer));
-
-        assertEquals("SELF_REVIEW", decide(403, id, founder).get("code").asText());
-        decide(403, id, admin);
-        var result = decide(200, id, peer);
-        assertEquals("APPROVED", result.get("status").asText()); assertEquals("FOUNDER_PEER", result.get("decision_source").asText());
-        assertTrue(applied("互审通过"));
-        assertFalse(result.get("reviewer_selectable").asBoolean());
+    @Test void multipleFoundersKeepExemptionAndCannotApproveEachOther() throws Exception {
+        String peer=user(company,department,"","FOUNDER",false);
+        String id=founderRequest(founder,"多创始人免审");
+        var detail=call(200,"GET","/reviews/"+id,founder,null);
+        assertEquals("APPROVED",detail.get("status").asText());
+        assertEquals("FOUNDER_EXEMPT",detail.get("decision_source").asText());
+        assertFalse(detail.get("reviewer_selectable").asBoolean());
+        assertNull(pendingReviewer(id)); assertTrue(applied("多创始人免审"));
+        assertEquals(0,db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='REVIEW_PENDING'",id));
+        decide(409,id,peer);
+        call(409,"GET","/reviews/"+id+"/reviewer-candidates",founder,null);
     }
 
-    @Test void applicantChangesReviewerAndInvalidSelectionsAreRejected() throws Exception {
-        String second = user(company, department, "", "FOUNDER", false), third = user(company, department, "", "FOUNDER", false);
-        String id = founderRequest(founder, "更换审核人");
-        String first = pendingReviewer(id), other = first.equals(second) ? third : second;
-        var candidates = call(200, "GET", "/reviews/" + id + "/reviewer-candidates", founder, null).get("items");
-        assertEquals(2, candidates.size());
-        for (var item : candidates) { assertNotEquals(founder, item.get("id").asText()); assertEquals(item.get("id").asText().equals(first), item.get("current").asBoolean()); }
-        call(403, "GET", "/reviews/" + id + "/reviewer-candidates", first, null);
-
-        for (String invalid : List.of(founder, admin, foreign, "missing"))
-            assertEquals("INVALID_REVIEWER", call(400, "POST", "/reviews/" + id + "/reviewer", founder, Map.of("reviewerId", invalid, "expectedVersion", expected(id))).get("code").asText());
-        call(409, "POST", "/reviews/" + id + "/reviewer", founder, Map.of("reviewerId", other, "expectedVersion", expected(id) + 1));
-        call(403, "POST", "/reviews/" + id + "/reviewer", other, Map.of("reviewerId", other, "expectedVersion", expected(id)));
-
-        call(200, "POST", "/reviews/" + id + "/reviewer", founder, Map.of("reviewerId", other, "expectedVersion", expected(id)));
-        assertEquals(other, pendingReviewer(id));
-        long steps = db.count("SELECT count(*) FROM review_steps WHERE request_id=?", id);
-        call(200, "POST", "/reviews/" + id + "/reviewer", founder, Map.of("reviewerId", other, "expectedVersion", expected(id)));
-        assertEquals(steps, db.count("SELECT count(*) FROM review_steps WHERE request_id=?", id));
-        assertEquals(1, db.count("SELECT count(*) FROM audit_records WHERE object_id=? AND type='REVIEW_REVIEWER_CHANGED'", id));
-
-        decide(403, id, first);
-        call(403, "GET", "/reviews/" + id, first, null);
-        decide(200, id, other);
-        assertTrue(applied("更换审核人"));
+    @Test void directorRoutesOnlyToAssignedFounderAndCannotChooseAnother() throws Exception {
+        String other=user(company,department,"","FOUNDER",false);
+        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",director,founder,company);
+        String id=directorDeletion("部门经理直属审批");
+        assertEquals(founder,pendingReviewer(id));
+        assertEquals("DIRECT_MANAGER",call(200,"GET","/reviews/"+id,director,null).get("approval_mode").asText());
+        call(403,"GET","/reviews/"+id,other,null); decide(403,id,other);
+        call(409,"POST","/reviews/"+id+"/reviewer",director,Map.of("reviewerId",other,"expectedVersion",expected(id)));
+        assertNotEquals("ARCHIVED",db.one("SELECT phase FROM tasks WHERE id=(SELECT target_id FROM review_requests WHERE id=?)",id).get("phase"));
+        decide(200,id,founder); assertEquals("ARCHIVED",db.one("SELECT phase FROM tasks WHERE id=(SELECT target_id FROM review_requests WHERE id=?)",id).get("phase"));
+        decide(409,id,founder);
     }
 
-    @Test void selectionUnsupportedOutsideFounderPeerMode() throws Exception {
-        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)", employee, leader, company);
-        var body = new LinkedHashMap<String, Object>(Map.of("name", "直属审核", "version", 1, "reason", "测试"));
-        String id = call(200, "POST", "/organization/users/" + colleague + "/revisions", admin, body).get("id").asText();
-        assertFalse(call(200, "GET", "/reviews/" + id, admin, null).get("reviewer_selectable").asBoolean());
-        assertEquals("REVIEWER_SELECTION_UNSUPPORTED", call(409, "GET", "/reviews/" + id + "/reviewer-candidates", admin, null).get("code").asText());
-        assertEquals("REVIEWER_SELECTION_UNSUPPORTED", call(409, "POST", "/reviews/" + id + "/reviewer", admin, Map.of("reviewerId", reviewer, "expectedVersion", expected(id))).get("code").asText());
-    }
-
-    @Test void parallelApproveAndReselectOnlyOneWins() throws Exception {
-        String second = user(company, department, "", "FOUNDER", false), third = user(company, department, "", "FOUNDER", false);
-        String id = founderRequest(founder, "并发互审");
-        String current = pendingReviewer(id), other = current.equals(second) ? third : second;
-        int version = expected(id);
-        try (var pool = Executors.newFixedThreadPool(2)) {
-            var approve = pool.submit(() -> send(current, "/reviews/" + id + "/decision", Map.of("approve", true, "expectedVersion", version)));
-            var reselect = pool.submit(() -> send(founder, "/reviews/" + id + "/reviewer", Map.of("reviewerId", other, "expectedVersion", version)));
-            int a = approve.get(20, TimeUnit.SECONDS), b = reselect.get(20, TimeUnit.SECONDS);
-            assertTrue(a == 200 && b == 409 || a == 403 && b == 200, a + "/" + b);
+    @Test void concurrentDirectApprovalAppliesOnce() throws Exception {
+        db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",director,founder,company);
+        String id=directorDeletion("一次生效");
+        var body=Map.<String,Object>of("approve",true,"expectedVersion",expected(id));
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var a=pool.submit(()->send(founder,"/reviews/"+id+"/decision",body));
+            var b=pool.submit(()->send(founder,"/reviews/"+id+"/decision",body));
+            assertEquals(Set.of(200,409),Set.of(a.get(20,TimeUnit.SECONDS),b.get(20,TimeUnit.SECONDS)));
         }
-        assertEquals(1, db.count("SELECT count(*) FROM review_steps WHERE request_id=? AND state='PENDING'", id) + db.count("SELECT count(*) FROM review_requests WHERE id=? AND status='APPROVED'", id));
-        assertTrue(db.count("SELECT count(*) FROM dashboard_items WHERE company_id=? AND title='并发互审'", company) <= 1);
+        assertEquals(1,db.count("SELECT count(*) FROM audit_records WHERE object_id=? AND type='REVIEW_APPROVED'",id));
+        assertEquals(1,db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='REVIEW_APPROVED'",id));
+    }
+    @Test void retiredPeerCannotBeReactivated() throws Exception {
+        String id=cn.workpanel.Db.id();
+        db.update("INSERT INTO review_requests(id,company_id,applicant_id,kind,target_id,expected_version,before_value,candidate,reason,status,approval_mode) VALUES (?,?,?,'COMPANY_ITEM',?,0,'{}','{}','old','SUPERSEDED','FOUNDER_PEER')",id,company,founder,cn.workpanel.Db.id());
+        assertEquals("REVIEW_RULE_RETIRED",call(409,"POST","/reviews/"+id+"/reroute",founder,Map.of()).get("code").asText());
+        call(409,"POST","/reviews/"+id+"/reviewer",founder,Map.of("reviewerId",admin,"expectedVersion",0));
+        decide(409,id,admin);
+        assertEquals(0,db.count("SELECT count(*) FROM review_steps WHERE request_id=?",id));
     }
 
-    @Test void duplicateParallelApprovalAppliesOnce() throws Exception {
-        String peer = user(company, department, "", "FOUNDER", false);
-        String id = founderRequest(founder, "重复批准");
-        int version = expected(id);
-        try (var pool = Executors.newFixedThreadPool(2)) {
-            var one = pool.submit(() -> send(peer, "/reviews/" + id + "/decision", Map.of("approve", true, "expectedVersion", version)));
-            var two = pool.submit(() -> send(peer, "/reviews/" + id + "/decision", Map.of("approve", true, "expectedVersion", version)));
-            assertEquals(Set.of(200, 409), Set.of(one.get(20, TimeUnit.SECONDS), two.get(20, TimeUnit.SECONDS)));
-        }
-        assertEquals(1, db.count("SELECT count(*) FROM audit_records WHERE object_id=? AND type='REVIEW_APPROVED'", id));
-        assertEquals(1, db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='REVIEW_APPROVED'", id));
-    }
-
-    @Test void disablingReviewerFounderReroutesAndLastFounderStaysPending() throws Exception {
-        String second = user(company, department, "", "FOUNDER", false), third = user(company, department, "", "FOUNDER", false);
-        String id = founderRequest(founder, "停用改派");
-        String first = pendingReviewer(id), other = first.equals(second) ? third : second;
-
-        approve(revision(first, Map.of("status", "DISABLED")).get("id").asText(), admin);
-        assertEquals(other, pendingReviewer(id));
-        assertEquals(1, db.count("SELECT count(*) FROM audit_records WHERE object_id=? AND type='REVIEW_AUTO_REROUTED'", id));
-        assertTrue(db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND recipient_id=? AND type='REVIEW_PENDING'", id, other) >= 1);
-
-        approve(revision(other, Map.of("status", "DISABLED")).get("id").asText(), admin);
-        assertNull(pendingReviewer(id));
-        assertEquals("PENDING", db.one("SELECT status FROM review_requests WHERE id=?", id).get("status"));
-        assertEquals(1, db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND recipient_id=? AND type='REVIEW_UNASSIGNED'", id, founder));
-        assertTrue(db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND recipient_id=? AND type='REVIEW_UNASSIGNED'", id, admin) >= 1);
-        decide(403, id, admin);
-        assertFalse(applied("停用改派"));
-
-        // 仅剩一位创始人：申请人显式 reroute 后按权限与版本免审。
-        var result = call(200, "POST", "/reviews/" + id + "/reroute", founder, Map.of());
-        assertEquals("APPROVED", result.get("status").asText()); assertEquals("FOUNDER_EXEMPT", result.get("decision_source").asText());
-        assertTrue(applied("停用改派"));
+    @Test void missingDirectFounderNeverFallsBackToOtherFounder() throws Exception {
+        user(company,department,"","FOUNDER",false);
+        String id=founderRequest(director,"无直属上级");
+        assertNull(pendingReviewer(id)); decide(403,id,founder); decide(403,id,admin);
+        assertEquals("PENDING",call(200,"GET","/reviews/"+id,director,null).get("status").asText());
+        assertFalse(applied("无直属上级"));
     }
 
     @Test void disabledDirectManagerLeavesRequestPendingAndAdminCannotDecide() throws Exception {
@@ -155,16 +104,12 @@ class MultiFounderReviewIntegrationTest extends MemberBHttpSupport {
         call(403, "POST", "/reviews/" + id + "/decision", admin, Map.of("approve", true, "expectedVersion", 1));
     }
 
-    @Test void failedOrganizationChangeDoesNotReroute() throws Exception {
-        String second = user(company, department, "", "FOUNDER", false);
-        String id = founderRequest(founder, "冲突不改派");
-        String review = revision(second, Map.of("status", "DISABLED")).get("id").asText();
-        db.update("UPDATE users SET version=version+1 WHERE id=?", second);
-        var detail = call(200, "GET", "/reviews/" + review, admin, null);
-        for (var step : detail.get("steps")) if (step.get("state").asText().equals("PENDING"))
-            call(409, "POST", "/reviews/" + review + "/decision", step.get("reviewer_id").asText(), Map.of("approve", true, "expectedVersion", detail.get("expected_version").asInt()));
-        assertEquals(second, pendingReviewer(id));
-        assertEquals(0, db.count("SELECT count(*) FROM audit_records WHERE object_id=? AND type='REVIEW_AUTO_REROUTED'", id));
+    String directorDeletion(String title) throws Exception {
+        String task=cn.workpanel.Db.id();
+        db.update("UPDATE users SET dispatch_enabled=true WHERE id=?",director);
+        db.update("INSERT INTO tasks(id,company_id,owner_id,issuer_id,title,deadline,body) VALUES (?,?,?,?,?,now()+interval '1 day','{}')",task,company,director,director,title);
+        db.update("INSERT INTO task_participants(task_id,user_id,company_id) VALUES (?,?,?)",task,director,company);
+        return call(200,"POST","/tasks/"+task+"/deletions",director,Map.of("version",1,"reason","直属删除审核")).get("id").asText();
     }
 
     int send(String who, String path, Map<String, Object> body) throws Exception {

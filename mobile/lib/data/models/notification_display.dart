@@ -19,6 +19,7 @@ String notificationTitle(Object? type) => switch (type) {
   'LOG_COMMENT' => '日志新评论',
   'REVIEW_PENDING' => '有申请待审核',
   'REVIEW_APPROVED' => '申请已通过',
+  'REVIEW_SUPERSEDED' => '旧审核申请已作废，请重新提交',
   'REVIEW_REJECTED' => '申请已驳回',
   'REVIEW_UNASSIGNED' => '有申请缺少审核人',
   'AI_READY' => 'AI 分析已完成',
@@ -41,6 +42,7 @@ String? notificationResource(Object? type) => switch (type) {
   'REVIEW_PENDING' ||
   'REVIEW_APPROVED' ||
   'REVIEW_REJECTED' ||
+  'REVIEW_SUPERSEDED' ||
   'REVIEW_UNASSIGNED' => 'reviews',
   'AI_READY' => 'ai-jobs',
   'AI_WORK_UPDATED' => 'ai-work',

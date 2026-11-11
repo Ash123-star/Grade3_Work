@@ -1401,7 +1401,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                           '待审' => creating ? '审核通过后创建记录' : '审核通过后生效，审核前保留原内容',
                           '已通过' => '申请已通过，以上为本次申请获批时的内容',
                           '已驳回' => '申请已驳回，以上内容未生效',
-                          '已失效' => '申请已失效，以上内容不再等待审核',
+                          '已失效' => f['approvalMode'] == 'FOUNDER_PEER' ? '旧创始人互审申请已作废，请重新提交；以上内容未生效' : '申请已失效，以上内容不再等待审核',
                           _ => '以上为提交申请时记录的内容',
                         },
                         style: const TextStyle(
@@ -1425,7 +1425,10 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                     '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
                   ),
-                if (self && pending && f['reviewerSelectable'] == true)
+                if (self &&
+                    pending &&
+                    f['reviewerSelectable'] == true &&
+                    f['approvalMode'] != 'FOUNDER_PEER')
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
@@ -1436,7 +1439,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   ),
                 if (f['decisionSource'] == 'FOUNDER_EXEMPT')
                   const Text(
-                    '公司仅一位在职创始人，授权操作已按免审规则自动批准',
+                    '创始人权限内操作已按免审规则自动批准，无需其他创始人审核',
                     style: TextStyle(color: CuteTokens.muted),
                   ),
                 for (final event in (f['reviewEvents'] as List? ?? []))
