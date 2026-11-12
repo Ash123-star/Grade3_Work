@@ -159,7 +159,7 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 
 ## 阿里云 Android 必要通知（Issue #86）
 
-2026-11-12，基于 `31f2df2cafe362d56ac446cd64f8f20d5d24f787` 的功能分支；本段记录同批实现的本地验收。提案、范围及外部未完成项由 [android-essential-push](../openspec/changes/android-essential-push/tasks.md) 维护。未提供EMAS/RAM/厂商/正式签名配置，本轮不部署、不发真实云推送；ACCEPTED只表示供应商受理。
+2026-11-12，实现提交 `bb017df1f3e1cefee33c934f14caffb66f44533c`，基于 `31f2df2cafe362d56ac446cd64f8f20d5d24f787`；草稿PR #87，本段记录同批实现的本地验收，后续提交仅同步交付状态。提案、范围及外部未完成项由 [android-essential-push](../openspec/changes/android-essential-push/tasks.md) 维护。未提供EMAS/RAM/厂商/正式签名配置，本轮不部署、不发真实云推送；ACCEPTED只表示供应商受理。
 
 - Windows、Java21/Maven3.9、隔离Docker PostgreSQL16，`powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests PushRulesTest,AliyunPushGatewayTest,EssentialPushIntegrationTest,TaskRevisionServiceTest,TaskLifecycleServiceTest,TaskDispatchServiceTest,TaskComponentsTest,TaskDispatchIntegrationTest,ReviewIntegrationTest,MultiFounderReviewIntegrationTest,BackendIntegrationTest`：119项通过、退出0，JAR构建成功；`output/push-backend-final.log`。随后仅扩展测试覆盖24h/1h/逾期各阶段及真实HTTP撤回入口，`-Tests EssentialPushIntegrationTest` 11项通过、退出0（`output/push-backend-scenarios.log`）；厂商参数更正为官方OPPO分类/Honor通道后，`-Tests AliyunPushGatewayTest` 2项通过、退出0（`output/push-provider-final.log`）。上述测试总计120个不同用例；受影响既有资料/置顶测试此前同批8项也通过，非全量后端验收。
 - 真实任务HTTP入口→审核生效→outbox→站内通知/推送队列→受控gateway→点击授权通过；额外覆盖事务回滚无部分通知、重复处理、会话撤销、换号lease、他人/他司拒绝、待确认仅本人入职结果、旧审核步骤取消、过期/分类关闭、静音延后、任务版本变化和最多5次重试。供应商层另以真实官方Java SDK向本机HTTP服务签名发送并检查通用摘要/参数，未调用阿里云；两层测试不等于云端端到端送达。
