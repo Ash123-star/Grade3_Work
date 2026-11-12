@@ -26,3 +26,5 @@
 草稿PR：[ #87 ](https://github.com/Ash123-star/Grade3_Work/pull/87)。5.1/5.2没有真实证据不得勾选；本地受控测试不代表云端送达，任务未全部完成不归档。
 
 后端已按用户要求部署提交 `3fec52f`，实际库V34成功，推送保持关闭；运行、备份和回滚见 [systemd部署说明](../../../docs/cloud-systemd-deployment.md)。本次只启动服务器，Android初始化修正和5.1/5.2继续待办。初始化约束依据 [阿里云Android SDK接入](https://help.aliyun.com/zh/document_detail/434660.html)：PushServiceFactory.init须在Application主线程且覆盖channel进程，不能放在Activity；注册联网仍须在用户同意后执行。
+
+APK构建补充：正式Release压缩被推送SDK引用的可选类缺失阻塞（华为系统/分析类、org.android.netutil、BouncyCastle）；发布前须核对依赖与官方混淆规则，不能仅隐藏全部警告。本次仅交付关闭Java压缩、使用调试证书的Release联网测试包，剥离Flutter图片/字体并保留原生必要资源和许可证；签名/包内容检查通过，本机模拟器启动失败，安装和真机界面未验收。详细证据见 [后端验证的APK补充](../../../docs/backend-validation.md#阿里云-android-必要通知issue-86)，3.1/5.1/5.2不勾选。
