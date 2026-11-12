@@ -142,3 +142,17 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 - 本地实际数据库 V4–V6、云端 V2–V6 已成功；两边主公司创始人均 4 名，场景成员未分配 0、在职个人资料缺失 0，每位在职普通员工有 8 条新增月历重叠计划（本地10人、云端9人，保留既有审批状态）。备份及执行证据见[年度场景](annual-scenario-rebuild.md)。
 - 原月历折叠/拖动逻辑保持；统计页、黄色主题、各子页及历史 14px 溢出等仍需用户设备验收，未将编译当作功能验收。PR #74 已合并，云端 API 重启后内网/公网健康检查 UP，公网 APK 已覆盖安装模拟器；云端 raw 网络故障及双入口修复另按实际发布记录跟踪。
 - 后续双入口修复：`mvn.cmd -B -f server/pom.xml '-Dmaven.test.skip=true' package` 退出0；`openspec.cmd validate --all --strict` 46项通过、退出0，证据 `output/yellow-theme/holiday-fallback-{build,spec}.log`。部署诊断在云端用相同 Java HTTP 设置读取 Contents 返回200、2026年39条安排，raw入口超时；没有把探测程序当作测试套件或完整功能验收。最终公网接口结果以修复PR发布记录为准。
+
+
+## 个人资料与首页修正（Issue #84）
+
+2026-11-12，Windows、Flutter/Dart（D:/flutter）、Java21、Maven3.9.9。实现验证提交 `94a5e9d29643954d7c4832f75d35a38a6bb929d3`，基于 OSS 分支 `f21e812a7c9bf9acccd933f380b9050f8ae3ebc8`，本段后续提交仅同步规格与验证记录。性别为男/女选填，非法写入拒绝，历史非标准值资料接口显示为空但保留数据库原值；任务预览三条真实数据；删除重复可见性提示；工龄按上海业务日期显示年月天。无新接口、迁移或部署。
+
+- `flutter test test/profile_choice_test.dart test/tenure_test.dart test/home_summary_navigation_test.dart test/home_prototype_layout_test.dart test/home_daily_todos_visual_test.dart test/week6_client_contract_test.dart`：46项通过，退出0。覆盖选择/取消/保存、请求条数、0至4条实际数据、320px及1.6倍字体、完整首页布局、空态与重试、日期边界。日志 `output/profile-final-flutter.log`。
+- `MAVEN_ARGS=-Dtest=MobileDataContractIntegrationTest,TaskPinIntegrationTest,MobileP0MigrationUpgradeTest` 后执行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1`：13项通过，退出0，JAR构建成功；隔离容器与真实PostgreSQL，日志 `output/profile-backend-scoped.log`。性别男女回读/空值/缺席保留、非法值不改变版本、历史值保留，以及既有组织权限与版本冲突通过。
+- 受影响的工龄、资料页、预览卡片、每日事项及新增/修改测试执行 `dart analyze <paths>`：无告警，退出0；全项目 `dart analyze` 退出2，剩余16项既有问题（2 warning、14 info），没有 error，见 `output/profile-final-analysis.log`。基线无关告警未扩展修复。
+- `openspec.cmd validate --all --strict`：47项通过，退出0；`git diff --check` 通过。
+- 正式默认模式中 `profile_dog_ui_test.dart` 访问未配置服务导致旧断言失败；按该演示测试所需 `--dart-define=USE_MOCK=true` 重跑通过。临时截图脚本及该测试合计3项通过，证据 `output/profile-capture.log`、`output/profile-verified.png`；截图使用本机中文字体替代测试字体，未启动OSS资源加载，仅验证资料布局，不能作为生产素材/设备验收。
+- 全量后端首轮在年度数据迁移夹具出现2个既有错误，随后进入无关AI等待，采集线程栈后主动中止（退出1），没有宣称全量通过。证据 `output/profile-backend.log`、`output/profile-threads.log`；受影响测试另行通过如上。
+- 非功能：安全验证资料读取范围、非法请求不写入与版本控制；易用性验证窄屏/大字/独立详情入口，无溢出。
+- 尚未验证：Android真机、线上发布及完整后端套件成功；本轮未创建或部署APK。保留既有OSS资源加载方式，PR依赖OSS分支 #81。

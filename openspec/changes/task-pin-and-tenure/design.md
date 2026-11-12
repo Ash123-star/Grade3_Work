@@ -45,7 +45,7 @@ CREATE INDEX task_pins_user_idx ON task_pins(user_id, pinned_at DESC);
 - 数据来源：`GET /profiles/me` 的 `employmentStartDate`（可空，管理员确认成员时写入，历史账号可能为空，不从 created_at 推测）。
 - 计算：纯函数 `tenureLabel(DateTime? start, DateTime today)`，today 取上海时区日期：
   - null 或晚于 today → “未提供”；
-  - 不足 1 个月 → “不满1个月”；不足 1 年 → “N个月”；否则 “X年” 或 “X年N个月”。
+  - 按完整月周年日计算总月数，短月周年日截至该月月末；从最近周年日起算剩余日数，统一显示“X年X个月X天”，同日为“0年0个月0天”。日期运算用 UTC 民用年月日避免夏令时影响；无效日期拒绝解析。
 - 展示：`dashboard_pages.dart` 我的页头部卡片角色徽章旁显示“工龄 X”；`own_profile_page.dart` 资料信息网格增加只读“入职日期”“工龄”。
 - Mock 资料补充 `employmentStartDate`。
 
@@ -57,4 +57,4 @@ CREATE INDEX task_pins_user_idx ON task_pins(user_id, pinned_at DESC);
 ## 4. 风险
 - 迁移编号需在多创始人迁移之后，合并前再次核对。
 - 任务管理表同时是成员 A 本周改动范围，置顶只新增按钮，不改其列宽与折叠逻辑。
-- 种子用户工龄均不足一年，演示显示“N个月”。
+- 种子用户工龄均不足一年，显示“0年N个月D天”。
