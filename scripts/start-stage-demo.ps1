@@ -18,7 +18,7 @@ if(-not(Test-Path -LiteralPath $envFile)) {
     @("DB_PASSWORD=$(& $secret)","REDIS_PASSWORD=$(& $secret)","NEO4J_PASSWORD=$(& $secret)",
       'ADMIN_ACCOUNT=stage-admin',"ADMIN_PASSWORD=$adminPassword",'ADMIN_PHONE=13900000001',
       'POSTGRES_PORT=55439','REDIS_PORT=56389','NEO4J_BOLT_PORT=57689',"SERVER_PORT=$Port",
-      'CORS_ORIGINS=http://localhost:5175,http://127.0.0.1:5175','DEEPSEEK_API_KEY=') |
+      'CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:5175,http://127.0.0.1:5175','DEEPSEEK_API_KEY=') |
       Set-Content -LiteralPath $envFile -Encoding ASCII
     @('仅供本机阶段展示；首次登录需要修改密码。','账号：stage-admin',"初始密码：$adminPassword") |
       Set-Content -LiteralPath (Join-Path $dir 'access.txt') -Encoding UTF8
@@ -52,6 +52,8 @@ try {
     foreach($key in @('DB_URL','DB_USER','REDIS_HOST','REDIS_PORT','NEO4J_URI','SERVER_PORT')){
         if(-not $saved.ContainsKey($key)){$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
     }
+    # 兼容既有stage.env：旧配置仅含Flutter的5175，独立Web的5173同样需要精确允许。
+    $env:CORS_ORIGINS=((@($env:CORS_ORIGINS -split ',')+@('http://localhost:5173','http://127.0.0.1:5173','http://localhost:5175','http://127.0.0.1:5175')) | Where-Object { $_ } | Select-Object -Unique) -join ','
     $env:DB_URL="jdbc:postgresql://127.0.0.1:$env:POSTGRES_PORT/$DatabaseName";$env:DB_USER='workpanel'
     $env:REDIS_HOST='127.0.0.1';$env:NEO4J_URI="bolt://127.0.0.1:$env:NEO4J_BOLT_PORT";$env:SERVER_PORT="$Port"
     $process=Start-Process -FilePath $java -ArgumentList '-Xms64m','-Xmx384m','-XX:+UseSerialGC','-jar',('"'+(Join-Path $dir 'app.jar')+'"'),('--app.cors-origins='+$env:CORS_ORIGINS) `

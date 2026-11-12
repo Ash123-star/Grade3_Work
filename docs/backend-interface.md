@@ -151,4 +151,20 @@ GET /api/reviews/{id} 在现有审核读取权限校验之后追加 `display_ref
 ### 组织团队名称与操作反馈（Issue #52）
 GET /organization/people沿用原组织数据范围，追加可空team_name，按teams.id及company_id联合关联；无团队或名称不存在时返回null。客户端将team_name/嵌套team.name归一化为teamName；统计筛选优先取当前授权组织树teams名称，不将team_id当显示名称。无需数据库迁移，旧客户端可忽略新增字段。任务和组织查询权限保持现有规则。
 
-
+## 管理员简易后台（2026-11-11）
+
+新增 `/api/admin/console`，每次重新验证 ACTIVE ADMIN、公司和首次改密状态；其他角色403、无效会话401。公开注册和Android接口不变。无新增数据库结构/迁移。
+
+| 方法与路径（前缀省略） | 契约 |
+| --- | --- |
+| GET /employees | search最多100字，cursor>=0、limit 1..100；含停用账号，按本公司过滤后分页，items/total/nextCursor；仅返回id/account/phone/name/department_id/department/role/status/version/must_change_password，不含哈希 |
+| POST /employees | account/password/phone/name/departmentId，固定ACTIVE/EMPLOYEE/首次改密；姓名最多100字，密码至少12字符且UTF-8最多72字节；未知字段400、外公司部门404、重复账号/手机409 ACCOUNT_OR_PHONE_EXISTS；无幂等键，不自动重试，唯一约束防重复；响应不含密码或哈希，同事务写角色和脱敏审计 |
+| GET /departments | 本公司id/name目录，只读幂等 |
+| POST /employees/{id}/revisions | name/departmentId/status可选，version/reason必填；status仅ACTIVE/DISABLED，跨部门调动随候选清空原团队；返回USER审核申请，旧值审核前有效，不能改角色；无幂等键，外公司404、最终版本冲突409 |
+| GET /priorities | 含撤下的本公司事项，cursor/limit分页，items/total/nextCursor，只读幂等 |
+| POST /priorities/revisions | id更新时必填、version新建为0、title/text/pinned/archived/position/reason；标题最多200字，正文最多20000字，position为0..10000整数；返回COMPANY_ITEM审核申请，无幂等键，最终审批最多十条置顶/版本校验，不允许自审 |
+| GET /reviews | cursor/limit分页，items/total/nextCursor；仅本人申请或当前分配审核，沿用原review数据范围 |
+| GET /reviews/{id} | 候选、步骤、原因和版本；本人或有权审核人，只读幂等；越权403/未知404 |
+| POST /reviews/{id}/decision | approve/reason/expectedVersion；驳回原因必填，自审403、已决或版本冲突409；无幂等键，不自动重放 |
+
+以上契约v1，错误沿用code/message/traceId。首次改密复用 `/api/auth/password`，失权前端清空页面和会话。公司事项与员工变更仍由当前直属独立审核人处理，后台不提供管理员免审。详见 [本地与云端说明](admin-console.md)。
