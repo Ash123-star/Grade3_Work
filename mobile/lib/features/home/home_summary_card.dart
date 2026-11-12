@@ -102,7 +102,14 @@ class HomeSummaryCard extends ConsumerWidget {
                             children: [
                               for (
                                 var i = 0;
-                                i < page.items.take(2).length;
+                                i <
+                                    page.items
+                                        .take(
+                                          resource == 'tasks/received-card'
+                                              ? 3
+                                              : 2,
+                                        )
+                                        .length;
                                 i++
                               ) ...[
                                 if (i > 0)

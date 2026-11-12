@@ -56,6 +56,63 @@ void main() {
     });
   }
 
+  for (final count in [0, 1, 2, 3, 4]) {
+    for (final scale in [1.0, 1.6]) {
+      testWidgets('task preview $count records at text scale $scale', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(320, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final opened = <String>[];
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              homePreviewProvider.overrideWith(
+                (ref, key) async => PageResult(
+                  List.generate(
+                    count,
+                    (i) => Record(id: '$i', title: '真实任务$i'),
+                  ),
+                ),
+              ),
+            ],
+            child: MaterialApp(
+              theme: appTheme(),
+              home: MediaQuery(
+                data: MediaQueryData(
+                  size: const Size(320, 900),
+                  textScaler: TextScaler.linear(scale),
+                ),
+                child: Scaffold(
+                  body: SingleChildScrollView(
+                    child: HomeSummaryCard(
+                      title: '任务看板',
+                      resource: 'tasks/received-card',
+                      onAll: () {},
+                      onItem: (record) => opened.add(record.id),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        for (var i = 0; i < count; i++) {
+          expect(find.text('真实任务$i'), i < 3 ? findsOneWidget : findsNothing);
+        }
+        if (count >= 3) {
+          await tester.tap(find.text('真实任务2'));
+          expect(opened, ['2']);
+        }
+        if (count == 0) expect(find.text('暂无参与任务'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('empty summary remains an entry to its full list', (
     tester,
   ) async {

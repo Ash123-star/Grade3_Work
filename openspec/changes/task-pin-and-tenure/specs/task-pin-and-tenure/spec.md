@@ -24,15 +24,15 @@ Could：有效用户 SHALL 能对本人可见的任务进行个人置顶与取�
 - **THEN** 用户 B 的列表 MUST NOT 显示为置顶或改变排序
 
 ### Requirement: Tenure display in profile
-“我的”、个人资料页及人员目录点击员工后的详情 SHALL 根据服务端 `employmentStartDate` 按上海时区显示工龄；入职日期为空或晚于今天时 MUST 显示“未提供”，不得从注册时间推测。
+“我的”、个人资料页及人员目录点击员工后的详情 SHALL 根据服务端 `employmentStartDate` 按上海业务日期显示完整的“X年X个月X天”工龄，月周年日遇短月截到月末，余天从该周年日起计算；入职日期为空或晚于今天时 MUST 显示“未提供”，不得从注册时间推测。
 
 #### Scenario: Known start date
 - **WHEN** 入职日期为 2025-08-01，今天为 2026-11-01
-- **THEN** 页面 SHALL 显示“工龄 1年3个月”及入职日期
+- **THEN** 页面 SHALL 显示“工龄 1年3个月0天”及入职日期
 
 #### Scenario: Short tenure
 - **WHEN** 入职不足一个月
-- **THEN** 页面 SHALL 显示“不满1个月”
+- **THEN** 页面 SHALL 显示“0年0个月X天”，X 为实际经过天数
 
 #### Scenario: Missing start date
 - **WHEN** 资料中 `employmentStartDate` 为 null

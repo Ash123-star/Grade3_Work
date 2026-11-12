@@ -59,3 +59,25 @@ Flutter 导图页 SHALL 保持公司重点、公司任务、个人重点、个�
 - **WHEN** 同一用户通过 Flutter 或 Web 查询记录，或尝试访问无权限记录
 - **THEN** 沿用相同的现有授权数据和审核版本契约，越权请求仍由服务端拒绝，本次宽度调整不扩大读取范围
 
+
+### Requirement: Homepage task preview count
+任务看板 SHALL 请求并显示前三条真实授权任务，少于三条时只显示实际记录，不补造占位任务；公司事项预览数量保持原状。
+
+#### Scenario: At least three available tasks
+- **WHEN** 用户有三条或更多可见任务
+- **THEN** 首页 SHALL 显示三条并支持分别进入详情
+
+#### Scenario: Fewer tasks
+- **WHEN** 用户只有零到两条可见任务
+- **THEN** 首页 SHALL 显示真实数量，零条时显示空状态并保留查看全部入口
+
+### Requirement: Profile gender choices
+个人资料性别 SHALL 为男/女的选填选择项，前端 MUST NOT 提供自由输入；服务端 SHALL 拒绝其他新写入值。历史非标准值展示为未提供，原始数据保留至本人修改。现有本人写入权限与版本控制保持。
+
+#### Scenario: Save or clear choice
+- **WHEN** 本人选择男或女并使用当前版本保存，或明确提交空值
+- **THEN** 资料 SHALL 回读所选值或空值；未提交该字段时保留原值
+
+#### Scenario: Reject arbitrary gender
+- **WHEN** 客户端绕过选择项提交其他性别文本
+- **THEN** 服务端 SHALL 返回 400 且不写入资料、不增加版本

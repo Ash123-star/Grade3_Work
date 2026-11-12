@@ -294,19 +294,6 @@ class _DailyTodosSectionState extends ConsumerState<DailyTodosSection>
                       Text('每日事项', style: paper.heading(18)),
                     ],
                   ),
-                  const SizedBox(height: 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.lock_outline_rounded,
-                        size: 11,
-                        color: paper.muted,
-                      ),
-                      const SizedBox(width: 4),
-                      Text('仅自己可见', style: paper.body(11, color: paper.muted)),
-                    ],
-                  ),
                 ],
               ),
               TextButton.icon(

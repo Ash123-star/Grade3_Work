@@ -1846,11 +1846,6 @@ class OwnPrivateNote extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
-              '仅本人可见，不进入公开资料、下属工作台或 AI 来源。',
-              style: TextStyle(fontSize: 12, color: CuteTokens.muted),
-            ),
-            const SizedBox(height: 12),
             ref
                 .watch(itemProvider(('private-notes', id)))
                 .when(

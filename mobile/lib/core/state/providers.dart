@@ -310,7 +310,10 @@ final homePreviewProvider = FutureProvider.autoDispose
       }
       return ref
           .watch(repositoryProvider)
-          .list(resource, const Query(limit: 2));
+          .list(
+            resource,
+            Query(limit: resource == 'tasks/received-card' ? 3 : 2),
+          );
     });
 final receivedTaskPageProvider = FutureProvider.autoDispose
     .family<PageResult, String>((ref, cursor) {

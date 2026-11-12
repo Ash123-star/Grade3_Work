@@ -18,6 +18,7 @@ public class ProfileService {
         if(!actor.id().equals(id)&&!actor.global()&&!repository.ancestor(actor,id)) throw ApiError.forbidden();
         var result=new LinkedHashMap<>(DefaultAuthApplicationService.publicUser(user));
         for(String field:List.of("phone","email","gender","age")) result.put(field,user.get(field));
+        result.put("gender",validGender(string(user.get("gender"))) ? user.get("gender") : null);
         result.put("employmentStartDate",user.get("employment_start_date"));
         result.put("profile",repository.json(user.get("profile"))); result.put("viewingSelf",actor.id().equals(id));
         result.put("department",repository.unit("departments",actor.company(),user.get("department_id")));
@@ -41,7 +42,10 @@ public class ProfileService {
             email=nullableText(body,"email",320);
             if(email!=null&&!Pattern.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",email)) throw ApiError.bad("INVALID_EMAIL","邮箱格式无效");
         }
-        if(body.containsKey("gender")) gender=nullableText(body,"gender",32);
+        if(body.containsKey("gender")) {
+            gender=nullableText(body,"gender",32);
+            if(!validGender(gender)) throw ApiError.bad("INVALID_GENDER","性别只能选择男或女");
+        }
         if(body.containsKey("age")) {
             age=body.get("age");
             if(age!=null&&(!(age instanceof Number number)||!Double.isFinite(number.doubleValue())||number.doubleValue()!=number.intValue()||number.intValue()<0)) throw ApiError.bad("INVALID_AGE","年龄必须为非负整数或空值");
@@ -58,6 +62,7 @@ public class ProfileService {
         for(String field:List.of("phone","email","gender","age")) if(body.containsKey(field)) profile.remove(field);
         repository.update(actor,expected,phone,email,gender,age,profile); return get(actor,actor.id());
     }
+    private static boolean validGender(String value) { return value==null||value.equals("男")||value.equals("女"); }
     private static String string(Object value) { return value==null?null:value.toString(); }
     private static String nullableText(Map<String,Object> body,String key,int max) {
         Object value=body.get(key); if(value==null) return null;

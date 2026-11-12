@@ -91,7 +91,7 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 ## 仪表盘、通知、分析和附件
 
-仪表盘提供 `/dashboard`、`/dashboard/company`、`/dashboard/personal`、`/profiles/{id}` 和 `/private-notes`；私人备注始终仅本人可见。`PUT /profiles/me` 的移动端协议字段为 `introduction/phone/email/gender/age/avatarAttachmentId/version`，姓名、部门、职位、角色和状态只读。通知提供 `GET /notifications`、`POST /notifications/read-all`、`POST /notifications/{id}/read` 和支持 `Last-Event-ID` 的 `/notifications/stream`。分析提供 `/analytics`、`/analytics/details`、`/timeline` 和 `/analytics/export`；汇总、钻取与 CSV 必须共用 `groupBy/departmentId/teamId/ownerId`、日期窗口和权限范围。附件 `POST /attachments` 使用 multipart，单文件最大 10MB；`GET /attachments/{id}` 每次重新鉴权，不提供公开 URL。
+仪表盘提供 `/dashboard`、`/dashboard/company`、`/dashboard/personal`、`/profiles/{id}` 和 `/private-notes`；私人备注始终仅本人可见。`PUT /profiles/me` 的移动端协议字段为 `introduction/phone/email/gender/age/avatarAttachmentId/version`，姓名、部门、职位、角色和状态只读。`gender` 选填，仅接受男/女，空文本或 null 清空，缺席保留；其他值返回 400 `INVALID_GENDER`（类型错误为 `INVALID_FIELD`）。历史非标准值通过资料接口显示为 null，数据库原值保留至本人修改，无数据库迁移。通知提供 `GET /notifications`、`POST /notifications/read-all`、`POST /notifications/{id}/read` 和支持 `Last-Event-ID` 的 `/notifications/stream`。分析提供 `/analytics`、`/analytics/details`、`/timeline` 和 `/analytics/export`；汇总、钻取与 CSV 必须共用 `groupBy/departmentId/teamId/ownerId`、日期窗口和权限范围。附件 `POST /attachments` 使用 multipart，单文件最大 10MB；`GET /attachments/{id}` 每次重新鉴权，不提供公开 URL。
 
 通知读取沿用`cursor/limit/type`，新增可选`category`（任务/审批/评论/待阅提醒/截止提醒/审核结果）、`unreadOnly`（默认false）、`search`（最多200字，按中文通知标题及当前可读目标摘要搜索）。过滤在分页与计数之前执行，响应保留`items/total/nextCursor/unread`；末页`nextCursor=null`，`unread`为本人全量未读数，不受分类、搜索及已加载页数影响。每项新增`message_title/summary`：任务标题复用TaskAccess，日志摘要复用本人或已提交日志的组织/直属范围，审核摘要复用当前申请人/有效审核人范围；不可读目标仅显示通用不可用提示，不能因为收到消息而读取目标标题。客户端首屏30条，显式加载更多，移除逐消息详情HTTP补读；首页和个人页共用首屏及全量未读数。旧客户端仍可读取原字段；新客户端的历史筛选和摘要须先部署新版服务端。
 

@@ -1837,7 +1837,7 @@ class _FormPageState extends ConsumerState<FormPage> {
                             ),
                             TextSpan(
                               text: savedAt == null
-                                  ? '尚未保存 · 草稿仅本人可见'
+                                  ? '尚未保存'
                                   : saved
                                   ? '上次本机保存 ${savedAt!.hour.toString().padLeft(2, '0')}:${savedAt!.minute.toString().padLeft(2, '0')}'
                                   : '保存中…',
@@ -1859,11 +1859,6 @@ class _FormPageState extends ConsumerState<FormPage> {
             ),
             const SizedBox(height: 16),
           ],
-          if (widget.kind == 'note')
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16),
-              child: Text('私人备注仅本人可见，不进入下属面板或 AI。'),
-            ),
           if (widget.kind == 'profile-edit')
             const Padding(
               padding: EdgeInsets.only(bottom: 16),
