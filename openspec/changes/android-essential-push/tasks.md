@@ -8,7 +8,7 @@
 - [x] 2.3 任务事件补动作元数据，截止阶段覆盖真实参与人且去重/不补错过窗口
 
 ## 3. Android and Flutter
-- [x] 3.1 官方SDK、厂商参数入口、Android13权限、三个私密通知channel及初始化开关
+- [ ] 3.1 官方SDK、厂商参数入口、Android13权限、三个私密通知channel及初始化开关；官方接入核对发现仍在MainActivity初始化，须改为Application初始化并维持用户同意后的注册门控，再验证
 - [x] 3.2 本人通知设置、分类/免打扰/系统状态、登录设备绑定及退出/换号清理
 - [x] 3.3 前后台/冷启动点击缓存、身份恢复、服务端授权和安全详情跳转，不重复展示SSE通知
 
@@ -24,3 +24,5 @@
 - [ ] 5.2 真机前台/后台/锁屏/进程回收/离线恢复送达及冷启动，验证系统通知关闭和设备分类设置
 
 草稿PR：[ #87 ](https://github.com/Ash123-star/Grade3_Work/pull/87)。5.1/5.2没有真实证据不得勾选；本地受控测试不代表云端送达，任务未全部完成不归档。
+
+后端已按用户要求部署提交 `3fec52f`，实际库V34成功，推送保持关闭；运行、备份和回滚见 [systemd部署说明](../../../docs/cloud-systemd-deployment.md)。本次只启动服务器，Android初始化修正和5.1/5.2继续待办。初始化约束依据 [阿里云Android SDK接入](https://help.aliyun.com/zh/document_detail/434660.html)：PushServiceFactory.init须在Application主线程且覆盖channel进程，不能放在Activity；注册联网仍须在用户同意后执行。
