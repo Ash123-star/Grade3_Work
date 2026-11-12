@@ -2,7 +2,7 @@
 
 ## 2026-11-12交付准备
 
-用户明确要求提交PR后，使用独立`codex/admin-simple-console`工作区提取后台改动，保留原工作区文件和运行服务；GitHub连接器此前403，本机已认证CLI成功创建[Issue #88](https://github.com/Ash123-star/Grade3_Work/issues/88)。以`zhw`为PR目标，避免带入该分支尚未进入main的3个其他主题提交。测试生成的非后台OpenAPI变化和检索指标不纳入提交；配套界面截图使用合成夹具，已放入docs/screenshots/admin-console。全量失败限制不变，草稿PR不合并。
+用户明确要求提交PR后，使用独立`codex/admin-simple-console`工作区提取后台改动，保留原工作区文件和运行服务；GitHub连接器此前403，本机已认证CLI成功创建[Issue #88](https://github.com/Ash123-star/Grade3_Work/issues/88)。以`zhw`为PR目标，避免带入该分支尚未进入main的3个其他主题提交。测试生成的非后台OpenAPI变化和检索指标不纳入提交；配套界面截图使用合成夹具，已放入docs/screenshots/admin-console。全量失败限制不变，草稿PR不合并。已推送提交`6bd80d7`并创建[草稿PR #89](https://github.com/Ash123-star/Grade3_Work/pull/89)，目标`zhw`，关联Issue #88；原工作区和运行服务保留。
 
 ## 本地浏览器403修复（2026-11-12）
 
