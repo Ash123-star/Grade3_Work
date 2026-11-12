@@ -5,6 +5,7 @@ version: 0.1.0+1
 environment:
   sdk: ^3.10.7
 dependencies:
+  aliyun_push: 1.2.0
   flutter:
     sdk: flutter
   flutter_localizations:

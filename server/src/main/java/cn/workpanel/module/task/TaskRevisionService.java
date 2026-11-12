@@ -180,7 +180,12 @@ public class TaskRevisionService {
         var recipients = new LinkedHashSet<String>();
         recipients.add(Db.str(db.one("SELECT issuer_id FROM tasks WHERE id=? AND company_id=?", taskId, actor.company()), "issuer_id"));
         for (var participant : db.rows("SELECT user_id FROM task_participants WHERE task_id=?", taskId)) recipients.add(Db.str(participant, "user_id"));
-        for (String recipient : recipients) db.notify(actor, recipient, type, taskId,
-                type.toLowerCase(Locale.ROOT) + ":" + taskId + ":" + version + ":" + recipient);
+        for (String recipient : recipients) {
+            // New participants already have the one new-assignment event for this revision.
+            if(db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND recipient_id=? AND type='TASK_ASSIGNED' AND body->>'taskVersion'=?",taskId,recipient,String.valueOf(version))>0) continue;
+            String key=type.toLowerCase(Locale.ROOT)+":"+taskId+":"+version+":"+recipient;
+            db.notify(actor,recipient,type,taskId,key);
+            db.update("UPDATE outbox_events SET body=?::jsonb WHERE dedup_key=? AND delivered_at IS NULL",db.write(Map.of("taskVersion",version,"actorId",actor.id())),key);
+        }
     }
 }

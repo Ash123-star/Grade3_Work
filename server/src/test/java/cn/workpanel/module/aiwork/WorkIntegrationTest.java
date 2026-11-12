@@ -32,6 +32,7 @@ class WorkIntegrationTest {
     static final java.util.concurrent.atomic.AtomicInteger providerStatus=new java.util.concurrent.atomic.AtomicInteger(200);
     @Autowired MemoryModel memoryModel;
     static final AtomicReference<Double> ocrConfidence=new AtomicReference<>(.99);
+    @Autowired cn.workpanel.module.push.application.PushService pushService;
     @LocalServerPort int port;@Autowired Db db;@Autowired StringRedisTemplate redis;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     @Autowired cn.workpanel.module.aiwork.application.WorkService workService;
@@ -845,7 +846,7 @@ class WorkIntegrationTest {
         for(String state:List.of("PREPARING","EXECUTING","WAITING_REVIEW"))tx.executeWithoutResult(s->repo.state(a,id,state,Map.of()));assertEquals(initial,db.count("SELECT count(*) FROM outbox_events WHERE object_id=?",id));
         tx.executeWithoutResult(s->repo.state(a,id,"WAITING_INPUT",Map.of()));tx.executeWithoutResult(s->repo.state(a,id,"WAITING_INPUT",Map.of()));assertEquals(initial+1,db.count("SELECT count(*) FROM outbox_events WHERE object_id=?",id));
         assertThrows(IllegalStateException.class,()->tx.executeWithoutResult(s->{repo.state(a,id,"SUCCEEDED",Map.of());throw new IllegalStateException("rollback");}));assertEquals(initial+1,db.count("SELECT count(*) FROM outbox_events WHERE object_id=?",id));
-        var messages=new cn.workpanel.module.message.application.MessageApplicationService(db,true);
+        var messages=new cn.workpanel.module.message.application.MessageApplicationService(db,true,pushService);
         for(int n=0;n<20;n++){db.update("UPDATE outbox_events SET delivered_at=NULL WHERE object_id=?",id);tx.executeWithoutResult(s->messages.deliver());}
         assertEquals(initial+1,db.count("SELECT count(*) FROM notifications WHERE object_id=?",id));assertEquals(0,db.count("SELECT count(*) FROM outbox_events WHERE object_id=? AND delivered_at IS NULL",id));
     }

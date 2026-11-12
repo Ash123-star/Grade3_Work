@@ -116,3 +116,18 @@ V22将旧待审步骤标记为SUPERSEDED并保留历史，每个申请至多一�
 删除会清除事项正文，但24小时幂等响应可能仍含原正文；过期回执在该用户后续写入时清理，不宣称物理立即擦除。未接入审计正文、AI、导出或组织面板。
 
 V26 原为避开待合并 PR 的 V24/V25 编号选择。五个 PR 整合后，已发布 V26/V27 保持原样，原待发布的创始人互审、任务置顶、多标签迁移分别调整为 V28/V29/V30；不启用 out-of-order。已验证空库与历史基线向 V30 升级。代码回滚可暂保留新增表，不删除历史数据；若确需删表，先备份本人事项和回执并安排独立维护迁移。
+
+
+## Android必要移动推送
+
+V34新增：并行整合分支已使用V31–V33，故选择V34。本分支基线已有V31 OSS；最终整合仍须统一既有分支的迁移版本与校验值，本功能不修改已发布迁移。
+
+| 表/索引 | 约束与用途 |
+| --- | --- |
+| `push_preferences` | user主键、公司/用户复合外键；总开关默认false，分类默认true；上海小时范围及起止不同；version乐观锁 |
+| `push_devices` | SDK device_id唯一，一台设备仅绑定一个当前会话；session_hash外键ON DELETE CASCADE，binding随机lease，30天不续租清理 |
+| `push_deliveries` | notification外键、设备外键ON DELETE CASCADE；通知/设备/lease唯一；状态PENDING/ACCEPTED/CANCELLED/FAILED，attempts<=5，task_version/expiry/next_attempt用于有效性与重试；不保存正文或密钥 |
+| `push_deliveries_pending` | 仅待投递的next_attempt_at索引，worker行锁SKIP LOCKED |
+| `push_reminder_deadlines` | DISPATCHED/RECEIVED任务deadline部分索引，1分钟阶段窗口 |
+
+不补推历史通知。设备注销、改密会话级联删除；投递诊断非待发记录保留30天。回滚先关闭开关，保留表及已发布迁移，不删除迁移历史。

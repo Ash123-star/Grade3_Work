@@ -67,7 +67,7 @@ public class TaskLifecycleService {
                 phase.name(), decision.next().name(), nextVersion);
         db.audit(actor, "TASK_EVENT", taskId, Map.of("phase", phase.name(), "version", currentVersion),
                 Map.of("phase", decision.next().name(), "version", nextVersion, "type", action.name()), text == null ? "" : text);
-        notifyParticipants(actor, taskId, nextVersion);
+        notifyParticipants(actor, taskId, nextVersion,action.name());
         return TaskView.of(db, TaskAccess.readable(db, actor, taskId, false), TaskTimeline.list(db, taskId));
     }
 
@@ -87,7 +87,7 @@ public class TaskLifecycleService {
         return text;
     }
 
-    private void notifyParticipants(Actor actor, String taskId, int version) {
+    private void notifyParticipants(Actor actor, String taskId, int version,String action) {
         var recipients = new LinkedHashSet<String>();
         var task = db.one("SELECT issuer_id FROM tasks WHERE id=? AND company_id=?", taskId, actor.company());
         recipients.add(Db.str(task, "issuer_id"));
@@ -95,7 +95,9 @@ public class TaskLifecycleService {
             recipients.add(Db.str(participant, "user_id"));
         }
         for (String recipient : recipients) {
-            db.notify(actor, recipient, "TASK_EVENT", taskId, "task-event:" + taskId + ":" + version + ":" + recipient);
+            String key="task-event:"+taskId+":"+version+":"+recipient;
+            db.notify(actor, recipient, "TASK_EVENT", taskId, key);
+            db.update("UPDATE outbox_events SET body=?::jsonb WHERE dedup_key=? AND delivered_at IS NULL",db.write(Map.of("action",action,"taskVersion",version,"actorId",actor.id())),key);
         }
     }
 }

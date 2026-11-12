@@ -8,6 +8,7 @@ import 'providers.dart';
 import 'local_state.dart';
 import '../config.dart';
 import 'live_notifications.dart';
+import '../push/push_controller.dart';
 
 /// Keeps the existing route/input mounted while foreground identity is checked.
 class SessionLifecycle extends ConsumerStatefulWidget {
@@ -27,6 +28,11 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     scheduleExpiry();
+    final push = ref.read(pushControllerProvider.notifier);
+    final initialSession = ref.read(sessionProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(push.sync(initialSession));
+    });
   }
 
   void scheduleExpiry() {
@@ -57,6 +63,7 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
       ref.read(notificationForegroundProvider.notifier).state = false;
     } else if (state == AppLifecycleState.resumed && backgrounded) {
       backgrounded = false;
+      unawaited(ref.read(pushControllerProvider.notifier).sync(ref.read(sessionProvider)));
       if (ref.read(sessionProvider).token != null) {
         unawaited(validate(blockBusiness: false));
       } else {
@@ -103,6 +110,7 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
     ref.watch(liveNotificationsProvider);
     ref.listen(sessionProvider, (previous, next) {
       scheduleExpiry();
+      unawaited(ref.read(pushControllerProvider.notifier).sync(next));
       if (!next.authenticated ||
           previous?.token != next.token ||
           previous?.id != next.id) {

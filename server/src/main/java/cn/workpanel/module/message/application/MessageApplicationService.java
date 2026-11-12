@@ -17,22 +17,24 @@ import org.springframework.http.ResponseEntity;
 
 @Service
 public class MessageApplicationService {
-    final Db db; final boolean enabled; final ScheduledExecutorService streams=Executors.newScheduledThreadPool(2);
-    public MessageApplicationService(Db db,@Value("${app.jobs-enabled}") boolean enabled) { this.db=db; this.enabled=enabled; }
+    final cn.workpanel.module.push.application.PushService pushes; final Db db; final boolean enabled; final ScheduledExecutorService streams=Executors.newScheduledThreadPool(2);
+    public MessageApplicationService(Db db,@Value("${app.jobs-enabled}") boolean enabled,cn.workpanel.module.push.application.PushService pushes) { this.db=db; this.enabled=enabled; this.pushes=pushes; }
     @Scheduled(fixedDelay=2000) @Transactional
     public void deliver() {
-        if(!enabled) return;
+        if(enabled) deliverNow();
+    }
+    /** Explicit transactional delivery entry for operations and integration verification; no HTTP endpoint. */
+    @Transactional public void deliverNow() {
         for(var e:db.rows("SELECT * FROM outbox_events WHERE delivered_at IS NULL AND type<>'MEMORY_SOURCE' ORDER BY created_at LIMIT 100 FOR UPDATE SKIP LOCKED")) {
             db.update("INSERT INTO notifications(id,company_id,recipient_id,type,object_id,body) VALUES (?,?,?,?,?,?::jsonb) ON CONFLICT(id) DO NOTHING",e.get("id"),e.get("company_id"),e.get("recipient_id"),e.get("type"),e.get("object_id"),db.write(e.get("body")));
+            pushes.enqueue(e);
             db.update("UPDATE outbox_events SET delivered_at=now() WHERE id=?",e.get("id"));
         }
     }
     @Scheduled(fixedDelay=60000) @Transactional
     public void reminders() {
         if(!enabled) return;
-        for(var t:db.rows("SELECT t.* FROM tasks t WHERE deadline>now() AND deadline<now()+interval '24 hours' AND phase NOT IN ('ACCEPTED','ARCHIVED','WITHDRAWN') LIMIT 1000")) {
-            Actor issuer=Actor.from(db.one("SELECT * FROM users WHERE id=?",t.get("issuer_id"))); db.notify(issuer,Db.str(t,"owner_id"),"DEADLINE",Db.str(t,"id"),"deadline:"+t.get("id")+":"+t.get("deadline"));
-        }
+        // Deadline stages are handled by DeadlinePushReminders for all real participants.
         db.update("DELETE FROM sessions WHERE expires_at<now()");
     }
     SseEmitter stream(String token,long after) {

@@ -98,6 +98,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 () => openForm(context, 'password'),
               ),
               const Divider(height: 1),
+              _settingRow('settings', '通知设置', null, () => context.push('/me/notifications')),
+              const Divider(height: 1),
               _settingRow(
                 'approval',
                 '隐私与数据',
@@ -291,7 +293,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
       'expired' => ('登录已失效', '请重新登录后继续。未提交的本地日志草稿会保留。'),
       'privacy' => (
         '隐私与数据',
-        '私人备注和未提交草稿仅本人可见。AI 只处理授权业务文本，不接收手机号、密码和私人备注。账号权限以服务端校验为准。',
+        '私人备注和未提交草稿仅本人可见。AI 只处理授权业务文本，不接收手机号、密码和私人备注。账号权限以服务端校验为准。开启手机通知后，阿里云移动推送及手机厂商通道会处理设备标识和通用提醒摘要，用于通知送达；不发送任务正文或审批原因。可在通知设置中关闭。',
       ),
       'licenses' => (
         '素材与开源许可',
@@ -326,6 +328,7 @@ class _UtilityPageState extends ConsumerState<UtilityPage> {
             const SizedBox(height: 12),
             Text(user.status == 'UNKNOWN' ? '账号状态未确认，请重新登录核对。' : '状态：等待归属确认'),
             if (user.authenticated) ...[
+              TextButton(onPressed: () => context.push('/me/notifications'), child: const Text('入职结果通知设置')),
               const SizedBox(height: 16),
               SunnyPrimaryButton(
                 loading: busy,

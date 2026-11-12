@@ -156,3 +156,15 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 - 全量后端首轮在年度数据迁移夹具出现2个既有错误，随后进入无关AI等待，采集线程栈后主动中止（退出1），没有宣称全量通过。证据 `output/profile-backend.log`、`output/profile-threads.log`；受影响测试另行通过如上。
 - 非功能：安全验证资料读取范围、非法请求不写入与版本控制；易用性验证窄屏/大字/独立详情入口，无溢出。
 - 尚未验证：Android真机、线上发布及完整后端套件成功；本轮未创建或部署APK。保留既有OSS资源加载方式，PR依赖OSS分支 #81。
+
+## 阿里云 Android 必要通知（Issue #86）
+
+2026-11-12，基于 `31f2df2cafe362d56ac446cd64f8f20d5d24f787` 的功能分支；本段记录同批实现的本地验收。提案、范围及外部未完成项由 [android-essential-push](../openspec/changes/android-essential-push/tasks.md) 维护。未提供EMAS/RAM/厂商/正式签名配置，本轮不部署、不发真实云推送；ACCEPTED只表示供应商受理。
+
+- Windows、Java21/Maven3.9、隔离Docker PostgreSQL16，`powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests PushRulesTest,AliyunPushGatewayTest,EssentialPushIntegrationTest,TaskRevisionServiceTest,TaskLifecycleServiceTest,TaskDispatchServiceTest,TaskComponentsTest,TaskDispatchIntegrationTest,ReviewIntegrationTest,MultiFounderReviewIntegrationTest,BackendIntegrationTest`：119项通过、退出0，JAR构建成功；`output/push-backend-final.log`。随后仅扩展测试覆盖24h/1h/逾期各阶段及真实HTTP撤回入口，`-Tests EssentialPushIntegrationTest` 11项通过、退出0（`output/push-backend-scenarios.log`）；厂商参数更正为官方OPPO分类/Honor通道后，`-Tests AliyunPushGatewayTest` 2项通过、退出0（`output/push-provider-final.log`）。上述测试总计120个不同用例；受影响既有资料/置顶测试此前同批8项也通过，非全量后端验收。
+- 真实任务HTTP入口→审核生效→outbox→站内通知/推送队列→受控gateway→点击授权通过；额外覆盖事务回滚无部分通知、重复处理、会话撤销、换号lease、他人/他司拒绝、待确认仅本人入职结果、旧审核步骤取消、过期/分类关闭、静音延后、任务版本变化和最多5次重试。供应商层另以真实官方Java SDK向本机HTTP服务签名发送并检查通用摘要/参数，未调用阿里云；两层测试不等于云端端到端送达。
+- Flutter3.38.7/Dart3.10.7，`flutter test --no-pub --concurrency=1 test/push_notifications_test.dart test/week6_client_contract_test.dart test/review_notification_display_test.dart --reporter expanded`：22项通过、退出0（`output/push-flutter-final.log`）。覆盖冷启动点击等待绑定、换号/同账号并发、退出、销毁后回调、拒绝权限、缺配置、保存失败、白名单目标及320px设置布局。受影响6组路径的 `dart analyze` 无问题、退出0（`output/push-dart-analysis.log`）。
+- `flutter build apk --debug --no-pub --dart-define=USE_MOCK=false`：退出0，原生SDK/receiver/PopupActivity/权限与channel编译成功（`output/push-android-build-final.log`）；产物 `mobile/build/app/outputs/flutter-apk/app-debug.apk`。无真实配置，安装包不代表离线推送可用，不调整既有素材打包配置。
+- 扩展运行calendar_notification_refresh/live_notifications_contract/notification_preview三组测试失败，其中8项在未修改的基线副本可复现（`output/push-baseline-tests.log`）；旧预览测试仍期望已移除的逐条详情读取，SSE断言仍期望旧刷新语义。此次新增的一处post-frame读取已销毁provider问题已修复，对应 `actual recovery inbox renders` 单项通过、退出0（`output/push-lifecycle-recheck.log`）。最终重新运行这三组测试为8项通过、8项失败，失败用例与基线一致（`output/push-legacy-recheck.log`）；未宣称扩展套件或全项目全部通过。
+- 窄屏设置页截图 `output/push-settings-unconfigured.png` 已目检无溢出；临时截图测试退出0（`output/push-capture.log`），使用本机中文字体，不是设备截图。安全/隐私证据为当前会话/组织范围再授权、仅发送通用摘要且签名请求不含RAM secret；可靠性证据为事务回滚、去重、时效和有限重试，云调用采用独立调度线程。
+- OpenSpec严格校验48项通过、退出0（`output/push-spec-validation.log`）；差异检查通过。真实前台/后台/锁屏/进程回收/离线恢复、厂商通知分类和系统权限手动操作均未验收，任务5.1/5.2保持未完成。回滚先关PUSH_ENABLED并关闭App通知，保留V34及表；最终整合须先统一基线和并行分支既有V31–V33迁移。
