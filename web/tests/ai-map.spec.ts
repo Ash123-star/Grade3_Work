@@ -29,6 +29,7 @@ test('knowledge status and forget job reach a clear terminal state', async ({ pa
   await page.route('**/api/**', async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (path === '/api/assets/manifest') return route.fulfill({ status: 404, json: { code: 'ASSET_NOT_PUBLISHED' } });
     let body: unknown;
     let status = 200;
     if (path === '/api/admin/workspace/ai/work-items') body = {items: []};
@@ -73,6 +74,7 @@ test('analysis failures and missing evidence never reveal a sample conclusion', 
   await page.addInitScript(() => sessionStorage.setItem('workpanel-token', 'browser-test-token'));
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
+    if (path === '/api/assets/manifest') return route.fulfill({ status: 404, json: { code: 'ASSET_NOT_PUBLISHED' } });
     let status = 200;
     let body: unknown;
     if (path === '/api/admin/workspace/ai/work-items') body = {items: []};

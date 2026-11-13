@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $results = Join-Path $repoRoot $ResultsDirectory
 New-Item -ItemType Directory -Force -Path $results | Out-Null
-$http = @('ai_map_ui_test.dart','ai_workbench_test.dart','member_workspace_contract_test.dart','attachment_assignment_http_test.dart','read_http_contract_test.dart','task_label_selector_test.dart','holiday_http_test.dart','notification_page_http_test.dart','live_notifications_contract_test.dart')
+$http = @('ai_map_ui_test.dart','ai_workbench_test.dart','member_workspace_contract_test.dart','attachment_assignment_http_test.dart','read_http_contract_test.dart','task_label_selector_test.dart','holiday_http_test.dart','notification_page_http_test.dart','live_notifications_contract_test.dart','push_notifications_test.dart')
 $previousTemp=$env:TEMP; $previousTmp=$env:TMP
 Push-Location (Join-Path $repoRoot 'mobile')
 try {

@@ -2,34 +2,42 @@
 
 需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
 
-## 全分支整合（2026-11-11，#82，自动验收通过，待非作者审阅）
+## 全分支整合（2026-11-13，八个PR，自动验收通过，用户授权直接推送main）
 
-基线 `origin/main=3f9eb2d561e17a41f91fb22c80cbfd23da2361ff`，分支 `chore/integrate-all-branches`；上一已推送提交 `cf710dd5ed2a058491e86884fcc9a7b8cf2a256e`，本批补修的最终 head 以 [PR #83](https://github.com/Ash123-star/Grade3_Work/pull/83) 为准。原有七个未被 main 包含的分支逐个保留 merge 历史；全部原分支 tip 已包含。原工作区混合修改、原分支均保留，不向 #77 推送补修。
+比较基线 `origin/main=3f9eb2d561e17a41f91fb22c80cbfd23da2361ff`，整合分支 `codex/integrate-requested-prs`，复用 [PR #83](https://github.com/Ash123-star/Grade3_Work/pull/83)；previous head为 `e73376153be0f5fcad9753a60738819e391e49b4`，最终head由PR记录。本批保留 #77/#78/#80/#81/#83/#85/#87/#89 全部原head及merge历史，不改写原分支。
 
-- #77：通知分页/条件 GET/30秒再验证、静默身份检查；修复清理回调返回自身 Future 导致200/304/错误挂起，保留账号及查询隔离。
-- #78：本人事项日期范围/颜色/月历条、头像入口及无草稿日志预填；本人事项HTTP9项覆盖正向、跨月、非法输入及本人隔离。
-- #80：创始人权限内免审、其他人当前直属上级审核；旧互审待审作废，保留已决定历史及审计/outbox。
-- #81：业务/生成文件与全量静态资源接入OSS，沿用现行导出、资料及数据范围校验；旧整合冲突保留main的多标签、快照分页和日志规则。
-- 迁移碰撞统一为 V31本人事项、V32退休互审、V33 OSS；已发布V1–V30及年度场景V1不改写。开发库若运行过某条独立V31，先核对脚本/校验和，禁止自动repair，见[数据库说明](database-schema.md)。
-- 经用户追加授权修复既有回归：年度空库使用新增B1，旧V1/V6继续校验与增量升级，不伪造创始人上级；原理、失败baseline(0)库的保留方式见[年度场景说明](annual-scenario-rebuild.md)。Flutter修复429缓存月历裁切，保留小徽标外观并为剩余任务入口单独保留48dp高的触控区。旧标题、from/to日期契约、提示入口及五行固定布局的断言按现行规则更新；手势使用实际月份、滚动位置和真实日期，仍验证预览/确认/提交同日期、任务数量及取消恢复。
+- #77：消息分页、搜索、条件GET/304、会话缓存与30秒再验证、静默身份检查；保留200/304/错误完成修复和账号隔离。
+- #78：本人事项起止日、颜色、月历长条、头像入口及无草稿日志预填。
+- #80：创始人权限内免审，其他人由当前有效直属上级审核；旧互审待审作废，保留已决定历史、审计和outbox。
+- #81：附件、生成文件及静态资源接入OSS，保留授权、导出一致快照、多标签、日志与迁移恢复规则。
+- #83：既有迁移碰撞协调、年度空库B1/旧V1–V6兼容、429缓存月历布局与回归修复全部保留，不伪造创始人上级，不改发布过的年度V1。
+- #85：资料性别选填与服务端校验、首页三条任务预览、精确到天的工龄及头像入口调整。
+- #87：阿里云必要通知、偏好/设备绑定、授权点击和outbox投递；SDK改在Application主线程初始化，持久化同意门控覆盖冷channel进程，设备及厂商注册仍在授权后执行。补实际OkHttp/XML依赖和精确SDK规则，R8正常开启；可选Tlog由反射异常捕获后保留默认logger和后续网络初始化，不使用全局ignorewarnings。
+- #89：默认管理员简易后台及员工直接开通；原组织权限 `/admin/accounts`、公司事项 `/admin/company-items` 与AI `/legacy` 仍可使用，分离两套样式且保留OSS素材初始化。恢复根README原文档和开发入口，保留新后台说明。
+- 正式迁移为V31本人事项、V32退休互审、V33 OSS、V34推送；main已有V1–V30逐字节不变。运行过独立V31（包括曾部署的OSS版本）的环境必须先核对历史脚本/校验和与备份，不能直接套用整合迁移或自动repair，见[数据库说明](database-schema.md)。
 
-环境：Windows/PowerShell、Java21、Maven3.9.9、Flutter3.38.7、Docker隔离PostgreSQL/Redis/Neo4j。日志、Surefire和截图均在忽略目录 `output/integration/`、`output/flutter-evidence/`；凭据仅从本机忽略环境配置读取，真实OSS使用随机验收前缀并清理对象。
+环境：Windows/PowerShell、Java21、Maven3.9.9、Flutter3.38.7，真实隔离Docker PostgreSQL/Redis/Neo4j。以下结果来自本批完整兼容修复工作树；验收后仅整理文档、规则注释与索引，未改变产品执行逻辑。过程证据在本机忽略目录 `output/pr-merge/`。
 
-| 最终检查 | 实际结果 | 证据（相对 output/integration） |
+| 最终检查 | 实际结果 | 证据（相对output/pr-merge） |
 | --- | --- | --- |
-| `scripts/test-backend.ps1`，`OSS_REAL_ACCEPTANCE=true` | 退出0；528项，527通过、0失败、0错误、1条件跳过；verify与JAR打包通过 | `repaired-backend.log`、`repaired-backend-exit.json`、`repaired-backend-reports/` |
-| 同次真实OSS | 2项通过，321素材/80583656字节；上传、授权读取、生成、迁移、恢复、删除、公开网关通过，测试对象清理；不表示生产激活 | `repaired-real-publication.json`及对应Surefire |
-| `scripts/test-backend.ps1 -Tests AnnualScenarioMultiFounderMigrationTest` | 退出0；最终5项通过，包含当前日期、新库、旧V1/V6历史、重复执行、冲突不覆盖；新增用例在临时B1副本固定2026-11-04/05/06，三日均有两条合法独立审核候选，生产SQL字节不改动。与全套中的4项重叠，不累加成独立全套次数 | `annual-final-boundaries.log`、`annual-final-boundaries-exit.json`、`annual-final-reports/` |
-| `scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat -ResultsDirectory output/integration/final-flutter` | 退出0；HTTP71通过；Mock458通过、6条件跳过，均无失败 | `final-flutter/{http,mock}.log`、`exit-codes.json`、`final-acceptance-exit.json` |
-| `flutter analyze --no-pub` / `flutter build bundle --no-pub --dart-define=USE_MOCK=false` | 均退出0；全项目无分析问题，资源包编译通过 | `final-flutter-analyze.log`、`final-analyze-exit.json`、`final-mobile-bundle.log` |
-| `openspec.cmd validate --all --strict` | 退出0；47通过、0失败 | `final-openspec.log`、`final-acceptance-exit.json` |
-| Web `npm run build` | 整合提交cf710dd阶段退出0；本批补修无Web代码变化，未无故重复构建 | `web-build.log`、`web-exit.json` |
+| `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1` | 退出0；556项，553通过、0失败、0错误、3条件跳过；verify和JAR成功 | `backend-final.log`、`backend-final-exit.json`，JUnit在server/target/surefire-reports |
+| `scripts/test-flutter.ps1 -Flutter D:/flutter/bin/flutter.bat -ResultsDirectory output/pr-merge/flutter-final` | 退出0；HTTP83通过，Mock471通过、6条件跳过，无失败 | `flutter-final.log`、`flutter-final/exit-codes.json`、`flutter-final-exit.json` |
+| `flutter analyze --no-pub` | 退出0，全项目无问题 | `flutter-analyze.log`、`flutter-analyze-exit.json` |
+| Web `npm.cmd run build` / `npm.cmd run test:e2e` | 类型检查/构建退出0；新后台浏览器20通过 | `web-build.log`、`web-ui.log`、`web-exit.json` |
+| Web `npm.cmd run test:e2e:legacy` | 退出0；原管理及AI浏览器48通过、6真实服务条件跳过 | `web-legacy-final.log`、`web-legacy-final-exit.json` |
+| `flutter build apk --release --dart-define=USE_MOCK=false` | 退出0；R8开启，APK构建成功，仍使用仓库原调试签名，未安装/真机验收 | `android-release-verified.log`、`android-release-verified-exit.json` |
+| `openspec.cmd validate --all --strict` | 退出0；49通过、0失败；收尾重新执行同样通过 | `openspec.log`、`openspec-exit.json`及终端收尾输出 |
+| Git完整性 | 8个原head均为整合HEAD祖先；已发布迁移字节不变；无冲突标记，空白检查退出0 | Git历史与本批最终差异 |
 
-历史失败证据保留：原完整后端527项中2错误；初轮Flutter HTTP3失败/Mock50失败；隔离main `3f9eb2d` 本身HTTP2失败/Mock35失败。用户随后明确授权修复既有失败，以上最终结果取代旧阻塞结论。诊断探测的失败、临时夹具及定向复验保留在忽略目录，不以其替代最终通过。测试生成的AI指标已恢复，OpenAPI仅属性排序变化且语义相等，未提交无关快照变动。
+APK为 `mobile/build/app/outputs/flutter-apk/app-release.apk`，126743252字节，SHA-256 `47972751CB6FDC3E49D2C1BCE8E006D075365D028D1306ED4939A2A4A3F011AA`。本次没有剥离资源、正式签名、安装或发布，不能把构建通过当作锁屏推送送达证明。
 
-非功能覆盖：安全/隐私（服务端本人/跨公司文件隔离、私有对象匿名拒读、当前审核人及账号缓存隔离）；可靠性（幂等/版本冲突、失败重试、304完成、迁移重放与OSS恢复/删除）；无障碍组件几何（大字体、替代移动操作及48dp触控高度）。自动化截图仅为组件证据，不冒充设备验收。
+本轮后端3个跳过为真实OSS2项（未设置OSS_REAL_ACCEPTANCE）及外部节假日公告1项（未设置calendar.live）。Flutter6项和Web legacy6项依赖真实服务/设备或在当前模式主动跳过。测试脚本将推送测试归入真实HTTP模式，未改变产品开关或放宽断言；迁移测试最终版本改为34并新增推送三表断言。测试生成的检索指标已恢复；OpenAPI仅同步运行时真实9个管理操作的502响应及operationId差异，保留原顺序。
 
-边界：后端跳过项是外部真实节假日公告源可选验收；Flutter6项依赖独立真实服务/设备环境或在Mock模式主动跳过。日志中的既有非阻塞手势命中提示保留。OSS生产配置/迁移/激活、RAM最小权限审计、双端真实远程渲染、Android/TalkBack/性能矩阵尚未完成，相关OpenSpec不归档。本批不部署、不重播生产种子、不重置数据库；自动化门禁已通过，仍须非作者在GitHub保留审阅结论后才能通过PR合入main。
+历史证据单独保留：2026-11-11的e733761阶段完整后端528项中527通过、1条件跳过；当时真实OSS2项通过，321素材/80583656字节，随机前缀已清理（`output/integration/repaired-real-publication.json`及对应Surefire）；年度专项最终5项通过，覆盖新库、旧V1/V6、重放及临时B1副本的2026-11-04/05/06边界（`annual-final-boundaries.log`、`annual-final-reports/`）。这些历史真实OSS和专项结果不计入本轮通过数，也不代表生产激活。原527项2错误、Flutter HTTP3/Mock50失败及本轮旧版本33断言失败均保留原始日志，以当前最终结果取代旧阻塞结论。
+
+非功能：安全/隐私覆盖本人/跨公司、首次改密、角色注入拒绝、私有对象、账号缓存隔离；可靠性覆盖事务原子性、幂等/版本冲突、304、重试与迁移重放；组件无障碍几何覆盖窄屏、大字和48dp触控高度。后台真实HTTP/PostgreSQL链路与新旧浏览器入口均通过，组件/夹具截图不替代设备签收。
+
+边界：EMAS/RAM/厂商通道/正式签名及真机前后台、锁屏、进程回收和离线恢复未验收，推送任务5.1/5.2不勾选；OSS生产迁移/激活、双端远程渲染、RAM审计、Android/TalkBack/性能矩阵仍按既有任务签收。本批不部署、不重播生产种子、不重置数据库，相关OpenSpec不归档。用户明确要求“直接推送到主分支，确保PR都被合并，列表里不显示”，本批按该指令直接快进推送main并核对PR合并状态；没有非作者审阅记录，不伪造审批。此为本次明确授权，不更改仓库通用合并规则。
 
 ## 消息缓存与定时再验证（2026-11-07，已部署，设备待验收）
 
@@ -194,6 +202,8 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 
 ## 阿里云 Android 必要通知（Issue #86）
 
+以下为2026-11-12历史验证，初始化及R8阻塞已由文首2026-11-13整合修复；5.1/5.2外部验收仍未完成。
+
 2026-11-12，实现提交 `bb017df1f3e1cefee33c934f14caffb66f44533c`，基于 `31f2df2cafe362d56ac446cd64f8f20d5d24f787`；草稿PR #87，本段记录同批实现的本地验收，后续提交仅同步交付状态。提案、范围及外部未完成项由 [android-essential-push](../openspec/changes/android-essential-push/tasks.md) 维护。未提供EMAS/RAM/厂商/正式签名配置，本轮不部署、不发真实云推送；ACCEPTED只表示供应商受理。
 
 - Windows、Java21/Maven3.9、隔离Docker PostgreSQL16，`powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests PushRulesTest,AliyunPushGatewayTest,EssentialPushIntegrationTest,TaskRevisionServiceTest,TaskLifecycleServiceTest,TaskDispatchServiceTest,TaskComponentsTest,TaskDispatchIntegrationTest,ReviewIntegrationTest,MultiFounderReviewIntegrationTest,BackendIntegrationTest`：119项通过、退出0，JAR构建成功；`output/push-backend-final.log`。随后仅扩展测试覆盖24h/1h/逾期各阶段及真实HTTP撤回入口，`-Tests EssentialPushIntegrationTest` 11项通过、退出0（`output/push-backend-scenarios.log`）；厂商参数更正为官方OPPO分类/Honor通道后，`-Tests AliyunPushGatewayTest` 2项通过、退出0（`output/push-provider-final.log`）。上述测试总计120个不同用例；受影响既有资料/置顶测试此前同批8项也通过，非全量后端验收。
@@ -210,4 +220,4 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 
 本次最终包 `output/apk/pandora-0.1.0-online-test.apk` 为81,778,042字节，SHA-256 `ca35a207757225106d7f978add1ae9db7596da50a29afb4d5fc0ee838148b970`，版本0.1.0+1、最低Android7/API24，支持arm64-v8a/armeabi-v7a/x86_64。核对已发布 `oss-20261112-ui` 清单后，后处理移除288个Flutter图片/字体（未压缩58,221,313字节），保留执行资源、安装清单、原生资源及许可证；重新zipalign并用现有Android Debug证书签名，apksigner v2/v3和16KB原生库对齐校验退出0。三种ABI的libapp.so均核对公网API地址，Mock关闭，后端健康200/UP。当前源码pubspec仍声明安装副本，只有这份后处理产物已剥离，不能外推到以后直接flutter build生成的包。首次加载素材需要联网，既有校验缓存逻辑沿用；无包内Flutter图片/字体回退。
 
-过程命令、签名和文件清单证据在 `output/apk-gradle-release.log`、`output/apk/package-online-apk.py`、`output/apk/package-inspection.json`、`output/apk/signature-verification.log` 和 `output/apk/badging.txt`。本机API36模拟器系统镜像缺失、API37只读实例创建加密分区失败，均未启动成功；没有安装到手机，也未验证该剥离包的实际界面或首次远程字体渲染。手机推送继续关闭，3.1/5.1/5.2保持未完成；本次没有运行测试套件或重新部署后端。
+过程命令、签名和文件清单证据在 `output/apk-gradle-release.log`、`output/apk/package-online-apk.py`、`output/apk/package-inspection.json`、`output/apk/signature-verification.log` 和 `output/apk/badging.txt`。本机API36模拟器系统镜像缺失、API37只读实例创建加密分区失败，均未启动成功；没有安装到手机，也未验证该剥离包的实际界面或首次远程字体渲染。该历史包手机推送关闭，当时3.1/5.1/5.2未完成；该次未运行测试套件或重新部署。当前3.1已修正且完整回归/R8构建通过，5.1/5.2仍未完成，以文首本批结果为准。

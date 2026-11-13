@@ -21,9 +21,10 @@ class FounderReviewRetirementMigrationTest {
    }
    var before=db.queryForList("SELECT * FROM dashboard_items");
    var flyway=Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema).load();flyway.migrate();flyway.validate();
-   assertEquals("33",flyway.info().current().getVersion().getVersion());
+   assertEquals("34",flyway.info().current().getVersion().getVersion());
    assertEquals(1,db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema=? AND table_name='personal_todos' AND column_name='end_date'",Integer.class,schema));
    assertEquals(1,db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema=? AND table_name='attachments' AND column_name='storage_provider'",Integer.class,schema));
+   assertEquals(3,db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema=? AND table_name IN ('push_preferences','push_devices','push_deliveries')",Integer.class,schema));
    assertEquals("SUPERSEDED",db.queryForObject("SELECT status FROM review_requests WHERE id='pending'",String.class));
    assertEquals("SUPERSEDED",db.queryForObject("SELECT state FROM review_steps WHERE request_id='pending'",String.class));
    assertEquals("APPROVED",db.queryForObject("SELECT status FROM review_requests WHERE id='approved'",String.class));

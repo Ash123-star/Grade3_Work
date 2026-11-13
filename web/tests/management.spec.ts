@@ -15,7 +15,7 @@ test('management has precisely two pages and submits a complete account candidat
     if (url.pathname.endsWith('/items')) return route.fulfill({ json: { items: [], preview: [], total: 0, pinnedCount: 0, nextCursor: '0' } });
     return route.fulfill({ json: { items: [account], total: 1, nextCursor: '1' } });
   });
-  await page.goto('/');
+  await page.goto('/admin/accounts');
   await expect(page).toHaveURL(/\/admin\/accounts$/);
   await expect(page.getByRole('navigation', { name: '管理导航' }).getByRole('link')).toHaveCount(2);
   await expect(page.getByRole('heading', { name: '账号管理' })).toBeVisible();
@@ -53,7 +53,12 @@ test('company item retains form after conflict and renders text safely', async (
 test('non admin cannot load management data', async ({ page }) => {
   let managementRequests = 0;
   await page.addInitScript(() => sessionStorage.setItem('workpanel-token', 'employee'));
-  await page.route('**/api/**', async route => { if (!route.request().url().endsWith('/auth/me')) managementRequests++; await route.fulfill({ json: { ...admin, role: 'EMPLOYEE' } }); });
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/assets/manifest') return route.fulfill({ status: 404, json: { code: 'ASSET_NOT_PUBLISHED' } });
+    if (path !== '/api/auth/me') managementRequests++;
+    await route.fulfill({ json: { ...admin, role: 'EMPLOYEE' } });
+  });
   await page.goto('/admin/accounts');
   await expect(page.getByRole('alert')).toContainText('仅供已启用的管理员');
   await expect(page.getByRole('button', { name: '登录工作台' })).toBeVisible();

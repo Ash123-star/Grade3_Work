@@ -39,6 +39,7 @@ android {
 
     buildTypes {
         release {
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
@@ -48,4 +49,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Keep the SDK's WebView certificate checker and Tika XML error types available.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("javax.xml.stream:stax-api:1.0-2")
 }

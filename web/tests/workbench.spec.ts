@@ -33,6 +33,7 @@ test('workbench preserves failed input, confirms a concrete action and clears lo
   await page.addInitScript(() => sessionStorage.setItem('workpanel-token', 'test-token'));
   await page.route('**/api/**', async route => {
     const request = route.request(), path = new URL(request.url()).pathname;
+    if (path === '/api/assets/manifest') return route.fulfill({ status: 404, json: { code: 'ASSET_NOT_PUBLISHED' } });
     if (path.endsWith('/stream')) { await route.fulfill({contentType:'text/event-stream',body:': connected\n\n'}); return; }
     let status = 200, body: any = {};
     if (path === '/api/auth/me') body = {role: 'ADMIN', must_change_password: false};

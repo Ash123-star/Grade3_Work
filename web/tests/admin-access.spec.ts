@@ -5,7 +5,9 @@ for (const role of ['EMPLOYEE', 'FOUNDER']) {
     let businessRequests = 0;
     await page.addInitScript(() => sessionStorage.setItem('workpanel-token', 'test-session'));
     await page.route('**/api/**', async route => {
-      if (new URL(route.request().url()).pathname !== '/api/auth/me') businessRequests++;
+      const path = new URL(route.request().url()).pathname;
+      if (path === '/api/assets/manifest') return route.fulfill({ status: 404, json: { code: 'ASSET_NOT_PUBLISHED' } });
+      if (path !== '/api/auth/me') businessRequests++;
       await route.fulfill({ json: { role, must_change_password: false } });
     });
     await page.goto('/legacy');
@@ -20,7 +22,9 @@ for (const role of ['EMPLOYEE', 'FOUNDER']) {
 test('revoked administrator clears workspace on protected API denial', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('workpanel-token', 'revoked-session'));
   await page.route('**/api/**', async route => {
-    if (new URL(route.request().url()).pathname === '/api/auth/me') {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/assets/manifest') return route.fulfill({ status: 404, json: { code: 'ASSET_NOT_PUBLISHED' } });
+    if (path === '/api/auth/me') {
       await route.fulfill({ json: { role: 'ADMIN', must_change_password: false } });
     } else {
       expect(new URL(route.request().url()).pathname).toMatch(/^\/api\/admin\/workspace\//);

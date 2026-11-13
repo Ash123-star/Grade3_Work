@@ -51,6 +51,14 @@ Should，范围为Android。设置 SHALL 提供总开关、任务/截止/审批�
 - **WHEN** 用户配置可用并授权开启，随后点击属于当前绑定的有效通知
 - **THEN** 手机 SHALL 注册设备并同步本人设置；身份恢复后进入对应授权详情，SSE不得重复创建系统通知
 
+#### Scenario: SDK channel process cold start
+- **WHEN** 用户已经同意开启通知后，SDK独立channel进程或应用主进程冷启动
+- **THEN** 自定义Application SHALL 在主线程按已持久化同意标记及应用配置初始化SDK；设备和厂商注册仍须经过现有开启状态、服务端配置和系统权限门控，缺配置或未同意时MUST NOT 初始化或注册
+
+#### Scenario: Disable and re-enable in one process
+- **WHEN** 用户关闭通知后在同一应用进程再次授权开启
+- **THEN** 客户端 SHALL 清除关闭时的本机同意标记并在重新开启时再次保存，保留原设备绑定和授权点击规则，不因SDK已初始化而跳过同意恢复
+
 #### Scenario: Quiet hours or denied permission
 - **WHEN** 当前处于免打扰、分类关闭或系统拒绝通知权限
 - **THEN** 系统 SHALL 延后并重新校验有效期或取消对应推送，不影响站内功能；设置如实显示状态

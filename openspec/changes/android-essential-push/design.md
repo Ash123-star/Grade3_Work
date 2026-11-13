@@ -11,9 +11,11 @@
 4. 新迁移（以当前最大版本后追加，实施时核对远端）创建设备、偏好、投递表及截止索引，无历史消息补推；设备30天不更新过期，投递仅保留30天诊断状态并定期清理。RPC供应商HTTP超时5秒、最多5次、指数退避，过期/权限变化不重试；无设备不补推历史。系统关闭通知/分类关闭直接取消待发送，免打扰延至上海结束时刻并重新检查expiry。
 5. 事件白名单：TASK_ASSIGNED（新参与人）、TASK_REVISED/REASSIGNED/RESCHEDULED、TASK_EVENT内WITHDRAWN/RETURNED、REVIEW_PENDING/REJECTED、MEMBERSHIP的APPROVED/REJECTED。普通接收/反馈/验收/评论/日志/AI不推。TASK_EVENT补不可变action与版本；推送快照版本与当前版本不一致取消，避免旧审批/旧任务提醒。发送前调用实际任务/审核应用读取校验当前组织范围及审核步骤，取消已失效待办；锁屏和厂商渠道统一只发无业务正文的摘要。
 6. 截止scheduler依真实任务deadline对所有参与人处理，仅DISPATCHED/RECEIVED：24h和1h窄时间窗、不补错过的阶段，逾期一次；键含deadline/阶段/接收人。DAY过期在deadline-1h，HOUR在deadline，OVERDUE在deadline+24h；完成/撤回/改期使旧投递无效。站内也保留这些阶段数据，不从文案推断。
-7. Android三类channel，SDK只由用户在通知设置开启后初始化（首次需授权）；设置页有系统通知状态、总开关/分类/免打扰。插件负责系统通知，SSE只刷新不再创建本地通知。native channel负责Android13权限、冷启动点击缓存及channel锁屏private；SDK通知extras仅notificationId、binding，不含正文。前后台点击等待身份可用，binding不匹配丢弃，调用open API后使用白名单路径跳转；PENDING跳本人申请状态页刷新。
+7. Android三类channel，SDK只由用户在通知设置开启后初始化（首次需授权）；由自定义Application在主线程管理SDK初始化，首次开启先同步持久化本人同意标记，再初始化；SDK channel进程及后续冷启动的Application仅在配置存在且已同意时初始化。设备register及厂商注册继续只由Flutter原有enabled/configured/系统权限门控触发，不在Application启动时注册。关闭通知清除本机同意标记，重新开启即使同进程已注册也重新保存同意；缺配置不初始化。设置页有系统通知状态、总开关/分类/免打扰。插件负责系统通知，SSE只刷新不再创建本地通知。native channel负责Android13权限、冷启动点击缓存及channel锁屏private；SDK通知extras仅notificationId、binding，不含正文。前后台点击等待身份可用，binding不匹配丢弃，调用open API后使用白名单路径跳转；PENDING跳本人申请状态页刷新。
 
 实施补充：官方Flutter插件initPush强制开启DEBUG，故通过原生桥接初始化同一官方Android SDK并在注册前LOG_OFF，复用官方厂商注册工具；SDK负责系统通知展示，Dart不重复创建通知。云投递使用独立调度器，避免网络等待阻塞站内消息调度。REVIEW_PENDING携带不可变reviewStepId，审核改派后旧步骤提醒失效；新参与人已生成TASK_ASSIGNED时不重复生成该次修订提醒。OPPO使用官方消息分类参数，其余厂商按支持的通道字段映射。
+
+Release兼容：保留aliyun_push官方样例中的SDK/厂商反射及JNI keep规则，明确接入app的proguard文件；不使用样例的全局ignorewarnings、不关闭压缩。对当前SDK依赖中可选的华为系统扩展/分析/更新、anet ping诊断以及Huawei security-encrypt的BouncyCastle增强随机源仅逐类声明dontwarn。已核对security-encrypt 1.3.0.301默认使用平台SecureRandom，启用BC分支时也捕获缺类并回退；不因压缩问题移除任何厂商通道。实际Release编译结果与真机外部验收分别记录，不能用编译替代送达验收。
 
 ## Risks / Trade-offs
 - 云应用/厂商证书、正式签名和RAM权限未提供 → 默认关闭，受控供应商测试，真实设备任务保持未完成。

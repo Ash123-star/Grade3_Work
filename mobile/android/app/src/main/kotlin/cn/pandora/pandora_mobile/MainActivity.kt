@@ -6,10 +6,7 @@ import android.app.NotificationManager
 import android.app.Notification
 import android.content.pm.PackageManager
 import android.os.Build
-import com.alibaba.sdk.android.push.CloudPushService
 import com.alibaba.sdk.android.push.CommonCallback
-import com.alibaba.sdk.android.push.noonesdk.PushInitConfig
-import com.alibaba.sdk.android.push.noonesdk.PushServiceFactory
 import com.aliyun.ams.push.AliyunThirdPushUtils
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -56,22 +53,27 @@ class MainActivity : FlutterActivity() {
                     prefs.edit().clear().apply()
                     result.success(if (id != null && binding != null) mapOf("notificationId" to id, "binding" to binding) else null)
                 }
-                "clear" -> { getSystemService(NotificationManager::class.java).cancelAll(); if (call.argument<Boolean>("discardOpen") == true) getSharedPreferences("push_open", MODE_PRIVATE).edit().clear().apply(); result.success(null) }
+                "clear" -> {
+                    getSystemService(NotificationManager::class.java).cancelAll()
+                    if (call.argument<Boolean>("discardOpen") == true) {
+                        getSharedPreferences("push_open", MODE_PRIVATE).edit().clear().apply()
+                        (application as PandoraApplication).revokePushConsent()
+                    }
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }
     }
-    // The Flutter plugin's initPush forces LOG_DEBUG. Initialize the same official SDK here
-    // so registration and application identifiers never pass through verbose SDK logging.
+    // Flutter only invokes this after its enabled/configured/system-permission checks.
+    // Application owns SDK initialization in both the app and the cold channel process.
     private fun initializePush(result: MethodChannel.Result) {
         val key = getString(R.string.pandora_push_app_key)
         val secret = getString(R.string.pandora_push_app_secret)
         if (key.isBlank() || secret.isBlank()) { result.error("NOT_CONFIGURED", "移动推送尚未配置", null); return }
         try {
-            if (pushInitialized) { result.success(PushServiceFactory.getCloudPushService().deviceId); return }
-            PushServiceFactory.init(PushInitConfig.Builder().application(application).appKey(key).appSecret(secret).build())
-            val service = PushServiceFactory.getCloudPushService()
-            service.setLogLevel(CloudPushService.LOG_OFF)
+            val service = (application as PandoraApplication).initializePushAfterConsent()
+            if (pushInitialized) { result.success(service.deviceId); return }
             service.register(applicationContext, object : CommonCallback {
                 override fun onSuccess(response: String?) {
                     runOnUiThread {

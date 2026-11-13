@@ -113,6 +113,7 @@ onMounted(() => { if (token.value) void run(enter); });
     <div v-else class="console-layout">
       <aside class="sidebar"><a href="#" class="brand" @click.prevent="selectTab('employees')"><span class="brand-mark small">P</span><span>潘多拉<small>企业管理后台</small></span></a><p class="nav-caption">日常管理</p>
         <nav aria-label="后台导航"><button v-for="(title, key) in titles" :key="key" :class="{ active: tab === key }" :aria-current="tab === key ? 'page' : undefined" :disabled="busy" @click="selectTab(key)"><span aria-hidden="true">{{ key === 'employees' ? '◎' : key === 'priorities' ? '◇' : '▤' }}</span>{{ title }}</button></nav>
+        <p><a href="/admin/accounts">组织与权限管理</a></p>
         <div class="sidebar-bottom"><span class="avatar">{{ user.name?.slice(0, 1) }}</span><div>{{ user.name }}<small>管理员</small></div><button class="logout" :disabled="busy" @click="logout">退出</button></div>
       </aside>
       <main class="console-main" :aria-busy="loading"><header class="topbar"><span>管理后台 <span class="separator">/</span> {{ titles[tab] }}</span><span class="admin-badge">管理员专属</span></header>

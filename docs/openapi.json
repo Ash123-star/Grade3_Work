@@ -17,7 +17,7 @@
       "tags": [
         "admin-console-controller"
       ],
-      "operationId": "decide_1",
+      "operationId": "decide_2",
       "parameters": [
         {
           "name": "id",
@@ -124,6 +124,16 @@
               }
             }
           }
+        },
+        "502": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
         }
       }
     }
@@ -222,6 +232,16 @@
           }
         },
         "503": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
+        },
+        "502": {
           "description": "错误码及 traceId，详情参见后端接口说明",
           "content": {
             "application/json": {
@@ -355,6 +375,16 @@
               }
             }
           }
+        },
+        "502": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
         }
       }
     },
@@ -453,6 +483,16 @@
           }
         },
         "503": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
+        },
+        "502": {
           "description": "错误码及 traceId，详情参见后端接口说明",
           "content": {
             "application/json": {
@@ -577,6 +617,16 @@
               }
             }
           }
+        },
+        "502": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
         }
       }
     }
@@ -586,7 +636,7 @@
       "tags": [
         "admin-console-controller"
       ],
-      "operationId": "reviews",
+      "operationId": "reviews_1",
       "parameters": [
         {
           "name": "cursor",
@@ -692,6 +742,16 @@
               }
             }
           }
+        },
+        "502": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
         }
       }
     }
@@ -701,7 +761,7 @@
       "tags": [
         "admin-console-controller"
       ],
-      "operationId": "review",
+      "operationId": "review_1",
       "parameters": [
         {
           "name": "id",
@@ -787,6 +847,16 @@
           }
         },
         "503": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
+        },
+        "502": {
           "description": "错误码及 traceId，详情参见后端接口说明",
           "content": {
             "application/json": {
@@ -910,6 +980,16 @@
               }
             }
           }
+        },
+        "502": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
         }
       }
     }
@@ -998,6 +1078,16 @@
           }
         },
         "503": {
+          "description": "错误码及 traceId，详情参见后端接口说明",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
+        },
+        "502": {
           "description": "错误码及 traceId，详情参见后端接口说明",
           "content": {
             "application/json": {

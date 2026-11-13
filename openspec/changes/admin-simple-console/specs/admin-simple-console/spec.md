@@ -11,6 +11,10 @@ P0，后台 SHALL 仅允许 ACTIVE 且已完成首次改密的 ADMIN 访问员�
 - **WHEN** 员工、仅 FOUNDER、待确认账号或撤权管理员访问后台接口
 - **THEN** 服务端拒绝401/403，浏览器清理受限内容，不依赖隐藏按钮鉴权
 
+#### Scenario: Existing management and AI entry points
+- **WHEN** 用户打开默认后台、既有 `/admin/accounts`、`/admin/company-items` 或 `/legacy` 深链
+- **THEN** 默认入口 SHALL 提供新增的员工开通和修改记录能力，既有深链 SHALL 保留完整组织权限、公司事项及 AI 工作区功能并继续执行原鉴权；两套界面样式 MUST 隔离且保留 OSS 素材初始化
+
 ### Requirement: Direct employee provisioning
 P0，ADMIN SHALL 填写账号、初始密码、手机号、姓名、部门直接创建 ACTIVE/EMPLOYEE 账号；MUST 强制首次改密，原子写入角色与脱敏审计，不返回密码或哈希。创建不要求幂等键，重复账号或手机号 SHALL 返回409。
 

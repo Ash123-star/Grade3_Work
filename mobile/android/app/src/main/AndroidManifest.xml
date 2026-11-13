@@ -7,7 +7,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:label="潘多拉工作台"
-        android:name="${applicationName}"
+        android:name=".PandoraApplication"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
