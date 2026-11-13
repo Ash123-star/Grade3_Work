@@ -33,7 +33,8 @@ app:
     access-key-id: ${PUSH_ACCESS_KEY_ID:}
     access-key-secret: ${PUSH_ACCESS_KEY_SECRET:}
     security-token: ${PUSH_SECURITY_TOKEN:}
-    huawei-channel: ${PUSH_HUAWEI_CHANNEL:}
+    huawei-channel: ${PUSH_HUAWEI_CHANNEL:NORMAL}
+    huawei-category: ${PUSH_HUAWEI_CATEGORY:WORK}
     xiaomi-channel: ${PUSH_XIAOMI_CHANNEL:}
     oppo-category: ${PUSH_OPPO_CATEGORY:}
     vivo-channel: ${PUSH_VIVO_CHANNEL:}
