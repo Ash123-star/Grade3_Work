@@ -1,3 +1,5 @@
+import '../core/push/push_controller.dart';
+import '../features/settings/push_settings_page.dart';
 import 'package:pandora_mobile/routing/branch_pager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -61,7 +63,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               '/auth/pending',
               '/auth/password',
               '/form/password',
-            ].contains(path)
+              '/me/notifications',
+            ].contains(path) || path.startsWith('/membership-result/')
             ? null
             : '/auth/pending';
       }
@@ -73,6 +76,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/me/notifications', builder: (_, _) => const PushSettingsPage()),
+      GoRoute(path: '/membership-result/:id', builder: (_, s) => MembershipResultPage(s.pathParameters['id']!)),
       GoRoute(
         path: '/ai/directions',
         builder: (_, _) => const LegacyDirectionPage(),
@@ -377,6 +382,9 @@ final routerProvider = Provider<GoRouter>((ref) {
     errorBuilder: (_, _) => const UtilityPage('not-found'),
   );
   ref.listen(sessionProvider, (_, _) => router.refresh());
+  ref.listen(pushRouteProvider, (_, route) {
+    if (route != null) { router.go(route); ref.read(pushRouteProvider.notifier).state = null; }
+  });
   ref.onDispose(router.dispose);
   return router;
 });

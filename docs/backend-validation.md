@@ -177,3 +177,37 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven
 - 本地实际数据库 V4–V6、云端 V2–V6 已成功；两边主公司创始人均 4 名，场景成员未分配 0、在职个人资料缺失 0，每位在职普通员工有 8 条新增月历重叠计划（本地10人、云端9人，保留既有审批状态）。备份及执行证据见[年度场景](annual-scenario-rebuild.md)。
 - 原月历折叠/拖动逻辑保持；统计页、黄色主题、各子页及历史 14px 溢出等仍需用户设备验收，未将编译当作功能验收。PR #74 已合并，云端 API 重启后内网/公网健康检查 UP，公网 APK 已覆盖安装模拟器；云端 raw 网络故障及双入口修复另按实际发布记录跟踪。
 - 后续双入口修复：`mvn.cmd -B -f server/pom.xml '-Dmaven.test.skip=true' package` 退出0；`openspec.cmd validate --all --strict` 46项通过、退出0，证据 `output/yellow-theme/holiday-fallback-{build,spec}.log`。部署诊断在云端用相同 Java HTTP 设置读取 Contents 返回200、2026年39条安排，raw入口超时；没有把探测程序当作测试套件或完整功能验收。最终公网接口结果以修复PR发布记录为准。
+
+
+## 个人资料与首页修正（Issue #84）
+
+2026-11-12，Windows、Flutter/Dart（D:/flutter）、Java21、Maven3.9.9。实现验证提交 `94a5e9d29643954d7c4832f75d35a38a6bb929d3`，基于 OSS 分支 `f21e812a7c9bf9acccd933f380b9050f8ae3ebc8`，本段后续提交仅同步规格与验证记录。性别为男/女选填，非法写入拒绝，历史非标准值资料接口显示为空但保留数据库原值；任务预览三条真实数据；删除重复可见性提示；工龄按上海业务日期显示年月天。无新接口、迁移或部署。
+
+- `flutter test test/profile_choice_test.dart test/tenure_test.dart test/home_summary_navigation_test.dart test/home_prototype_layout_test.dart test/home_daily_todos_visual_test.dart test/week6_client_contract_test.dart`：46项通过，退出0。覆盖选择/取消/保存、请求条数、0至4条实际数据、320px及1.6倍字体、完整首页布局、空态与重试、日期边界。日志 `output/profile-final-flutter.log`。
+- `MAVEN_ARGS=-Dtest=MobileDataContractIntegrationTest,TaskPinIntegrationTest,MobileP0MigrationUpgradeTest` 后执行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1`：13项通过，退出0，JAR构建成功；隔离容器与真实PostgreSQL，日志 `output/profile-backend-scoped.log`。性别男女回读/空值/缺席保留、非法值不改变版本、历史值保留，以及既有组织权限与版本冲突通过。
+- 受影响的工龄、资料页、预览卡片、每日事项及新增/修改测试执行 `dart analyze <paths>`：无告警，退出0；全项目 `dart analyze` 退出2，剩余16项既有问题（2 warning、14 info），没有 error，见 `output/profile-final-analysis.log`。基线无关告警未扩展修复。
+- `openspec.cmd validate --all --strict`：47项通过，退出0；`git diff --check` 通过。
+- 正式默认模式中 `profile_dog_ui_test.dart` 访问未配置服务导致旧断言失败；按该演示测试所需 `--dart-define=USE_MOCK=true` 重跑通过。临时截图脚本及该测试合计3项通过，证据 `output/profile-capture.log`、`output/profile-verified.png`；截图使用本机中文字体替代测试字体，未启动OSS资源加载，仅验证资料布局，不能作为生产素材/设备验收。
+- 全量后端首轮在年度数据迁移夹具出现2个既有错误，随后进入无关AI等待，采集线程栈后主动中止（退出1），没有宣称全量通过。证据 `output/profile-backend.log`、`output/profile-threads.log`；受影响测试另行通过如上。
+- 非功能：安全验证资料读取范围、非法请求不写入与版本控制；易用性验证窄屏/大字/独立详情入口，无溢出。
+- 尚未验证：Android真机、线上发布及完整后端套件成功；本轮未创建或部署APK。保留既有OSS资源加载方式，PR依赖OSS分支 #81。
+
+## 阿里云 Android 必要通知（Issue #86）
+
+2026-11-12，实现提交 `bb017df1f3e1cefee33c934f14caffb66f44533c`，基于 `31f2df2cafe362d56ac446cd64f8f20d5d24f787`；草稿PR #87，本段记录同批实现的本地验收，后续提交仅同步交付状态。提案、范围及外部未完成项由 [android-essential-push](../openspec/changes/android-essential-push/tasks.md) 维护。未提供EMAS/RAM/厂商/正式签名配置，本轮不部署、不发真实云推送；ACCEPTED只表示供应商受理。
+
+- Windows、Java21/Maven3.9、隔离Docker PostgreSQL16，`powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests PushRulesTest,AliyunPushGatewayTest,EssentialPushIntegrationTest,TaskRevisionServiceTest,TaskLifecycleServiceTest,TaskDispatchServiceTest,TaskComponentsTest,TaskDispatchIntegrationTest,ReviewIntegrationTest,MultiFounderReviewIntegrationTest,BackendIntegrationTest`：119项通过、退出0，JAR构建成功；`output/push-backend-final.log`。随后仅扩展测试覆盖24h/1h/逾期各阶段及真实HTTP撤回入口，`-Tests EssentialPushIntegrationTest` 11项通过、退出0（`output/push-backend-scenarios.log`）；厂商参数更正为官方OPPO分类/Honor通道后，`-Tests AliyunPushGatewayTest` 2项通过、退出0（`output/push-provider-final.log`）。上述测试总计120个不同用例；受影响既有资料/置顶测试此前同批8项也通过，非全量后端验收。
+- 真实任务HTTP入口→审核生效→outbox→站内通知/推送队列→受控gateway→点击授权通过；额外覆盖事务回滚无部分通知、重复处理、会话撤销、换号lease、他人/他司拒绝、待确认仅本人入职结果、旧审核步骤取消、过期/分类关闭、静音延后、任务版本变化和最多5次重试。供应商层另以真实官方Java SDK向本机HTTP服务签名发送并检查通用摘要/参数，未调用阿里云；两层测试不等于云端端到端送达。
+- Flutter3.38.7/Dart3.10.7，`flutter test --no-pub --concurrency=1 test/push_notifications_test.dart test/week6_client_contract_test.dart test/review_notification_display_test.dart --reporter expanded`：22项通过、退出0（`output/push-flutter-final.log`）。覆盖冷启动点击等待绑定、换号/同账号并发、退出、销毁后回调、拒绝权限、缺配置、保存失败、白名单目标及320px设置布局。受影响6组路径的 `dart analyze` 无问题、退出0（`output/push-dart-analysis.log`）。
+- `flutter build apk --debug --no-pub --dart-define=USE_MOCK=false`：退出0，原生SDK/receiver/PopupActivity/权限与channel编译成功（`output/push-android-build-final.log`）；产物 `mobile/build/app/outputs/flutter-apk/app-debug.apk`。无真实配置，安装包不代表离线推送可用，不调整既有素材打包配置。
+- 扩展运行calendar_notification_refresh/live_notifications_contract/notification_preview三组测试失败，其中8项在未修改的基线副本可复现（`output/push-baseline-tests.log`）；旧预览测试仍期望已移除的逐条详情读取，SSE断言仍期望旧刷新语义。此次新增的一处post-frame读取已销毁provider问题已修复，对应 `actual recovery inbox renders` 单项通过、退出0（`output/push-lifecycle-recheck.log`）。最终重新运行这三组测试为8项通过、8项失败，失败用例与基线一致（`output/push-legacy-recheck.log`）；未宣称扩展套件或全项目全部通过。
+- 窄屏设置页截图 `output/push-settings-unconfigured.png` 已目检无溢出；临时截图测试退出0（`output/push-capture.log`），使用本机中文字体，不是设备截图。安全/隐私证据为当前会话/组织范围再授权、仅发送通用摘要且签名请求不含RAM secret；可靠性证据为事务回滚、去重、时效和有限重试，云调用采用独立调度线程。
+- OpenSpec严格校验48项通过、退出0（`output/push-spec-validation.log`）；差异检查通过。真实前台/后台/锁屏/进程回收/离线恢复、厂商通知分类和系统权限手动操作均未验收，任务5.1/5.2保持未完成。回滚先关PUSH_ENABLED并关闭App通知，保留V34及表；最终整合须先统一基线和并行分支既有V31–V33迁移。
+
+2026-11-12 后端部署补充：用户要求先启动服务器后端，实际发布提交 `3fec52f65b0f02fec15d092526a302dfae54374d`，不再沿用上文本地实现阶段“本轮不部署”的范围。干净源码重新打包退出0（跳过测试套件），原systemd服务运行新JAR、启用开机启动且NRestarts=0；实际库V34成功，原迁移SQL、数据库连接及私有环境配置保持。公网16项部署检查退出0，覆盖健康、已有账号登录/本人资料/任务/站内消息、304、OSS图片大小与哈希、未认证401/非法400/关闭状态409，以及会话退出；未发送真实推送。备份、产物SHA、运行路径及回滚由 [systemd部署说明](cloud-systemd-deployment.md#当前运行版本必要通知后端2026-11-12issue-86) 唯一维护，证据在 `output/push-deploy-{build.log,receipt.json,public-result.json}`。EMAS/RAM/华为/正式签名和真机仍未验收；官方文档核对发现Android SDK仍在MainActivity初始化，3.1重新打开，需迁移至Application并保持用户同意后才注册联网，不能以此前编译通过视为该项完成。
+
+2026-11-12 APK补充：源提交 `cdd03ede07a6692a8e15decf6a3f54763d30f792`，产品代码未改。常规Release先遇到旧测试插件注册残留，重新生成工具文件后消除；随后R8因华为可选系统/分析类、org.android.netutil和BouncyCastle缺失而失败，未将其改写为通过。测试包通过直接Gradle `assembleRelease -Pshrink=false -Ptarget-platform=android-arm,android-arm64,android-x64 -Ptarget=lib/main.dart -Pdart-defines=VVNFX01PQ0s9ZmFsc2U=,QVBJX0JBU0VfVVJMPWh0dHA6Ly8zOS45Ni44NC41MS9hcGk= -Pdart-obfuscation=false -Ptrack-widget-creation=false -Ptree-shake-icons=true` 构建，退出0；Dart为Release AOT，Java压缩关闭，未新增压缩警告抑制规则。正式发布前仍须修正SDK初始化及压缩依赖/规则。
+
+本次最终包 `output/apk/pandora-0.1.0-online-test.apk` 为81,778,042字节，SHA-256 `ca35a207757225106d7f978add1ae9db7596da50a29afb4d5fc0ee838148b970`，版本0.1.0+1、最低Android7/API24，支持arm64-v8a/armeabi-v7a/x86_64。核对已发布 `oss-20261112-ui` 清单后，后处理移除288个Flutter图片/字体（未压缩58,221,313字节），保留执行资源、安装清单、原生资源及许可证；重新zipalign并用现有Android Debug证书签名，apksigner v2/v3和16KB原生库对齐校验退出0。三种ABI的libapp.so均核对公网API地址，Mock关闭，后端健康200/UP。当前源码pubspec仍声明安装副本，只有这份后处理产物已剥离，不能外推到以后直接flutter build生成的包。首次加载素材需要联网，既有校验缓存逻辑沿用；无包内Flutter图片/字体回退。
+
+过程命令、签名和文件清单证据在 `output/apk-gradle-release.log`、`output/apk/package-online-apk.py`、`output/apk/package-inspection.json`、`output/apk/signature-verification.log` 和 `output/apk/badging.txt`。本机API36模拟器系统镜像缺失、API37只读实例创建加密分区失败，均未启动成功；没有安装到手机，也未验证该剥离包的实际界面或首次远程字体渲染。手机推送继续关闭，3.1/5.1/5.2保持未完成；本次没有运行测试套件或重新部署后端。

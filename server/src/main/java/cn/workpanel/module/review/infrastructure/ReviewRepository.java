@@ -94,5 +94,11 @@ public class ReviewRepository {
         return new ReviewDisplayReferences(db).resolve(company,before,candidate);
     }
     public void audit(Actor a,String type,String id,Object before,Object after,String reason) { db.audit(a,type,id,before,after,reason); }
-    public void notify(Actor a,String recipient,String type,String id,String dedup) { db.notify(a,recipient,type,id,dedup); }
+    public void notify(Actor a,String recipient,String type,String id,String dedup) {
+        db.notify(a,recipient,type,id,dedup);
+        if(type.equals("REVIEW_PENDING")) {
+            var step=db.one("SELECT id FROM review_steps WHERE request_id=? AND reviewer_id=? AND state='PENDING' ORDER BY position LIMIT 1",id,recipient);
+            db.update("UPDATE outbox_events SET body=?::jsonb WHERE dedup_key=? AND delivered_at IS NULL",db.write(Map.of("reviewStepId",step.get("id"))),dedup);
+        }
+    }
 }

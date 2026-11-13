@@ -2564,6 +2564,9 @@ class MockRepository implements Repository {
       final phone = '${v['手机号'] ?? ''}'.trim();
       final email = '${v['邮箱'] ?? ''}'.trim();
       final age = v['年龄'];
+      if (v['性别'] != null && !['', '男', '女'].contains(v['性别'])) {
+        throw const ApiFailure(FailureKind.validation, '性别只能选择男或女');
+      }
       if (phone.isNotEmpty &&
           !RegExp(r'^\+?[0-9][0-9 ()-]{4,18}[0-9]$').hasMatch(phone)) {
         throw const ApiFailure(FailureKind.validation, '请输入有效电话号码');

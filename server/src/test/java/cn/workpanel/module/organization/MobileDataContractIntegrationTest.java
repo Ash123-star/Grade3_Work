@@ -70,6 +70,25 @@ class MobileDataContractIntegrationTest extends MemberBHttpSupport {
         call(403,"GET","/profiles/"+employee,director,null);
     }
 
+    @Test void genderChoicesRejectInvalidValuesWithoutChangingVersionAndAllowClear() throws Exception {
+        db.update("UPDATE users SET gender='历史自填' WHERE id=?",employee);
+        assertTrue(call(200,"GET","/profiles/"+employee,employee,null).get("gender").isNull());
+        assertEquals("历史自填",db.one("SELECT gender FROM users WHERE id=?",employee).get("gender"));
+        for(Object invalid:List.of("随便填","male",42)) {
+            call(400,"PUT","/profiles/me",employee,Map.of("version",1,"gender",invalid));
+            assertEquals(1,((Number)db.one("SELECT version FROM users WHERE id=?",employee).get("version")).intValue());
+        }
+        var male=call(200,"PUT","/profiles/me",employee,Map.of("version",1,"gender","男"));
+        assertEquals("男",male.get("gender").asText());
+        var female=call(200,"PUT","/profiles/me",employee,Map.of("version",2,"gender","女"));
+        assertEquals("女",female.get("gender").asText());
+        var unchanged=call(200,"PUT","/profiles/me",employee,Map.of("version",3,"introduction","简介"));
+        assertEquals("女",unchanged.get("gender").asText());
+        var clear=new LinkedHashMap<String,Object>(); clear.put("version",4); clear.put("gender",null);
+        assertTrue(call(200,"PUT","/profiles/me",employee,clear).get("gender").isNull());
+        assertNull(db.one("SELECT gender FROM users WHERE id=?",employee).get("gender"));
+    }
+
     @Test void teamDirectoryUsesCurrentOrganizationScope() throws Exception {
         assertEquals(2,call(200,"GET","/organization/teams",admin,null).size());
         assertEquals(1,call(200,"GET","/organization/teams",director,null).size());

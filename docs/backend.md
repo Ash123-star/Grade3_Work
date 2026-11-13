@@ -86,3 +86,22 @@ powershell -ExecutionPolicy Bypass -File scripts/backup-backend.ps1
 备份为 PostgreSQL 自定义格式，包含账号、业务、记忆、遗忘排除规则、审计、通知、AI 和附件，默认位于被 Git 忽略的 `deploy/backend/backups/`。Neo4j 可由 PostgreSQL 重建；Redis 只存临时限流及预算，持久业务用量保存在 PostgreSQL。备份文件应按业务数据管理访问权限，并单独保存 `.env`。
 
 恢复到全新隔离数据库时，保持目标库和 API 离线，`docker cp` 备份入数据库容器，通过 `pg_restore -U workpanel -d <新库> --no-owner --no-privileges <容器内路径>` 恢复。必须导入比备份更新的独立遗忘账本，并执行 `deploy/backend/replay-ai-forget.sql`，重建知识索引与 Neo4j 投影且核查遗忘内容不可见后才切换流量；详见 `docs/ai-map-operations.md`。不在现有业务库直接覆盖恢复。应用回滚保持数据库迁移向前，新增结构通过下一个 Flyway 版本调整。
+
+
+## Android必要通知：阿里云移动推送
+
+本功能不是短信。实现及验收进度以 [OpenSpec任务](../openspec/changes/android-essential-push/tasks.md) 为准；未配置云应用/厂商通道时不声称手机可收到。
+
+服务端安全环境变量：`PUSH_ENABLED=false`（默认）；`PUSH_APP_KEY`（EMAS Android数字AppKey）；`PUSH_ACCESS_KEY_ID`、`PUSH_ACCESS_KEY_SECRET`、可选`PUSH_SECURITY_TOKEN`。RAM仅授权实际使用的移动推送Push动作和相应应用，勿复用OSS全权账号；STS需在到期前更新服务配置。本实现不自动签发/续期STS。按厂商后台创建并审核分类通道后填 `PUSH_HUAWEI_CHANNEL`、`PUSH_XIAOMI_CHANNEL`、`PUSH_VIVO_CHANNEL`、`PUSH_HONOR_CHANNEL`；OPPO使用经审核的消息分类 `PUSH_OPPO_CATEGORY`，映射官方 `AndroidMessageOppoCategory`。本批阿里云Java官方SDK固定HTTPS `cloudpush.aliyuncs.com`，不开放用户可控的供应商地址。
+
+Android构建配置放在本机忽略的Gradle属性或安全构建环境，禁止提交真实值：`pandora.push.app_key` / `pandora.push.app_secret`（EMAS SDK应用标识，与服务端RAM凭据不同）；也支持 `PANDORA_PUSH_APP_KEY` / `PANDORA_PUSH_APP_SECRET` 环境变量。厂商键为同前缀 `huawei_id`、`honor_id`、`vivo_id`/`vivo_key`、`oppo_key`/`oppo_secret`、`xiaomi_id`/`xiaomi_key`、`meizu_id`/`meizu_key`；环境变量取大写。按官方SDK格式华为ID填`appid=实际ID`，小米ID/Key长数字填`id=实际值`。厂商应用须匹配正式包名 `cn.pandora.pandora_mobile`、签名和控制台配置；签名/证书未提供时不能宣称厂商离线通道完成。
+
+先部署新增迁移和默认关闭的后端，配置EMAS应用及服务器凭据，核对后打开PUSH_ENABLED，再用配置好的APK在本人“通知设置”中阅读用途并开启；Android13申请系统权限，注册成功后续租绑定。支持任务/截止/审批三个类别，用户可在系统中进一步关闭类别。总开关、分类和免打扰在服务端按用户保存；只有授权可用的当前设备才排队。本变更不调整现有素材加载和打包配置。
+
+官方Flutter插件1.2.0的initPush会强制开启LOG_DEBUG，因此本应用使用该依赖提供的官方Android SDK，在原生桥接中先设置LOG_OFF再注册；不调用插件的调试初始化方法。点击由自定义receiver和厂商PopupActivity缓存不透明ID，避免依赖Flutter单例在冷启动时已经存在。供应商投递使用独立pushDeliveryScheduler，网络等待不占用站内消息和截止事件的业务调度线程。
+
+云受理失败不影响业务保存或站内消息。检查push_deliveries状态、attempts/error_code/provider_id即可诊断，勿输出RAM凭据、设备原始标识或完整供应商请求。ACCEPTED不是送达回执。供应商网络超时可能导致重复受理，稳定notifyId及只由SDK展示减少重复，不能承诺跨网络exactly-once。
+
+锁屏仅通用摘要，打开/恢复/退出会清除系统已展示通知，点击再次服务端鉴权；系统已展示的通知无法由服务端即时撤销。用户强制停止、关闭通知、厂商限制和网络异常影响送达。验收需覆盖真实锁屏/进程回收/离线恢复及冷启动，不以模拟测试或编译替代。关闭PUSH_ENABLED可止发；Android关闭总开关可解绑，站内消息继续可用。
+
+官方依据：[Flutter接入](https://help.aliyun.com/document_detail/434552.html)、[厂商通道](https://help.aliyun.com/document_detail/434677.html)、官方`aliyun_push`1.2.0及`aliyun-java-sdk-push`3.13.21。隐私入口同步说明设备标识与通用摘要处理用途。

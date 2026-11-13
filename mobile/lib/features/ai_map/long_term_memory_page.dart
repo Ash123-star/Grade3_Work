@@ -181,7 +181,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                   maxLines: 4,
                   decoration: const InputDecoration(labelText: '建议偏好与可投入时间'),
                 ),
-                const Text('仅本人可见。更新后，下一次分析会使用新目标。'),
+                const Text('更新后，下一次分析会使用新目标。'),
               ],
             ),
           ),
@@ -554,7 +554,6 @@ class _AiPageState extends ConsumerState<AiPage> {
                       ? '目标：${preferences['explicit_goals']}'
                       : '尚未设置个人目标',
                 ),
-                subtitle: const Text('本人目标与偏好仅自己可见'),
                 trailing: TextButton(
                   onPressed: editGoal,
                   child: const Text('编辑目标'),

@@ -14,3 +14,6 @@
 - [x] 4.3 Flutter analyze 与相关测试通过；全量仍有与基线一致的既有失败
 
 备注（2026-11-01）：迁移编号确定为 V29；4.2/4.3 中全量套件既有失败与基线一致，相关测试全部通过，见 docs/zhw-week7-validation.md。
+
+## 5. Tenure day precision
+- [x] 5.1 Issue #84：统一显示年月天，验证同日、月末、闰日、空值、未来和无效日期；证据见 docs/backend-validation.md 的个人资料与首页修正段落。

@@ -20,7 +20,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
   final introduction = TextEditingController();
   final phone = TextEditingController();
   final email = TextEditingController();
-  final gender = TextEditingController();
+  String? gender;
   final age = TextEditingController();
   bool editing = false, saving = false;
   String? error;
@@ -31,7 +31,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
     introduction.dispose();
     phone.dispose();
     email.dispose();
-    gender.dispose();
     age.dispose();
     super.dispose();
   }
@@ -41,7 +40,8 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
         '${profile.fields['个人介绍'] ?? profile.fields['body'] ?? ''}';
     phone.text = '${profile.fields['phone'] ?? profile.fields['手机号'] ?? ''}';
     email.text = '${profile.fields['email'] ?? profile.fields['邮箱'] ?? ''}';
-    gender.text = '${profile.fields['gender'] ?? profile.fields['性别'] ?? ''}';
+    final storedGender = profile.fields['gender'] ?? profile.fields['性别'];
+    gender = ['男', '女'].contains(storedGender) ? storedGender as String : null;
     age.text = '${profile.fields['age'] ?? profile.fields['年龄'] ?? ''}';
     setState(() {
       editing = true;
@@ -106,7 +106,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                 if (saveFields) ...{
                   '手机号': phone.text.trim(),
                   '邮箱': email.text.trim(),
-                  '性别': gender.text.trim(),
+                  '性别': gender,
                   '年龄': age.text.trim().isEmpty
                       ? null
                       : int.parse(age.text.trim()),
@@ -339,8 +339,10 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
           (
             '性别',
             'person',
-            value.fields['gender'] ?? value.fields['性别'],
-            gender,
+            ['男', '女'].contains(value.fields['gender'] ?? value.fields['性别'])
+                ? value.fields['gender'] ?? value.fields['性别']
+                : null,
+            null,
             null,
           ),
           (
@@ -470,7 +472,34 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                             const SizedBox(height: 5),
-                            if (editing && entries[i].$4 != null)
+                            if (editing && entries[i].$1 == '性别')
+                              DropdownButtonFormField<String>(
+                                key: ValueKey('gender:$accountId'),
+                                initialValue: gender,
+                                decoration: const InputDecoration(
+                                  labelText: '性别',
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: '',
+                                    child: Text('未填写'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: '男',
+                                    child: Text('男'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: '女',
+                                    child: Text('女'),
+                                  ),
+                                ],
+                                onChanged: saving
+                                    ? null
+                                    : (value) => setState(() {
+                                        gender = value == '' ? null : value;
+                                      }),
+                              )
+                            else if (editing && entries[i].$4 != null)
                               TextField(
                                 controller: entries[i].$4,
                                 keyboardType: entries[i].$5,

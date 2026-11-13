@@ -28,6 +28,13 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // EMAS application identifiers only; never put RAM AccessKey credentials in this APK.
+        val pushConfig = listOf("app_key", "app_secret", "huawei_id", "honor_id", "vivo_id", "vivo_key", "oppo_key", "oppo_secret", "xiaomi_id", "xiaomi_key", "meizu_id", "meizu_key")
+        for (key in pushConfig) {
+            val value = providers.gradleProperty("pandora.push.$key").orElse(providers.environmentVariable("PANDORA_PUSH_${key.uppercase()}" )).getOrElse("")
+            resValue("string", "pandora_push_$key", value)
+        }
+
     }
 
     buildTypes {

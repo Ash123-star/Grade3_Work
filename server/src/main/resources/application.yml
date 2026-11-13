@@ -27,6 +27,17 @@ spring:
     async:
       request-timeout: 60000
 app:
+  push:
+    enabled: ${PUSH_ENABLED:false}
+    app-key: ${PUSH_APP_KEY:0}
+    access-key-id: ${PUSH_ACCESS_KEY_ID:}
+    access-key-secret: ${PUSH_ACCESS_KEY_SECRET:}
+    security-token: ${PUSH_SECURITY_TOKEN:}
+    huawei-channel: ${PUSH_HUAWEI_CHANNEL:}
+    xiaomi-channel: ${PUSH_XIAOMI_CHANNEL:}
+    oppo-category: ${PUSH_OPPO_CATEGORY:}
+    vivo-channel: ${PUSH_VIVO_CHANNEL:}
+    honor-channel: ${PUSH_HONOR_CHANNEL:}
   oss:
     bucket: ${OSS_BUCKET:panduola-work}
     region: ${OSS_REGION:cn-beijing}

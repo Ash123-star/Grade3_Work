@@ -120,3 +120,17 @@ V22将旧待审步骤标记为SUPERSEDED并保留历史，每个申请至多一�
 V26 原为避开待合并 PR 的 V24/V25 编号选择。五个 PR 整合后，已发布 V26/V27 保持原样，原待发布的创始人互审、任务置顶、多标签迁移分别调整为 V28/V29/V30；不启用 out-of-order。已验证空库与历史基线向 V30 升级。代码回滚可暂保留新增表，不删除历史数据；若确需删表，先备份本人事项和回执并安排独立维护迁移。
 
 2026-11-11 全分支整合（#82）协调三条未进入 main 的 V31：每日事项日期范围/颜色保留 V31，停用创始人互审调整为 V32，OSS 资源调整为 V33；已发布 V1–V30 正文不变。部署前停止旧写入并备份，按顺序升级，不启用 out-of-order 或自动 repair。已经独立运行任一分支 V31 的开发库须先核对 `flyway_schema_history` 的脚本和校验和，再从已验证备份制定升级方案，不能直接运行整合版或删除历史记录。V32 作废操作不自动撤销，禁止回退到仍创建互审的旧版本；OSS 数据迁移及恢复另见 [OSS 运维](oss-storage.md)。本轮实际验证以 [验证入口](backend-validation.md) 为准。
+
+## Android必要移动推送
+
+V34 在整合版 V31–V33 之后新增必要移动推送；本次合并沿用每日事项 V31、退休互审 V32、OSS V33，既有迁移正文及校验值保持不变。曾单独部署 OSS V31 的环境仍须按上述历史核对和备份流程安排升级，不能直接套用此序列。
+
+| 表/索引 | 约束与用途 |
+| --- | --- |
+| `push_preferences` | user主键、公司/用户复合外键；总开关默认false，分类默认true；上海小时范围及起止不同；version乐观锁 |
+| `push_devices` | SDK device_id唯一，一台设备仅绑定一个当前会话；session_hash外键ON DELETE CASCADE，binding随机lease，30天不续租清理 |
+| `push_deliveries` | notification外键、设备外键ON DELETE CASCADE；通知/设备/lease唯一；状态PENDING/ACCEPTED/CANCELLED/FAILED，attempts<=5，task_version/expiry/next_attempt用于有效性与重试；不保存正文或密钥 |
+| `push_deliveries_pending` | 仅待投递的next_attempt_at索引，worker行锁SKIP LOCKED |
+| `push_reminder_deadlines` | DISPATCHED/RECEIVED任务deadline部分索引，1分钟阶段窗口 |
+
+不补推历史通知。设备注销、改密会话级联删除；投递诊断非待发记录保留30天。回滚先关闭开关，保留表及已发布迁移，不删除迁移历史。

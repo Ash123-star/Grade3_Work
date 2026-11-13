@@ -9,6 +9,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "93.0.0"
+  aliyun_push:
+    dependency: "direct main"
+    description:
+      name: aliyun_push
+      sha256: d41dfa26fde6fa472d43ee89e2c42d91a4b2f15dca0486edf96c5e44b31a61ce
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.0"
   analyzer:
     dependency: transitive
     description:

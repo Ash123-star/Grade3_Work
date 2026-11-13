@@ -93,7 +93,7 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 ## 仪表盘、通知、分析和附件
 
-仪表盘提供 `/dashboard`、`/dashboard/company`、`/dashboard/personal`、`/profiles/{id}` 和 `/private-notes`；私人备注始终仅本人可见。`PUT /profiles/me` 的移动端协议字段为 `introduction/phone/email/gender/age/avatarAttachmentId/version`，姓名、部门、职位、角色和状态只读。通知提供 `GET /notifications`、`POST /notifications/read-all`、`POST /notifications/{id}/read` 和支持 `Last-Event-ID` 的 `/notifications/stream`。分析提供 `/analytics`、`/analytics/details`、`/timeline` 和 `/analytics/export`；汇总、钻取与 CSV 必须共用 `groupBy/departmentId/teamId/ownerId`、日期窗口和权限范围。附件 `POST /attachments` 使用 multipart，单文件最大 10MB；`GET /attachments/{id}` 每次重新鉴权，不提供公开 URL。
+仪表盘提供 `/dashboard`、`/dashboard/company`、`/dashboard/personal`、`/profiles/{id}` 和 `/private-notes`；私人备注始终仅本人可见。`PUT /profiles/me` 的移动端协议字段为 `introduction/phone/email/gender/age/avatarAttachmentId/version`，姓名、部门、职位、角色和状态只读。`gender` 选填，仅接受男/女，空文本或 null 清空，缺席保留；其他值返回 400 `INVALID_GENDER`（类型错误为 `INVALID_FIELD`）。历史非标准值通过资料接口显示为 null，数据库原值保留至本人修改，无数据库迁移。通知提供 `GET /notifications`、`POST /notifications/read-all`、`POST /notifications/{id}/read` 和支持 `Last-Event-ID` 的 `/notifications/stream`。分析提供 `/analytics`、`/analytics/details`、`/timeline` 和 `/analytics/export`；汇总、钻取与 CSV 必须共用 `groupBy/departmentId/teamId/ownerId`、日期窗口和权限范围。附件 `POST /attachments` 使用 multipart，单文件最大 10MB；`GET /attachments/{id}` 每次重新鉴权，不提供公开 URL。
 
 通知读取沿用`cursor/limit/type`，新增可选`category`（任务/审批/评论/待阅提醒/截止提醒/审核结果）、`unreadOnly`（默认false）、`search`（最多200字，按中文通知标题及当前可读目标摘要搜索）。过滤在分页与计数之前执行，响应保留`items/total/nextCursor/unread`；末页`nextCursor=null`，`unread`为本人全量未读数，不受分类、搜索及已加载页数影响。每项新增`message_title/summary`：任务标题复用TaskAccess，日志摘要复用本人或已提交日志的组织/直属范围，审核摘要复用当前申请人/有效审核人范围；不可读目标仅显示通用不可用提示，不能因为收到消息而读取目标标题。客户端首屏30条，显式加载更多，移除逐消息详情HTTP补读；首页和个人页共用首屏及全量未读数。旧客户端仍可读取原字段；新客户端的历史筛选和摘要须先部署新版服务端。
 
@@ -190,3 +190,22 @@ GET /organization/people沿用原组织数据范围，追加可空team_name，�
 ### 中国大陆节假日月历（成员 D）
 `GET /api/calendar/holidays?year=2026`：已登录、已确认且无需强制改密的账号可读；沿用公共认证规则。year为2007至2100，越界400 `INVALID_YEAR`；缺失/格式错误400；未登录401、无业务访问权限403。只读幂等，无写入版本及分页。返回 `{year,days:[{date,name,isOffDay}],papers,status,fetchedAt}`；date为中国大陆业务日期，isOffDay=false表示公告指定的调休上班日。status为FRESH、STALE或UNAVAILABLE；fetchedAt为最后成功获取的UTC时间，无成功记录为空字符串。
 固定来源为同一 NateScarlet/holiday-cn 仓库：GitHub Contents API（raw Accept）优先，raw.githubusercontent.com 原始文件兜底，保留国务院公告链接。缓存24小时；两入口均失败时5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。同年请求合并、不同年份独立加载。客户端查询相邻公告年份处理跨年网格，提示仅针对可见年份；数据故障不阻塞任务。每入口仅请求一次、各3秒，合计请求预算6秒，流式响应上限256 KiB，连接超时2秒；中断立即停止。无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。
+
+
+### Android必要移动推送（Issue #86）
+
+服务使用阿里云移动推送，非短信；站内消息仍为独立入口。当前实现与外部验收进度见 `openspec/changes/android-essential-push/tasks.md`。
+
+| v1接口 | 权限/请求 | 结果与错误 |
+| --- | --- | --- |
+| `GET /push/preferences` | 登录本人（含待确认员工），无需版本 | configured/enabled/tasks/deadlines/reviews/quietEnabled/quietStart/quietEnd/version；默认不开启，上海22至8时免打扰 |
+| `PUT /push/preferences` | 本人全量上述偏好+version，不接受configured | bool须为布尔值，小时0..23且不同；400非法，409旧版本或PUSH_UNAVAILABLE；成功version+1，无额外幂等键 |
+| `PUT /push/device` | 本人当前会话，`{deviceId}`，SDK设备ID8..200位字母数字下划线短横线 | 返回binding；同会话续租幂等，换号旋转binding；400非法，409未配置；不允许客户端指定公司/接收人 |
+| `DELETE /push/device` | 本人当前会话，`{deviceId}` | 幂等解绑，不删除其他会话的新绑定 |
+| `GET /push/open/{id}?deviceId=...&binding=...` | 本人通知+当前会话绑定，重新检查当前对象/版本/审核人和有效期 | `{resource: tasks/reviews/membership,objectId}`，不返回任意URL；404失效/越权，401/403认证；只读无版本 |
+
+所有接口保留公共限流和错误模型。待确认员工仅可使用本人设备/偏好、本人入职申请结果，不开放任务和其他公司数据。首次强制改密期间不允许启用。
+
+必要白名单：新派发/转派、生效关键变更、WITHDRAWN/RETURNED、DEADLINE分DAY/HOUR/OVERDUE、REVIEW_PENDING/REJECTED及MEMBERSHIP的APPROVED。普通审批通过、评论、日志、AI不推。任务生命周期outbox body新增action/taskVersion/actorId，旧客户端可忽略；派发及修订含taskVersion/actorId，新增参与人每次变更仅生成新派发提醒。截止body含stage/deadline/expiresAt/taskVersion；REVIEW_PENDING含reviewStepId，改派后的旧步骤提醒失效。预览/消息类型协议不改变。
+
+供应商只接收通用摘要与notificationId/binding，不含业务正文。ACCEPTED仅代表供应商受理，非手机送达。关闭通知不影响站内消息；过期、旧版本、旧绑定、当前无权限的队列取消，供应商暂时失败最多5次重试。

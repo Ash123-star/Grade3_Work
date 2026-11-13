@@ -4,6 +4,20 @@
 
 关联 Issue：#44（文档维护，延续 #42 的云端更新）。
 
+## 当前运行版本：必要通知后端（2026-11-12，Issue #86）
+
+按用户要求，提交 `3fec52f65b0f02fec15d092526a302dfae54374d` 的后端已部署并启动，仍由原 `collaboration-server.service` 管理，开机启动已启用，未合并草稿 PR #87。当前实际 JAR 为 `/opt/Grade3_Work-releases/push-3fec52f/server/target/collaboration-server-1.0.0.jar`，SHA-256 为 `abedbb74a9020d249b78a580e1e7a1454c5a2f354374f522dc2986f4e08eb9af`。保留原 Java 21 与 `-Xmx512m`，2026-11-12 13:46:34（上海时间）启动，发布核对时 active/running、NRestarts=0。
+
+本地从该提交的干净 Git archive 重新打包，`mvn.cmd -B -f output/push-deploy-3fec52f/server/pom.xml -DskipTests package` 退出0；上传校验SHA后在独立release目录保存源码及JAR。原 `/opt/Grade3_Work` 工作区、暂存补丁和未跟踪备份保持，四个原环境文件的哈希未变。此次没有重跑完整测试套件，既有实现测试证据及限制见 [后端验证](backend-validation.md#阿里云-android-必要通知issue-86)。
+
+通过原进程环境与容器端口定位实际 `collaboration-data-postgres-1:55432` 的 `workpanel_annual2026` 库，发布前和停写后分别备份，均经 `pg_restore --list` 校验；旧JAR、原unit/drop-in、环境文件及私有补丁保存在 `/root/workpanel-backups/20261112-push-3fec52f`，其中配置仅root可读。新旧JAR中所有既有结构/场景迁移SQL逐字节一致，仅追加 V34；实际Flyway V34成功，三张推送表存在，人员和任务总数不变，没有切库或初始化场景。
+
+本次新增 `/etc/systemd/system/collaboration-server.service.d/zzzzzzz-push-release.conf`，只切换实际JAR路径并设置 `PUSH_ENABLED=false`、`APP_PUSH_ENABLED=false`。EMAS/RAM/华为通道和正式签名尚未完成，不发送真实推送；以后启用须同步处理该drop-in的两个关闭变量，再重新加载systemd并重启，不能只编辑Compose的 `.env`。Android初始化位置还需按官方要求修正，具体未完成项见 [OpenSpec任务](../openspec/changes/android-essential-push/tasks.md)。
+
+公网 `http://39.96.84.51/api` 的16项定向部署检查通过：健康200/UP；既有场景登录、本人资料、任务列表及站内通知可读；通知ETag条件请求304；素材清单和一份OSS图片大小/SHA-256核对成功；未认证偏好401、非法设备400、未配置绑定/启用409，偏好显示configured=false/enabled=false；核对会话已退出且复用令牌401。最终设备及投递记录均为0。证据为本机忽略目录 `output/push-deploy-build.log`、`output/push-deploy-receipt.json`、`output/push-deploy-public-result.json`，不代表手机锁屏送达验收。
+
+回滚时停止服务，将本次 `zzzzzzz-push-release.conf` 移至上述root备份目录，再执行 `systemctl daemon-reload` 和 `systemctl start collaboration-server`，恢复原ExecStart。原release JAR未被覆盖，SHA-256为 `10016818dbc16a1bf0eb801acb6e32fc1835303e81a69d77cec0224958cd94ef`。V34仅增表/索引，回滚保留迁移和业务数据，不向在线库覆盖恢复。
+
 ## 2026-11-07 消息缓存修订发布
 
 业务提交 `6f2ec8e606b51799acf7a714efcee64121a2b1c6` 已推送原 PR #77 并部署，未合并main。前后端编译退出0、按要求不运行测试套件；发布后公网健康UP，授权消息请求先返回200及ETag，再发送If-None-Match返回304、正文0字节，已注销核对会话。服务active/running、NRestarts=0，实际数据库和服务器私有补丁保持。新旧JAR迁移SQL逐字节相同，无迁移。必要连通性核对不替代缓存、后台恢复和消息状态的设备验收。
@@ -181,4 +195,4 @@ JAR回滚不会撤销已执行的数据库迁移或恢复旧账号密码。需�
 
 ## 执行边界
 
-本文记录用户提供的部署事实与操作步骤。未远程执行替换、重启、迁移或回滚，尚未确认原服务实际连接的数据库，也未确认云端V3已成功。按用户要求，本轮文档维护不运行编译或测试。
+后续实际部署以文首对应日期、提交和运行产物的记录为准；下方通用步骤不构成执行证据。早期仅文档维护时未执行远程操作的结论不代表当前运行状态。不得将历史构建、健康检查或受控测试外推为手机厂商送达成功。

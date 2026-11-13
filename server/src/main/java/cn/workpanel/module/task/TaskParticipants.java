@@ -19,15 +19,25 @@ public final class TaskParticipants {
 
     /** 写入无角色参与人并为每人写既有的派发提醒 outbox（投递不在本模块）。 */
     public static void assign(Db db,Actor a,String taskId,TaskDraft d) {
+        assign(db,a,taskId,d,Set.of(),1);
+    }
+    private static void assign(Db db,Actor a,String taskId,TaskDraft d,Set<String> previous,int version) {
         String hash=Db.hash(db.write(d.body()));
         for(String p:d.participants()) {
             db.update("INSERT INTO task_participants(task_id,user_id,company_id) VALUES (?,?,?) ON CONFLICT (task_id,user_id) DO NOTHING",taskId,p,a.company());
-            db.notify(a,p,"TASK_ASSIGNED",taskId,"assigned:"+taskId+":"+p+":"+hash);
+            if(!previous.contains(p)) {
+                String key="assigned:"+taskId+":"+p+":"+version+":"+hash;
+                db.notify(a,p,"TASK_ASSIGNED",taskId,key);
+                db.update("UPDATE outbox_events SET body=?::jsonb WHERE dedup_key=? AND delivered_at IS NULL",db.write(Map.of("taskVersion",version,"actorId",a.id())),key);
+            }
         }
     }
 
     public static void replace(Db db,Actor a,String taskId,TaskDraft d) {
-        db.update("DELETE FROM task_participants WHERE task_id=?",taskId); assign(db,a,taskId,d);
+        Set<String> previous=new HashSet<>();
+        for(var row:db.rows("SELECT user_id FROM task_participants WHERE task_id=?",taskId)) previous.add(Db.str(row,"user_id"));
+        int nextVersion=((Number)db.one("SELECT version FROM tasks WHERE id=?",taskId).get("version")).intValue()+1;
+        db.update("DELETE FROM task_participants WHERE task_id=?",taskId); assign(db,a,taskId,d,previous,nextVersion);
     }
 
     public static List<Map<String,Object>> list(Db db,String taskId) {
