@@ -172,40 +172,21 @@ GET /api/reviews/{id} 在现有审核读取权限校验之后追加 `display_ref
 GET /organization/people沿用原组织数据范围，追加可空team_name，按teams.id及company_id联合关联；无团队或名称不存在时返回null。客户端将team_name/嵌套team.name归一化为teamName；统计筛选优先取当前授权组织树teams名称，不将team_id当显示名称。无需数据库迁移，旧客户端可忽略新增字段。任务和组织查询权限保持现有规则。
 
 
-## 公司月历整段移动（Issue #58，V27）
 
-- `GET /tasks?from=<ISO带时区>&to=<ISO带时区>` 返回区间相交的完整范围分页；窗口≤62日、记录≤5000。新响应含 `snapshotToken`、`scheduleConstraints`、`capabilities.reschedule`；末页 `nextCursor=null`。新月历后续页带原快照，变化返回409 `CALENDAR_SNAPSHOT_CHANGED`。旧客户端无快照仍可分页；参与人 `ownerId`/`participantId` 别名及当前 `date/period` 相交规则不变。
-- `POST /tasks/{id}/reschedules` 新模式仅接受 `{version,moveDays,reason}`：version正int32，moveDays非零int32，reason去空白后1–1000码点。头部 `Idempotency-Key` 为1–128可见ASCII字符；`If-Schedule-Constraints-Match` 使用服务端约束版本。服务端按上海业务日同时移动开始/截止时间，保持时长及其他业务字段。
-- 仅有当前派发资格的原派发人或管理员可申请；客户端能力是提示，服务端每次重验。提交返回审核记录，待审原排期不变。审核继续使用 `expectedVersion`；权限变化/版本冲突拒绝，禁止自审，采用现有审核策略。
-- 相同键相同内容返回同一审核结果；不同内容409 `IDEMPOTENCY_CONFLICT`，同任务同版本不同键待审409 `RESCHEDULE_PENDING`。旧版仅 `deadline/version/reason` 请求保持兼容。关闭移动开关后仍可重放已有命令。
-- `scheduleConstraints` 定义上海业务年Y的日期窗口 `[Y-2年01-01,Y+8年01-01]`；头过期409 `SCHEDULE_CONSTRAINTS_CHANGED`。快捷创建沿用 `/tasks`，带约束头时校验窗口，不带头的既有创建不新增限制。
-- V27只新增改期命令表和索引；已发布迁移不变。部署全部MOVE审核消费者后设置 `CALENDAR_MOVE_ENABLED=true`；存在待审MOVE时禁止回滚至不理解MOVE的旧服务端。
+## 管理员简易后台（2026-11-11）
 
-### 统一集成兼容约定（2026-11-04）
+新增 `/api/admin/console`，每次重新验证 ACTIVE ADMIN、公司和首次改密状态；其他角色403、无效会话401。公开注册和Android接口不变。无新增数据库结构/迁移。
 
-正式迁移顺序为 V27 日历、V28 创始人互审、V29 个人置顶、V30 多标签；旧 PR 的 V24/V25 为未发布编号。任务创建可以省略 labelIds 或传空集合；旧 labelId 与相同单元素集合兼容，双字段冲突返回 400 LABEL_CONTRACT_CONFLICT。列表和详情增加 labels、保留旧 label。升级前零/单标签请求的原幂等键仍可重放；增加或更换标签不得复用原键。
+| 方法与路径（前缀省略） | 契约 |
+| --- | --- |
+| GET /employees | search最多100字，cursor>=0、limit 1..100；含停用账号，按本公司过滤后分页，items/total/nextCursor；仅返回id/account/phone/name/department_id/department/role/status/version/must_change_password，不含哈希 |
+| POST /employees | account/password/phone/name/departmentId，固定ACTIVE/EMPLOYEE/首次改密；姓名最多100字，密码至少12字符且UTF-8最多72字节；未知字段400、外公司部门404、重复账号/手机409 ACCOUNT_OR_PHONE_EXISTS；无幂等键，不自动重试，唯一约束防重复；响应不含密码或哈希，同事务写角色和脱敏审计 |
+| GET /departments | 本公司id/name目录，只读幂等 |
+| POST /employees/{id}/revisions | name/departmentId/status可选，version/reason必填；status仅ACTIVE/DISABLED，跨部门调动随候选清空原团队；返回USER审核申请，旧值审核前有效，不能改角色；无幂等键，外公司404、最终版本冲突409 |
+| GET /priorities | 含撤下的本公司事项，cursor/limit分页，items/total/nextCursor，只读幂等 |
+| POST /priorities/revisions | id更新时必填、version新建为0、title/text/pinned/archived/position/reason；标题最多200字，正文最多20000字，position为0..10000整数；返回COMPANY_ITEM审核申请，无幂等键，最终审批最多十条置顶/版本校验，不允许自审 |
+| GET /reviews | cursor/limit分页，items/total/nextCursor；仅本人申请或当前分配审核，沿用原review数据范围 |
+| GET /reviews/{id} | 候选、步骤、原因和版本；本人或有权审核人，只读幂等；越权403/未知404 |
+| POST /reviews/{id}/decision | approve/reason/expectedVersion；驳回原因必填，自审403、已决或版本冲突409；无幂等键，不自动重放 |
 
-管理后台 POST /admin/workspace/management/reviews/{id}/decision 采用 {approve,reason,expectedVersion}，与公共审核使用同一版本和独立审核校验；缺失版本400、版本冲突409、自审或非分配审核人403。
-
-### 中国大陆节假日月历（成员 D）
-`GET /api/calendar/holidays?year=2026`：已登录、已确认且无需强制改密的账号可读；沿用公共认证规则。year为2007至2100，越界400 `INVALID_YEAR`；缺失/格式错误400；未登录401、无业务访问权限403。只读幂等，无写入版本及分页。返回 `{year,days:[{date,name,isOffDay}],papers,status,fetchedAt}`；date为中国大陆业务日期，isOffDay=false表示公告指定的调休上班日。status为FRESH、STALE或UNAVAILABLE；fetchedAt为最后成功获取的UTC时间，无成功记录为空字符串。
-固定来源为同一 NateScarlet/holiday-cn 仓库：GitHub Contents API（raw Accept）优先，raw.githubusercontent.com 原始文件兜底，保留国务院公告链接。缓存24小时；两入口均失败时5分钟重试间隔，保留最后有效内容，首次失败返回空days及UNAVAILABLE，不伪造假期。同年请求合并、不同年份独立加载。客户端查询相邻公告年份处理跨年网格，提示仅针对可见年份；数据故障不阻塞任务。每入口仅请求一次、各3秒，合计请求预算6秒，流式响应上限256 KiB，连接超时2秒；中断立即停止。无密钥、无新增迁移。此接口不提供其他国家/地区、节气或任务修改能力。
-
-
-### Android必要移动推送（Issue #86）
-
-服务使用阿里云移动推送，非短信；站内消息仍为独立入口。当前实现与外部验收进度见 `openspec/changes/android-essential-push/tasks.md`。
-
-| v1接口 | 权限/请求 | 结果与错误 |
-| --- | --- | --- |
-| `GET /push/preferences` | 登录本人（含待确认员工），无需版本 | configured/enabled/tasks/deadlines/reviews/quietEnabled/quietStart/quietEnd/version；默认不开启，上海22至8时免打扰 |
-| `PUT /push/preferences` | 本人全量上述偏好+version，不接受configured | bool须为布尔值，小时0..23且不同；400非法，409旧版本或PUSH_UNAVAILABLE；成功version+1，无额外幂等键 |
-| `PUT /push/device` | 本人当前会话，`{deviceId}`，SDK设备ID8..200位字母数字下划线短横线 | 返回binding；同会话续租幂等，换号旋转binding；400非法，409未配置；不允许客户端指定公司/接收人 |
-| `DELETE /push/device` | 本人当前会话，`{deviceId}` | 幂等解绑，不删除其他会话的新绑定 |
-| `GET /push/open/{id}?deviceId=...&binding=...` | 本人通知+当前会话绑定，重新检查当前对象/版本/审核人和有效期 | `{resource: tasks/reviews/membership,objectId}`，不返回任意URL；404失效/越权，401/403认证；只读无版本 |
-
-所有接口保留公共限流和错误模型。待确认员工仅可使用本人设备/偏好、本人入职申请结果，不开放任务和其他公司数据。首次强制改密期间不允许启用。
-
-必要白名单：新派发/转派、生效关键变更、WITHDRAWN/RETURNED、DEADLINE分DAY/HOUR/OVERDUE、REVIEW_PENDING/REJECTED及MEMBERSHIP的APPROVED。普通审批通过、评论、日志、AI不推。任务生命周期outbox body新增action/taskVersion/actorId，旧客户端可忽略；派发及修订含taskVersion/actorId，新增参与人每次变更仅生成新派发提醒。截止body含stage/deadline/expiresAt/taskVersion；REVIEW_PENDING含reviewStepId，改派后的旧步骤提醒失效。预览/消息类型协议不改变。
-
-供应商只接收通用摘要与notificationId/binding，不含业务正文。ACCEPTED仅代表供应商受理，非手机送达。关闭通知不影响站内消息；过期、旧版本、旧绑定、当前无权限的队列取消，供应商暂时失败最多5次重试。
+以上契约v1，错误沿用code/message/traceId。首次改密复用 `/api/auth/password`，失权前端清空页面和会话。公司事项与员工变更仍由当前直属独立审核人处理，后台不提供管理员免审。详见 [本地与云端说明](admin-console.md)。

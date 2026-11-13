@@ -1,13 +1,6 @@
 import { createApp } from 'vue';
-import AdminApp from './admin/AdminApp.vue';
-import { createPinia } from 'pinia';
-import { router } from './admin/router';
-import 'element-plus/dist/index.css';
-import '@vue-flow/core/dist/style.css';
-import '@vue-flow/core/dist/theme-default.css';
-import './style.css';
-import './admin/admin.css';
+import AdminConsole from './AdminConsole.vue';
+import './admin.css';
 import { initializeProductAssets } from './assets';
 void initializeProductAssets();
-const app = createApp(AdminApp).use(createPinia()).use(router);
-void router.isReady().then(() => app.mount('#app'));
+createApp(AdminConsole).mount('#app');
