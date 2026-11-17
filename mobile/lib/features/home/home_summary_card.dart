@@ -43,120 +43,188 @@ class HomeSummaryCard extends ConsumerWidget {
             onTap: onAll,
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: narrow ? 10 : 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Stack(
                 children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: large ? 56 : 48),
-                    child: Row(
-                      children: [
-                        TuantuanIcon(
-                          resource == 'dashboard/company' ? 'calendar' : 'task',
-                          size: narrow ? 22 : 24,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: paper.heading(narrow ? 15 : 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  state.when(
-                    loading: () => const SizedBox(
-                      height: 96,
-                      child: Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                    error: (e, _) => ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 96),
-                      child: TextButton(
-                        onPressed: () =>
-                            ref.invalidate(homePreviewProvider(resource)),
-                        style: TextButton.styleFrom(
-                          foregroundColor: HomePaperTokens.error,
-                          alignment: Alignment.centerLeft,
-                          padding: EdgeInsets.zero,
-                        ),
-                        child: const Text('加载失败，重试'),
-                      ),
-                    ),
-                    data: (page) => page.items.isEmpty
-                        ? ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 96),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: large ? 56 : 48),
+                        child: Row(
+                          children: [
+                            TuantuanIcon(
+                              resource == 'dashboard/company'
+                                  ? 'calendar'
+                                  : 'task',
+                              size: narrow ? 22 : 24,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
                               child: Text(
-                                resource == 'dashboard/company'
-                                    ? '暂无公司事项'
-                                    : '暂无参与任务',
-                                style: paper.body(13, color: paper.muted),
+                                title,
+                                style: paper.heading(narrow ? 15 : 16),
                               ),
                             ),
-                          )
-                        : Column(
-                            children: [
-                              for (
-                                var i = 0;
-                                i <
-                                    page.items
-                                        .take(
-                                          resource == 'tasks/received-card'
-                                              ? 3
-                                              : 2,
-                                        )
-                                        .length;
-                                i++
-                              ) ...[
-                                if (i > 0)
-                                  const Divider(
-                                    height: 1,
-                                    thickness: 1,
-                                    color: HomePaperTokens.previewLine,
-                                  ),
-                                InkWell(
-                                  onTap: () => onItem(page.items[i]),
-                                  child: ConstrainedBox(
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        height:
+                            3 *
+                            (MediaQuery.textScalerOf(context).scale(15) *
+                                    1.55 *
+                                    2 +
+                                13),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: state.when(
+                            loading: () => const SizedBox(
+                              height: 96,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                            error: (e, _) => ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 96),
+                              child: TextButton(
+                                onPressed: () => ref.invalidate(
+                                  homePreviewProvider(resource),
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: HomePaperTokens.error,
+                                  alignment: Alignment.centerLeft,
+                                  padding: EdgeInsets.zero,
+                                ),
+                                child: const Text('加载失败，重试'),
+                              ),
+                            ),
+                            data: (page) => page.items.isEmpty
+                                ? ConstrainedBox(
                                     constraints: const BoxConstraints(
-                                      minHeight: 48,
+                                      minHeight: 96,
                                     ),
                                     child: Align(
                                       alignment: Alignment.centerLeft,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 5,
-                                        ),
-                                        child: Text(
-                                          page.items[i].title,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: paper.body(15, height: 1.55),
+                                      child: Text(
+                                        resource == 'dashboard/company'
+                                            ? '暂无公司事项'
+                                            : '暂无参与任务',
+                                        style: paper.body(
+                                          13,
+                                          color: paper.muted,
                                         ),
                                       ),
                                     ),
+                                  )
+                                : Column(
+                                    children: [
+                                      for (
+                                        var i = 0;
+                                        i <
+                                            page.items
+                                                .take(
+                                                  resource ==
+                                                          'tasks/received-card'
+                                                      ? 3
+                                                      : 2,
+                                                )
+                                                .length;
+                                        i++
+                                      ) ...[
+                                        if (i > 0)
+                                          const Divider(
+                                            height: 1,
+                                            thickness: 1,
+                                            color: HomePaperTokens.previewLine,
+                                          ),
+                                        InkWell(
+                                          key: ValueKey(
+                                            'home-summary:$resource:${page.items[i].id}',
+                                          ),
+                                          onTap: () => onItem(page.items[i]),
+                                          child: SizedBox(
+                                            height:
+                                                MediaQuery.textScalerOf(
+                                                      context,
+                                                    ).scale(15) *
+                                                    1.55 *
+                                                    2 +
+                                                12,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 6,
+                                                  ),
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  const Padding(
+                                                    padding: EdgeInsets.only(
+                                                      top: 9,
+                                                      right: 7,
+                                                    ),
+                                                    child: DecoratedBox(
+                                                      decoration: BoxDecoration(
+                                                        color: Color(
+                                                          0xFF5D4037,
+                                                        ),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: SizedBox(
+                                                        width: 6,
+                                                        height: 6,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    child: Text(
+                                                      page.items[i].title,
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: paper.body(
+                                                        15,
+                                                        height: 1.55,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ],
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 48),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: onAll,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      foregroundColor: HomePaperTokens.moreInk,
-                      textStyle: paper.body(narrow ? 10 : 11),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('查看全部'),
-                        Icon(Icons.chevron_right, size: 14),
-                      ],
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: TextButton(
+                      key: ValueKey('home-all:$resource'),
+                      onPressed: onAll,
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        foregroundColor: HomePaperTokens.moreInk,
+                        textStyle: paper.body(narrow ? 10 : 11),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('查看全部'),
+                          SizedBox(width: 4),
+                          Icon(Icons.chevron_right, size: 14),
+                        ],
+                      ),
                     ),
                   ),
                 ],

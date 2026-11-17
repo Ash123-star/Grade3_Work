@@ -545,7 +545,8 @@ class DiaryVersionPage extends ConsumerWidget {
                         style: const TextStyle(height: 1.8),
                       ),
                       for (final label in ['关联任务', '遇到的阻碍', '明日计划', '工时'])
-                        if (fields[label] != null) ...[
+                        if (fields[label] != null ||
+                            (label == '关联任务' && fields['taskIds'] != null)) ...[
                           const Divider(height: 32),
                           Text(
                             label,

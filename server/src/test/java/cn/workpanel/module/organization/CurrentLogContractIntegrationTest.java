@@ -22,6 +22,44 @@ class CurrentLogContractIntegrationTest extends MemberBHttpSupport {
     }
     LocalDate today(){return LocalDate.now(ZoneId.of("Asia/Shanghai"));}
     Map<String,Object> row(String id){return db.one("SELECT * FROM daily_logs WHERE id=?",id);}
+    String task(String participant,String phase) {
+        String id=Db.id();
+        db.update("INSERT INTO tasks(id,company_id,owner_id,issuer_id,title,deadline,body,phase) VALUES (?,?,?,?,?,now()+interval '1 day','{}',?)",id,company,participant,admin,"日志今日任务",phase);
+        db.update("INSERT INTO task_participants(task_id,user_id,company_id) VALUES (?,?,?)",id,participant,company);
+        return id;
+    }
+    @Test void selectedTasksSurviveDraftSubmissionCompletionAndHistory() throws Exception {
+        String first=task(employee,"RECEIVED"),second=task(employee,"RECEIVED");
+        String id=call(200,"PUT","/logs/draft",employee,Map.of("businessDate",today().toString(),"version",0,"body",Map.of("work","参与任务","taskIds",List.of(first,second)))).get("id").asText();
+        assertEquals(2,db.count("SELECT count(*) FROM log_tasks WHERE log_id=?",id));
+        call(200,"POST","/logs/"+id+"/submit",employee,Map.of("version",1));
+        db.update("UPDATE tasks SET phase='ACCEPTED' WHERE id=?",first);
+        db.update("UPDATE tasks SET phase='FEEDBACK' WHERE id=?",second);
+        call(200,"PUT","/logs/"+id+"/content",employee,Map.of("work","继续记录","taskIds",List.of(first,second),"version",2));
+        assertEquals(List.of(first,second),db.read(row(id).get("body")).get("taskIds"));
+        assertEquals(List.of(first,second),db.read(db.one("SELECT body FROM log_versions WHERE log_id=? AND version=3",id).get("body")).get("taskIds"));
+        call(200,"PUT","/logs/"+id+"/content",employee,Map.of("work","省略保留","version",3));
+        assertEquals(2,db.count("SELECT count(*) FROM log_tasks WHERE log_id=?",id));
+        call(200,"PUT","/logs/"+id+"/content",employee,Map.of("work","明确清空","taskIds",List.of(),"version",4));
+        assertEquals(0,db.count("SELECT count(*) FROM log_tasks WHERE log_id=?",id));
+    }
+    @Test void invalidSelectionsAndStaleVersionsLeaveContentAndLinksUnchanged() throws Exception {
+        String pending=task(employee,"RECEIVED"),unreceived=task(employee,"DISPATCHED"),done=task(employee,"ACCEPTED"),others=task(colleague,"RECEIVED"),feedback=task(employee,"FEEDBACK");
+        String id=draft(today());call(200,"POST","/logs/"+id+"/submit",employee,Map.of("version",1));
+        for(String task:List.of(unreceived,done,feedback)) call(400,"PUT","/logs/"+id+"/content",employee,Map.of("work","无效新增","taskIds",List.of(task),"version",2));
+        call(400,"PUT","/logs/"+id+"/content",employee,Map.of("work","无效数组","taskIds",pending,"version",2));
+        call(400,"PUT","/logs/draft",employee,Map.of("businessDate",today().minusDays(1).toString(),"version",0,"body",Map.of("work","不能保存未接收任务","taskIds",List.of(unreceived))));
+        assertEquals(0,db.count("SELECT count(*) FROM daily_logs WHERE owner_id=? AND business_date=?::date",employee,today().minusDays(1).toString()));
+        call(404,"PUT","/logs/"+id+"/content",employee,Map.of("work","越权新增","taskIds",List.of(others),"version",2));
+        String managed=task(colleague,"RECEIVED");
+        String managerLog=call(200,"PUT","/logs/draft",director,Map.of("businessDate",today().toString(),"version",0,"body",Map.of("work","管理者日志"))).get("id").asText();
+        call(200,"POST","/logs/"+managerLog+"/submit",director,Map.of("version",1));
+        call(403,"PUT","/logs/"+managerLog+"/content",director,Map.of("work","可读但未参与","taskIds",List.of(managed),"version",2));
+        call(409,"PUT","/logs/"+id+"/content",employee,Map.of("work","过期版本","taskIds",List.of(pending),"version",1));
+        assertEquals(2,row(id).get("version"));assertEquals("原始正文",db.read(row(id).get("body")).get("work"));
+        assertEquals(0,db.count("SELECT count(*) FROM log_tasks WHERE log_id=?",id));
+        assertEquals(1,db.count("SELECT count(*) FROM log_versions WHERE log_id=?",id));
+    }
     @Test void firstSubmissionAllowsThreeShanghaiDatesOnly() throws Exception {
         for(int offset:List.of(-3,-2,-1,0,1)){
             String id=draft(today().plusDays(offset));
@@ -59,6 +97,7 @@ class CurrentLogContractIntegrationTest extends MemberBHttpSupport {
     }
     @Test void removedRoutesAreAbsentFromRuntimeContractAndCannotWrite() throws Exception {
         String id=draft(today());call(200,"POST","/logs/"+id+"/submit",employee,Map.of("version",1));
+        assertEquals("array",call(200,"GET","/openapi",employee,null).at("/components/schemas/LogContentUpdate/properties/taskIds/type").asText());
         var before=row(id); long audit=db.count("SELECT count(*) FROM audit_records WHERE company_id=?",company);
         long outbox=db.count("SELECT count(*) FROM outbox_events WHERE company_id=?",company);
         for(String suffix:List.of("read","revisions","withdraw")){

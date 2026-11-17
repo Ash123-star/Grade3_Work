@@ -195,27 +195,22 @@ void main() {
     );
     notice(context, '草稿已加密保存到此设备', success: true);
     await t.pump();
-    expect(
-      find.image(AssetImage(TuantuanAssets.icons['success']!)),
-      findsOneWidget,
-    );
+    expect(find.byIcon(Icons.check_circle_outline_rounded), findsOneWidget);
     expect(find.text('草稿已加密保存到此设备'), findsOneWidget);
     expect(find.byType(TuantuanSkin), findsNothing);
     notice(context, '修订已提交，等待复核');
     await t.pump();
-    expect(
-      find.image(AssetImage(TuantuanAssets.icons['help']!)),
-      findsOneWidget,
-    );
-    expect(
-      find.image(AssetImage(TuantuanAssets.icons['success']!)),
-      findsNothing,
-    );
+    expect(find.byIcon(Icons.info_outline_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline_rounded), findsNothing);
     expect(find.text('修订已提交，等待复核'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
     expect(find.byType(DogPose), findsNothing);
-    await t.tap(find.byTooltip('关闭提示'));
+    final box = t.getRect(find.byKey(const ValueKey('app-bottom-notice')));
+    expect(box.bottom, greaterThan(500));
+    expect(box.height, lessThanOrEqualTo(80));
+    await t.pump(const Duration(seconds: 4));
     await t.pump();
+    expect(find.text('修订已提交，等待复核'), findsNothing);
   });
 
   testWidgets('dropdown choices use the shared rounded option sheet', (

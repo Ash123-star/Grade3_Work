@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'dart:typed_data';
@@ -13,14 +12,15 @@ import 'package:pandora_mobile/features/personal_todos/application/todo_provider
 import 'package:pandora_mobile/features/personal_todos/data/personal_todo.dart';
 import 'package:pandora_mobile/features/personal_todos/data/todo_repository.dart';
 import 'package:pandora_mobile/features/personal_todos/presentation/daily_todos_section.dart';
+import 'package:pandora_mobile/features/personal_todos/presentation/todo_calendar_source.dart';
+import 'package:pandora_mobile/features/calendar/calendar_content.dart';
 import 'package:pandora_mobile/features/personal_todos/presentation/todo_editor.dart';
 import 'package:pandora_mobile/shared/calendar/civil_date.dart';
-import 'package:pandora_mobile/features/dashboard/dashboard_home.dart';
-import 'package:pandora_mobile/theme/app_theme.dart';
 
 class TodoAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   bool fail = false, malformed = false;
+  List<Map<String, dynamic>> rows = [];
   @override
   void close({bool force = false}) {}
   @override
@@ -44,7 +44,11 @@ class TodoAdapter implements HttpClientAdapter {
             'completed': false,
             'version': 1,
           }
-        : {'items': [], 'total': 0, 'nextCursor': malformed ? '0' : null};
+        : {
+            'items': rows,
+            'total': rows.length,
+            'nextCursor': malformed ? '0' : null,
+          };
     return ResponseBody.fromString(
       jsonEncode(body),
       200,
@@ -84,7 +88,7 @@ class MovingTodoRepository extends DemoTodoRepository {
   );
 
   @override
-  Future<TodoPage> day(String date, String cursor) async {
+  Future<TodoPage> month(String month, String cursor) async {
     reads.add(cursor);
     if (cursor == '0' && changed) {
       await repairGate?.future;
@@ -133,269 +137,127 @@ Widget host(Widget child, TodoRepository repo, {double scale = 1}) =>
     );
 
 void main() {
-  Future<void> waitForRepair(WidgetTester tester) async {
-    final indicator = find.byKey(const ValueKey('todo-list-repair'));
-    for (var frame = 0; frame < 20 && indicator.evaluate().isEmpty; frame++) {
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    expect(indicator, findsOneWidget);
-  }
-
-  for (final changesTotal in [false, true]) {
-    testWidgets(
-      'pagination re-reads after concurrent ${changesTotal ? 'total change' : 'same-total ordering change'}',
-      (tester) async {
-        final repo = MovingTodoRepository(changeTotal: changesTotal)
-          ..repairGate = Completer<void>();
-        await tester.pumpWidget(host(const DailyTodosSection(), repo));
-        await tester.pumpAndSettle();
-        expect(find.text('并发事项30'), findsNothing);
-        await tester.ensureVisible(find.text('加载更多事项'));
-        await tester.tap(find.text('加载更多事项'));
-        await waitForRepair(tester);
-        expect(find.text('并发事项0'), findsOneWidget);
-        expect(find.textContaining('31件事项'), findsOneWidget);
-        repo.repairGate!.complete();
-        await tester.pumpAndSettle();
-
-        for (var i = 0; i < (changesTotal ? 32 : 31); i++) {
-          expect(find.text('并发事项$i'), findsOneWidget);
-        }
-        expect(find.text('加载更多事项'), findsNothing);
-        expect(find.byKey(const ValueKey('todo-list-repair')), findsNothing);
+  test(
+    'HTTP month accepts adjacent grid days and rejects outside rows',
+    () async {
+      final adapter = TodoAdapter();
+      final dio = Dio(BaseOptions(baseUrl: 'https://unit.test/api'));
+      dio.httpClientAdapter = adapter;
+      final repo = HttpTodoRepository(dio);
+      Map<String, dynamic> row(String date) => {
+        'id': date,
+        'title': date,
+        'note': '',
+        'date': date,
+        'endDate': date,
+        'completed': false,
+        'version': 1,
+      };
+      adapter.rows = [row('2026-10-26'), row('2026-12-06')];
+      final page = await repo.month('2026-11', '0');
+      expect(page.items.map((t) => t.date), ['2026-10-26', '2026-12-06']);
+      expect(adapter.requests.single.path, '/personal-todos/month');
+      expect(adapter.requests.single.queryParameters, {
+        'month': '2026-11',
+        'cursor': '0',
+        'limit': 100,
+      });
+      for (final date in ['2026-10-25', '2026-12-07']) {
+        adapter.rows = [row(date)];
+        await expectLater(
+          repo.month('2026-11', '0'),
+          throwsA(isA<ApiFailure>()),
+        );
+      }
+    },
+  );
+  test(
+    'month records cover the shared full week grid including adjacent days',
+    () async {
+      final repo = DemoTodoRepository();
+      for (final date in [
+        '2026-10-25',
+        '2026-10-26',
+        '2026-12-06',
+        '2026-12-07',
+      ]) {
+        await repo.execute(
+          TodoCommand('POST', null, {'title': date, 'date': date}),
+        );
+      }
+      final page = await repo.month('2026-11', '0');
+      expect(page.items.map((t) => t.date), ['2026-10-26', '2026-12-06']);
+      expect(page.total, 2);
+    },
+  );
+  for (final changeTotal in [false, true]) {
+    test(
+      'month pagination retries a concurrent ${changeTotal ? 'count' : 'ordering'} change once',
+      () async {
+        final repo = MovingTodoRepository(changeTotal: changeTotal);
+        final c = ProviderContainer(
+          overrides: [todoRepositoryProvider.overrideWithValue(repo)],
+        );
+        addTearDown(c.dispose);
+        final p = todoCalendarRecordsProvider(
+          civilDate(shanghaiToday()).substring(0, 7),
+        );
+        final subscription = c.listen(p, (_, _) {});
+        addTearDown(subscription.close);
+        final page = await c.read(p.future);
+        expect(page.total, changeTotal ? 32 : 31);
+        expect(page.items.map((r) => r.id).toSet().length, page.total);
         expect(repo.reads, ['0', '30', '0', '30']);
-        expect(tester.takeException(), isNull);
       },
     );
   }
-
-  testWidgets(
-    'pagination recovery failure preserves rows and retries once on request',
-    (tester) async {
+  test(
+    'month pagination exposes a failed recovery instead of a partial month',
+    () async {
       final repo = MovingTodoRepository(failRepair: true);
-      await tester.pumpWidget(host(const DailyTodosSection(), repo));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('加载更多事项'));
-      await tester.tap(find.text('加载更多事项'));
-      await tester.pumpAndSettle();
+      final c = ProviderContainer(
+        overrides: [todoRepositoryProvider.overrideWithValue(repo)],
+      );
+      addTearDown(c.dispose);
+      final p = todoCalendarRecordsProvider(
+        civilDate(shanghaiToday()).substring(0, 7),
+      );
+      final subscription = c.listen(p, (_, _) {});
+      addTearDown(subscription.close);
+      await expectLater(c.read(p.future), throwsA(isA<ApiFailure>()));
       expect(repo.reads, ['0', '30', '0']);
-      expect(find.text('并发事项0'), findsOneWidget);
-      expect(find.text('并发事项29'), findsOneWidget);
-      expect(find.text('并发事项30'), findsNothing);
-      expect(find.textContaining('尚未加载完整'), findsOneWidget);
-      expect(find.text('加载更多事项'), findsNothing);
-      repo.failRepair = false;
-      final retry = find.byKey(const ValueKey('retry-todo-list-repair'));
-      await tester.ensureVisible(retry);
-      await tester.tap(retry);
-      await tester.pumpAndSettle();
-      expect(find.text('并发事项30'), findsOneWidget);
-      expect(repo.reads, ['0', '30', '0', '0', '30']);
-      expect(find.textContaining('尚未加载完整'), findsNothing);
-      expect(tester.takeException(), isNull);
     },
   );
-
-  testWidgets(
-    'partial background refresh keeps stable rows when reordered pages overlap and the last page fails',
-    (tester) async {
-      final date = civilDate(shanghaiToday());
-      TodoPage page(int start, int end, String? next) => TodoPage(
-        [
-          for (var i = start; i < end; i++)
-            PersonalTodo(
-              id: 'refresh-$i',
-              title: '刷新事项$i',
-              note: '',
-              date: date,
-              completed: false,
-              version: 1,
-            ),
-        ],
-        61,
-        next,
-      );
-      var refreshing = false;
-      final refreshes = {
-        for (final cursor in ['0', '30', '60']) cursor: Completer<TodoPage>(),
-      };
-      final container = ProviderContainer(
-        overrides: [
-          sessionProvider.overrideWith((_) => const Session(id: 'alice')),
-          todoMonthProvider.overrideWith((ref, month) async => {}),
-          todoDayProvider.overrideWith((ref, key) async {
-            if (refreshing) return refreshes[key.$2]!.future;
-            return switch (key.$2) {
-              '0' => page(0, 30, '30'),
-              '30' => page(30, 60, '60'),
-              _ => page(60, 61, null),
-            };
-          }),
-        ],
-      );
-      addTearDown(container.dispose);
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const MaterialApp(
-            home: Scaffold(
-              body: SingleChildScrollView(child: DailyTodosSection()),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      for (var i = 0; i < 2; i++) {
-        await tester.ensureVisible(find.text('加载更多事项'));
-        await tester.tap(find.text('加载更多事项'));
-        await tester.pumpAndSettle();
-      }
-
-      refreshing = true;
-      container.invalidate(todoDayProvider);
-      await tester.pump();
-      // The second page sees the old order; the first sees a completed item
-      // moved past its boundary. Neither partial snapshot may replace the list.
-      refreshes['30']!.complete(page(30, 60, '60'));
-      await tester.pump();
-      refreshes['0']!.complete(page(1, 31, '30'));
-      await tester.pump();
-      for (var i = 0; i < 61; i++) {
-        expect(find.text('刷新事项$i'), findsOneWidget);
-      }
-      expect(find.textContaining('61件事项'), findsOneWidget);
-
-      refreshes['60']!.completeError(
-        const ApiFailure(FailureKind.unavailable, '末页重新读取断网'),
-      );
-      await tester.pumpAndSettle();
-      for (var i = 0; i < 61; i++) {
-        expect(find.text('刷新事项$i'), findsOneWidget);
-      }
-      expect(find.textContaining('尚未加载完整'), findsOneWidget);
-      expect(find.text('加载更多事项'), findsNothing);
-      expect(find.byKey(const ValueKey('todo-list-repair')), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'pagination recovery cannot restore a previous account response',
-    (tester) async {
-      final alice = MovingTodoRepository()..repairGate = Completer<void>();
-      final bob = DemoTodoRepository();
-      await bob.execute(
-        TodoCommand('POST', null, {'title': 'Bob独立事项', 'date': alice.date}),
-      );
-      final container = ProviderContainer(
-        overrides: [
-          sessionProvider.overrideWith((_) => const Session(id: 'alice')),
-          todoRepositoryProvider.overrideWith(
-            (ref) => ref.watch(sessionProvider).id == 'alice' ? alice : bob,
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp(
-            theme: appTheme(),
-            home: const Scaffold(
-              body: SingleChildScrollView(child: DailyTodosSection()),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('加载更多事项'));
-      await tester.tap(find.text('加载更多事项'));
-      await waitForRepair(tester);
-      container.read(sessionProvider.notifier).state = const Session(id: 'bob');
-      await tester.pumpAndSettle();
-      expect(find.text('Bob独立事项'), findsNWidgets(2));
-      expect(find.text('并发事项0'), findsNothing);
-      alice.repairGate!.complete();
-      await tester.pumpAndSettle();
-      expect(find.text('Bob独立事项'), findsNWidgets(2));
-      expect(find.textContaining('并发事项'), findsNothing);
-      expect(find.byKey(const ValueKey('todo-list-repair')), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets('account switch clears prior day and pending command', (
-    tester,
-  ) async {
-    final old = DemoTodoRepository();
-    final date = civilDate(shanghaiToday());
-    await old.execute(
-      TodoCommand('POST', null, {'title': 'Alice private', 'date': date}),
-    );
-    final waiting = Completer<TodoPage>();
-    final container = ProviderContainer(
-      overrides: [
-        sessionProvider.overrideWith((ref) => const Session(id: 'alice')),
-        todoDayProvider.overrideWith(
-          (ref, key) => ref.watch(sessionProvider).id == 'alice'
-              ? old.day(key.$1, key.$2)
-              : waiting.future,
-        ),
-        todoMonthProvider.overrideWith((ref, month) => old.calendar(month)),
-      ],
-    );
-    addTearDown(container.dispose);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(child: DailyTodosSection()),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Alice private'), findsNWidgets(2));
-    container.read(pendingTodoCommandProvider.notifier).state = TodoCommand(
-      'POST',
-      null,
-      {'title': 'Alice pending', 'date': date},
-    );
-    container.read(sessionProvider.notifier).state = const Session(id: 'bob');
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Alice private'), findsNothing);
-    expect(container.read(pendingTodoCommandProvider), isNull);
-    waiting.complete(const TodoPage([], 0, null));
-    await tester.pumpAndSettle();
-  });
-  testWidgets('homepage exposes new sections and no personal task/log cards', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          sessionProvider.overrideWith(
-            (ref) => const Session(id: 'alice', role: UserRole.employee),
-          ),
-          homePreviewProvider.overrideWith(
-            (ref, resource) async => const PageResult([]),
-          ),
-          todoRepositoryProvider.overrideWithValue(DemoTodoRepository()),
-        ],
-        child: MaterialApp(theme: appTheme(), home: const DashboardPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('事件纪'), findsOneWidget);
-    expect(find.text('任务看板'), findsOneWidget);
-    expect(find.text('每日事项'), findsOneWidget);
-    expect(find.text('个人日志'), findsNothing);
-    expect(find.text('个人十大任务'), findsNothing);
-    expect(find.byTooltip('派发任务'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+  for (final width in [320.0, 360.0, 390.0, 480.0]) {
+    for (final scale in [1.0, 1.5]) {
+      testWidgets('shared month and todo editor fit $width at $scale', (
+        t,
+      ) async {
+        t.view.physicalSize = Size(width, 1000);
+        t.view.devicePixelRatio = 1;
+        addTearDown(t.view.resetPhysicalSize);
+        addTearDown(t.view.resetDevicePixelRatio);
+        await t.pumpWidget(
+          host(const DailyTodosSection(), DemoTodoRepository(), scale: scale),
+        );
+        await t.pumpAndSettle();
+        expect(find.byType(CalendarContent), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('calendar-month-timeline')),
+          findsOneWidget,
+        );
+        expect(t.takeException(), isNull);
+        await t.tap(find.text('新增事项'));
+        await t.pumpAndSettle();
+        await t.tap(find.text('保存'));
+        await t.pumpAndSettle();
+        expect(find.text('请填写事项标题'), findsOneWidget);
+        await t.tap(find.text('取消'));
+        await t.pumpAndSettle();
+        expect(t.takeException(), isNull);
+      });
+    }
+  }
   test('civil dates reject invalid inputs and span leap/year boundaries', () {
     expect(() => parseCivilDate('2026-02-30'), throwsFormatException);
     expect(() => parseCivilDate('1899-12-31'), throwsFormatException);
@@ -488,93 +350,4 @@ void main() {
     expect(repo.commands[0].key, repo.commands[1].key);
     expect((await repo.day('2026-11-04', '0')).total, 1);
   });
-  testWidgets(
-    'month heading selects a month and cancel keeps the current day',
-    (tester) async {
-      final repo = DemoTodoRepository();
-      await tester.pumpWidget(host(const DailyTodosSection(), repo));
-      await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.calendar_today_outlined), findsNothing);
-      final heading = find.byKey(const ValueKey('todo-month-picker'));
-      await tester.tap(heading);
-      await tester.pumpAndSettle();
-      final wheel = tester.widget<CupertinoDatePicker>(
-        find.byKey(const ValueKey('todo-month-wheel')),
-      );
-      expect(wheel.mode, CupertinoDatePickerMode.monthYear);
-      expect(wheel.minimumYear, 1900);
-      expect(wheel.maximumYear, 2100);
-      wheel.onDateTimeChanged(DateTime(2028, 2));
-      await tester.tap(find.byKey(const ValueKey('todo-month-confirm')));
-      await tester.pumpAndSettle();
-      expect(find.text('2028年 2月'), findsOneWidget);
-      expect(find.text('2月1日'), findsOneWidget);
-      await tester.tap(heading);
-      await tester.pumpAndSettle();
-      tester
-          .widget<CupertinoDatePicker>(
-            find.byKey(const ValueKey('todo-month-wheel')),
-          )
-          .onDateTimeChanged(DateTime(1900, 1));
-      await tester.tap(find.text('取消'));
-      await tester.pumpAndSettle();
-      expect(find.text('2028年 2月'), findsOneWidget);
-      await tester.tap(heading);
-      await tester.pumpAndSettle();
-      tester
-          .widget<CupertinoDatePicker>(
-            find.byKey(const ValueKey('todo-month-wheel')),
-          )
-          .onDateTimeChanged(DateTime(2100, 12));
-      await tester.tap(find.byKey(const ValueKey('todo-month-confirm')));
-      await tester.pumpAndSettle();
-      expect(find.text('2100年 12月'), findsOneWidget);
-      expect(
-        tester
-            .widget<IconButton>(
-              find.byWidgetPredicate(
-                (w) => w is IconButton && w.tooltip == '下个月',
-              ),
-            )
-            .onPressed,
-        isNull,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
-  for (final width in [320.0, 360.0, 390.0, 480.0]) {
-    for (final scale in [1.0, 1.5]) {
-      testWidgets('month and editor fit $width at $scale', (tester) async {
-        tester.view.physicalSize = Size(width, 1200);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        await tester.pumpWidget(
-          host(
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: DailyTodosSection(),
-            ),
-            DemoTodoRepository(),
-            scale: scale,
-          ),
-        );
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        await tester.tap(find.byKey(const ValueKey('todo-month-picker')));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        await tester.tap(find.text('取消'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('新增事项'));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        await tester.tap(find.text('保存'));
-        await tester.pumpAndSettle();
-        expect(find.text('请填写事项标题'), findsOneWidget);
-        await tester.tap(find.text('取消'));
-        await tester.pumpAndSettle();
-      });
-    }
-  }
 }

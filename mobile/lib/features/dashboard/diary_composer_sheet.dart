@@ -1,3 +1,5 @@
+import '../../shared/diary_task_links.dart';
+import '../../data/models/diary_task_links.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -113,6 +115,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
   bool _allowPop = false;
   late Future<void> _restoreFuture;
   String? _error;
+  String _taskLinks = '';
 
   @override
   void initState() {
@@ -145,7 +148,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
     WidgetsBinding.instance.removeObserver(this);
     _saveTimer?.cancel();
     _editWindowTimer?.cancel();
-    if (!_submitted && _controller.text.isNotEmpty) {
+    if (!_submitted && (_controller.text.isNotEmpty || _taskLinks.isNotEmpty)) {
       unawaited(
         _enqueueSave(_controller.text, _revision).catchError((Object _) {}),
       );
@@ -179,6 +182,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
       if (!mounted || !_isCurrentAccount) return;
       if (local != null) {
         _controller.text = local.fields['今日工作'] ?? '';
+        _taskLinks = local.fields['关联任务'] ?? '';
         _recordId = local.serverId ?? _recordId;
         _version = local.serverVersion ?? _version;
       }
@@ -212,10 +216,26 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
             if (mounted) setState(() => _readOnly = true);
           });
         }
+        final serverLinks = DiaryTaskLinks.encode(
+          record.fields['taskIds'] ?? record.fields['关联任务'],
+        );
+        if (_version != null &&
+            record.version != _version &&
+            local != null &&
+            (_controller.text != serverWork || _taskLinks != serverLinks)) {
+          throw const ApiFailure(
+            FailureKind.conflict,
+            '日志版本已变化，请从日志页重新打开并核对正文和关联任务',
+          );
+        }
         if (local == null) {
+          _taskLinks = serverLinks;
           _controller.text = '${record.fields['今日工作'] ?? ''}';
         }
-        if (_readOnly) _controller.text = '${record.fields['今日工作'] ?? ''}';
+        if (_readOnly) {
+          _controller.text = '${record.fields['今日工作'] ?? ''}';
+          _taskLinks = serverLinks;
+        }
         _version = record.version;
       }
     } catch (error) {
@@ -294,14 +314,15 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
   }
 
   Future<void> _enqueueSave(String text, int revision) {
+    final links = _taskLinks;
     final operation = _saveQueue.catchError((Object _) {}).then((_) async {
-      if (text.trim().isEmpty) {
+      if (text.trim().isEmpty && links.isEmpty) {
         await _draftStore.remove(_location);
       } else {
         await _draftStore.write(
           _location,
           LocalDraft(
-            fields: {'今日工作': text},
+            fields: {'今日工作': text, '关联任务': links},
             savedAt: DateTime.now(),
             serverId: _recordId,
             serverVersion: _version,
@@ -404,6 +425,7 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
             Command(
               _hasSubmittedBefore ? 'update-content' : 'submit',
               {
+                'taskIds': DiaryTaskLinks.parse(_taskLinks),
                 if (_hasSubmittedBefore) ...{
                   'id': _recordId,
                   'work': text,
@@ -570,7 +592,35 @@ class _DiaryComposerSheetState extends ConsumerState<DiaryComposerSheet>
                           ),
                         )
                       else
-                        Expanded(child: _fullEditor(context)),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Expanded(child: _fullEditor(context)),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  4,
+                                ),
+                                child: DiaryTaskLinksEditor(
+                                  value: _taskLinks,
+                                  enabled:
+                                      !_loading &&
+                                      !_restoreFailed &&
+                                      !_submitting &&
+                                      !_submitted &&
+                                      !_closing &&
+                                      !_readOnly,
+                                  onChanged: (links) {
+                                    setState(() => _taskLinks = links);
+                                    _changed('');
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (active)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),

@@ -1,3 +1,4 @@
+import '../../shared/diary_task_links.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'dart:async';
 import 'package:pandora_mobile/data/models/task_display.dart';
@@ -1568,6 +1569,13 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                         _value(f['今日工作']),
                         style: const TextStyle(fontSize: 15, height: 1.8),
                       ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        '关联任务',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      DiaryTaskLinksReader(f['taskIds'] ?? f['关联任务']),
                     ],
                   ),
                 ),

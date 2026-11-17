@@ -21,6 +21,11 @@ public class JdbcTodoRepository implements TodoRepository {
         var items=db.rows("SELECT * FROM personal_todos WHERE "+OWN+" AND business_date<=? AND end_date>=? ORDER BY completed,business_date,created_at,id LIMIT ? OFFSET ?",a.company(),a.id(),date,date,limit,cursor).stream().map(JdbcTodoRepository::todo).toList();
         return new Page(items,total,cursor+items.size()<total?String.valueOf(cursor+items.size()):null);
     }
+    @Override public Page month(Actor a,LocalDate from,LocalDate to,int cursor,int limit) {
+        long total=db.count("SELECT count(*) FROM personal_todos WHERE "+OWN+" AND business_date<? AND end_date>=?",a.company(),a.id(),to,from);
+        var items=db.rows("SELECT * FROM personal_todos WHERE "+OWN+" AND business_date<? AND end_date>=? ORDER BY business_date,created_at,id LIMIT ? OFFSET ?",a.company(),a.id(),to,from,limit,cursor).stream().map(JdbcTodoRepository::todo).toList();
+        return new Page(items,total,cursor+items.size()<total?String.valueOf(cursor+items.size()):null);
+    }
     @Override public List<DayCount> counts(Actor a,LocalDate from,LocalDate to) {
         return db.rows("SELECT d::date AS business_date,count(t.id) AS total,count(t.id) FILTER (WHERE t.completed) AS completed FROM generate_series(?::timestamp,?::timestamp - interval '1 day',interval '1 day') AS d LEFT JOIN personal_todos t ON t.company_id=? AND t.owner_id=? AND t.deleted_at IS NULL AND t.business_date<=d::date AND t.end_date>=d::date GROUP BY d ORDER BY d",from,to,a.company(),a.id())
             .stream().map(r->new DayCount(LocalDate.parse(r.get("business_date").toString()),((Number)r.get("total")).longValue(),((Number)r.get("completed")).longValue())).toList();

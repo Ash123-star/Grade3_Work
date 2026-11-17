@@ -538,6 +538,7 @@ class TaskDispatchIntegrationTest {
     @Test void dailyLogWorkflowKeepsDraftPrivateAndHistoryConsistent() throws Exception {
         String date=LocalDate.now(ZoneId.of("Asia/Shanghai")).toString();
         String taskId=dispatch("leader",body("日报关联任务","alice"),key()).get("id").asText();
+        call(200,"POST","/tasks/"+taskId+"/events","alice",Map.of("type","RECEIVED","version",1),null);
         var firstBody=new LinkedHashMap<String,Object>();
         firstBody.put("work","完成初稿"); firstBody.put("tomorrow","继续联调"); firstBody.put("taskIds",List.of(taskId,taskId));
         var draft=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",0,"body",firstBody),null);

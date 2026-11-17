@@ -55,7 +55,7 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 `GET /tasks?date=YYYY-MM-DD&period=day|week|month` 使用上海自然日/周/月按任务区间相交筛选：`COALESCE(start_at,deadline) < 范围结束 && deadline >= 范围开始`，排除反向区间。移动端自行计算月历可见网格并发送成对带时区的 `from/to`；不得与 `date/period` 混用。`participantId` 为正式参与人参数，`ownerId` 是兼容别名，同时出现且不同返回400。
 
-移动端新月历调用的正式目标形状为 `GET /tasks?from=<inclusive-ISO8601>&to=<exclusive-ISO8601>&ownerId=<optional-id>`；导图接收卡片使用 `GET /tasks/received-card?cursor&limit&search`，返回 `id/title/version/dispatchAt/phase` 和卡片所需的参与人、标签字段。`phase` 必须区分 `DISPATCHED/RECEIVED/FEEDBACK/ACCEPTED/ARCHIVED/WITHDRAWN`，服务端不得让客户端从缺失字段推导完成状态。
+移动端新月历调用的正式目标形状为 `GET /tasks?from=<inclusive-ISO8601>&to=<exclusive-ISO8601>&ownerId=<optional-id>`；导图接收卡片使用 `GET /tasks/received-card?cursor&limit&search`，返回 `id/title/version/dispatchAt/phase` 和卡片所需的参与人、标签字段。`phase` 必须区分 `DISPATCHED/RECEIVED/ACCEPTED/ARCHIVED/WITHDRAWN`，服务端不得让客户端从缺失字段推导完成状态。
 
 `POST /tasks/{id}/events` 请求至少包含当前 `version` 和 `type`。事件枚举及附加字段如下：
 
@@ -81,7 +81,9 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 `GET /logs` 只返回本人草稿或授权范围内已提交日志；下属列表、月状态与详情共享组织范围和真实祖先关系。`PUT /logs/draft` 保存每日唯一草稿，首次提交仅允许上海今天和此前两日。已提交正文由本人在原始24小时内 `PUT /logs/{id}/content` 直改。已删除日志修订、撤回和阅读登记三条旧 HTTP 路由（请求返回404 `NOT_FOUND`），历史待审LOG候选迁移为 `SUPERSEDED`，不能延迟覆盖正文；旧历史字段和版本保留。阅读登记不再提供写入口，统计不再使用待阅指标。
 
-移动端日期范围列表同时支持 `from/to`；成员月状态使用 `GET /logs/subordinates/calendar?ownerId=<id>&month=YYYY-MM`，返回 `employmentStartDate` 和逐日 `SUBMITTED/MISSING/FUTURE/UNKNOWN`。首次提交后的直接正文修改使用 `PUT /logs/{id}/content`，请求 `{work,version}`，只能由本人在 `submitted_at + 24h` 前执行，必须保留首次提交时间并递增版本。
+移动端日期范围列表同时支持 `from/to`；成员月状态使用 `GET /logs/subordinates/calendar?ownerId=<id>&month=YYYY-MM`，返回 `employmentStartDate` 和逐日 `SUBMITTED/MISSING/FUTURE/UNKNOWN`。首次提交后的直接正文修改使用 `PUT /logs/{id}/content`，请求 `{work,version,taskIds?}`，只能由本人在 `submitted_at + 24h` 前执行，必须保留首次提交时间并递增版本。
+
+Issue #94：“今日任务”候选来自完整的本人参与任务，仅 `RECEIVED` 可新增勾选，不按日志日期筛选；服务端同样检查参与关系和生命周期，并锁定新增任务避免并发完成。已有且仍可读取的关联在完成后可以保留。草稿保存及正文修改将 `taskIds` 与正文、`log_tasks` 和版本历史同事务写入；修改时省略 `taskIds` 保留旧值，传空数组清空，非数组400，新关联不是未完成任务400、非参与人403、不可读取对象404。移动端正文下方使用主题奶油黄下拉框多选，展开显示同标签色胶囊，查看和历史版本显示关联；日志页右上角取消下属日志入口，既有成员日志读取接口和权限不变。复用已有表，无新增Flyway迁移。
 
 本人及下属日志列表在指定起止时间时均发送成对的`from/to`，移除互斥的`date/period`。近三天为上海前天零点至明天零点的左闭右开区间；例如2026年11月6日发送`2026-11-03T16:00:00Z`至`2026-11-06T16:00:00Z`，不得将三天区间转换成前天的单日查询。提交后沿用既有日志列表失效刷新，不需要修改后端或重新提交已保存日志。
 

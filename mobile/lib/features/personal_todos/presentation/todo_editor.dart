@@ -1,3 +1,5 @@
+import 'package:pandora_mobile/shared/premium_pickers.dart';
+import 'todo_calendar_source.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -148,6 +150,7 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
       ref.read(pendingTodoCommandProvider.notifier).state = null;
       ref.invalidate(todoDayProvider);
       ref.invalidate(todoMonthProvider);
+      ref.invalidate(todoCalendarRecordsProvider);
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted || !sameSession) return;
@@ -261,9 +264,9 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                           onPressed: locked
                               ? null
                               : () async {
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: parseCivilDate(date),
+                                  final picked = await showPremiumDatePicker(
+                                    context,
+                                    initial: parseCivilDate(date),
                                     firstDate: DateTime(1900),
                                     lastDate: DateTime(2100, 12, 31),
                                   );
@@ -309,9 +312,9 @@ class _TodoEditorState extends ConsumerState<TodoEditor> {
                           onPressed: locked
                               ? null
                               : () async {
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: parseCivilDate(endDate),
+                                  final picked = await showPremiumDatePicker(
+                                    context,
+                                    initial: parseCivilDate(endDate),
                                     firstDate: parseCivilDate(date),
                                     lastDate: DateTime(2100, 12, 31),
                                   );

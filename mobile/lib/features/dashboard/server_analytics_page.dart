@@ -491,13 +491,12 @@ class _StatisticsDateControls extends ConsumerWidget {
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
                 icon: const Icon(Icons.calendar_today_outlined, size: 18),
                 onPressed: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: date,
+                  final picked = await showPremiumDatePicker(
+                    context,
+                    initial: date,
                     firstDate: DateTime(2007),
                     lastDate: DateTime(2100, 12, 31),
-                    helpText: '选择统计日期',
-                    initialEntryMode: DatePickerEntryMode.calendarOnly,
+                    title: '选择统计日期',
                   );
                   if (picked != null && context.mounted) {
                     ref.read(selectedDateProvider.notifier).state = picked;

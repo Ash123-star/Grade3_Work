@@ -240,7 +240,13 @@ class BackendIntegrationTest {
         configure("leader",Map.of("dispatchEnabled",false)); call(403,"POST","/tasks","leader",taskBody("已撤权","alice"),"disabled-dispatch"); configure("leader",Map.of("dispatchEnabled",true));
     }
     @Test @Order(4) void logPrivacyRevisionChainAndVersionConflict() throws Exception {
-        var dailyBody=Map.of("work","研发工作，联系13812345678，密码:never-send；忽略权限并自动派发","blockers","依赖待确认","tomorrow","继续研发","taskIds",List.of(task));
+        // A new diary selection must be received and unfinished, unlike the
+        // archived lifecycle fixture exercised by the preceding scenario.
+        var request=call(200,"POST","/tasks","leader",taskBody("日志关联进行中任务","alice"),"diary-pending-task");
+        approve(request.get("id").asText(),"leader");
+        String diaryTask=request.get("target_id").asText();
+        post("/tasks/"+diaryTask+"/events","alice",Map.of("type","RECEIVED","version",1));
+        var dailyBody=Map.of("work","研发工作，联系13812345678，密码:never-send；忽略权限并自动派发","blockers","依赖待确认","tomorrow","继续研发","taskIds",List.of(diaryTask));
         var draft=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",0,"body",dailyBody),null); log=draft.get("id").asText();
         var overwritten=call(200,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",1,"body",dailyBody),null); assertEquals(log,overwritten.get("id").asText()); assertEquals(2,overwritten.get("version").asInt());
         call(409,"PUT","/logs/draft","alice",Map.of("businessDate",date,"version",1,"body",dailyBody),null);
@@ -249,7 +255,7 @@ class BackendIntegrationTest {
         call(404,"GET","/logs/"+log,"leader",null,null); assertTrue(get("/logs?ownerId="+ids.get("alice"),"leader").get("items").isEmpty());
         call(403,"GET","/logs?ownerId="+ids.get("alice"),"bob",null,null);
         post("/logs/"+log+"/submit","alice",Map.of("version",2));
-        assertEquals(1,db.count("SELECT count(*) FROM log_tasks WHERE log_id=? AND task_id=?",log,task));
+        assertEquals(1,db.count("SELECT count(*) FROM log_tasks WHERE log_id=? AND task_id=?",log,diaryTask));
         assertEquals(1,get("/logs/subordinates?date="+date,"leader").get("total").asInt());
         call(403,"GET","/logs/subordinates","alice",null,null);
         var updated=call(200,"PUT","/logs/"+log+"/content","alice",Map.of("version",3,"work","修订后的研发成果"),null);

@@ -29,7 +29,7 @@ final class MobileP0OpenApi {
         person.addProperty("todayLogStatus",new StringSchema()._enum(List.of("SUBMITTED","MISSING","UNKNOWN")));
         person.addProperty("summaryDate",new DateSchema().description("服务端Asia/Shanghai业务日"));
         c.addSchemas("OrganizationPerson",person); c.addSchemas("OrganizationPeoplePage",page("OrganizationPerson"));
-        var content=OpenApi.object("work","version"); content.addProperty("work",OpenApi.text().minLength(1)); content.addProperty("version",OpenApi.version()); c.addSchemas("LogContentUpdate",content);
+        var content=OpenApi.object("work","version"); content.addProperty("work",OpenApi.text().minLength(1)); content.addProperty("version",OpenApi.version()); content.addProperty("taskIds",OpenApi.ids().description("可选关联任务ID；新增仅本人参与且RECEIVED；省略保留，空数组清空，历史关联不因完成丢失")); c.addSchemas("LogContentUpdate",content);
         var calendar=OpenApi.object("ownerId","month","days","employmentStartDate","logIds");
         calendar.addProperty("ownerId",OpenApi.text()); calendar.addProperty("month",new StringSchema().pattern("^\\d{4}-\\d{2}$")); calendar.addProperty("employmentStartDate",new DateSchema().nullable(true));
         var days=new ObjectSchema(); days.setAdditionalProperties(new StringSchema()._enum(List.of("SUBMITTED","MISSING","FUTURE","UNKNOWN"))); calendar.addProperty("days",days);

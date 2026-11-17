@@ -10,7 +10,10 @@ class CalendarMonthTimeline extends StatefulWidget {
     required this.dragging,
     required this.onMonthChanged,
     required this.monthBuilder,
+    this.firstYear = 2000,
+    this.lastYear = 9999,
   });
+  final int firstYear, lastYear;
   final DateTime selectedMonth;
   final ScrollController controller;
   final bool dragging;
@@ -97,14 +100,14 @@ class _CalendarMonthTimelineState extends State<CalendarMonthTimeline> {
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (_, index) => _month(_anchor - index - 1),
-                childCount: _anchor - 2000 * 12,
+                childCount: _anchor - widget.firstYear * 12,
               ),
             ),
             SliverList(
               key: _center,
               delegate: SliverChildBuilderDelegate(
                 (_, index) => _month(_anchor + index),
-                childCount: 10000 * 12 - _anchor,
+                childCount: (widget.lastYear + 1) * 12 - _anchor,
               ),
             ),
           ],

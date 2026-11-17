@@ -320,28 +320,39 @@ class TuantuanDialog extends StatelessWidget {
   final bool scrollable;
   @override
   Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: const Color(0xFFFFFAF0),
+    backgroundColor: SunnyPalette.paper,
     surfaceTintColor: Colors.transparent,
     elevation: 8,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(28),
-      side: const BorderSide(color: Color(0xFFEADBB9)),
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(color: SunnyPalette.primaryContainer),
     ),
     insetPadding:
         insetPadding ??
         const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
     constraints: constraints ?? const BoxConstraints(maxWidth: 480),
     scrollable: scrollable,
-    titlePadding: titlePadding ?? const EdgeInsets.fromLTRB(24, 20, 24, 16),
-    contentPadding: contentPadding ?? const EdgeInsets.fromLTRB(24, 0, 24, 20),
-    actionsPadding: actionsPadding ?? const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    titlePadding: titlePadding ?? const EdgeInsets.fromLTRB(20, 16, 20, 12),
+    contentPadding: contentPadding ?? const EdgeInsets.fromLTRB(20, 0, 20, 16),
+    actionsPadding: actionsPadding ?? const EdgeInsets.fromLTRB(12, 0, 12, 12),
     actionsOverflowButtonSpacing: 8,
     title: title == null
         ? null
         : Row(
             children: [
-              const SunshineMascot(size: 44),
-              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: SunnyPalette.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.info_outline_rounded,
+                  size: 20,
+                  color: SunnyPalette.ink,
+                ),
+              ),
+              const SizedBox(width: 10),
               Expanded(child: title!),
             ],
           ),
@@ -390,7 +401,7 @@ class TuantuanSheet extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => Material(
-    color: const Color(0xFFFFFAF0),
+    color: SunnyPalette.paper,
     borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
     clipBehavior: Clip.antiAlias,
     child: child,

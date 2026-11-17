@@ -79,9 +79,8 @@ void main() {
         find.text('班'),
         mode == 'first-offline' ? findsNothing : findsOneWidget,
       );
-      if (mode == 'first-offline') {
-        expect(find.byTooltip(RegExp('暂无放假调休公告')), findsOneWidget);
-      }
+      expect(find.byTooltip(RegExp('暂无放假调休公告')), findsNothing);
+      expect(find.text('调休数据待更新 · 刷新'), findsNothing);
       expect(t.takeException(), isNull);
     });
   }

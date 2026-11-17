@@ -443,3 +443,7 @@ OpenSpec严格校验46项通过。本批差异检查通过；全工作区检查�
 本地运行诊断：2026-11-06 Docker容器pandora-local-api-1中的HolidayService仍使用api.github.com，容器访问返回403 rate limit exceeded；当前源码的raw.githubusercontent.com来源返回200。源码修复不等于后端已部署，当前容器须重建后才会采用新来源。
 
 本批编译：`flutter build apk --debug --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://127.0.0.1:8080/api` 退出0，日志`output/yellow-theme/statistics-compact-build.log`。按用户要求未运行测试，未安装App或重建Docker。原型截图`output/yellow-theme/statistics-compact-overview.png`、`statistics-compact-trend.png`、`account-settings-refined.png`，业务及设备验收待用户执行。工作区混有其他修改，未提交或推送。
+
+## 日期与操作提示
+
+统一 QuickDateTimePicker：年/月/日直接输入、月网格点选、时分同面板，保留原业务范围和取消语义，分钟精确至1分钟。日期网格点选可直接完成，日期时间只需一次确认，不使用框架自带选择器。输入和确认弹层采用暖黄/奶油底色及紧凑间距，保留手动关闭。操作提示采用暖黄色底部浮层，深棕文字与状态图标，默认4秒、错误7秒自动消失；辅助导航模式延长至8/12秒。操作按钮与关闭入口保持48dp触控；提示不推动正文、导航或日历网格。

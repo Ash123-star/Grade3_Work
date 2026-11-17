@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart';
+import 'quick_date_time_picker.dart';
+import '../theme/sunshine_palette.dart';
 import 'package:flutter/material.dart';
 
 class PremiumTagOption {
@@ -156,30 +157,62 @@ class _PremiumOptionRow extends StatelessWidget {
   );
 }
 
+Future<DateTime?> _quickPicker(
+  BuildContext context, {
+  DateTime? initial,
+  DateTime? firstDate,
+  DateTime? lastDate,
+  required String title,
+  bool includeDate = true,
+  bool includeTime = false,
+}) {
+  final now = DateTime.now();
+  final min = DateUtils.dateOnly(firstDate ?? DateTime(now.year - 2));
+  final max = DateUtils.dateOnly(lastDate ?? DateTime(now.year + 8));
+  if (min.isAfter(max)) throw ArgumentError('开始日期不能晚于截止日期');
+  final seed = initial ?? now;
+  final date = DateUtils.dateOnly(seed);
+  final picked = date.isBefore(min)
+      ? min
+      : date.isAfter(max)
+      ? max
+      : date;
+  return showModalBottomSheet<DateTime>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => QuickDateTimePicker(
+      initial: DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        seed.hour,
+        seed.minute,
+      ),
+      firstDate: min,
+      lastDate: max,
+      title: title,
+      includeDate: includeDate,
+      includeTime: includeTime,
+    ),
+  );
+}
+
 Future<DateTime?> showPremiumDateTimePicker(
   BuildContext context, {
   DateTime? initial,
   DateTime? firstDate,
   DateTime? lastDate,
-  String title = '选择时间',
-}) async {
-  final now = DateTime.now();
-  final seed = initial ?? now;
-  final date = await showPremiumDatePicker(
-    context,
-    initial: seed,
-    firstDate: firstDate ?? DateTime(now.year - 2),
-    lastDate: lastDate ?? DateTime(now.year + 8),
-    title: title,
-  );
-  if (date == null || !context.mounted) return null;
-  final time = await showPremiumTimePicker(
-    context,
-    initial: TimeOfDay.fromDateTime(seed),
-  );
-  if (time == null) return null;
-  return DateTime(date.year, date.month, date.day, time.hour, time.minute);
-}
+  String title = '选择日期与时间',
+}) => _quickPicker(
+  context,
+  initial: initial,
+  firstDate: firstDate,
+  lastDate: lastDate,
+  title: title,
+  includeTime: true,
+);
 
 Future<DateTime?> showPremiumDatePicker(
   BuildContext context, {
@@ -187,42 +220,28 @@ Future<DateTime?> showPremiumDatePicker(
   DateTime? firstDate,
   DateTime? lastDate,
   String title = '选择日期',
-}) async {
-  final today = DateTime.now();
-  final min = DateUtils.dateOnly(firstDate ?? DateTime(today.year - 2));
-  final max = DateUtils.dateOnly(lastDate ?? DateTime(today.year + 8));
-  if (min.isAfter(max)) throw ArgumentError('开始日期不能晚于截止日期');
-  final candidate = DateUtils.dateOnly(initial ?? today);
-  final picked = candidate.isBefore(min)
-      ? min
-      : candidate.isAfter(max)
-      ? max
-      : candidate;
-  return showModalBottomSheet<DateTime>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (sheetContext) => _PremiumDateSheet(
-      initial: picked,
-      firstDate: min,
-      lastDate: max,
-      title: title,
-    ),
-  );
-}
+}) => _quickPicker(
+  context,
+  initial: initial,
+  firstDate: firstDate,
+  lastDate: lastDate,
+  title: title,
+);
 
 Future<TimeOfDay?> showPremiumTimePicker(
   BuildContext context, {
   TimeOfDay? initial,
 }) async {
-  return showModalBottomSheet<TimeOfDay>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _PremiumTimeSheet(initial: initial ?? TimeOfDay.now()),
+  final time = initial ?? TimeOfDay.now();
+  final now = DateTime.now();
+  final value = await _quickPicker(
+    context,
+    initial: DateTime(now.year, now.month, now.day, time.hour, time.minute),
+    title: '选择时间',
+    includeDate: false,
+    includeTime: true,
   );
+  return value == null ? null : TimeOfDay.fromDateTime(value);
 }
 
 Future<String?> showPremiumTagPicker(
@@ -300,8 +319,8 @@ class _PremiumShell extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surface,
-    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+    color: SunshinePalette.canvas,
+    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
     clipBehavior: Clip.antiAlias,
     child: ConstrainedBox(
       constraints: BoxConstraints(
@@ -309,10 +328,10 @@ class _PremiumShell extends StatelessWidget {
       ),
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
-          20,
-          12,
-          20,
-          20 + MediaQuery.viewInsetsOf(context).bottom,
+          16,
+          10,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -330,235 +349,6 @@ class _PremiumShell extends StatelessWidget {
           ],
         ),
       ),
-    ),
-  );
-}
-
-class _PremiumDateSheet extends StatefulWidget {
-  const _PremiumDateSheet({
-    required this.initial,
-    required this.firstDate,
-    required this.lastDate,
-    required this.title,
-  });
-  final DateTime initial, firstDate, lastDate;
-  final String title;
-  @override
-  State<_PremiumDateSheet> createState() => _PremiumDateSheetState();
-}
-
-class _PremiumDateSheetState extends State<_PremiumDateSheet> {
-  late DateTime selected = DateTime(
-    widget.initial.year,
-    widget.initial.month,
-    widget.initial.day,
-  );
-  late DateTime month = DateTime(widget.initial.year, widget.initial.month);
-  int get days => DateTime(month.year, month.month + 1, 0).day;
-  int get offset => DateTime(month.year, month.month, 1).weekday - 1;
-  bool allowed(DateTime value) =>
-      !value.isBefore(widget.firstDate) && !value.isAfter(widget.lastDate);
-  @override
-  Widget build(BuildContext context) => _PremiumShell(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                widget.title,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, selected),
-              child: const Text('确定'),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            IconButton(
-              tooltip: '上个月',
-              onPressed:
-                  month.month == widget.firstDate.month &&
-                      month.year == widget.firstDate.year
-                  ? null
-                  : () => setState(
-                      () => month = DateTime(month.year, month.month - 1),
-                    ),
-              icon: const Icon(Icons.chevron_left),
-            ),
-            Expanded(
-              child: Center(
-                child: Text(
-                  '${month.year}年${month.month}月',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ),
-            IconButton(
-              tooltip: '下个月',
-              onPressed:
-                  month.year == widget.lastDate.year &&
-                      month.month == widget.lastDate.month
-                  ? null
-                  : () => setState(
-                      () => month = DateTime(month.year, month.month + 1),
-                    ),
-              icon: const Icon(Icons.chevron_right),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            for (final day in ['一', '二', '三', '四', '五', '六', '日'])
-              Expanded(
-                child: Center(
-                  child: Text(
-                    day,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: ((offset + days + 6) ~/ 7) * 7,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            mainAxisExtent: 44,
-          ),
-          itemBuilder: (_, index) {
-            final day = index - offset + 1;
-            if (day < 1 || day > days) return const SizedBox.shrink();
-            final value = DateTime(month.year, month.month, day);
-            final isSelected =
-                value.year == selected.year &&
-                value.month == selected.month &&
-                value.day == selected.day;
-            return Padding(
-              padding: const EdgeInsets.all(3),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: allowed(value)
-                    ? () => setState(() => selected = value)
-                    : null,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '$day',
-                      style: TextStyle(
-                        color: isSelected
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : null,
-                        fontWeight: isSelected ? FontWeight.w700 : null,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    ),
-  );
-}
-
-class _PremiumTimeSheet extends StatefulWidget {
-  const _PremiumTimeSheet({required this.initial});
-  final TimeOfDay initial;
-  @override
-  State<_PremiumTimeSheet> createState() => _PremiumTimeSheetState();
-}
-
-class _PremiumTimeSheetState extends State<_PremiumTimeSheet> {
-  late int hour = widget.initial.hour;
-  late int minute = widget.initial.minute - widget.initial.minute % 5;
-  @override
-  Widget build(BuildContext context) => _PremiumShell(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '选择时间',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.pop(context, TimeOfDay(hour: hour, minute: minute)),
-              child: const Text('确定'),
-            ),
-          ],
-        ),
-        SizedBox(
-          height: 170,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _wheel(24, hour, (v) => setState(() => hour = v)),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  ':',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
-                ),
-              ),
-              _wheel(
-                12,
-                minute ~/ 5,
-                (v) => setState(() => minute = v * 5),
-                minuteLabel: true,
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-  Widget _wheel(
-    int count,
-    int value,
-    ValueChanged<int> onChanged, {
-    bool minuteLabel = false,
-  }) => SizedBox(
-    width: 82,
-    child: CupertinoPicker(
-      itemExtent: 42,
-      scrollController: FixedExtentScrollController(initialItem: value),
-      onSelectedItemChanged: onChanged,
-      children: [
-        for (var i = 0; i < count; i++)
-          Center(
-            child: Text(
-              '${minuteLabel ? i * 5 : i}'.padLeft(2, '0'),
-              style: const TextStyle(fontSize: 22),
-            ),
-          ),
-      ],
     ),
   );
 }

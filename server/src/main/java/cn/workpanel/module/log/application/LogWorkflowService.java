@@ -32,6 +32,7 @@ public class LogWorkflowService {
             if((boolean)log.get("submitted")) throw new ApiError(409,"DIRECT_CONTENT_REQUIRED","已提交日报正文请使用 PUT /logs/{id}/content");
             Db.conflict(db.update("UPDATE daily_logs SET body=?::jsonb,version=version+1 WHERE id=? AND version=?",db.write(content),id,Db.version(command)));
         }
+        LogTaskLinks.validateSelection(db,actor,content,old.isEmpty()?Map.of():db.read(old.getFirst().get("body")));
         LogTaskLinks.validateAndSync(db,actor,id,content);
         return detail(actor,id);
     }
@@ -69,7 +70,7 @@ public class LogWorkflowService {
     @Transactional
     public Map<String,Object> updateContent(Actor actor,String id,Map<String,Object> command) {
         if(!actor.status().equals("ACTIVE")||actor.mustChange()) throw ApiError.forbidden();
-        Db.fields(command,"work","version");
+        Db.fields(command,"work","version","taskIds");
         var staleRequests=db.rows("SELECT id FROM review_requests WHERE company_id=? AND kind='LOG' AND target_id=? AND status='PENDING' ORDER BY id FOR UPDATE",actor.company(),id);
         var log=business.log(actor,id,true);
         if(!actor.id().equals(log.get("owner_id"))) throw ApiError.forbidden();
@@ -78,7 +79,14 @@ public class LogWorkflowService {
         String work=Db.required(command,"work");
         if(work.length()>20000) throw ApiError.bad("INVALID_FIELD","work 不得超过20000字");
         int version=Db.version(command); var body=db.read(log.get("body")); body.put("work",work);
+        if(command.containsKey("taskIds")) {
+            var previous=db.read(log.get("body"));
+            body.put("taskIds",command.get("taskIds"));
+            LogTaskLinks.validateSelection(db,actor,body,previous);
+            body.put("taskIds",Business.strings(body,"taskIds"));
+        }
         Db.conflict(db.update("UPDATE daily_logs SET body=?::jsonb,version=version+1 WHERE id=? AND owner_id=? AND submitted=true AND version=?",db.write(body),id,actor.id(),version));
+        if(command.containsKey("taskIds")) LogTaskLinks.sync(db,actor.company(),id,body);
         int next=version+1;
         db.update("INSERT INTO log_versions(company_id,log_id,version,body) VALUES (?,?,?,?::jsonb)",actor.company(),id,next,db.write(body));
         for(var stale:staleRequests) {

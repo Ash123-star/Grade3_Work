@@ -182,13 +182,6 @@ class _LogsPageState extends ConsumerState<LogsPage>
     return PageFrame(
       title: team ? '下属日志' : '日志',
       showTitle: team,
-      actions: [
-        if (!team && user.manager)
-          TextButton(
-            onPressed: () => context.push('/logs/subordinates'),
-            child: const Text('下属日志 ›', maxLines: 1, softWrap: false),
-          ),
-      ],
       fab: team || !canCreateForDate
           ? null
           : FloatingActionButton(

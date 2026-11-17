@@ -1,3 +1,4 @@
+import 'calendar_data_source.dart';
 import 'holiday_data.dart';
 import 'calendar_interaction.dart';
 import 'calendar_schedule.dart';
@@ -73,10 +74,14 @@ class CalendarContent extends ConsumerStatefulWidget {
     this.availableHeight = 0,
     this.ownerId,
     this.monthOnly = false,
+    this.source,
+    this.dateStateProvider,
   });
   final double availableHeight;
   final String? ownerId;
   final bool monthOnly;
+  final CalendarDataSource? source;
+  final StateProvider<DateTime>? dateStateProvider;
   @override
   ConsumerState<CalendarContent> createState() => _CalendarContentState();
 }
@@ -84,13 +89,16 @@ class CalendarContent extends ConsumerStatefulWidget {
 class _CalendarContentState extends ConsumerState<CalendarContent> {
   @override
   Widget build(BuildContext context) {
-    final dateProvider = widget.ownerId == null
-        ? selectedDateProvider
-        : memberCalendarDateProvider(widget.ownerId!);
+    final dateProvider =
+        widget.dateStateProvider ??
+        (widget.ownerId == null
+            ? selectedDateProvider
+            : memberCalendarDateProvider(widget.ownerId!));
     final date = ref.watch(dateProvider),
         period = widget.monthOnly ? '月' : ref.watch(periodProvider);
     if (period == '月') {
       return _StableMonthPager(
+        source: widget.source,
         selectedDate: date,
         ownerId: widget.ownerId,
         availableHeight: widget.availableHeight,
@@ -118,6 +126,10 @@ class _CalendarContentState extends ConsumerState<CalendarContent> {
                   children: [
                     _DayAgenda(
                       date: next,
+                      onOpen: widget.source == null
+                          ? null
+                          : (record) =>
+                                widget.source!.open(context, ref, record),
                       events: eventsOnDay(events, next),
                       onMove:
                           interaction == null ||
@@ -293,9 +305,11 @@ class _StableMonthPager extends StatefulWidget {
     required this.availableHeight,
     required this.onMonthChanged,
     required this.onDayChanged,
+    this.source,
   });
   final DateTime selectedDate;
   final String? ownerId;
+  final CalendarDataSource? source;
   final double availableHeight;
   final ValueChanged<DateTime> onMonthChanged;
   final void Function(
@@ -332,16 +346,20 @@ class _StableMonthPagerState extends State<_StableMonthPager> {
       height: height,
       child: CalendarInteractionSurface(
         key: _interaction,
+        source: widget.source,
         scroll: _controller,
         readOnly: widget.ownerId != null,
         builder: (context, dragging) => LayoutBuilder(
           builder: (context, space) => CalendarMonthTimeline(
+            firstYear: widget.source?.firstYear ?? 2000,
+            lastYear: widget.source?.lastYear ?? 9999,
             selectedMonth: widget.selectedDate,
             controller: _controller,
             dragging: dragging,
             onMonthChanged: widget.onMonthChanged,
             monthBuilder: (month) => _StableMonthPage(
               month: month,
+              source: widget.source,
               ownerId: widget.ownerId,
               availableHeight: space.maxHeight,
               onDayChanged: widget.onDayChanged,
@@ -359,9 +377,11 @@ class _StableMonthPage extends ConsumerStatefulWidget {
     required this.ownerId,
     required this.availableHeight,
     required this.onDayChanged,
+    this.source,
   });
   final DateTime month;
   final String? ownerId;
+  final CalendarDataSource? source;
   final double availableHeight;
   final void Function(
     DateTime,
@@ -391,9 +411,15 @@ class _StableMonthPageState extends ConsumerState<_StableMonthPage> {
       _scope = scope;
       _lastComplete = null;
     }
-    final state = ref.watch(
-      calendarMonthTasksProvider((ownerId, _monthIndex(month))),
-    );
+    final provider =
+        widget.source?.monthProvider(month) ??
+        calendarMonthTasksProvider((ownerId, _monthIndex(month)));
+    final state = ref.watch(provider);
+    void retry() => widget.source == null
+        ? ref.invalidate(
+            calendarMonthTasksProvider((ownerId, _monthIndex(month))),
+          )
+        : widget.source!.invalidateMonth(ref, month);
     final holidays = ref.watch(holidayCalendarProvider(month.year));
     if (state is AsyncData<PageResult>) _lastComplete = state.value;
     Widget render(PageResult page, {bool readOnly = false}) {
@@ -448,12 +474,7 @@ class _StableMonthPageState extends ConsumerState<_StableMonthPage> {
               alignment: previous == null
                   ? Alignment.center
                   : Alignment.topCenter,
-              child: CalendarReadStatus(
-                failure: failure,
-                onRetry: () => ref.invalidate(
-                  calendarMonthTasksProvider((ownerId, _monthIndex(month))),
-                ),
-              ),
+              child: CalendarReadStatus(failure: failure, onRetry: retry),
             ),
           ),
         ],
@@ -468,12 +489,7 @@ class _StableMonthPageState extends ConsumerState<_StableMonthPage> {
       error: (error, _) => SizedBox(
         height: widget.availableHeight,
         child: Center(
-          child: _MonthRetry(
-            message: '$error',
-            onPressed: () => ref.invalidate(
-              calendarMonthTasksProvider((ownerId, _monthIndex(month))),
-            ),
-          ),
+          child: _MonthRetry(message: '$error', onPressed: retry),
         ),
       ),
       data: render,
@@ -560,8 +576,9 @@ class _DayAgenda extends StatelessWidget {
     required this.events,
     this.onMove,
     this.onCreate,
+    this.onOpen,
   });
-  final ValueChanged<Record>? onMove;
+  final ValueChanged<Record>? onMove, onOpen;
   final VoidCallback? onCreate;
   final DateTime date;
   final List<CalendarEvent> events;
@@ -599,20 +616,22 @@ class _DayAgenda extends StatelessWidget {
       for (final event in events)
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: _EventRow(event, onMove: onMove),
+          child: _EventRow(event, onMove: onMove, onOpen: onOpen),
         ),
     ],
   );
 }
 
 class _EventRow extends StatelessWidget {
-  const _EventRow(this.event, {this.onMove});
-  final ValueChanged<Record>? onMove;
+  const _EventRow(this.event, {this.onMove, this.onOpen});
+  final ValueChanged<Record>? onMove, onOpen;
   final CalendarEvent event;
   @override
   Widget build(BuildContext context) => PaperSurface(
     key: ValueKey('agenda:tasks:${event.record.id}'),
-    onTap: () => openItem(context, 'tasks', event.record.id),
+    onTap: () => onOpen != null
+        ? onOpen!(event.record)
+        : openItem(context, 'tasks', event.record.id),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -907,8 +926,6 @@ class _MonthGrid extends StatelessWidget {
                 8,
           );
           final gridLast = start.add(Duration(days: weeks * 7 - 1));
-          final holidayWarning =
-              holidays?.warningForRange(start, gridLast) ?? '';
           final lanes = _monthLanes(events, start, gridLast);
           final folded = calendarMonthPreview(
             first: start,
@@ -1024,30 +1041,7 @@ class _MonthGrid extends StatelessWidget {
                           ),
                       ],
                     ),
-                    if (holidayWarning.isNotEmpty)
-                      Positioned(
-                        left: 4,
-                        right: 4,
-                        top: 0,
-                        height: 18,
-                        child: Tooltip(
-                          message: holidayWarning,
-                          child: TextButton(
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: onRefreshHolidays,
-                            child: Text(
-                              '调休数据待更新 · 刷新',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                          ),
-                        ),
-                      ),
+
                   ],
                 ),
               ),

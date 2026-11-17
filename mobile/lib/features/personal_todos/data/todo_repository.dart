@@ -6,6 +6,7 @@ import 'personal_todo.dart';
 abstract interface class TodoRepository {
   Future<Map<String, TodoCount>> calendar(String month);
   Future<TodoPage> day(String date, String cursor);
+  Future<TodoPage> month(String month, String cursor);
   Future<PersonalTodo> detail(String id);
   Future<void> execute(TodoCommand command);
 }
@@ -74,6 +75,32 @@ class HttpTodoRepository implements TodoRepository {
             (int.tryParse(next) == null ||
                 int.parse(next) <= int.parse(cursor)))) {
       throw const FormatException('无效事项分页');
+    }
+    return TodoPage(items, total, next);
+  });
+  @override
+  Future<TodoPage> month(String month, String cursor) => _guard(() async {
+    final response = await dio.get<Map<String, dynamic>>(
+      '/personal-todos/month',
+      queryParameters: {'month': month, 'cursor': cursor, 'limit': 100},
+    );
+    final body = response.data!;
+    final items = (body['items'] as List)
+        .map((r) => PersonalTodo.fromJson(Map<String, dynamic>.from(r as Map)))
+        .toList();
+    final days = monthDays(parseCivilDate('$month-01'));
+    final start = civilDate(days.first);
+    final end = civilDate(days.last.add(const Duration(days: 1)));
+    final total = body['total'] as int;
+    final next = body['nextCursor'] as String?;
+    if (total < items.length ||
+        items.any(
+          (t) => t.date.compareTo(end) >= 0 || t.lastDate.compareTo(start) < 0,
+        ) ||
+        (next != null &&
+            (int.tryParse(next) == null ||
+                int.parse(next) <= int.parse(cursor)))) {
+      throw const FormatException('无效事项月分页');
     }
     return TodoPage(items, total, next);
   });
@@ -154,6 +181,32 @@ class DemoTodoRepository implements TodoRepository {
           );
     final offset = int.parse(cursor),
         items = rows.skip(offset).take(30).toList();
+    return TodoPage(
+      items,
+      rows.length,
+      offset + items.length < rows.length ? '${offset + items.length}' : null,
+    );
+  }
+
+  @override
+  Future<TodoPage> month(String month, String cursor) async {
+    final days = monthDays(parseCivilDate('$month-01'));
+    final start = civilDate(days.first);
+    final end = civilDate(days.last.add(const Duration(days: 1)));
+    final rows =
+        _items.values
+            .where(
+              (t) =>
+                  t.date.compareTo(end) < 0 && t.lastDate.compareTo(start) >= 0,
+            )
+            .toList()
+          ..sort(
+            (a, b) => a.date == b.date
+                ? a.id.compareTo(b.id)
+                : a.date.compareTo(b.date),
+          );
+    final offset = int.parse(cursor),
+        items = rows.skip(offset).take(100).toList();
     return TodoPage(
       items,
       rows.length,

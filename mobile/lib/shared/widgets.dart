@@ -1,3 +1,4 @@
+import 'premium_pickers.dart';
 export 'paper_layout.dart'
     show TuantuanDialog, TuantuanSheet, showTuantuanBottomSheet;
 export 'page_states.dart';
@@ -6,7 +7,6 @@ export 'sunny_button.dart';
 import 'page_states.dart';
 import 'floating_feedback.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cute_ui/cute_ui.dart'
@@ -486,58 +486,9 @@ class _DateControlAction extends StatelessWidget {
 Future<DateTime?> showCalendarDateWheel({
   required BuildContext context,
   required DateTime initialDate,
-}) {
-  var selected = DateTime(initialDate.year, initialDate.month, initialDate.day);
-  return showModalBottomSheet<DateTime>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (sheetContext) => SafeArea(
-      child: SizedBox(
-        height: 340,
-        child: Column(
-          children: [
-            Expanded(
-              child: CupertinoTheme(
-                data: const CupertinoThemeData(
-                  primaryColor: SunnyPalette.primaryStrong,
-                ),
-                child: CupertinoDatePicker(
-                  key: const ValueKey('calendar-date-wheel'),
-                  mode: CupertinoDatePickerMode.date,
-                  dateOrder: DatePickerDateOrder.ymd,
-                  initialDateTime: selected,
-                  minimumYear: 2020,
-                  maximumYear: 2040,
-                  onDateTimeChanged: (value) => selected = value,
-                ),
-              ),
-            ),
-            const Divider(height: 1),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    key: const ValueKey('calendar-date-cancel'),
-                    onPressed: () => Navigator.pop(sheetContext),
-                    child: const Text('取消'),
-                  ),
-                ),
-                Expanded(
-                  child: TextButton(
-                    key: const ValueKey('calendar-date-confirm'),
-                    onPressed: () => Navigator.pop(sheetContext, selected),
-                    child: const Text('确定'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
+}) => showPremiumDatePicker(
+  context,
+  initial: initialDate,
+  firstDate: DateTime(2020),
+  lastDate: DateTime(2040, 12, 31),
+);

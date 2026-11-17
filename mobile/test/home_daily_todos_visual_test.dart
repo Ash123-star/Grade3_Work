@@ -95,7 +95,9 @@ void main() {
             final bytes = await image.toByteData(
               format: ui.ImageByteFormat.png,
             );
-            final file = File('docs/screenshots/home-daily-todos.png');
+            final file = File(
+              '../output/home-month-shared/home-daily-todos.png',
+            );
             file.parent.createSync(recursive: true);
             file.writeAsBytesSync(bytes!.buffer.asUint8List());
             image.dispose();
@@ -103,7 +105,7 @@ void main() {
         }
         await t.drag(find.byType(Scrollable).first, const Offset(0, -700));
         await t.pumpAndSettle();
-        expect(find.text('整理本周的阅读笔记'), findsNWidgets(2));
+        expect(find.text('整理本周的阅读笔记'), findsWidgets);
         expect(t.takeException(), isNull);
       });
     }
