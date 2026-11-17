@@ -57,6 +57,30 @@ class PersonalTodoIntegrationTest {
     Map<String,Object> createBody(){return new LinkedHashMap<>(Map.of("title","私人阅读计划","date","2026-11-04","note","仅本人可见"));}
     JsonNode create()throws Exception{return call(201,"POST","/personal-todos","alice",createBody(),UUID.randomUUID().toString());}
     Map<String,Object> update(JsonNode t,boolean completed){return new LinkedHashMap<>(Map.of("title",t.get("title").asText(),"note",t.get("note").asText(),"date",t.get("date").asText(),"completed",completed,"version",t.get("version").asInt()));}
+    @Test void monthReadIsPagedPrivateAndIncludesSpanningRecordsOnce() throws Exception {
+        var body=createBody();body.put("date","2026-10-30");body.put("endDate","2026-11-02");
+        var spanning=call(201,"POST","/personal-todos","alice",body,"month-span");
+        create();
+        var page=call(200,"GET","/personal-todos/month?month=2026-11&limit=1","alice",null,null);
+        assertEquals(2,page.get("total").asInt());assertEquals(spanning.get("id"),page.get("items").get(0).get("id"));
+        var next=call(200,"GET","/personal-todos/month?month=2026-11&limit=1&cursor="+page.get("nextCursor").asText(),"alice",null,null);
+        assertEquals(1,next.get("items").size());assertTrue(next.get("nextCursor").isNull());
+        for(String who:List.of("bob","admin","founder","leader","other")) assertEquals(0,call(200,"GET","/personal-todos/month?month=2026-11",who,null,null).get("total").asInt());
+        call(400,"GET","/personal-todos/month?month=2026-13","alice",null,null);
+        call(400,"GET","/personal-todos/month?month=2026-11&ownerId="+uid("alice"),"admin",null,null);
+        call(400,"GET","/personal-todos/month?month=2026-11&cursor=-1","alice",null,null);
+        call(403,"GET","/personal-todos/month?month=2026-11","pending",null,null);
+    }
+    @Test void monthGridIncludesAdjacentDaysButExcludesOutsideWeeks() throws Exception {
+        for(String date:List.of("2026-10-25","2026-10-26","2026-12-06","2026-12-07")) {
+            var body=createBody();body.put("date",date);
+            call(201,"POST","/personal-todos","alice",body,"grid-"+date);
+        }
+        var page=call(200,"GET","/personal-todos/month?month=2026-11","alice",null,null);
+        assertEquals(2,page.get("total").asInt());
+        assertEquals("2026-10-26",page.get("items").get(0).get("date").asText());
+        assertEquals("2026-12-06",page.get("items").get(1).get("date").asText());
+    }
     @Test void fullLifecycleAndCivilMonthCounts()throws Exception{
         var t=create();String path="/personal-todos/"+t.get("id").asText();
         assertEquals(t,call(200,"GET",path,"alice",null,null));
@@ -153,6 +177,7 @@ class PersonalTodoIntegrationTest {
     @Test void openApiPublishesPrivateContractsWithoutAdminAlias()throws Exception{
         var api=call(200,"GET","/openapi",null,null,null);
         assertTrue(api.path("paths").has("/api/personal-todos/calendar"));assertFalse(api.path("paths").has("/api/admin/workspace/personal-todos"));
+        assertTrue(api.path("paths").has("/api/personal-todos/month"));
         assertTrue(api.path("components").path("schemas").has("PersonalTodoCreate"));
     }
 }

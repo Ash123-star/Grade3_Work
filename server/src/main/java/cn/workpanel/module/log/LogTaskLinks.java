@@ -1,7 +1,9 @@
 package cn.workpanel.module.log;
 
 import cn.workpanel.*;
-import java.util.Map;
+import java.util.*;
+import cn.workpanel.module.task.TaskRoles;
+import cn.workpanel.module.task.TaskStateMachine;
 
 /** 日报与任务关系的内部持久化工具；关联资格校验由工作流调用方负责。 */
 public final class LogTaskLinks {
@@ -10,6 +12,22 @@ public final class LogTaskLinks {
     public static void validate(Db db,Actor actor,Map<String,Object> body) {
         Business business=new Business(db);
         for(String taskId:Business.strings(body,"taskIds")) business.task(actor,taskId,false);
+    }
+    /** New selections must be RECEIVED tasks in which the author participates.
+     * Existing readable links are retained after completion; lock new tasks so
+     * concurrent completion cannot race the eligibility check and log commit.
+     */
+    public static void validateSelection(Db db,Actor actor,Map<String,Object> body,Map<String,Object> previous) {
+        if(body.containsKey("taskIds") && !(body.get("taskIds") instanceof List<?>)) throw ApiError.bad("INVALID_LIST","taskIds 必须为数组");
+        var old=new HashSet<>(Business.strings(previous,"taskIds"));
+        var ids=new ArrayList<>(Business.strings(body,"taskIds"));Collections.sort(ids);
+        Business business=new Business(db);
+        for(String id:ids) {
+            var task=business.task(actor,id,!old.contains(id));
+            if(old.contains(id)) continue;
+            if(!TaskRoles.resolve(db,actor,task).contains(TaskStateMachine.Role.PARTICIPANT)) throw ApiError.forbidden();
+            if(!"RECEIVED".equals(Db.str(task,"phase"))) throw ApiError.bad("TASK_NOT_PENDING","只能关联本人参与且状态为已接收的任务");
+        }
     }
     /** 校验成功后同步结构化关系；调用方须处于保存或审核事务内。 */
     public static void validateAndSync(Db db,Actor actor,String logId,Map<String,Object> body) {

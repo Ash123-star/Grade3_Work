@@ -56,6 +56,62 @@ void main() {
     });
   }
 
+  testWidgets(
+    'summary rows have equal height and start at the top with brown bullets',
+    (t) async {
+      await t.pumpWidget(
+        ProviderScope(
+          overrides: [
+            homePreviewProvider.overrideWith(
+              (ref, key) async => PageResult([
+                const Record(id: 'one', title: '短标题'),
+                const Record(id: 'two', title: '这是一条需要换行展示的比较长的任务标题'),
+              ]),
+            ),
+          ],
+          child: MaterialApp(
+            theme: appTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 190,
+                height: 450,
+                child: HomeSummaryCard(
+                  title: '任务看板',
+                  resource: 'tasks/received-card',
+                  onAll: () {},
+                  onItem: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      final first = t.getRect(
+        find.byKey(const ValueKey('home-summary:tasks/received-card:one')),
+      );
+      final second = t.getRect(
+        find.byKey(const ValueKey('home-summary:tasks/received-card:two')),
+      );
+      final footer = t.getRect(
+        find.byKey(const ValueKey('home-all:tasks/received-card')),
+      );
+      expect(footer.bottom, 450);
+      expect(footer.right, 178);
+      expect(first.height, second.height);
+      expect(first.top, 48);
+      expect(second.top - first.bottom, 1);
+      final dots = find.byWidgetPredicate(
+        (w) =>
+            w is DecoratedBox &&
+            w.decoration is BoxDecoration &&
+            (w.decoration as BoxDecoration).shape == BoxShape.circle &&
+            (w.decoration as BoxDecoration).color == const Color(0xFF5D4037),
+      );
+      expect(dots, findsNWidgets(2));
+    },
+  );
+
   for (final count in [0, 1, 2, 3, 4]) {
     for (final scale in [1.0, 1.6]) {
       testWidgets('task preview $count records at text scale $scale', (

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/app.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
@@ -147,7 +146,9 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('date control opens a cancellable date wheel', (t) async {
+  testWidgets('date control opens a cancellable direct date selector', (
+    t,
+  ) async {
     final c = testContainer(
       overrides: [
         selectedDateProvider.overrideWith((ref) => DateTime(2026, 10, 13)),
@@ -161,17 +162,17 @@ void main() {
     );
     await t.tap(find.text('2026年10月'));
     await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('calendar-date-wheel')), findsOneWidget);
-    await t.tap(find.byKey(const ValueKey('calendar-date-cancel')));
+    expect(find.byKey(const ValueKey('quick-date-年')), findsOneWidget);
+    await t.tap(find.byTooltip('取消选择'));
     await t.pumpAndSettle();
     expect(c.read(selectedDateProvider), DateTime(2026, 10, 13));
     await t.tap(find.text('2026年10月'));
     await t.pumpAndSettle();
-    await t.drag(find.byType(CupertinoPicker).first, const Offset(0, -96));
+    await t.enterText(find.byKey(const ValueKey('quick-date-年')), '2030');
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('calendar-date-confirm')));
+    await t.tap(find.byKey(const ValueKey('quick-date-confirm')));
     await t.pumpAndSettle();
-    expect(c.read(selectedDateProvider), isNot(DateTime(2026, 10, 13)));
+    expect(c.read(selectedDateProvider), DateTime(2030, 10, 13));
     expect(t.takeException(), isNull);
     c.dispose();
   });

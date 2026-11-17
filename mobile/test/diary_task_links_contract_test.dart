@@ -19,7 +19,9 @@ class _DiaryBodyAdapter implements HttpClientAdapter {
     return ResponseBody.fromString(
       jsonEncode({'id': 'log-draft', 'title': '工作日志', 'version': 2}),
       200,
-      headers: {Headers.contentTypeHeader: ['application/json']},
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
     );
   }
 
@@ -54,4 +56,33 @@ void main() {
       'version': 1,
     });
   });
+  test(
+    'diary selected tasks reach both draft and content update contracts',
+    () async {
+      final adapter = _DiaryBodyAdapter();
+      final repository = HttpRepository('http://localhost/api', 'session');
+      repository.dio.httpClientAdapter = adapter;
+      for (final action in ['save-draft', 'update-content']) {
+        await repository.execute(
+          'logs',
+          Command(action, {
+            'id': 'log-draft',
+            'businessDate': '2026-11-17',
+            '今日工作': '处理任务',
+            'taskIds': ['task-1', 'task-2'],
+          }, version: 1),
+        );
+      }
+      expect((adapter.requests.first.data as Map)['body'], {
+        'work': '处理任务',
+        'taskIds': ['task-1', 'task-2'],
+      });
+      expect(adapter.requests.last.path, '/logs/log-draft/content');
+      expect(adapter.requests.last.data, {
+        'work': '处理任务',
+        'version': 1,
+        'taskIds': ['task-1', 'task-2'],
+      });
+    },
+  );
 }

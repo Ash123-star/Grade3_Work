@@ -1085,6 +1085,7 @@ class HttpRepository implements Repository {
 
   Map<String, dynamic> _diaryBody(Map<String, dynamic> v) => {
     'work': v['今日工作'] ?? v['work'] ?? '',
+    if (v.containsKey('taskIds')) 'taskIds': DiaryTaskLinks.parse(v['taskIds']),
   };
 
   Map<String, dynamic> _taskDraft(Command command) {
@@ -1360,7 +1361,12 @@ class HttpRepository implements Repository {
           }
           final response = await dio.put<Map<String, dynamic>>(
             '/logs/${Uri.encodeComponent(_commandId(command))}/content',
-            data: {'work': v['work'] ?? v['今日工作'], 'version': command.version},
+            data: {
+              'work': v['work'] ?? v['今日工作'],
+              'version': command.version,
+              if (v.containsKey('taskIds'))
+                'taskIds': DiaryTaskLinks.parse(v['taskIds']),
+            },
             options: Options(
               headers: {'Idempotency-Key': ?command.idempotencyKey},
             ),

@@ -2,6 +2,30 @@
 
 需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
 
+## 首页月历复用与日志关联任务（2026-11-17，Issue #94）
+
+基线 `70f97503dc4ee5dd0f5fac163baa61118b0b4782`，工作分支 `feature/94-home-calendar-diary-tasks`，本段结果对应本次提交前的实现工作树。首页摘要等高、顶部排列并增加深棕圆点，个人事项直接复用公司月历；日志正文下以紧凑黄色“关联任务”下拉框多选本人参与且 RECEIVED 的任务，排除 FEEDBACK 待验收候选，保留可读的历史关联，详情/历史回显，移除右上角下属日志入口。用户在本机验收并提出调整后，已明确授权提交及创建 PR；该授权不替代未完成的设备验证。未部署线上服务。产品边界由现有 [首页 tasks](../openspec/changes/home-company-daily-todos/tasks.md#7-首页月历复用与摘要布局2026-11-17) 和 [日志 tasks](../openspec/changes/log-task-linkage/tasks.md#今日任务选择2026-11-17) 维护。
+
+环境：Windows/PowerShell、Java 21.0.6、Maven 3.9.15、Flutter 3.38.7/Dart 3.10.7、Docker Desktop 29.9.2；过程证据位于忽略目录 `output/home-log-verification/`。
+
+- 本机原无数据运行镜像。按 `deploy/runtime/Dockerfile` 构建 `collaboration-data-runtime:local`，保留 PostgreSQL16/Redis7/Neo4j5.26/Java21 组成；Docker Hub及PG软件源网络失败后，临时 Dockerfile 使用镜像下载入口和 Debian 镜像源，保留软件包签名校验，未改仓库部署文件。镜像 ID `sha256:248c243df9f5d97a9b76817ddc1bf33f2937572384cd727ffa4511441f3c2afa`，构建退出0，证据 `image-build-final.log`。数据库从空库由服务端 `db/migration` 执行32个正式迁移，成功到V34，未使用 `deploy/postgresql` 模型，也无本次新增迁移。
+- 后端执行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests 'PersonalTodoIntegrationTest,TodoDraftTest,LogTaskLinksTest,LogWorkflowServiceTest,LogEditWindowTest,CurrentLogContractIntegrationTest,LogSubordinateContractIntegrationTest,BackendIntegrationTest,TaskDispatchIntegrationTest#dailyLogWorkflowKeepsDraftPrivateAndHistoryConsistent'`。首次59项中，新增端点/日志及其他专项41项全部通过；`BackendIntegrationTest` 新夹具创建任务漏传幂等键，导致该组4失败1错误（包含连带失败），退出1，保留 `backend-final.log`、`backend-first-reports/`。补齐夹具幂等键后仅重跑 `-Tests BackendIntegrationTest`，18项全部通过，verify/JAR成功，退出0，证据 `backend-recheck.log`、`backend-recheck-reports/`。最终59个不同用例均通过，不将首次失败或重复执行计成新增通过数；本轮不是全量后端回归。
+- 真实HTTP→应用层→PostgreSQL验证月网格分页、跨月事项仅返回一次、邻月边界、本人/上级/管理员/他司隔离、非法月份和参数拒绝；日志草稿→提交→任务完成后保留→正文与任务修改→版本历史→省略保留/空数组清空通过。未接收/已完成新增、非参与人、可读但未参与管理者、非法数组及旧版本均拒绝，正文/关联/版本失败回滚。保留服务端下属日志读取权限既有测试，仅移除客户端入口。
+- Flutter集中回归 `flutter test --no-pub --dart-define=USE_MOCK=true --dart-define=HOME_VISUAL_CAPTURE=true test/home_summary_navigation_test.dart test/home_shared_calendar_test.dart test/diary_today_tasks_test.dart test/personal_todos_test.dart test/home_prototype_layout_test.dart test/home_daily_todos_visual_test.dart test/calendar_agenda_test.dart test/calendar_movement_test.dart test/calendar_drag_widget_test.dart test/recent_logs_acceptance_test.dart --reporter expanded`：94通过、1既有跳过、退出0（`flutter-final.log`）。新增邻月HTTP响应边界测试后 `personal_todos_test.dart` 17通过、退出0（`personal-todos-grid-http.log`）；个人改期确认提示修正后 `home_shared_calendar_test.dart calendar_movement_test.dart calendar_drag_widget_test.dart` 24通过、退出0（`calendar-confirmation-final.log`），不累加重复用例。
+- 真实模式HTTP适配器套件 `diary_task_links_contract_test.dart week6_log_contract_test.dart subordinate_log_range_http_test.dart`：9通过、退出0（`http.log`）；验证发送taskIds与兼容省略语义，HTTP适配器测试不能替代上述真实数据库结果。全项目 `dart analyze` 无问题、退出0（`analyze-final.log`）；最后小范围提示与测试修改另执行受影响分析，结果见 `analyze-followup.log`。
+- 界面验证包括320/360/390/480dp、文字放大、等高圆点、长按日期创建、长按记录拖动、跨月区间/颜色/完成状态保持、个人与公司独立选日、换号清理、候选完整分页及历史已完成关联。截图 `../home-prototype/flutter-390-top.png`、`../home-prototype/flutter-390-agenda.png`、`diary-today-tasks.png` 为组件实际渲染及测试数据，非设备截图。
+- 本机真实后端浏览器验收入口 `http://127.0.0.1:18081/preview.html`，Flutter Web使用 `USE_MOCK=false`、API `http://127.0.0.1:18080/api`。独立容器 `workpanel-home-log-acceptance` 从正式Flyway空库升级，再执行现有年度虚构场景B1及V2–V6，未访问生产库。已通过浏览器登录 `zhou`，创建“验收：拖动调整个人日程”，PostgreSQL确认2026-11-17、version1；页面保留供用户操作，截图 `browser-acceptance.jpg`。窗口外框提供320/360/390/480宽度切换，仅位于忽略目录，不修改产品页面。原生产Web入口因不支持Android安全存储而阻止日志编辑；因此本机验收另用 `output/home-log-verification/acceptance_main.dart` 入口，保留真实产品Widget、会话认证、HTTP仓储和服务端，只将会话保存及本地DraftStore替换为当前页面内存，外框明确标注刷新即清空。这是临时平台适配，不代表生产Web新增草稿能力，也不能作为Android加密持久化证据；服务端提交数据仍持久化到独立数据库。
+- `flutter build web --no-pub --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://127.0.0.1:18080/api` 退出0（`web-build.log`）；最后 `flutter build apk --debug --no-pub --dart-define=USE_MOCK=false` 退出0（`apk-final.log`），产物 `mobile/build/app/outputs/flutter-apk/app-debug.apk`。`openspec.cmd validate --all --strict` 49通过、0失败、退出0（`openspec-delivery.log`），`git diff --check` 退出0。运行时OpenAPI真实导出后只保留新月份路径与taskIds属性两项语义增量，测试生成的无关AI检索指标已恢复。
+
+以上为首轮实现验证。按用户反馈完成固定卡片底部按钮、统一快速日期/时间面板、个人事项直接移动、去除日历顶部提示和自动消失的黄色底部提示后，追加以下集中验证；此前的个人改期确认与行内胶囊布局已被替换。
+
+- `flutter test --no-pub --dart-define=USE_MOCK=true` 受影响批次首轮138通过、2跳过、5失败（`flutter-feedback.log`）。修复嵌套滚动控制器、日历诊断字段及旧节假日提示断言后，日志/日历定向复验34通过、退出0（`flutter-feedback-repair.log`）；AI工作台改用实际HTTP模式执行，与日志契约合计18通过、退出0（`http-ai-feedback.log`）。只收紧 RECEIVED 候选后，日志组件4通过、退出0（`diary-received-feedback.log`）；不累加重复用例，不声称全项目套件通过。
+- `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests 'LogTaskLinksTest,LogWorkflowServiceTest,LogEditWindowTest,CurrentLogContractIntegrationTest,BackendIntegrationTest,TaskDispatchIntegrationTest#dailyLogWorkflowKeepsDraftPrivateAndHistoryConsistent'`：34通过、0失败、退出0，JAR成功（`backend-feedback.log`）。包含新增FEEDBACK关联拒绝、原有关联完成/待验收后保留及事务一致性。
+- 最终 `flutter analyze --no-pub` 无问题、退出0（`analyze-received-final.log`）；真实HTTP Web验收入口构建成功、退出0（`web-feedback-build.log`）；`flutter build apk --debug --no-pub --dart-define=USE_MOCK=false` 退出0（`apk-feedback-build.log`）；OpenSpec严格校验49通过、退出0（`openspec-feedback.log`）。Web构建仍有未打包CupertinoIcons字体提示，未作为错误隐藏。
+- 本机API已换为本批JAR，Web已更新。快速选日面板实际浏览器截图为 `browser-quick-date.jpg`；已观察点击日期直接返回并跳转首页选日。最终下拉框、个人移动及底部提示有组件交互回归，最终版本浏览器完整保存/回读链路尚未补验；提交授权不记为这些步骤已执行。
+
+非功能证据：安全/隐私为服务端参与资格及本人数据范围、失败不写入和客户端换号隔离；可靠性为版本冲突/幂等重试、分页不一致最多重读一次及失败不显示完整月；易用性为窄屏/放大文字及48dp主要操作组件测试。Android真机、TalkBack及正式部署未完成；这些限制保留在现有tasks。调试APK仍默认连接原线上API，线上尚无新增月份端点，本轮以本机浏览器作为实际验收入口，不以旧线上服务验收新功能。
+
 ## 全分支整合（2026-11-13，八个PR，自动验收通过，用户授权直接推送main）
 
 比较基线 `origin/main=3f9eb2d561e17a41f91fb22c80cbfd23da2361ff`，整合分支 `codex/integrate-requested-prs`，复用 [PR #83](https://github.com/Ash123-star/Grade3_Work/pull/83)；previous head为 `e73376153be0f5fcad9753a60738819e391e49b4`，最终head由PR记录。本批保留 #77/#78/#80/#81/#83/#85/#87/#89 全部原head及merge历史，不改写原分支。

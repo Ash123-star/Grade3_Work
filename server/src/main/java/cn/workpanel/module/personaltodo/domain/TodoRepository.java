@@ -9,6 +9,7 @@ import java.util.*;
 public interface TodoRepository {
     Todo find(Actor actor,String id);
     Page page(Actor actor,LocalDate day,int cursor,int limit);
+    Page month(Actor actor,LocalDate from,LocalDate to,int cursor,int limit);
     List<DayCount> counts(Actor actor,LocalDate from,LocalDate to);
     Todo create(Actor actor,TodoDraft draft);
     Todo update(Actor actor,String id,TodoDraft draft);

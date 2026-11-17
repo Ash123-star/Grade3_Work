@@ -1,3 +1,4 @@
+import 'calendar_data_source.dart';
 import '../../core/state/live_notifications.dart';
 import '../../core/errors/api_failure.dart';
 import 'dart:async';
@@ -37,7 +38,9 @@ class CalendarInteractionSurface extends ConsumerStatefulWidget {
     required this.scroll,
     required this.readOnly,
     required this.builder,
+    this.source,
   });
+  final CalendarDataSource? source;
   final ScrollController scroll;
   final bool readOnly;
   final Widget Function(BuildContext, bool) builder;
@@ -60,7 +63,15 @@ class CalendarInteractionSurfaceState
       restoring = true,
       confirming = false,
       multiTouch = false;
+  // Kept for live-test diagnostics; status is never rendered above the grid.
   String? message;
+  void feedback(String text, {bool success = false}) {
+    if (!current) return;
+    message = text;
+    notice(context, text, success: success,
+      actionLabel: pending == null ? null : '确认结果',
+      onAction: pending == null ? null : () { unawaited(confirmPending()); });
+  }
   Timer? _reviewRefresh;
   int operation = 0, pointers = 0;
   Size? _size;
@@ -133,13 +144,13 @@ class CalendarInteractionSurfaceState
       return;
     }
     if (current) {
-      refreshBusiness(ref);
+      _refresh();
       unawaited(_restore(queryKnown: true));
     }
   }
 
   Future<void> _restore({bool queryKnown = false}) async {
-    if (widget.readOnly) {
+    if (widget.readOnly || widget.source != null) {
       if (mounted) setState(() => restoring = false);
       return;
     }
@@ -153,15 +164,16 @@ class CalendarInteractionSurfaceState
         pending = command;
         restoring = false;
       });
+      if (command != null && !queryKnown) feedback('有未完成的改期申请，可确认结果');
       if (queryKnown && command?.reviewId != null && !busy) {
         await confirmPending();
       }
     } catch (e) {
       if (current && generation == operation) {
         setState(() {
-          message = '$e';
           restoring = false;
         });
+        feedback('$e');
       }
     }
   }
@@ -211,13 +223,13 @@ class CalendarInteractionSurfaceState
         confirming ||
         multiTouch ||
         !writable) {
-      if (pending != null) notice(context, '请先确认上一条改期申请的结果');
+      if (pending != null) feedback('请先确认上一条改期申请的结果');
       return;
     }
     if (drag.begin(record, point, constraints)) {
       unawaited(HapticFeedback.selectionClick());
     } else {
-      setState(() => message = '当前任务排期无效或日期尚未加载，请刷新后重试');
+      feedback('当前任务排期无效或日期尚未加载，请刷新后重试');
     }
   }
 
@@ -240,7 +252,8 @@ class CalendarInteractionSurfaceState
   ) async {
     if (!writable) return;
     if (_readingPaused()) return;
-    if (!writable || busy || restoring || confirming || pending != null) return;
+    if (pending != null) { feedback('请先确认上一条改期申请的结果'); return; }
+    if (!writable || busy || restoring || confirming) return;
     final generation = operation;
     try {
       final schedule = CalendarSchedule.fromRecord(record),
@@ -259,7 +272,7 @@ class CalendarInteractionSurfaceState
       final delta = businessDayDelta(seed, target);
       if (delta != 0) await move(record, delta, constraints);
     } catch (e) {
-      if (current) setState(() => message = '$e');
+      if (current) feedback('$e');
     }
   }
 
@@ -277,7 +290,9 @@ class CalendarInteractionSurfaceState
     bool valid() => writable && operation == generation;
     setState(() => confirming = true);
     try {
-      final source = await repository.detail('tasks', record.id);
+      final source = widget.source == null
+          ? await repository.detail('tasks', record.id)
+          : await widget.source!.detail(ref, record.id);
       if (!mounted || !valid()) return;
       if (source.version != record.version ||
           source.fields['capabilities'] is! Map ||
@@ -291,6 +306,14 @@ class CalendarInteractionSurfaceState
               after.end != placement.schedule.end)) {
         throw const FormatException('任务排期已变化，原移动已取消，请刷新');
       }
+      if (widget.source != null) {
+        await widget.source!.saveMove(ref, source, after);
+        if (valid()) {
+          widget.source!.refresh(ref);
+          feedback('事项日期已更新', success: true);
+        }
+        return;
+      }
       final reason = await showDialog<String>(
         context: context,
         builder: (_) => CalendarMoveConfirmation(
@@ -302,7 +325,9 @@ class CalendarInteractionSurfaceState
       );
       if (reason == null || !valid()) return;
       // Confirm the authoritative source again after an arbitrarily long dialog.
-      final latest = await repository.detail('tasks', record.id);
+      final latest = widget.source == null
+          ? await repository.detail('tasks', record.id)
+          : await widget.source!.detail(ref, record.id);
       if (!valid()) return;
       if (latest.version != source.version ||
           latest.fields['capabilities'] is! Map ||
@@ -323,8 +348,8 @@ class CalendarInteractionSurfaceState
     } catch (e) {
       if (valid()) {
         _recordRateLimit(e);
-        setState(() => message = '$e');
-        if (!_rateLimited(e)) refreshBusiness(ref);
+        feedback('$e');
+        if (!_rateLimited(e)) _refresh();
       }
     } finally {
       if (mounted && operation == generation) {
@@ -340,7 +365,6 @@ class CalendarInteractionSurfaceState
     final generation = operation, session = ref.read(sessionProvider);
     setState(() {
       busy = true;
-      message = null;
     });
     try {
       final result =
@@ -356,7 +380,7 @@ class CalendarInteractionSurfaceState
           );
       if (!current || operation != generation) return;
       if (result == null) {
-        setState(() => message = '提交结果待确认，请使用原命令继续确认');
+        feedback('提交结果待确认，请使用原命令继续确认');
         return;
       }
       final status = '${result.fields['status']}';
@@ -367,13 +391,20 @@ class CalendarInteractionSurfaceState
         pending = null;
         refreshBusiness(ref);
       }
-      setState(
-        () => message = switch (status) {
-          'APPROVED' => '移动已审核通过，正在刷新排期',
-          'REJECTED' => '申请已驳回，原排期保留；可打开申请查看原因',
-          _ => '移动申请待审，任务保留原排期',
-        },
-      );
+      setState(() {});
+      final text = switch (status) {
+        'APPROVED' => '移动已审核通过，排期已更新',
+        'REJECTED' => '申请已驳回，原排期保留',
+        _ => '排期移动申请已提交，审核后生效',
+      };
+      if (!mounted) return;
+      message = text;
+      notice(context, text, success: status != 'REJECTED',
+        actionLabel: pending?.reviewId == null ? null : '查看申请',
+        onAction: pending?.reviewId == null ? null : () {
+          final id = pending?.reviewId;
+          if (id != null && current) openItem(context, 'reviews', id);
+        });
     } catch (e) {
       if (current && operation == generation) {
         _recordRateLimit(e);
@@ -397,9 +428,9 @@ class CalendarInteractionSurfaceState
             ].contains(e.kind);
         setState(() {
           pending = rejected ? null : restored ?? command;
-          message = '$e';
         });
-        if (!_rateLimited(e)) refreshBusiness(ref);
+        feedback('$e');
+        if (!_rateLimited(e)) _refresh();
       }
     } finally {
       if (mounted && operation == generation) setState(() => busy = false);
@@ -413,9 +444,12 @@ class CalendarInteractionSurfaceState
         drag.active ||
         busy ||
         confirming ||
-        !session.manager ||
-        !session.dispatch ||
+        (widget.source == null && (!session.manager || !session.dispatch)) ||
         !constraints.contains(day)) {
+      return;
+    }
+    if (widget.source != null) {
+      unawaited(widget.source!.create(context, ref, day));
       return;
     }
     context.push(
@@ -431,20 +465,26 @@ class CalendarInteractionSurfaceState
     );
   }
 
+  void _refresh() {
+    if (widget.source != null) {
+      widget.source!.refresh(ref);
+    } else {
+      refreshBusiness(ref);
+    }
+  }
+
   bool _readingPaused() {
+    if (widget.source != null) return false;
     final remaining = ref
         .read(calendarTaskReaderProvider)
         .cooldown(ref.read(repositoryProvider));
     if (remaining <= Duration.zero) return false;
-    setState(
-      () =>
-          message = '请求较多，请 ${(remaining.inMilliseconds / 1000).ceil()} 秒后再移动',
-    );
+    feedback('请求较多，请 ${(remaining.inMilliseconds / 1000).ceil()} 秒后再移动');
     return true;
   }
 
   void _recordRateLimit(Object error) {
-    if (_rateLimited(error)) {
+    if (widget.source == null && _rateLimited(error)) {
       ref
           .read(calendarTaskReaderProvider)
           .recordRateLimit(ref.read(repositoryProvider), error as ApiFailure);
@@ -505,39 +545,9 @@ class CalendarInteractionSurfaceState
             }
             drag.cancel();
           },
-          child: Column(
-            children: [
-              if (message != null || pending != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        message ??
-                            (pending!.reviewId == null ? '提交结果待确认' : '有待审移动申请'),
-                      ),
-                      if (pending != null)
-                        TextButton(
-                          onPressed: busy ? null : confirmPending,
-                          child: Text(busy ? '正在确认' : '确认结果'),
-                        ),
-                      if (pending?.reviewId != null)
-                        TextButton(
-                          onPressed: () =>
-                              openItem(context, 'reviews', pending!.reviewId!),
-                          child: const Text('查看申请'),
-                        ),
-                    ],
-                  ),
-                ),
-              Expanded(
-                child: SizedBox(
-                  key: viewport,
-                  child: widget.builder(context, drag.active),
-                ),
-              ),
-            ],
+          child: SizedBox(
+            key: viewport,
+            child: widget.builder(context, drag.active),
           ),
         ),
       ),

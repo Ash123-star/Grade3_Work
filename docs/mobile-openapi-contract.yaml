@@ -10,6 +10,21 @@ servers:
 security:
   - bearer: []
 paths:
+  /api/personal-todos/month:
+    get:
+      operationId: personalTodoMonth
+      summary: 分页读取本人事项月视图
+      description: 仅当前员工本人；每项返回一次，按开始日、创建时间、id稳定排序。无版本或幂等键要求，不允许ownerId代查。
+      parameters:
+        - {name: month, in: query, required: true, schema: {type: string, example: '2026-11'}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 100}}
+      responses:
+        '200': {description: 与该月完整周网格（含邻月）重叠的本人事项分页, content: {application/json: {schema: {$ref: '#/components/schemas/PersonalTodoPage'}}}}
+        '400': {description: 非法月份、分页或未知/重复参数}
+        '401': {description: 会话失效}
+        '403': {description: 账号未激活或需改密}
+        '429': {description: 请求限流}
   /api/personal-todos/{id}:
     get:
       tags:
@@ -974,6 +989,10 @@ components:
       properties:
         work: {type: string, minLength: 1, maxLength: 20000}
         version: {type: integer, minimum: 0}
+        taskIds:
+          type: array
+          description: 可选；省略保留原关联，空数组清空。新增仅本人参与且RECEIVED的任务；仍可读取的历史关联可保留。
+          items: {type: string}
     Metric:
       type: object
       required: [numerator, denominator, rate, denominatorKnown]

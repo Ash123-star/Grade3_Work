@@ -12,6 +12,138 @@
     "bearer" : [ ]
   } ],
   "paths" : {
+      "/api/personal-todos/month": {
+        "get": {
+          "tags": [
+            "personal-todo-controller"
+          ],
+          "summary": "分页读取本人事项月视图",
+          "description": "month为YYYY-MM；读取与该月完整周网格（含邻月）重叠的本人事项，每条仅出现一次；cursor>=0，limit 1-100，末页nextCursor=null；不接受ownerId。",
+          "operationId": "personalTodoMonth",
+          "parameters": [
+            {
+              "name": "month",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "integer",
+                "format": "int32",
+                "default": 0
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "integer",
+                "format": "int32",
+                "default": 100
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "content": {
+                "*/*": {
+                  "schema": {
+                    "$ref": "#/components/schemas/PersonalTodoPage"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "错误码及 traceId，详情参见后端接口说明",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "错误码及 traceId，详情参见后端接口说明",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "错误码及 traceId，详情参见后端接口说明",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "错误码及 traceId，详情参见后端接口说明",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "错误码及 traceId，详情参见后端接口说明",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "429": {
+              "description": "错误码及 traceId，详情参见后端接口说明",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "502": {
+              "description": "错误码及 traceId，详情参见后端接口说明",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "503": {
+              "description": "错误码及 traceId，详情参见后端接口说明",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
   "/api/admin/console/reviews/{id}/decision": {
     "post": {
       "tags": [
@@ -26411,6 +26543,15 @@
         "type" : "object",
         "additionalProperties" : false,
         "properties" : {
+          "taskIds": {
+            "type": "array",
+            "description": "可选关联任务ID；新增仅本人参与且RECEIVED；省略保留，空数组清空，历史关联不因完成丢失",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "uniqueItems": true
+          },
           "work" : {
             "type" : "string",
             "maxLength" : 20000,

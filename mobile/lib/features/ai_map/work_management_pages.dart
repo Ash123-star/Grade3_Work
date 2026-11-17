@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -574,9 +575,9 @@ class _ProcedureScopeEditorState extends ConsumerState<_ProcedureScopeEditor> {
   }
 
   Future<void> date(bool end) async {
-    final result = await showDatePicker(
-      context: context,
-      initialDate: end ? (until ?? from.add(const Duration(days: 365))) : from,
+    final result = await showPremiumDatePicker(
+      context,
+      initial: end ? (until ?? from.add(const Duration(days: 365))) : from,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );

@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -1192,34 +1193,33 @@ class _WorkDetailPageState extends ConsumerState<WorkDetailPage>
                                               if (busy) return;
                                               final ticket = generation;
                                               final now = DateTime.now();
-                                              final day = await showDatePicker(
-                                                context: context,
-                                                initialDate: now.add(
-                                                  const Duration(days: 1),
-                                                ),
-                                                firstDate: now,
-                                                lastDate: now.add(
-                                                  const Duration(days: 3650),
-                                                ),
+                                              final tomorrow = now.add(
+                                                const Duration(days: 1),
                                               );
+                                              final day =
+                                                  await showPremiumDateTimePicker(
+                                                    context,
+                                                    initial: DateTime(
+                                                      tomorrow.year,
+                                                      tomorrow.month,
+                                                      tomorrow.day,
+                                                      18,
+                                                    ),
+                                                    firstDate: now,
+                                                    lastDate: now.add(
+                                                      const Duration(
+                                                        days: 3650,
+                                                      ),
+                                                    ),
+                                                    title: '选择截止时间',
+                                                  );
                                               if (day == null ||
                                                   !context.mounted ||
                                                   !current(ticket)) {
                                                 return;
                                               }
-                                              final time = await showTimePicker(
-                                                context: context,
-                                                initialTime: const TimeOfDay(
-                                                  hour: 18,
-                                                  minute: 0,
-                                                ),
-                                              );
-                                              if (time == null ||
-                                                  !current(ticket)) {
-                                                return;
-                                              }
                                               input.text =
-                                                  '${input.text} 截止时间：${day.year}年${day.month}月${day.day}日${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                                                  '${input.text} 截止时间：${day.year}年${day.month}月${day.day}日${day.hour.toString().padLeft(2, '0')}:${day.minute.toString().padLeft(2, '0')}';
                                               focus.requestFocus();
                                             },
                                           ),

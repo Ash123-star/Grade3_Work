@@ -30,6 +30,14 @@ public class PersonalTodoController {
     @GetMapping public Page list(HttpServletRequest r,@RequestParam String date,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit) {
         query(r,"date","cursor","limit");return service.list(Actor.current(r),date,cursor,limit);
     }
+    /** v1 read-only owner month; stable date/creation/id order, overlap covers the full Monday-to-Sunday grid, including adjacent-month days.
+     * No version or idempotency key; cursor>=0, limit 1-100, invalid input 400,
+     * authentication/active-account 401/403. Owner/company are always server-bound.
+     */
+    @Operation(operationId="personalTodoMonth",summary="分页读取本人事项月视图",description="month为YYYY-MM；读取与该月完整周网格（含邻月）重叠的本人事项，每条仅出现一次；cursor>=0，limit 1-100，末页nextCursor=null；不接受ownerId。")
+    @GetMapping("/month") public Page month(HttpServletRequest r,@RequestParam String month,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="100") int limit) {
+        query(r,"month","cursor","limit");return service.month(Actor.current(r),month,cursor,limit);
+    }
     /** Read-only bounded month grid counts, inclusive fromDate/exclusive toDate, including adjacent weeks. */
     @Operation(operationId="personalTodoCalendar",summary="读取本人事项月历计数",description="month为YYYY-MM，周一开始的完整网格，仅本人；无版本或幂等要求。")
     @GetMapping("/calendar") public cn.workpanel.module.personaltodo.api.TodoContracts.Calendar calendar(HttpServletRequest r,@RequestParam String month) {

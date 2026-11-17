@@ -405,27 +405,16 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
   }
 
   Future<void> pickDeadline() async {
-    final date = await showPremiumDatePicker(
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final date = await showPremiumDateTimePicker(
       context,
-      initial: DateTime.now().add(const Duration(days: 1)),
+      initial: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 18),
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
+      title: '选择截止时间',
     );
-    if (!mounted || !alive || date == null) return;
-    final time = await showPremiumTimePicker(
-      context,
-      initial: const TimeOfDay(hour: 18, minute: 0),
-    );
-    if (alive && time != null) {
-      setState(
-        () => deadline = DateTime(
-          date.year,
-          date.month,
-          date.day,
-          time.hour,
-          time.minute,
-        ),
-      );
+    if (mounted && alive && date != null) {
+      setState(() => deadline = date);
     }
   }
 
@@ -525,11 +514,17 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
         primary: SunnyPrimaryButton(
           loading: busy,
           onPressed: successfulId != null
-              ? () => context.push('/item/${successfulReview ? 'reviews' : 'tasks'}/${encode(successfulId!)}')
+              ? () => context.push(
+                  '/item/${successfulReview ? 'reviews' : 'tasks'}/${encode(successfulId!)}',
+                )
               : loading || busy || !ready || stale || job == null
               ? null
               : submit,
-          child: Text(successfulId != null ? (successfulReview ? '查看任务申请' : '查看已创建任务') : '确认并提交任务申请'),
+          child: Text(
+            successfulId != null
+                ? (successfulReview ? '查看任务申请' : '查看已创建任务')
+                : '确认并提交任务申请',
+          ),
         ),
         note: job == null ? '核对来源与分工后人工派发' : error ?? '核对来源与分工后人工派发，包含实际附件ID',
       ),
@@ -538,7 +533,12 @@ class _AiConfirmPageState extends AiProtectedState<AiConfirmPage> {
           if (loading) const LoadingSkeleton(),
           if (error != null && job == null)
             ErrorPanel(error!, retry: job == null ? load : null),
-          if (successfulId != null) Text(successfulReview ? '任务申请已提交，请以审核结果确认生效状态。原AI建议仍保留。' : '任务已创建，原AI建议仍保留为草稿。'),
+          if (successfulId != null)
+            Text(
+              successfulReview
+                  ? '任务申请已提交，请以审核结果确认生效状态。原AI建议仍保留。'
+                  : '任务已创建，原AI建议仍保留为草稿。',
+            ),
           if (job != null)
             Form(
               key: form,

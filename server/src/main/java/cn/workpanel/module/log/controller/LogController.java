@@ -56,7 +56,7 @@ public class LogController {
         return workflow.submit(Actor.current(r),id,b);
     }
     /**
-     * 本人首次提交后24小时内直接更新 work 正文。请求 {work,version}；保存历史版本并使旧待审 LOG 候选失效。
+     * 本人首次提交后24小时内直接更新 work 正文。请求 {work,version,taskIds?}，taskIds省略保留、空数组清空，新增仅本人参与且RECEIVED；同事务保存关联和历史版本并使旧待审 LOG 候选失效。
      * 版本冲突、超时和非已提交日志均返回可区分的409；非作者403；保留首次 submitted_at。
      */
     @PutMapping("/{id}/content") @Transactional

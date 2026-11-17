@@ -22,6 +22,13 @@ public class PersonalTodoService {
     public Page list(Actor a,String date,int cursor,int limit) {
         allowed(a);Business.page(cursor,limit);return repo.page(a,TodoDraft.date(date),cursor,limit);
     }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public Page month(Actor a,String month,int cursor,int limit) {
+        allowed(a);Business.page(cursor,limit);YearMonth m=TodoDraft.month(month);
+        LocalDate from=m.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate to=m.atEndOfMonth().with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(1);
+        return repo.month(a,from,to,cursor,limit);
+    }
     @Transactional(readOnly=true)
     public Todo detail(Actor a,String id) { allowed(a);return repo.find(a,id); }
     @Transactional(readOnly=true)

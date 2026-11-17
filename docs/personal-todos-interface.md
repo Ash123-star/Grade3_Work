@@ -6,6 +6,7 @@
 |---|---|---|---|
 | GET | `/personal-todos/calendar` | month：YYYY-MM | month、fromDate（含）、toDate（不含）、days：date/total/completed；含邻月的周一至周日完整网格 |
 | GET | `/personal-todos` | date；cursor 默认0；limit 默认30、1–100 | items、total、nextCursor；返回与该自然日重叠的事项，末页为 null |
+| GET | `/personal-todos/month` | month：YYYY-MM；cursor 默认0；limit 默认100、1–100 | items、total、nextCursor；返回与该月完整周网格（含邻月）重叠的本人事项，每项仅一次，按开始日、创建时间、id稳定排序 |
 | GET | `/personal-todos/{id}` | id | 当前 Todo |
 | POST | `/personal-todos` | title、date、note（可选）、endDate（可选）、color（可选） | 201 Todo；version=1、completed=false |
 | PUT | `/personal-todos/{id}` | title、date、note（可选）、endDate（可选）、color（可选）、completed、version | 更新后的 Todo |
@@ -20,3 +21,5 @@ Todo 为 id/title/note/date/endDate/color/completed/completedAt/version/createdA
 首页任务看板使用 `/tasks/received-card?cursor=0&limit=2` 取摘要，完整页每页30条；沿用 task_participants 范围，包含本人派发且本人参与的任务，保留完成等生命周期。禁止回退到组织范围的 `/tasks` 或 `/dashboard.companyTasks`。支持未来 `labels` 数组并兼容当前 `label`，实际主线仍只有单标签。
 
 公司页面仍用 `/view`，首页仍用 `/dashboard`，已存在深链接兼容。每日事项日期状态不影响公司和日志的共享筛选。
+
+Issue #94：首页每日事项直接使用公司的 `CalendarContent` 月视图、日期弹层、长按创建、记录长按拖动、跨月滚动和移动确认；个人数据源只适配本人事项的查询、详情、编辑与版本/幂等写入。个人事项不进入任务审核，移动确认使用“确认移动”。月列表在单次响应内使用只读可重复读事务保持计数与内容一致；客户端读取全部分页，检测重复、数量或游标变化后最多重读一次，仍不一致时显示错误与刷新入口，不展示残缺月份。原按日列表和计数接口继续兼容旧调用方，不再用独立首页月历重绘交互。

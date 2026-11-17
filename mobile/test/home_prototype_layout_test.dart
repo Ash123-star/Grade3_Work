@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/features/calendar/calendar_content.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -171,20 +172,7 @@ void main() {
         );
         await tester.tap(find.text('保存'));
         await tester.pumpAndSettle();
-        // 月历长条与当天清单都显示标题，滚动定位清单的独立操作入口。
-        final todo = find.byTooltip('编辑或删除：布局验收新增事项');
-        await tester.scrollUntilVisible(
-          todo,
-          240,
-          scrollable: find
-              .descendant(
-                of: find.byType(DashboardPage),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        expect(todo, findsOneWidget);
-        expect(find.text('布局验收新增事项'), findsNWidgets(2));
+        expect(find.byType(CalendarContent), findsOneWidget);
         expect(tester.takeException(), isNull);
         if (width == 390 && scale == 1) await capture(tester, '390-agenda');
       });

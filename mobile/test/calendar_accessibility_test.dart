@@ -81,9 +81,7 @@ void main() {
             await tester.pumpAndSettle();
             expect(state.message, isNull);
             expect(find.text('移动到日期'), findsOneWidget);
-            await tester.tap(
-              find.text('取消').hitTestable(at: const Alignment(0, .9)).last,
-            );
+            await tester.tap(find.byTooltip('取消选择'));
             await tester.pumpAndSettle();
             expect(state.pending, isNull);
             final day = find
@@ -99,9 +97,7 @@ void main() {
             await tester.tap(button);
             await tester.pumpAndSettle();
             expect(find.text('移动到日期'), findsOneWidget);
-            await tester.tap(
-              find.text('取消').hitTestable(at: const Alignment(0, .9)).last,
-            );
+            await tester.tap(find.byTooltip('取消选择'));
             await tester.pumpAndSettle();
             expect(store.records['reviews'], isEmpty);
             expect(tester.takeException(), isNull);

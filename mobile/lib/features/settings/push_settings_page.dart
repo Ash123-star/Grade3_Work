@@ -167,8 +167,10 @@ class MembershipResultPage extends ConsumerWidget {
                         await refreshCurrentSession(ref);
                       } catch (_) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('账号状态刷新失败，请重试')),
+                          notice(
+                            context,
+                            '账号状态刷新失败，请重试',
+                            tone: NoticeTone.error,
                           );
                         }
                       }
