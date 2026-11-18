@@ -16,18 +16,19 @@ import java.util.*;
 @Component
 public class AliyunPushGateway implements PushGateway {
     final DefaultAcsClient client; final long appKey; final ObjectMapper json;
-    final String huawei,xiaomi,oppo,vivo,honor;
+    final String huawei,huaweiCategory,xiaomi,oppo,vivo,honor;
     public AliyunPushGateway(ObjectMapper json,
             @Value("${app.push.app-key:0}") long appKey,
             @Value("${app.push.access-key-id:}") String id,
             @Value("${app.push.access-key-secret:}") String secret,
             @Value("${app.push.security-token:}") String token,
-            @Value("${app.push.huawei-channel:}") String huawei,
+            @Value("${app.push.huawei-channel:NORMAL}") String huawei,
+            @Value("${app.push.huawei-category:WORK}") String huaweiCategory,
             @Value("${app.push.xiaomi-channel:}") String xiaomi,
             @Value("${app.push.oppo-category:}") String oppo,
             @Value("${app.push.vivo-channel:}") String vivo,
             @Value("${app.push.honor-channel:}") String honor) {
-        this.json=json;this.appKey=appKey;this.huawei=huawei;this.xiaomi=xiaomi;this.oppo=oppo;this.vivo=vivo;this.honor=honor;
+        this.json=json;this.appKey=appKey;this.huawei=huawei;this.huaweiCategory=huaweiCategory;this.xiaomi=xiaomi;this.oppo=oppo;this.vivo=vivo;this.honor=honor;
         this.client=appKey>0&&!id.isBlank()&&!secret.isBlank()?new DefaultAcsClient(token.isBlank()?DefaultProfile.getProfile("cn-hangzhou",id,secret):DefaultProfile.getProfile("cn-hangzhou",id,secret,token)):null;
         if(client!=null) {client.setAutoRetry(false);client.setMaxRetryNumber(0);}
     }
@@ -43,6 +44,8 @@ public class AliyunPushGateway implements PushGateway {
         r.setAndroidPopupActivity("cn.pandora.pandora_mobile.PushPopupActivity");r.setAndroidPopupTitle("潘多拉工作台");r.setAndroidPopupBody(title);
         r.setAndroidExtParameters(json.writeValueAsString(Map.of("notificationId",notification,"binding",binding)));
         if(!huawei.isBlank()) r.setAndroidNotificationHuaweiChannel(huawei);
+        // Huawei classification and message importance are independent provider fields.
+        if(!huaweiCategory.isBlank()) r.setAndroidMessageHuaweiCategory(huaweiCategory);
         if(!xiaomi.isBlank()) r.setAndroidNotificationXiaomiChannel(xiaomi);
         if(!vivo.isBlank()) r.setAndroidNotificationVivoChannel(vivo);
         if(!oppo.isBlank()) r.setAndroidMessageOppoCategory(oppo);

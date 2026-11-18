@@ -31,7 +31,12 @@ android {
         // EMAS application identifiers only; never put RAM AccessKey credentials in this APK.
         val pushConfig = listOf("app_key", "app_secret", "huawei_id", "honor_id", "vivo_id", "vivo_key", "oppo_key", "oppo_secret", "xiaomi_id", "xiaomi_key", "meizu_id", "meizu_key")
         for (key in pushConfig) {
-            val value = providers.gradleProperty("pandora.push.$key").orElse(providers.environmentVariable("PANDORA_PUSH_${key.uppercase()}" )).getOrElse("")
+            val raw = providers.gradleProperty("pandora.push.$key").orElse(providers.environmentVariable("PANDORA_PUSH_${key.uppercase()}" )).getOrElse("")
+            // HMS manifest metadata requires appid=<id>; accept the numeric console value too.
+            val value = if (key == "huawei_id" && raw.matches(Regex("[0-9]+"))) "appid=$raw" else raw
+            if (key == "huawei_id" && value.isNotBlank()) {
+                require(value.matches(Regex("appid=[0-9]+"))) { "Huawei App ID must be numeric or appid=<numeric ID>" }
+            }
             resValue("string", "pandora_push_$key", value)
         }
 

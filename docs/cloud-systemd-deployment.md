@@ -4,7 +4,27 @@
 
 关联 Issue：#44（文档维护，延续 #42 的云端更新）。
 
+## 华为通道配置与验收（Issue #86）
+
+本项目沿用阿里云移动推送聚合通道，由 EMAS 保存华为应用的 Client Secret 和回执配置；服务端只使用专用 RAM 身份发送，不直接集成另一套华为发送接口。Android Application 在用户开启通知后初始化 SDK，冷启动通道进程沿用同意状态；关闭通知或退出会话后撤销本地同意及服务端绑定。
+
+- EMAS：项目 `panduola`，Android AppKey `335763065`；华为应用 ID `119784335`，包名 `cn.pandora.pandora_mobile`。客户端构建环境为 `PANDORA_PUSH_APP_KEY`、`PANDORA_PUSH_APP_SECRET`、`PANDORA_PUSH_HUAWEI_ID`；华为 ID 可填纯数字，Gradle 转为 HMS 要求的 `appid=<id>`，错误格式会中止构建。
+- EMAS 华为通道须填写应用级 Client ID/Secret、已启用回执及审核通过的工作事项分类。回调 `https://amspush-ack.aliyuncs.com/hw/`；当前回执 ID `RCP90E33B39`，到期日 2027-02-26，续期后同步 EMAS。普通通知无需填写实况窗服务账号。
+- 服务端：`PUSH_APP_KEY`、`PUSH_ACCESS_KEY_ID`、`PUSH_ACCESS_KEY_SECRET`；可选 STS 使用 `PUSH_SECURITY_TOKEN`。`PUSH_HUAWEI_CATEGORY` 默认 `WORK`，`PUSH_HUAWEI_CHANNEL` 默认 `NORMAL`，两者分别映射分类与消息级别，互不替代。开启必须同时核对 systemd 的 `PUSH_ENABLED` 和 Spring 外部覆盖 `APP_PUSH_ENABLED`；以实际进程配置为准。
+- RAM 仅需自定义策略 `{"Version":"1","Statement":[{"Effect":"Allow","Action":"mpush:Push","Resource":"*"}]}`，授予专用服务端用户；[官方 Push 接口授权表](https://help.aliyun.com/document_detail/48089.html) 标明该操作不支持资源级授权，不能虚构单 App ARN。RAM Secret 不得进入 APK，EMAS AppSecret 不得提交 Git 或打印到日志。密钥通过本机忽略文件或服务端 root 可读环境文件注入。
+- 当前测试签名 SHA-256：`01:F9:6B:60:7C:46:5B:59:39:6B:34:31:F0:1F:F6:1B:08:2E:15:FC:5F:BF:CB:AE:9E:7E:92:12:17:09:0B:9E`。正式签名变更前须先更新华为应用指纹；测试签名不能作为正式发布签名验收。
+
+实际验收须使用已安装 HMS 且允许应用通知的华为 Android/兼容 Android 手机：登录后在 App 内开启通知，分别验证前台、后台、锁屏、划掉进程后的到达与点击；点击须再次执行会话和数据权限校验。测试期间检查免打扰时段，勿将被免打扰过滤误判为通道失败。系统设置中的“强行停止”、卸载，以及不能安装 APK 的 HarmonyOS NEXT 不纳入送达保证。供应商返回 MessageId 仅表示受理，不能代替真机和回执证据。
+
+部署前核对实际 Flyway 历史与 JAR 内迁移：2026-11-13 核对的在线库已使用 `V31__oss_resources.sql`，主分支该主题已调整为 V33，不能直接部署主分支整包或擅自 repair 历史。本次发布应以在线源码 `3fec52f65b0f02fec15d092526a302dfae54374d` 加华为 gateway/YAML 修复构建，保留全部既有迁移字节；切换前备份实际库、JAR 和 systemd 配置。启用、实际发布结果与未完成验收见 [后端验证记录](backend-validation.md#阿里云-android-必要通知issue-86)。
+
+2026-11-13 已按上述兼容方式发布：实际 JAR `/opt/Grade3_Work-releases/huawei-20261113/collaboration-server-1.0.0.jar`，SHA-256 `e4adef81daa73998ae80eb42a7f677484973704a0624128bee40a72d1fcdcb56`。原服务 active/running、NRestarts=0，两个推送开关均为 true，日历拖动开关保留；RAM 配置存于 `/etc/collaboration-push.env`（0600），临时上传副本已删除。备份位于 `/root/workpanel-backups/20261113-huawei`，包含旧 JAR、原 drop-in 和两次实际库 dump。回滚时停止服务，以 `previous-dropin.conf` 恢复 `zzzzzzz-push-release.conf`，重新加载并启动；保留数据库和新增私有配置文件，原版本关闭推送。发布不等于真实投递验证。
+
+发布后 OSS 图片检查曾返回 `STORAGE_UNAVAILABLE`；独立签名读取确认原身份为 `InvalidAccessKeyId`，OSS 进程环境与此前发布一致，用户说明变更过 AccessKey。已用用户通过私有文件提供的有效 OSS 凭据更新 `/etc/collaboration-oss.env`，原文件备份为上述目录内的 `oss-credentials-before.env`，权限0600。更新前直接读取、更新后后端读取均核对图片大小及 SHA-256；公网14项检查通过，推送保持开启。仅恢复了凭据配置，未改桶权限、未重新上传或打包素材；未将图片读取验证外推为全部附件写入验收。回滚该凭据会再次使用失效 Key，不应随 JAR 回滚恢复它。
+
 ## 当前运行版本：必要通知后端（2026-11-12，Issue #86）
+
+本节保留此前部署与回滚历史；最新实际运行版本见上方华为通道段落。
 
 按用户要求，提交 `3fec52f65b0f02fec15d092526a302dfae54374d` 的后端已部署并启动，仍由原 `collaboration-server.service` 管理，开机启动已启用，未合并草稿 PR #87。当前实际 JAR 为 `/opt/Grade3_Work-releases/push-3fec52f/server/target/collaboration-server-1.0.0.jar`，SHA-256 为 `abedbb74a9020d249b78a580e1e7a1454c5a2f354374f522dc2986f4e08eb9af`。保留原 Java 21 与 `-Xmx512m`，2026-11-12 13:46:34（上海时间）启动，发布核对时 active/running、NRestarts=0。
 
