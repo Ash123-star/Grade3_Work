@@ -50,7 +50,7 @@ public class MemoryModel {
         try {
             Long budget=redis.execute(new org.springframework.data.redis.core.script.DefaultRedisScript<>("local n=tonumber(redis.call('GET',KEYS[1]) or '0'); if n+tonumber(ARGV[1])>tonumber(ARGV[2]) then return -1 end; redis.call('INCRBY',KEYS[1],ARGV[1]); redis.call('EXPIRE',KEYS[1],172800); return n+tonumber(ARGV[1])",Long.class),List.of(budgetKey),String.valueOf(reserve),String.valueOf(daily));
             if(budget==null||budget<0) { db.update("UPDATE memory_model_calls SET tokens=0 WHERE id=?",call); throw new ApiError(429,"AI_BUDGET","每日 AI 预算不足"); }
-            limiter.check("memory-model:"+a.id(),5,60);
+            limiter.check("memory-model:"+a.id(),25,60);
             var req=HttpRequest.newBuilder(URI.create(url+"/chat/completions")).timeout(Duration.ofSeconds(timeout)).header("Authorization","Bearer "+key).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8)).build();
             var response=http.send(req,HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if(response.statusCode()!=200) throw new ApiError(503,"AI_PROVIDER_FAILED","模型服务暂不可用");

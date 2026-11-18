@@ -55,7 +55,7 @@ public class AiApplicationService {
     }
     public static String sanitize(String s) { return s.replaceAll("(?i)(password|密码|api[_-]?key|密钥|token)\\s*[:：=]\\s*\\S+","[已隐藏敏感信息]").replaceAll("(?<![0-9])1[3-9][0-9]{9}(?![0-9])","[已隐藏手机号]"); }
     public Map<String,Object> create(Actor a,Map<String,Object> b) {
-        Db.fields(b,"date","period","purpose","focusSourceId","scope"); limiter.check("ai:"+a.id(),5,60);
+        Db.fields(b,"date","period","purpose","focusSourceId","scope"); limiter.check("ai:"+a.id(),25,60);
         if(key.isBlank()) throw new ApiError(503,"AI_NOT_CONFIGURED","AI 尚未配置，基础业务可继续使用");
         var input=new LinkedHashMap<>(context(a,Db.required(b,"date"),Db.required(b,"period"),b.containsKey("scope")?Db.required(b,"scope"):"AUTHORIZED")); options(input,b); if(db.write(input).length()>60000) throw ApiError.bad("AI_INPUT_TOO_LARGE","请缩小 AI 总结范围");
         String id=Db.id(); db.update("INSERT INTO ai_jobs(id,company_id,owner_id,input) VALUES (?,?,?,?::jsonb)",id,a.company(),a.id(),db.write(input)); return job(a,id);

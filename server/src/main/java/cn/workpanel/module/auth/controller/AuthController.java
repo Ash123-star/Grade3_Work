@@ -22,14 +22,14 @@ public class AuthController {
     /** 公开注册部门列表；无请求参数，返回 id/name；无版本或幂等键要求。 */
     @GetMapping("/departments") public List<Map<String, Object>> registrationDepartments() { return service.registrationDepartments(); }
     /** 公开注册：account/password/phone/name/departmentId；仅员工待确认，禁止 role。
-     * 返回 id/role/status/reviewId/phoneVerified；非法字段 400、部门不存在 404、重复 409、限流 429。
+     * 返回 id/role/status/reviewId/phoneVerified；非法字段 400、部门不存在 404、重复 409；每 IP 50 次/小时，超限 429。
      * 无版本；重复注册拒绝，不采用幂等键。 */
     @PostMapping("/register") public Map<String, Object> register(@RequestBody Map<String, Object> body, HttpServletRequest request) {
-        limiter.check("register:" + request.getRemoteAddr(), 10, 3600);
+        limiter.check("register:" + request.getRemoteAddr(), 50, 3600);
         return service.register(body);
     }
     /** 公开登录：account/password；返回 token/expiresAt/user；默认有效期168小时（SESSION_HOURS可覆盖），退出、改密及停用可提前撤销。错误或锁定 401，密码已验证的停用账号 403，IP 限流 429。
-     * 五次失败锁十分钟；每次成功创建新会话，无版本或幂等键要求。 */
+     * 每 IP 150 次/分钟；五次失败锁十分钟；每次成功创建新会话，无版本或幂等键要求。 */
     @Operation(summary = "账号密码登录", description = "连续五次失败锁定十分钟，锁定期间不续期。未知账号与错误密码统一返回 INVALID_CREDENTIALS；成功创建新会话。")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "返回 token、expiresAt 和公开 user"),
         @ApiResponse(responseCode = "400", description = "INVALID_FIELD 或 UNKNOWN_FIELD"),
@@ -38,7 +38,7 @@ public class AuthController {
         @ApiResponse(responseCode = "429", description = "RATE_LIMITED：IP 限流"),
         @ApiResponse(responseCode = "503", description = "LIMITER_UNAVAILABLE")})
     @PostMapping("/login") public Map<String, Object> login(@RequestBody Map<String, Object> body, HttpServletRequest request) {
-        limiter.check("login:" + request.getRemoteAddr(), 30, 60);
+        limiter.check("login:" + request.getRemoteAddr(), 150, 60);
         return service.login(body);
     }
     /** 有效会话读取本人公开字段，不含密码/手机号/会话摘要；未认证 401；无版本要求。 */
