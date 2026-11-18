@@ -22,7 +22,7 @@ public final class EmployeeIdentity {
         if(!card.matches("[0-9]{17}[0-9X]")) throw ApiError.bad("INVALID_ID_CARD","身份证号须为有效的18位号码");
         try {
             LocalDate birth=LocalDate.parse(card.substring(6,14),DateTimeFormatter.ofPattern("uuuuMMdd").withResolverStyle(ResolverStyle.STRICT));
-            if(birth.isAfter(LocalDate.now()) || birth.isBefore(LocalDate.of(1900,1,1))) throw new DateTimeParseException("birth",card,6);
+            if(birth.isAfter(LocalDate.now(ZoneId.of("Asia/Shanghai"))) || birth.isBefore(LocalDate.of(1900,1,1))) throw new DateTimeParseException("birth",card,6);
         } catch(DateTimeParseException e) { throw ApiError.bad("INVALID_ID_CARD","身份证号出生日期无效"); }
         int[] weight={7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2};
         String check="10X98765432";int sum=0;

@@ -21,7 +21,9 @@ class FounderReviewRetirementMigrationTest {
    }
    var before=db.queryForList("SELECT * FROM dashboard_items");
    var flyway=Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema).load();flyway.migrate();flyway.validate();
-   assertEquals("34",flyway.info().current().getVersion().getVersion());
+   assertTrue(flyway.info().current().getVersion().compareTo(org.flywaydb.core.api.MigrationVersion.fromVersion("35"))>=0);
+   assertEquals(0,flyway.info().pending().length);
+   assertEquals(1,db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema=? AND table_name='users' AND column_name='id_card_number'",Integer.class,schema));
    assertEquals(1,db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema=? AND table_name='personal_todos' AND column_name='end_date'",Integer.class,schema));
    assertEquals(1,db.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_schema=? AND table_name='attachments' AND column_name='storage_provider'",Integer.class,schema));
    assertEquals(3,db.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema=? AND table_name IN ('push_preferences','push_devices','push_deliveries')",Integer.class,schema));

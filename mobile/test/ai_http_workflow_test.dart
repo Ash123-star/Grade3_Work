@@ -852,8 +852,6 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('确定'));
     await t.pumpAndSettle();
-    await t.tap(find.text('确定'));
-    await t.pumpAndSettle();
   }
 
   Future<void> confirm(WidgetTester t) async {

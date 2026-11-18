@@ -884,8 +884,6 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('确定'));
       await t.pumpAndSettle();
-      await t.tap(find.text('确定'));
-      await t.pumpAndSettle();
       final date = find.text('选择日期和时间').last;
       await t.ensureVisible(date);
       await t.pumpAndSettle();
@@ -904,8 +902,6 @@ void main() {
             )
             .last,
       );
-      await t.tap(find.text('确定'));
-      await t.pumpAndSettle();
       await t.tap(find.text('确定'));
       await t.pumpAndSettle();
       final primary = find.widgetWithText(ActionChip, '添加');

@@ -42,7 +42,8 @@ void main() {
           .length,
       greaterThan(0),
     );
-    await tester.tap(find.text('下属日志 ›'));
+    expect(find.text('下属日志 ›'), findsNothing);
+    container.read(routerProvider).go('/logs/subordinates');
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('subordinate-log-search')),

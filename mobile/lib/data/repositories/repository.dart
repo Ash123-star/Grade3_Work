@@ -1502,7 +1502,7 @@ class HttpRepository implements Repository {
             'gender': v['性别'] == null || '${v['性别']}'.trim().isEmpty
                 ? null
                 : v['性别'],
-          if (v.containsKey('年龄')) 'age': v['年龄'],
+          if (v.containsKey('idCardNumber')) 'idCardNumber': v['idCardNumber'],
           if (v.containsKey('avatarAttachmentId'))
             'avatarAttachmentId': v['avatarAttachmentId'],
           'version': command.version ?? 1,

@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/data/models/identity_card.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,7 +22,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
   final phone = TextEditingController();
   final email = TextEditingController();
   String? gender;
-  final age = TextEditingController();
+  final idCard = TextEditingController();
   bool editing = false, saving = false;
   String? error;
   late String accountId = ref.read(sessionProvider).id;
@@ -31,7 +32,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
     introduction.dispose();
     phone.dispose();
     email.dispose();
-    age.dispose();
+    idCard.dispose();
     super.dispose();
   }
 
@@ -42,7 +43,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
     email.text = '${profile.fields['email'] ?? profile.fields['邮箱'] ?? ''}';
     final storedGender = profile.fields['gender'] ?? profile.fields['性别'];
     gender = ['男', '女'].contains(storedGender) ? storedGender as String : null;
-    age.text = '${profile.fields['age'] ?? profile.fields['年龄'] ?? ''}';
+    idCard.clear();
     setState(() {
       editing = true;
       error = null;
@@ -51,6 +52,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
 
   void cancelEdit() {
     setState(() {
+      idCard.clear();
       editing = false;
       error = null;
     });
@@ -74,15 +76,15 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
         setState(() => error = '请输入有效电话号码');
         return;
       }
+      if (idCard.text.trim().isNotEmpty &&
+          identityCardError(idCard.text) != null) {
+        setState(() => error = identityCardError(idCard.text));
+        return;
+      }
       final emailValue = email.text.trim();
       if (emailValue.isNotEmpty &&
           !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(emailValue)) {
         setState(() => error = '请输入有效邮箱地址');
-        return;
-      }
-      if (age.text.trim().isNotEmpty &&
-          (int.tryParse(age.text.trim()) ?? -1) < 0) {
-        setState(() => error = '年龄必须为非负整数');
         return;
       }
     }
@@ -107,9 +109,8 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                   '手机号': phone.text.trim(),
                   '邮箱': email.text.trim(),
                   '性别': gender,
-                  '年龄': age.text.trim().isEmpty
-                      ? null
-                      : int.parse(age.text.trim()),
+                  if (idCard.text.trim().isNotEmpty)
+                    'idCardNumber': idCard.text.trim(),
                 },
                 'avatarAttachmentId': avatarId,
               },
@@ -121,7 +122,10 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
       ref.invalidate(itemProvider(('organization/profile', accountId)));
       refreshBusiness(ref);
       setState(() {
-        if (saveFields) editing = false;
+        if (saveFields) {
+          editing = false;
+          idCard.clear();
+        }
         saving = false;
       });
     } catch (failure) {
@@ -345,12 +349,13 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
             null,
             null,
           ),
+          ('年龄', 'birthday', value.fields['age'] ?? '未录入', null, null),
           (
-            '年龄',
-            'birthday',
-            value.fields['age'] ?? value.fields['年龄'],
-            age,
-            TextInputType.number,
+            '身份证号',
+            'person',
+            value.fields['idCardMasked'] ?? '未录入',
+            idCard,
+            TextInputType.text,
           ),
           (
             '入职日期',
@@ -505,7 +510,9 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                                 keyboardType: entries[i].$5,
                                 enabled: !saving,
                                 decoration: InputDecoration(
-                                  hintText: '未提供',
+                                  hintText: entries[i].$1 == '身份证号'
+                                      ? '输入18位身份证号，留空保持原值'
+                                      : '未提供',
                                   labelText: entries[i].$1,
                                   floatingLabelBehavior:
                                       FloatingLabelBehavior.never,
@@ -538,6 +545,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
     final user = ref.watch(sessionProvider);
     if (accountId != user.id) {
       accountId = user.id;
+      idCard.clear();
       editing = false;
       error = null;
     }

@@ -51,9 +51,18 @@ class MobileDataContractIntegrationTest extends MemberBHttpSupport {
 
     @Test void profileColumnsRoundTripAndRejectStaleDuplicateAndProtectedFields() throws Exception {
         db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?),(?,?,?)",employee,leader,company,leader,director,company);
-        var profile=Map.of("version",1,"phone","13987654321","email","member@example.com","gender","女","age",29,"introduction","保留简介");
+        db.update("UPDATE users SET age=29 WHERE id=?",employee);
+        assertTrue(call(200,"GET","/profiles/"+employee,employee,null).get("age").isNull());
+        var profile=Map.of("version",1,"phone","13987654321","email","member@example.com","gender","女","idCardNumber","110105198507160732","introduction","保留简介");
         var saved=call(200,"PUT","/profiles/me",employee,profile);
-        assertEquals("13987654321",saved.get("phone").asText()); assertEquals(29,saved.get("age").asInt());
+        assertEquals("13987654321",saved.get("phone").asText()); assertEquals(cn.workpanel.module.organization.domain.EmployeeIdentity.age("110105198507160732"),saved.get("age").asInt());
+        assertFalse(saved.toString().contains("110105198507160732"));
+        call(400,"PUT","/profiles/me",employee,Map.of("version",2,"age",29));
+        call(400,"PUT","/profiles/me",employee,Map.of("version",2,"idCardNumber","110105194912310021"));
+        call(409,"PUT","/profiles/me",colleague,Map.of("version",1,"idCardNumber","110105198507160732"));
+        assertNull(db.one("SELECT id_card_number FROM users WHERE id=?",colleague).get("id_card_number"));
+        assertEquals(1,((Number)db.one("SELECT version FROM users WHERE id=?",colleague).get("version")).intValue());
+        assertFalse(call(200,"GET","/profiles/"+employee,director,null).has("idCardMasked"));
         assertEquals("member@example.com",db.one("SELECT email FROM users WHERE id=?",employee).get("email"));
         assertEquals("保留简介",saved.at("/profile/introduction").asText()); assertTrue(saved.get("employmentStartDate").isNull());
         assertEquals("member@example.com",call(200,"GET","/profiles/"+employee,director,null).get("email").asText());
@@ -65,7 +74,7 @@ class MobileDataContractIntegrationTest extends MemberBHttpSupport {
         var clear=new LinkedHashMap<String,Object>(); clear.put("version",2); clear.put("phone",null); clear.put("email",null);
         var cleared=call(200,"PUT","/profiles/me",employee,clear);
         assertTrue(cleared.get("phone").isNull()); assertTrue(cleared.get("email").isNull());
-        assertEquals(29,cleared.get("age").asInt()); assertEquals("保留简介",cleared.at("/profile/introduction").asText());
+        assertEquals(cn.workpanel.module.organization.domain.EmployeeIdentity.age("110105198507160732"),cleared.get("age").asInt()); assertEquals("保留简介",cleared.at("/profile/introduction").asText());
         db.update("DELETE FROM reporting_relations WHERE employee_id=?",employee);
         call(403,"GET","/profiles/"+employee,director,null);
     }

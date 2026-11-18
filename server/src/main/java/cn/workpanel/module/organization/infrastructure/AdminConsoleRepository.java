@@ -16,7 +16,7 @@ public class AdminConsoleRepository {
         String from=" FROM users u LEFT JOIN departments d ON d.id=u.department_id AND d.company_id=u.company_id LEFT JOIN teams t ON t.id=u.team_id AND t.company_id=u.company_id LEFT JOIN reporting_relations rr ON rr.employee_id=u.id AND rr.company_id=u.company_id LEFT JOIN users m ON m.id=rr.manager_id AND m.company_id=u.company_id WHERE u.company_id=? AND (?='' OR u.department_id=?) AND (u.name ILIKE ? OR u.account ILIKE ? OR u.phone ILIKE ?)";
         String like="%"+search+"%";
         var items=db.rows("SELECT u.id,u.account,u.phone,u.name,u.gender,u.age,u.id_card_number,u.department_id,u.team_id,rr.manager_id,m.name AS manager_name,t.name AS team_name,u.role,u.status,u.version,u.must_change_password,d.name AS department"+from+" ORDER BY d.name,u.name,u.id LIMIT ? OFFSET ?",actor.company(),department,department,like,like,like,limit,cursor);
-        for(var item:items) { Object card=item.remove("id_card_number");item.put("has_id_card",card!=null);Integer age=EmployeeIdentity.age(card);if(age!=null)item.put("age",age); }
+        for(var item:items) { Object card=item.remove("id_card_number");item.put("has_id_card",card!=null);Integer age=EmployeeIdentity.age(card);item.put("age",age); }
         return Map.of("items",items,"total",db.count("SELECT count(*)"+from,actor.company(),department,department,like,like,like),"nextCursor",String.valueOf((long)cursor+items.size()));
     }
     public List<Map<String,Object>> teams(Actor actor) { return db.rows("SELECT id,name,department_id FROM teams WHERE company_id=? ORDER BY name,id",actor.company()); }

@@ -1,6 +1,7 @@
 package cn.workpanel.module.dashboard.application;
 
 import cn.workpanel.*;
+import cn.workpanel.module.organization.domain.EmployeeIdentity;
 import cn.workpanel.module.auth.application.DefaultAuthApplicationService;
 import cn.workpanel.module.dashboard.infrastructure.ProfileRepository;
 import org.springframework.stereotype.Service;
@@ -19,19 +20,22 @@ public class ProfileService {
         var result=new LinkedHashMap<>(DefaultAuthApplicationService.publicUser(user));
         for(String field:List.of("phone","email","gender","age")) result.put(field,user.get(field));
         result.put("gender",validGender(string(user.get("gender"))) ? user.get("gender") : null);
+        result.put("age",EmployeeIdentity.age(user.get("id_card_number")));
+        if(actor.id().equals(id)) { String card=string(user.get("id_card_number")); result.put("hasIdCard",card!=null); result.put("idCardMasked",card==null?null:card.substring(0,3)+"***********"+card.substring(14)); }
         result.put("employmentStartDate",user.get("employment_start_date"));
-        result.put("profile",repository.json(user.get("profile"))); result.put("viewingSelf",actor.id().equals(id));
+        var safeProfile=repository.json(user.get("profile"));safeProfile.remove("age");safeProfile.remove("年龄");safeProfile.remove("idCardNumber");safeProfile.remove("id_card_number");result.put("profile",safeProfile); result.put("viewingSelf",actor.id().equals(id));
         result.put("department",repository.unit("departments",actor.company(),user.get("department_id")));
         result.put("team",repository.unit("teams",actor.company(),user.get("team_id"))); return result;
     }
     @Transactional
     public Map<String,Object> update(Actor actor,Map<String,Object> body) {
         if(!actor.status().equals("ACTIVE")||actor.mustChange()) throw ApiError.forbidden();
-        Db.fields(body,"avatarAttachmentId","introduction","phone","email","gender","age","version");
+        if(body.containsKey("age")) throw ApiError.bad("AGE_READ_ONLY","年龄由身份证号自动计算，不可修改");
+        Db.fields(body,"avatarAttachmentId","introduction","phone","email","gender","idCardNumber","version");
         int expected=Db.version(body); var user=repository.user(actor,actor.id(),true);
         if(!"ACTIVE".equals(user.get("status"))||Boolean.TRUE.equals(user.get("must_change_password"))) throw ApiError.forbidden();
         if(((Number)user.get("version")).intValue()!=expected) throw ApiError.conflict();
-        String phone=string(user.get("phone")),email=string(user.get("email")),gender=string(user.get("gender")); Object age=user.get("age");
+        String phone=string(user.get("phone")),email=string(user.get("email")),gender=string(user.get("gender"));
         if(body.containsKey("phone")) {
             phone=nullableText(body,"phone",32);
             if(phone!=null&&!phone.matches("1[3-9][0-9]{9}")) throw ApiError.bad("INVALID_PHONE","手机号格式无效");
@@ -46,11 +50,7 @@ public class ProfileService {
             gender=nullableText(body,"gender",32);
             if(!validGender(gender)) throw ApiError.bad("INVALID_GENDER","性别只能选择男或女");
         }
-        if(body.containsKey("age")) {
-            age=body.get("age");
-            if(age!=null&&(!(age instanceof Number number)||!Double.isFinite(number.doubleValue())||number.doubleValue()!=number.intValue()||number.intValue()<0)) throw ApiError.bad("INVALID_AGE","年龄必须为非负整数或空值");
-            if(age instanceof Number number) age=number.intValue();
-        }
+        String card=body.containsKey("idCardNumber")?EmployeeIdentity.idCard(body.get("idCardNumber")):string(user.get("id_card_number"));
         var profile=repository.json(user.get("profile"));
         if(body.containsKey("introduction")) profile.put("introduction",nullableText(body,"introduction",20000));
         if(body.containsKey("avatarAttachmentId")) {
@@ -60,7 +60,9 @@ public class ProfileService {
         }
         // 只有本人明确改写该字段时才清除旧重复值；其他历史/非法数据由迁移保留。
         for(String field:List.of("phone","email","gender","age")) if(body.containsKey(field)) profile.remove(field);
-        repository.update(actor,expected,phone,email,gender,age,profile); return get(actor,actor.id());
+        profile.remove("age");profile.remove("年龄");
+        repository.updateIdentity(actor,card);
+        repository.update(actor,expected,phone,email,gender,null,profile); return get(actor,actor.id());
     }
     private static boolean validGender(String value) { return value==null||value.equals("男")||value.equals("女"); }
     private static String string(Object value) { return value==null?null:value.toString(); }

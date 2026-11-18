@@ -330,9 +330,12 @@ void main() {
     expect(find.text('通知前日志'), findsOneWidget);
     expect(adapter.streams, hasLength(1));
     adapter.title = '通知后日志';
-    adapter.send(event(1));
+    adapter.send(event(1).replaceAll('TASK_ASSIGNED', 'LOG_SUBMITTED'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 220));
+    expect(find.text('通知前日志'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    await settleLocalIo(tester);
     await tester.pumpAndSettle();
     expect(find.text('通知后日志'), findsOneWidget);
     expect(find.text('通知前日志'), findsNothing);
