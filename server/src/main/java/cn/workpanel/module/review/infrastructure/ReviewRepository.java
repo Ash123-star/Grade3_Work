@@ -24,6 +24,14 @@ public class ReviewRepository {
         return Map.of("items",items,"total", db.count("SELECT count(*) FROM review_requests r WHERE " + where, actor.company(), actor.id(), actor.id()), "nextCursor", String.valueOf((long) cursor + items.size()));
     }
 
+    /** Web 管理员当前待办：历史已决与目标员工版本失效的成员申请保留在数据库，但不占待办。 */
+    public Map<String,Object> pendingList(Actor actor,int cursor,int limit) {
+        String where=readableScope(actor).sql()+" AND r.status='PENDING' AND (r.kind<>'MEMBERSHIP' OR EXISTS (SELECT 1 FROM users tu WHERE tu.id=r.target_id AND tu.company_id=r.company_id AND tu.status='PENDING' AND tu.version=r.expected_version))";
+        var items=db.rows("SELECT r.id,r.kind,r.target_id,r.applicant_id,u.name AS applicant_name,r.status,r.reason,r.expected_version,r.approval_mode,r.decision_source,r.created_at FROM review_requests r JOIN users u ON u.id=r.applicant_id AND u.company_id=r.company_id WHERE "+where+" ORDER BY r.created_at DESC,r.id LIMIT ? OFFSET ?",actor.company(),actor.id(),actor.id(),limit,cursor);
+        for(var item:items) { var current=currentReviewerView(Db.str(item,"id"));item.put("reviewer_id",current.get("reviewer_id"));item.put("reviewer_name",current.get("reviewer_name"));item.put("reviewer_configured",!current.isEmpty()); }
+        return Map.of("items",items,"total",db.count("SELECT count(*) FROM review_requests r WHERE "+where,actor.company(),actor.id(),actor.id()),"nextCursor",String.valueOf((long)cursor+items.size()));
+    }
+
     public void create(String id,Actor a,String kind,String target,int version,Object before,Map<String,Object> candidate,String reason,String mode) {
         db.update("INSERT INTO review_requests(id,company_id,applicant_id,kind,target_id,expected_version,before_value,candidate,reason,approval_mode) VALUES (?,?,?,?,?,?,?::jsonb,?::jsonb,?,?)",id,a.company(),a.id(),kind,target,version,db.write(before),db.write(candidate),reason,mode);
     }

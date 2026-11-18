@@ -27,6 +27,10 @@ public class ReviewApplicationService {
         actor=fresh(actor); Business.page(cursor,limit); return repository.list(actor,cursor,limit);
     }
 
+    public Map<String,Object> pendingList(Actor actor,int cursor,int limit) {
+        actor=fresh(actor);Business.page(cursor,limit);return repository.pendingList(actor,cursor,limit);
+    }
+
     @Transactional
     public Map<String,Object> create(Actor actor,String kind,String target,int version,Object before,Map<String,Object> candidate,String reason) {
         actor=fresh(actor);
