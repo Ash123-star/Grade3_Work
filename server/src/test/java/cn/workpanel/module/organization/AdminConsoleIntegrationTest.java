@@ -11,15 +11,23 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.admin-account=integration-admin","app.admin-password=Initial-test-password-2026","app.admin-phone=13900000001"
 })
 class AdminConsoleIntegrationTest extends MemberBHttpSupport {
+    private static final java.util.concurrent.atomic.AtomicInteger CARD_SERIAL=new java.util.concurrent.atomic.AtomicInteger(1);
+    private static String card() { String prefix="11010519900101"+String.format("%03d",CARD_SERIAL.getAndIncrement());int[] weights={7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2};int sum=0;for(int i=0;i<17;i++)sum+=(prefix.charAt(i)-'0')*weights[i];return prefix+"10X98765432".charAt(sum%11); }
     Map<String,Object> employeeCommand() {
-        return new LinkedHashMap<>(Map.of("account","console-"+Db.id(),"password","Initial-password-2026","phone","138"+String.format("%08d",java.util.concurrent.ThreadLocalRandom.current().nextInt(100000000)),"name","新同事","departmentId",department));
+        String team=Db.id();db.update("INSERT INTO teams(id,company_id,department_id,name) VALUES (?,?,?,'测试组')",team,company,department);
+        var command=new LinkedHashMap<String,Object>(Map.of("account","console-"+Db.id(),"password","Initial-password-2026","phone","138"+String.format("%08d",java.util.concurrent.ThreadLocalRandom.current().nextInt(100000000)),"name","新同事","departmentId",department,"teamId",team,"managerId",admin));command.put("gender","女");command.put("idCardNumber",card());return command;
     }
     @Test void createsEmployeeAndEnforcesPasswordChangeAcrossBusinessEntry() throws Exception {
         var command=employeeCommand();var created=call(200,"POST","/admin/console/employees",admin,command);String id=created.get("id").asText();
         assertEquals("EMPLOYEE",created.get("role").asText());assertEquals("ACTIVE",created.get("status").asText());assertTrue(created.get("must_change_password").asBoolean());assertFalse(created.has("password_hash"));assertFalse(created.has("password"));
         assertEquals(1,db.count("SELECT count(*) FROM user_roles WHERE user_id=? AND role_id='EMPLOYEE'",id));
         assertEquals(0,db.count("SELECT count(*) FROM review_requests WHERE target_id=?",id));
+        assertEquals(command.get("teamId"),db.one("SELECT team_id FROM users WHERE id=?",id).get("team_id"));
+        var identity=db.one("SELECT gender,id_card_number FROM users WHERE id=?",id);assertEquals("女",identity.get("gender"));assertEquals(command.get("idCardNumber"),identity.get("id_card_number"));
+        var directory=call(200,"GET","/admin/console/employees?search="+command.get("account"),admin,null).get("items").get(0);assertTrue(directory.get("has_id_card").asBoolean());assertFalse(directory.has("id_card_number"));assertEquals(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).getYear()-1990,directory.get("age").asInt());
+        assertEquals(command.get("managerId"),db.one("SELECT manager_id FROM reporting_relations WHERE employee_id=?",id).get("manager_id"));
         var audit=db.one("SELECT * FROM audit_records WHERE object_id=? AND type='EMPLOYEE_PROVISIONED'",id);assertFalse(db.write(audit).contains("Initial-password"));assertFalse(db.write(audit).contains(command.get("phone").toString()));
+        var history=call(200,"GET","/admin/console/history",admin,null).get("items");assertTrue(history.size()>0);assertFalse(history.toString().contains(command.get("idCardNumber").toString()));
         var login=call(200,"POST","/auth/login",admin,Map.of("account",command.get("account"),"password",command.get("password")));tokens.put(id,login.get("token").asText());
         call(403,"GET","/dashboard",id,null);
         call(200,"POST","/auth/password",id,Map.of("oldPassword",command.get("password"),"newPassword","Changed-password-2026"));
@@ -36,6 +44,18 @@ class AdminConsoleIntegrationTest extends MemberBHttpSupport {
         var foreignDepartment=employeeCommand();foreignDepartment.put("departmentId",db.one("SELECT department_id FROM users WHERE id=?",foreign).get("department_id"));call(404,"POST","/admin/console/employees",admin,foreignDepartment);
         assertEquals(1,db.count("SELECT count(*) FROM users WHERE account=?",c.get("account")));assertEquals(auditCount,db.count("SELECT count(*) FROM audit_records WHERE company_id=?",company));
     }
+    @Test void filtersDepartmentAndRejectsInvalidReportingNodes() throws Exception {
+        var valid=employeeCommand();var created=call(200,"POST","/admin/console/employees",admin,valid);
+        var filtered=call(200,"GET","/admin/console/employees?departmentId="+department+"&search="+valid.get("account"),admin,null);
+        assertEquals(1,filtered.get("total").asInt());assertEquals(created.get("id").asText(),filtered.get("items").get(0).get("id").asText());
+        assertEquals(valid.get("teamId"),filtered.get("items").get(0).get("team_id").asText());
+        var wrongTeam=employeeCommand();wrongTeam.put("departmentId",otherDepartment);call(404,"POST","/admin/console/employees",admin,wrongTeam);
+        var wrongManager=employeeCommand();wrongManager.put("managerId",foreign);call(400,"POST","/admin/console/employees",admin,wrongManager);
+        var ordinaryManager=employeeCommand();ordinaryManager.put("managerId",employee);call(400,"POST","/admin/console/employees",admin,ordinaryManager);
+        var crossDepartmentManager=employeeCommand();crossDepartmentManager.put("managerId",user(company,otherDepartment,"","DIRECTOR",false));call(400,"POST","/admin/console/employees",admin,crossDepartmentManager);
+        call(404,"GET","/admin/console/employees?departmentId=other-company-department",admin,null);
+        assertEquals(0,db.count("SELECT count(*) FROM users WHERE account IN (?,?)",wrongTeam.get("account"),wrongManager.get("account")));
+    }
     @Test void deniesOtherRolesAndSeparatesCompaniesAndPagination() throws Exception {
         for(String who:List.of(employee,founder)) { call(403,"GET","/admin/console/employees",who,null);call(403,"POST","/admin/console/employees",who,employeeCommand()); }
         call(401,"GET","/admin/console/employees","missing",null);call(400,"GET","/admin/console/employees?limit=0",admin,null);
@@ -45,28 +65,60 @@ class AdminConsoleIntegrationTest extends MemberBHttpSupport {
         var foreignPage=call(200,"GET","/admin/console/employees?search="+foreign,admin,null);assertEquals(0,foreignPage.get("total").asInt());
         call(404,"POST","/admin/console/employees/"+foreign+"/revisions",admin,Map.of("version",1,"reason","测试","name","越权"));
     }
-    @Test void employeeChangeAndDisableRequireIndependentApproval() throws Exception {
-        var revision=call(200,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","调岗","name","新姓名","departmentId",otherDepartment,"status","DISABLED"));
-        assertEquals("PENDING",revision.get("status").asText());assertEquals("ACTIVE",db.one("SELECT status FROM users WHERE id=?",employee).get("status"));
-        call(403,"POST","/admin/console/reviews/"+revision.get("id").asText()+"/decision",admin,Map.of("approve",true,"reason","自审","expectedVersion",1));
-        call(200,"POST","/admin/console/reviews/"+revision.get("id").asText()+"/decision",reviewer,Map.of("approve",true,"reason","同意","expectedVersion",1));
-        var changed=db.one("SELECT * FROM users WHERE id=?",employee);assertEquals("新姓名",changed.get("name"));assertEquals(otherDepartment,changed.get("department_id"));assertNull(changed.get("team_id"));call(401,"GET","/auth/me",employee,null);
+    @Test void webAdminEmployeeChangeAppliesImmediatelyAndKeepsVersionAudit() throws Exception {
+        String newTeam=Db.id();db.update("INSERT INTO teams(id,company_id,department_id,name) VALUES (?,?,?,'直属关系验证组')",newTeam,company,otherDepartment);
+        String otherManager=user(company,otherDepartment,"","DIRECTOR",false);
+        String replacementCard="11010519491231002X";
+        var revision=call(200,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","调岗","name","新姓名","departmentId",otherDepartment,"teamId",newTeam,"managerId",otherManager,"status","DISABLED","gender","女","idCardNumber",replacementCard));
+        assertEquals("APPLIED",revision.get("status").asText());assertEquals(0,db.count("SELECT count(*) FROM review_requests WHERE kind='USER' AND target_id=?",employee));
+        var changed=db.one("SELECT * FROM users WHERE id=?",employee);assertEquals("新姓名",changed.get("name"));assertEquals(otherDepartment,changed.get("department_id"));assertEquals(newTeam,changed.get("team_id"));assertEquals("女",changed.get("gender"));assertEquals(replacementCard,changed.get("id_card_number"));assertEquals(otherManager,db.one("SELECT manager_id FROM reporting_relations WHERE employee_id=?",employee).get("manager_id"));call(401,"GET","/auth/me",employee,null);
+        call(409,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","旧版本","name","重复"));
+        assertEquals(1,db.count("SELECT count(*) FROM audit_records WHERE object_id=? AND type='ADMIN_EMPLOYEE_UPDATED'",employee));
+        assertFalse(db.write(db.one("SELECT before_value,after_value FROM audit_records WHERE object_id=? AND type='ADMIN_EMPLOYEE_UPDATED'",employee)).contains(replacementCard));
+    }
+    @Test void webAdminConfirmsPendingAccountWithTeamAndManager() throws Exception {
+        String team=Db.id(),request=Db.id();
+        db.update("INSERT INTO teams(id,company_id,department_id,name) VALUES (?,?,?,'确认归属组')",team,company,department);
+        db.update("UPDATE users SET status='PENDING',team_id=NULL WHERE id=?",employee);
+        db.update("INSERT INTO review_requests(id,company_id,applicant_id,kind,target_id,expected_version,before_value,candidate,reason) VALUES (?,?,?,?,?,1,'{}','{}','待确认')",request,company,employee,"MEMBERSHIP",employee);
+        call(400,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","确认","status","ACTIVE","teamId",team,"managerId",""));
+        var result=call(200,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","确认","status","ACTIVE","teamId",team,"managerId",admin));
+        assertEquals("APPLIED",result.get("status").asText());
+        var changed=db.one("SELECT status,team_id,employment_start_date FROM users WHERE id=?",employee);
+        assertEquals("ACTIVE",changed.get("status"));assertEquals(team,changed.get("team_id"));assertNotNull(changed.get("employment_start_date"));
+        assertEquals("SUPERSEDED",db.one("SELECT status FROM review_requests WHERE id=?",request).get("status"));
+        var second=call(200,"POST","/admin/console/employees",admin,employeeCommand());String secondId=second.get("id").asText(),secondRequest=Db.id();
+        db.update("UPDATE users SET status='PENDING' WHERE id=?",secondId);
+        db.update("INSERT INTO review_requests(id,company_id,applicant_id,kind,target_id,expected_version,before_value,candidate,reason) VALUES (?,?,?,?,?,1,'{}','{}','待确认')",secondRequest,company,secondId,"MEMBERSHIP",secondId);
+        call(200,"POST","/admin/console/employees/"+secondId+"/revisions",admin,Map.of("version",1,"reason","账号不予启用","status","DISABLED"));
+        assertEquals("SUPERSEDED",db.one("SELECT status FROM review_requests WHERE id=?",secondRequest).get("status"));
+    }
+    @Test void staleMembershipReviewExplainsTargetVersionWithoutChangingAccount() throws Exception {
+        String request=Db.id();
+        db.update("UPDATE users SET status='PENDING',version=4 WHERE id=?",employee);
+        db.update("INSERT INTO review_requests(id,company_id,applicant_id,kind,target_id,expected_version,before_value,candidate,reason,approval_mode) VALUES (?,?,?,?,?,1,'{}',?::jsonb,'确认归属','ADMIN_MEMBERSHIP')",request,company,employee,"MEMBERSHIP",employee,db.write(Map.of("departmentId",department)));
+        db.update("INSERT INTO review_steps(request_id,reviewer_id,applicant_id,position,company_id) VALUES (?,?,?,1,?)",request,admin,employee,company);
+        var detail=call(200,"GET","/admin/console/reviews/"+request,admin,null);
+        assertTrue(detail.get("stale").asBoolean());assertEquals(1,detail.get("expected_version").asInt());assertEquals(4,detail.get("target_version").asInt());
+        assertEquals(0,call(200,"GET","/admin/console/reviews",admin,null).get("total").asInt());
+        call(409,"POST","/admin/console/reviews/"+request+"/decision",admin,Map.of("approve",true,"reason","确认","expectedVersion",1));
+        assertEquals("PENDING",db.one("SELECT status FROM users WHERE id=?",employee).get("status"));
     }
     Map<String,Object> priority(String title) { return new LinkedHashMap<>(Map.of("title",title,"text","公司重点正文","pinned",true,"archived",false,"position",1,"version",0,"reason","新增事项")); }
-    @Test void priorityReviewPublishesSameContentAndProtectsVersions() throws Exception {
-        var request=call(200,"POST","/admin/console/priorities/revisions",admin,priority("重点事项"));String id=request.get("target_id").asText();
-        assertEquals(0,db.count("SELECT count(*) FROM dashboard_items WHERE id=?",id));approve(request.get("id").asText(),admin);
+    @Test void webAdminPriorityPublishesImmediatelyAndProtectsVersions() throws Exception {
+        var request=call(200,"POST","/admin/console/priorities/revisions",admin,priority("重点事项"));String id=request.get("id").asText();
+        assertEquals("APPLIED",request.get("status").asText());assertEquals(1,db.count("SELECT count(*) FROM dashboard_items WHERE id=?",id));
         var mobile=call(200,"GET","/dashboard/company",employee,null);assertEquals("重点事项",mobile.get("items").get(0).get("title").asText());
         var change=priority("修订重点");change.put("id",id);change.put("version",1);
-        var first=call(200,"POST","/admin/console/priorities/revisions",admin,change);var stale=call(200,"POST","/admin/console/priorities/revisions",admin,change);approve(first.get("id").asText(),admin);
-        call(409,"POST","/admin/console/reviews/"+stale.get("id").asText()+"/decision",reviewer,Map.of("approve",true,"expectedVersion",1,"reason","旧版本"));
+        call(200,"POST","/admin/console/priorities/revisions",admin,change);
+        call(409,"POST","/admin/console/priorities/revisions",admin,change);
+        assertEquals(0,db.count("SELECT count(*) FROM review_requests WHERE kind='COMPANY_ITEM' AND target_id=?",id));
         var foreignActorCompany=db.one("SELECT company_id FROM users WHERE id=?",foreign).get("company_id");String foreignAdmin=user(foreignActorCompany.toString(),db.one("SELECT department_id FROM users WHERE id=?",foreign).get("department_id").toString(),"","ADMIN",false);
         assertEquals(0,call(200,"GET","/admin/console/priorities",foreignAdmin,null).get("total").asInt());call(404,"POST","/admin/console/priorities/revisions",foreignAdmin,change);
     }
     @Test void rejectsEleventhPinnedPriorityAtomically() throws Exception {
         for(int i=0;i<10;i++) db.update("INSERT INTO dashboard_items(id,company_id,owner_id,kind,title,body,pinned) VALUES (?,?,?,'COMPANY',?,'{}',true)",Db.id(),company,admin,"事项"+i);
-        var pending=call(200,"POST","/admin/console/priorities/revisions",admin,priority("第十一项"));
-        call(400,"POST","/admin/console/reviews/"+pending.get("id").asText()+"/decision",reviewer,Map.of("approve",true,"expectedVersion",0,"reason","尝试通过"));
-        assertEquals(10,db.count("SELECT count(*) FROM dashboard_items WHERE company_id=?",company));assertEquals("PENDING",call(200,"GET","/admin/console/reviews/"+pending.get("id").asText(),admin,null).get("status").asText());
+        call(400,"POST","/admin/console/priorities/revisions",admin,priority("第十一项"));
+        assertEquals(10,db.count("SELECT count(*) FROM dashboard_items WHERE company_id=?",company));
     }
 }

@@ -26,6 +26,10 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 每日事项与首页任务看板新增契约见 [personal-todos-interface.md](personal-todos-interface.md)（Issue #63）。事项仅本人可见，所有写请求必须有幂等键；该约束比下文通用创建规则更严格。
 
+## Web 管理控制台 `/api/admin/console`
+
+仅当前 ACTIVE 管理员可用。`GET /employees` 支持 `search` 与 `departmentId` 服务端筛选，返回部门、组、直属上级、性别、身份证号录入标记和年龄；完整身份证号不会出现在目录响应。`GET /departments`、`GET /teams`、`GET /managers` 提供录入选项；上级限同部门在职团队长及以上。`POST /employees` 必须提交部门、组、直属上级、性别和有效身份证号，固定创建 EMPLOYEE/ACTIVE 并要求首次改密。`POST /employees/{id}/revisions` 携带 `version`、`reason`，支持资料、组织关系及身份证资料修改，身份证号不会写入审计明文。`GET /history` 分页返回管理员直接操作审计；`GET /reviews` 仅返回当前有效待审项，历史申请仍保存在数据库。Web 管理员的员工及公司事项修改直接生效并保留版本校验和审计；手机端与普通员工原有审核链保持不变。年龄依据身份证出生日期按 Asia/Shanghai 时区计算，无身份证号时使用既有 `users.age`。
+
 ## 认证 `/auth`
 
 | 方法 | 路径 | 用途与权限 | 请求 | 返回/错误 |
