@@ -198,4 +198,4 @@ GET /organization/people沿用原组织数据范围，追加可空team_name，�
 以上契约v1，错误沿用code/message/traceId。首次改密复用 `/api/auth/password`，失权前端清空页面和会话。公司事项与员工变更仍由当前直属独立审核人处理，后台不提供管理员免审。详见 [本地与云端说明](admin-console.md)。
 
 ### 本人身份证与年龄（2026-11-18）
-PUT /api/profiles/me 接受可选 idCardNumber（18位，服务端校验格式、出生日期、校验位和唯一性），沿用本人ACTIVE/版本校验及事务审计。省略保留旧号，空值拒绝；无证件年龄为null，年龄只按北京时间从出生日期计算，不接受age（400 AGE_READ_ONLY）。重复身份证409 ID_CARD_EXISTS，非法号码400 INVALID_ID_CARD。本人读取仅返回hasIdCard/idCardMasked；其他人不返回证件信息，完整号码不进入响应或审计。本校验不是实名认证。
+PUT /api/profiles/me 不接受 idCardNumber（400 ID_CARD_READ_ONLY）或 age（400 AGE_READ_ONLY）。证件号仅由管理员维护；年龄按北京时间从证件出生日期计算，无证件为 null。本人读取仅返回 hasIdCard/idCardMasked，其他人不返回证件信息，完整号码不进入响应或审计。

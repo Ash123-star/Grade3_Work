@@ -9,18 +9,13 @@ void main() {
     final repo = MockRepository(const Session());
     final profile = await repo.detail('organization/profile', 'u1');
     expect(profile.fields['age'], isNull);
-    final saved = await repo.execute(
-      'organization/profile',
-      Command('update', {
-        'id': 'u1',
-        'idCardNumber': '11010519491231002x',
-      }, version: profile.version),
-    );
+    repo.store.identityCards['u1'] = '11010519491231002X';
+    final saved = await repo.detail('organization/profile', 'u1');
     expect(saved.fields['age'], identityCardAge('11010519491231002X'));
     expect(saved.fields.containsKey('idCardNumber'), isFalse);
     final read = await repo.detail('organization/profile', 'u1');
     expect(read.fields['idCardMasked'], '110***********002X');
-    for (final invalid in [null, '', 110105198507160732]) {
+    for (final invalid in [null, '', 110105198507160732, '11010519491231002X']) {
       await expectLater(
         repo.execute(
           'organization/profile',

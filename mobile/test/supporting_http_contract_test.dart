@@ -210,7 +210,6 @@ void main() {
       );
       expect(adapter.requests.last.data, {
         'introduction': '更新介绍',
-        'idCardNumber': '11010519491231002X',
         'avatarAttachmentId': 'owned-avatar',
         'version': 7,
       });

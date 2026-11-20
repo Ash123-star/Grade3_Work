@@ -18,7 +18,12 @@ String tenureLabel(DateTime? start, DateTime today) {
   var months = (to.year - from.year) * 12 + to.month - from.month;
   if (anniversary(months).isAfter(to)) months--;
   final days = to.difference(anniversary(months)).inDays;
-  return '${months ~/ 12}年${months % 12}个月$days天';
+  if (months == 0 && days == 0) return '今日入职';
+  return [
+    if (months >= 12) '${months ~/ 12}年',
+    if (months % 12 != 0) '${months % 12}个月',
+    if (days != 0) '$days天',
+  ].join();
 }
 
 DateTime? parseEmploymentDate(Object? value) {

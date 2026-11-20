@@ -25549,11 +25549,6 @@
           "gender" : {
             "type" : "string",
             "maxLength" : 32
-          },
-          "idCardNumber" : {
-            "type" : "string",
-            "description" : "本人身份证号；格式、出生日期、校验位及唯一性校验，不回传原文；年龄禁止直接写入",
-            "pattern" : "^[0-9]{17}[0-9Xx]$"
           }
         },
         "required" : [ "version" ]

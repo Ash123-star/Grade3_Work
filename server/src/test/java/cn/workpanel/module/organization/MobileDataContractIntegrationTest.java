@@ -53,13 +53,14 @@ class MobileDataContractIntegrationTest extends MemberBHttpSupport {
         db.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?),(?,?,?)",employee,leader,company,leader,director,company);
         db.update("UPDATE users SET age=29 WHERE id=?",employee);
         assertTrue(call(200,"GET","/profiles/"+employee,employee,null).get("age").isNull());
-        var profile=Map.of("version",1,"phone","13987654321","email","member@example.com","gender","女","idCardNumber","110105198507160732","introduction","保留简介");
+        db.update("UPDATE users SET id_card_number=? WHERE id=?","110105198507160732",employee);
+        var profile=Map.of("version",1,"phone","13987654321","email","member@example.com","gender","女","introduction","保留简介");
         var saved=call(200,"PUT","/profiles/me",employee,profile);
         assertEquals("13987654321",saved.get("phone").asText()); assertEquals(cn.workpanel.module.organization.domain.EmployeeIdentity.age("110105198507160732"),saved.get("age").asInt());
         assertFalse(saved.toString().contains("110105198507160732"));
         call(400,"PUT","/profiles/me",employee,Map.of("version",2,"age",29));
         call(400,"PUT","/profiles/me",employee,Map.of("version",2,"idCardNumber","110105194912310021"));
-        call(409,"PUT","/profiles/me",colleague,Map.of("version",1,"idCardNumber","110105198507160732"));
+        call(400,"PUT","/profiles/me",colleague,Map.of("version",1,"idCardNumber","110105198507160732"));
         assertNull(db.one("SELECT id_card_number FROM users WHERE id=?",colleague).get("id_card_number"));
         assertEquals(1,((Number)db.one("SELECT version FROM users WHERE id=?",colleague).get("version")).intValue());
         assertFalse(call(200,"GET","/profiles/"+employee,director,null).has("idCardMasked"));

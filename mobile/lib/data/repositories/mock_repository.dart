@@ -2581,12 +2581,8 @@ class MockRepository implements Repository {
       final phone = '${v['手机号'] ?? ''}'.trim();
       final email = '${v['邮箱'] ?? ''}'.trim();
       if(v.containsKey('年龄') || v.containsKey('age')) throw const ApiFailure(FailureKind.validation,'年龄由身份证自动计算');
-      final card=v['idCardNumber'];
       if(v.containsKey('idCardNumber')) {
-        if(card is! String) throw const ApiFailure(FailureKind.validation,'身份证号须为有效的18位号码');
-        final error=identityCardError(card,now:clock());
-        if(error!=null) throw ApiFailure(FailureKind.validation,error);
-        if(store.identityCards.entries.any((e)=>e.key!=session.id && e.value==card.trim().toUpperCase())) throw const ApiFailure(FailureKind.conflict,'身份证号已被使用');
+        throw const ApiFailure(FailureKind.validation,'身份证号由管理员维护');
       }
       if (v['性别'] != null && !['', '男', '女'].contains(v['性别'])) {
         throw const ApiFailure(FailureKind.validation, '性别只能选择男或女');
@@ -2901,7 +2897,6 @@ class MockRepository implements Repository {
       if (v.containsKey('手机号')) fields['phone'] = v['手机号'];
       if (v.containsKey('邮箱')) fields['email'] = v['邮箱'];
       if (v.containsKey('性别')) fields['gender'] = v['性别'];
-      if(v['idCardNumber']!=null) store.identityCards[session.id]='${v['idCardNumber']}'.trim().toUpperCase();
       final card=store.identityCards[session.id];
       fields.remove('idCardNumber');fields.remove('年龄');
       fields['age']=card==null?null:identityCardAge(card,now:clock());

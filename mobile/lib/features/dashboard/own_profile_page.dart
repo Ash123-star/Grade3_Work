@@ -1,4 +1,3 @@
-import 'package:pandora_mobile/data/models/identity_card.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,7 +21,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
   final phone = TextEditingController();
   final email = TextEditingController();
   String? gender;
-  final idCard = TextEditingController();
   bool editing = false, saving = false;
   String? error;
   late String accountId = ref.read(sessionProvider).id;
@@ -32,7 +30,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
     introduction.dispose();
     phone.dispose();
     email.dispose();
-    idCard.dispose();
     super.dispose();
   }
 
@@ -43,7 +40,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
     email.text = '${profile.fields['email'] ?? profile.fields['邮箱'] ?? ''}';
     final storedGender = profile.fields['gender'] ?? profile.fields['性别'];
     gender = ['男', '女'].contains(storedGender) ? storedGender as String : null;
-    idCard.clear();
     setState(() {
       editing = true;
       error = null;
@@ -52,7 +48,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
 
   void cancelEdit() {
     setState(() {
-      idCard.clear();
       editing = false;
       error = null;
     });
@@ -74,11 +69,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
       if (phoneValue.isNotEmpty &&
           !RegExp(r'^\+?[0-9][0-9 ()-]{4,18}[0-9]$').hasMatch(phoneValue)) {
         setState(() => error = '请输入有效电话号码');
-        return;
-      }
-      if (idCard.text.trim().isNotEmpty &&
-          identityCardError(idCard.text) != null) {
-        setState(() => error = identityCardError(idCard.text));
         return;
       }
       final emailValue = email.text.trim();
@@ -109,8 +99,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                   '手机号': phone.text.trim(),
                   '邮箱': email.text.trim(),
                   '性别': gender,
-                  if (idCard.text.trim().isNotEmpty)
-                    'idCardNumber': idCard.text.trim(),
                 },
                 'avatarAttachmentId': avatarId,
               },
@@ -124,7 +112,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
       setState(() {
         if (saveFields) {
           editing = false;
-          idCard.clear();
         }
         saving = false;
       });
@@ -354,8 +341,8 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
             '身份证号',
             'person',
             value.fields['idCardMasked'] ?? '未录入',
-            idCard,
-            TextInputType.text,
+            null,
+            null,
           ),
           (
             '入职日期',
@@ -510,9 +497,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                                 keyboardType: entries[i].$5,
                                 enabled: !saving,
                                 decoration: InputDecoration(
-                                  hintText: entries[i].$1 == '身份证号'
-                                      ? '输入18位身份证号，留空保持原值'
-                                      : '未提供',
+                                  hintText: '未提供',
                                   labelText: entries[i].$1,
                                   floatingLabelBehavior:
                                       FloatingLabelBehavior.never,
@@ -545,7 +530,6 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
     final user = ref.watch(sessionProvider);
     if (accountId != user.id) {
       accountId = user.id;
-      idCard.clear();
       editing = false;
       error = null;
     }

@@ -312,6 +312,9 @@ void main() {
       ];
       record = await repo.detail('tasks', 'task-1');
       expect(record.fields.containsKey('status'), isFalse);
+      final event = (record.fields['events'] as List).single;
+      expect(event, contains('其他流转记录'));
+      expect(event, isNot(contains('FUTURE_EVENT')));
     },
   );
 

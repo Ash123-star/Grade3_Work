@@ -264,12 +264,6 @@ class _MemberWorkspaceState extends ConsumerState<MemberWorkspace> {
                                   ),
                                 ),
                                 _memberInfo(
-                                  '职位',
-                                  member.fields['position'] ??
-                                      member.fields['position_name'] ??
-                                      member.fields['职位'],
-                                ),
-                                _memberInfo(
                                   '部门',
                                   member.fields['departmentName'] ??
                                       member.fields['department_name'] ??
