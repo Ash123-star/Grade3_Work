@@ -158,7 +158,8 @@ void main() {
       await _launch(tester, adapter, '/me/team/u2/logs?date=2026-01-31');
 
       expect(find.text('陈一诺'), findsOneWidget);
-      expect(find.textContaining('产品专员'), findsOneWidget);
+      expect(find.textContaining('产品专员'), findsNothing);
+      expect(find.text('职位'), findsNothing);
       expect(find.textContaining('产品部'), findsOneWidget);
       expect(find.textContaining('13800138002'), findsOneWidget);
       await tester.ensureVisible(find.textContaining('chen@example.invalid'));

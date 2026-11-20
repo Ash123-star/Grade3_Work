@@ -37,7 +37,7 @@ final class MobileP0OpenApi {
         var profile=OpenApi.object("version"); profile.addProperty("version",OpenApi.version());
         profile.addProperty("introduction",OpenApi.text().nullable(true)); profile.addProperty("avatarAttachmentId",OpenApi.text().maxLength(200).nullable(true));
         profile.addProperty("phone",new StringSchema().nullable(true).pattern("^1[3-9][0-9]{9}$")); profile.addProperty("email",new StringSchema().nullable(true).format("email").maxLength(320));
-        profile.addProperty("gender",new StringSchema().nullable(true).maxLength(32)); profile.addProperty("idCardNumber",new StringSchema().pattern("^[0-9]{17}[0-9Xx]$").description("本人身份证号；格式、出生日期、校验位及唯一性校验，不回传原文；年龄禁止直接写入")); c.addSchemas("Profile",profile);
+        profile.addProperty("gender",new StringSchema().nullable(true).maxLength(32)); c.addSchemas("Profile",profile);
         var profileView=new ObjectSchema(); profileView.setAdditionalProperties(true);
         for(String key:List.of("id","name","role","status")) profileView.addProperty(key,OpenApi.text());
         for(String key:List.of("phone","email","gender")) profileView.addProperty(key,profile.getProperties().get(key));

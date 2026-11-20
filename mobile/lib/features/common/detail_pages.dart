@@ -1064,6 +1064,9 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     ),
   );
   String _value(dynamic value) {
+    if (widget.resource == 'tasks' && value is Map) {
+      return _value(value['text'] ?? value['content'] ?? value['description']);
+    }
     if (value == null || '$value'.isEmpty) return '暂无内容';
     if (value is Map) {
       return value.entries.map((e) => '${e.key}：${_value(e.value)}').join('\n');
@@ -1205,12 +1208,12 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   runSpacing: 8,
                   children: [
                     TuantuanStatusPill(
-                      '${f['status'] ?? '待接收'}',
+                      status == '需补充' ? status : taskCompletionLabel(f),
                       color: SunnyPalette.mint,
                       icon: Icons.flag_outlined,
                     ),
                     TuantuanStatusPill(
-                      '${f['tagCategory'] == null ? '' : '${f['tagCategory']} · '}${taskTagLabel(f)}',
+                      taskTagLabel(f),
                       color: _recordColor(f['tagColor'] ?? f['tag_color']),
                       icon: Icons.sell_outlined,
                     ),
@@ -1280,22 +1283,18 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       const SizedBox(height: 14),
                       _attribute(
                         '审核状态',
-                        '${f['reviewState'] ?? f['approvalStatus'] ?? '无需审核'}',
+                        switch (f['reviewState'] ?? f['approvalStatus']) {
+                          null || '无需审核' => '无需审核',
+                          'PENDING' || '待审' => '待审',
+                          'APPROVED' || '已通过' => '已通过',
+                          'REJECTED' || '已驳回' => '已驳回',
+                          'SUPERSEDED' || '已失效' => '已失效',
+                          _ => '审核状态未确认',
+                        },
                       ),
                     ],
                   ),
                 ),
-                if (!AppConfig.mock && ['进行中', '需补充', '待验收'].contains(status))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: OutlinedButton.icon(
-                      onPressed: () => context.push(
-                        '/tasks/${encode(item.id)}/delivery-check?version=${item.version}',
-                      ),
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const Text('检查交付材料'),
-                    ),
-                  ),
                 if ((f['attachments'] as List? ?? []).isNotEmpty) ...[
                   const SectionHeader('任务附件'),
                   for (final id

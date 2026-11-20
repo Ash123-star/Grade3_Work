@@ -31,7 +31,8 @@ public class ProfileService {
     public Map<String,Object> update(Actor actor,Map<String,Object> body) {
         if(!actor.status().equals("ACTIVE")||actor.mustChange()) throw ApiError.forbidden();
         if(body.containsKey("age")) throw ApiError.bad("AGE_READ_ONLY","年龄由身份证号自动计算，不可修改");
-        Db.fields(body,"avatarAttachmentId","introduction","phone","email","gender","idCardNumber","version");
+        if(body.containsKey("idCardNumber")) throw ApiError.bad("ID_CARD_READ_ONLY","身份证号由管理员维护");
+        Db.fields(body,"avatarAttachmentId","introduction","phone","email","gender","version");
         int expected=Db.version(body); var user=repository.user(actor,actor.id(),true);
         if(!"ACTIVE".equals(user.get("status"))||Boolean.TRUE.equals(user.get("must_change_password"))) throw ApiError.forbidden();
         if(((Number)user.get("version")).intValue()!=expected) throw ApiError.conflict();
@@ -50,7 +51,6 @@ public class ProfileService {
             gender=nullableText(body,"gender",32);
             if(!validGender(gender)) throw ApiError.bad("INVALID_GENDER","性别只能选择男或女");
         }
-        String card=body.containsKey("idCardNumber")?EmployeeIdentity.idCard(body.get("idCardNumber")):string(user.get("id_card_number"));
         var profile=repository.json(user.get("profile"));
         if(body.containsKey("introduction")) profile.put("introduction",nullableText(body,"introduction",20000));
         if(body.containsKey("avatarAttachmentId")) {
@@ -61,7 +61,6 @@ public class ProfileService {
         // 只有本人明确改写该字段时才清除旧重复值；其他历史/非法数据由迁移保留。
         for(String field:List.of("phone","email","gender","age")) if(body.containsKey(field)) profile.remove(field);
         profile.remove("age");profile.remove("年龄");
-        repository.updateIdentity(actor,card);
         repository.update(actor,expected,phone,email,gender,null,profile); return get(actor,actor.id());
     }
     private static boolean validGender(String value) { return value==null||value.equals("男")||value.equals("女"); }

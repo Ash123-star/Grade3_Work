@@ -608,7 +608,7 @@ class HttpRepository implements Repository {
             );
       fields['events'] = [
         for (final e in events)
-          '${displayPersonName(e['actor_name'])} · ${_eventLabels[e['type']] ?? '未知事件（${e['type']}）'} · ${e['created_at'] ?? '时间未提供'}',
+          '${displayPersonName(e['actor_name'])} · ${_eventLabels[e['type']] ?? '其他流转记录'} · ${e['created_at'] ?? '时间未提供'}',
       ];
       for (final e in events) {
         if (e['type'] == 'DISPATCHED' && e['created_at'] != null) {
@@ -1502,7 +1502,6 @@ class HttpRepository implements Repository {
             'gender': v['性别'] == null || '${v['性别']}'.trim().isEmpty
                 ? null
                 : v['性别'],
-          if (v.containsKey('idCardNumber')) 'idCardNumber': v['idCardNumber'],
           if (v.containsKey('avatarAttachmentId'))
             'avatarAttachmentId': v['avatarAttachmentId'],
           'version': command.version ?? 1,
