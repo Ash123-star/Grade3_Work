@@ -99,10 +99,23 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('男').last);
     await tester.pumpAndSettle();
+    final identityInput = find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.decoration?.labelText == '身份证号',
+    );
+    await tester.ensureVisible(identityInput);
+    await tester.enterText(identityInput, '123');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(repository.saved, isNull);
+    await tester.ensureVisible(identityInput);
+    await tester.enterText(identityInput, '11010519491231002x');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(repository.saved?.values['性别'], '男');
+    expect(repository.saved?.values['idCardNumber'], '11010519491231002x');
     expect(repository.saved?.version, 1);
+    expect(repository.saved?.values.containsKey('年龄'), isFalse);
+    expect(repository.saved?.values.containsKey('age'), isFalse);
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.text('男'), findsOneWidget);
     expect(tester.takeException(), isNull);

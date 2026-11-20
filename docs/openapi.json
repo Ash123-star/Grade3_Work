@@ -25550,10 +25550,10 @@
             "type" : "string",
             "maxLength" : 32
           },
-          "age" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 0
+          "idCardNumber" : {
+            "type" : "string",
+            "description" : "本人身份证号；格式、出生日期、校验位及唯一性校验，不回传原文；年龄禁止直接写入",
+            "pattern" : "^[0-9]{17}[0-9Xx]$"
           }
         },
         "required" : [ "version" ]
@@ -26756,11 +26756,6 @@
             "type" : "string",
             "maxLength" : 32
           },
-          "age" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 0
-          },
           "version" : {
             "type" : "integer",
             "format" : "int32",
@@ -26769,6 +26764,19 @@
           "employmentStartDate" : {
             "type" : "string",
             "format" : "date"
+          },
+          "age" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "身份证计算的周岁；无证件为null，只读"
+          },
+          "hasIdCard" : {
+            "type" : "boolean",
+            "description" : "仅本人返回"
+          },
+          "idCardMasked" : {
+            "type" : "string",
+            "description" : "仅本人返回脱敏号码"
           }
         }
       },

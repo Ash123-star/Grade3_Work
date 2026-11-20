@@ -21,6 +21,10 @@ public class ProfileRepository {
         if(id==null) return Map.of();
         var rows=db.rows("SELECT id,name FROM "+table+" WHERE id=? AND company_id=?",id,company); return rows.isEmpty()?Map.of():rows.getFirst();
     }
+    public void updateIdentity(Actor actor,String card) {
+        try { db.update("UPDATE users SET id_card_number=? WHERE id=? AND company_id=?",card,actor.id(),actor.company()); }
+        catch(org.springframework.dao.DuplicateKeyException error) { throw new ApiError(409,"ID_CARD_EXISTS","身份证号已被使用"); }
+    }
     public void update(Actor actor,int version,String phone,String email,String gender,Object age,Map<String,Object> profile) {
         try {
             Db.conflict(db.update("UPDATE users SET phone=?,email=?,gender=?,age=?,profile=?::jsonb,version=version+1 WHERE id=? AND company_id=? AND version=?",phone,email,gender,age,db.write(profile),actor.id(),actor.company(),version));

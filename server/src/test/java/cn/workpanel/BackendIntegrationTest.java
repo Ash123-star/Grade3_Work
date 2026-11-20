@@ -30,6 +30,12 @@ import static org.junit.jupiter.api.Assertions.*;
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class BackendIntegrationTest {
+    // 这些场景手动驱动 process/project 并注入失败；避免定时轮询抢先消费或重置健康状态。
+    // 仅隔离轮询入口，真实索引、Neo4j 和异步 AI 作业仍照常执行。
+    @BeforeEach void isolateManuallyDrivenMemoryJobs() {
+        org.mockito.Mockito.doNothing().when(memory).work();
+        org.mockito.Mockito.doNothing().when(memoryGraph).scheduled();
+    }
     @LocalServerPort int port;
     @Autowired Db db;
     @Autowired cn.workpanel.module.auth.controller.AuthBootstrap bootstrap;
@@ -37,10 +43,10 @@ class BackendIntegrationTest {
     @Autowired cn.workpanel.module.message.application.MessageApplicationService messages;
     @Autowired Limiter limiter;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
-    @Autowired Memory memory;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean Memory memory;
     @Autowired Rag rag;
     @Autowired Development development;
-    @Autowired MemoryGraph memoryGraph;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean MemoryGraph memoryGraph;
     @Autowired MemoryExtraction extraction;
     static final ObjectMapper JSON=new ObjectMapper();
     static final AtomicReference<String> providerMode=new AtomicReference<>("OK");
@@ -146,7 +152,7 @@ class BackendIntegrationTest {
 
     @Test @Order(1) void initializationAndAuthentication() throws Exception {
         assertEquals("UP",get("/health",null).get("status").asText());
-        var contract=get("/openapi",null); assertTrue(contract.has("paths")); assertEquals("#/components/schemas/TaskDraft",contract.at("/paths/~1api~1tasks/post/requestBody/content/application~1json/schema/$ref").asText());
+        var contract=get("/openapi",null); assertEquals("integer",contract.at("/components/schemas/ProfileView/properties/age/type").asText()); assertFalse(contract.at("/components/schemas/Profile/properties").has("age")); assertTrue(contract.has("paths")); assertEquals("#/components/schemas/TaskDraft",contract.at("/paths/~1api~1tasks/post/requestBody/content/application~1json/schema/$ref").asText());
         assertTrue(contract.at("/components/schemas/TaskDraft/properties/title").isObject()); assertEquals("/",contract.at("/servers/0/url").asText());
         var taskListProperties=contract.at("/components/schemas/TaskListItem/properties");
         for(String field:List.of("phase","dispatchAt","start_at","pinnedAt")) {
@@ -356,6 +362,11 @@ class BackendIntegrationTest {
         memory.process();
         Actor alice=Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("alice")));
         var personal=new Memory.Scope("PERSONAL","SELF",alice.id());
+        // 首次回填可能补齐此前未派发 MEMORY_SOURCE 的历史任务；幂等比较使用完成回填后的基线。
+        for(int batch=0;batch<100 && db.count("SELECT count(*) FROM outbox_events WHERE type='MEMORY_SOURCE' AND delivered_at IS NULL")>0;batch++) memory.process();
+        assertEquals(0,db.count("SELECT count(*) FROM outbox_events WHERE type='MEMORY_SOURCE' AND delivered_at IS NULL"));
+        memory.backfill(Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("integration-admin"))),0,100);
+        memory.process();
         long before=db.count("SELECT count(*) FROM memory_items WHERE owner_id=?",alice.id());
         memory.backfill(Actor.from(db.one("SELECT * FROM users WHERE id=?",ids.get("integration-admin"))),0,100);
         memory.process();assertEquals(before,db.count("SELECT count(*) FROM memory_items WHERE owner_id=?",alice.id()));

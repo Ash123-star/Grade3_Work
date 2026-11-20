@@ -1,3 +1,4 @@
+import '../models/identity_card.dart';
 import '../../features/calendar/calendar_schedule.dart';
 import '../local/calendar_command_store.dart';
 import 'dart:convert';
@@ -373,6 +374,7 @@ const _demoEmploymentStart = <String, String>{
 };
 
 class DemoStore {
+  final Map<String,String> identityCards = {};
   DemoStore({this.founderIds});
   /// 在职创始人；为空时取演示账号中的全部创始人，测试可收窄以覆盖单创始人免审。
   final Set<String>? founderIds;
@@ -2090,6 +2092,21 @@ class MockRepository implements Repository {
         },
       );
     }
+    if (resource == 'organization/profile') {
+      final card = store.identityCards[item.id];
+      final fields = Map<String, Object?>.from(item.fields)
+        ..remove('年龄')
+        ..remove('idCardNumber')
+        ..remove('hasIdCard')
+        ..remove('idCardMasked');
+      fields['age'] = card == null ? null : identityCardAge(card, now: clock());
+      if (item.id == session.id) {
+        fields['hasIdCard'] = card != null;
+        fields['idCardMasked'] = card == null ? null : '${card.substring(0,3)}***********${card.substring(14)}';
+      }
+      return Record(id: item.id, title: item.title, subtitle: item.subtitle,
+          ownerId: item.ownerId, version: item.version, fields: fields);
+    }
     if (resource != 'tasks') return item;
     final display = _withTaskDisplay(item);
     final pinnedAt = (item.fields['pinnedBy'] as Map?)?[session.id];
@@ -2563,7 +2580,14 @@ class MockRepository implements Repository {
       }
       final phone = '${v['手机号'] ?? ''}'.trim();
       final email = '${v['邮箱'] ?? ''}'.trim();
-      final age = v['年龄'];
+      if(v.containsKey('年龄') || v.containsKey('age')) throw const ApiFailure(FailureKind.validation,'年龄由身份证自动计算');
+      final card=v['idCardNumber'];
+      if(v.containsKey('idCardNumber')) {
+        if(card is! String) throw const ApiFailure(FailureKind.validation,'身份证号须为有效的18位号码');
+        final error=identityCardError(card,now:clock());
+        if(error!=null) throw ApiFailure(FailureKind.validation,error);
+        if(store.identityCards.entries.any((e)=>e.key!=session.id && e.value==card.trim().toUpperCase())) throw const ApiFailure(FailureKind.conflict,'身份证号已被使用');
+      }
       if (v['性别'] != null && !['', '男', '女'].contains(v['性别'])) {
         throw const ApiFailure(FailureKind.validation, '性别只能选择男或女');
       }
@@ -2574,9 +2598,6 @@ class MockRepository implements Repository {
       if (email.isNotEmpty &&
           !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
         throw const ApiFailure(FailureKind.validation, '请输入有效邮箱地址');
-      }
-      if (age != null && (int.tryParse('$age') ?? -1) < 0) {
-        throw const ApiFailure(FailureKind.validation, '年龄必须为非负整数');
       }
       if (phone.isNotEmpty &&
           rows(resource).any(
@@ -2880,7 +2901,12 @@ class MockRepository implements Repository {
       if (v.containsKey('手机号')) fields['phone'] = v['手机号'];
       if (v.containsKey('邮箱')) fields['email'] = v['邮箱'];
       if (v.containsKey('性别')) fields['gender'] = v['性别'];
-      if (v.containsKey('年龄')) fields['age'] = v['年龄'];
+      if(v['idCardNumber']!=null) store.identityCards[session.id]='${v['idCardNumber']}'.trim().toUpperCase();
+      final card=store.identityCards[session.id];
+      fields.remove('idCardNumber');fields.remove('年龄');
+      fields['age']=card==null?null:identityCardAge(card,now:clock());
+      fields['hasIdCard']=card!=null;
+      fields['idCardMasked']=card==null?null:'${card.substring(0,3)}***********${card.substring(14)}';
     }
     if (resource == 'notifications') fields['read'] = true;
     if (resource == 'reviews') {

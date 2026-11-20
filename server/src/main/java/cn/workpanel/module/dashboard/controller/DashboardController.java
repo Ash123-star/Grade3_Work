@@ -50,7 +50,7 @@ public class DashboardController {
     static void validate(Map<String,Object> b) { for(String k:List.of("pinned","archived")) if(b.containsKey(k)&&!(b.get(k) instanceof Boolean)) throw ApiError.bad("INVALID_BOOLEAN",k+" 必须是布尔值"); if(b.containsKey("position")&&(!(b.get("position") instanceof Number n)||n.intValue()<0||n.intValue()>10000)) throw ApiError.bad("INVALID_POSITION","排序位置无效"); }
     /** 读取本人、当前真实组织上级或既有全局范围内资料；越权403/404。只读，无分页、幂等或版本要求。 */
     @GetMapping("/profiles/{id}") public Map<String,Object> profile(HttpServletRequest r,@PathVariable String id) { return profiles.get(Actor.current(r),id); }
-    /** 本人按version更新phone/email/gender/age及简介头像，选填字段支持清空；未知字段400、重复手机号409、旧版本409。数据库原子更新，不要求幂等键。 */
+    /** 本人按version更新phone/email/gender/idCardNumber及简介头像；身份证非空且须通过校验，年龄只读。未知字段/年龄写入400、重复手机号或身份证409、旧版本409。数据库原子更新，不要求幂等键。 */
     @PutMapping("/profiles/me") public Map<String,Object> profile(HttpServletRequest r,@RequestBody Map<String,Object> body) { return profiles.update(Actor.current(r),body); }
     /** 获取本人私人备注。仅本人可见；不接受 ownerId 代查。 */
     @GetMapping("/private-notes") public List<Map<String,Object>> notes(HttpServletRequest r) { Actor a=Actor.current(r); return db.rows("SELECT * FROM private_notes WHERE company_id=? AND owner_id=?",a.company(),a.id()); }

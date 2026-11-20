@@ -19,11 +19,16 @@ const availableManagers = computed(() => managers.value.filter(m => m.id !== for
 function changeDepartment() { form.value.teamId = ''; form.value.managerId = ''; }
 function ageFromIdCard(value: unknown): number | null {
   if (typeof value !== 'string' || !/^[0-9]{17}[0-9Xx]$/.test(value)) return null;
-  const year=Number(value.slice(6,10)), month=Number(value.slice(10,12)), day=Number(value.slice(12,14));
+  value=value.trim().toUpperCase();
+  const weights=[7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2];
+  const card=value as string;
+  if(card[17]!=='10X98765432'[weights.reduce((sum,w,i)=>sum+Number(card[i])*w,0)%11]) return null;
+  const year=Number(card.slice(6,10)), month=Number(card.slice(10,12)), day=Number(card.slice(12,14));
   const birth=new Date(Date.UTC(year,month-1,day));
   if (birth.getUTCFullYear()!==year || birth.getUTCMonth()+1!==month || birth.getUTCDate()!==day) return null;
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(part=>[part.type,part.value]));
   const nowYear=Number(parts.year),nowMonth=Number(parts.month),nowDay=Number(parts.day);
+  if(year<1900 || year>nowYear || year===nowYear && (month>nowMonth || month===nowMonth && day>nowDay)) return null;
   return nowYear-year-(nowMonth<month || nowMonth===month && nowDay<day ? 1 : 0);
 }
 function clearSession() {
@@ -161,7 +166,7 @@ onMounted(() => { if (token.value) void run(enter); });
           <label v-if="editor === 'employee'">员工姓名<input v-model="form.name" required maxlength="100"></label>
           <label v-if="editor === 'create' || editor === 'employee'">性别<select v-model="form.gender" :required="editor === 'create'"><option value="" disabled>请选择性别</option><option value="男">男</option><option value="女">女</option></select></label>
           <label v-if="editor === 'create' || editor === 'employee'">身份证号<input v-model="form.idCardNumber" :required="editor === 'create'" pattern="[0-9]{17}[0-9Xx]" maxlength="18" autocomplete="off" :placeholder="editor === 'employee' && form.hasIdCard ? '已录入，留空保持原号码' : '18位身份证号'"><small v-if="editor === 'employee'" class="muted">{{ form.hasIdCard ? '已录入，留空不修改' : '尚未录入' }}</small></label>
-          <label v-if="editor === 'create' || editor === 'employee'">年龄<input aria-label="年龄" :value="ageFromIdCard(form.idCardNumber) ?? form.age ?? ''" readonly placeholder="从身份证号自动计算"></label>
+          <label v-if="editor === 'create' || editor === 'employee'">年龄<input aria-label="年龄" :value="form.idCardNumber ? (ageFromIdCard(form.idCardNumber) ?? '') : (form.age ?? '')" readonly placeholder="从身份证号自动计算"></label>
           <label v-if="editor === 'create' || editor === 'employee'">所属部门<select v-model="form.departmentId" required @change="changeDepartment"><option value="" disabled>请选择部门</option><option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option></select></label>
           <label v-if="editor === 'create' || editor === 'employee'">所属组<select v-model="form.teamId" :required="editor === 'create' || editingPending && form.status === 'ACTIVE'"><option value="" disabled>请选择组</option><option v-for="t in availableTeams" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
           <label v-if="editor === 'create' || editor === 'employee'">直接上级<select v-model="form.managerId" :required="editor === 'create' || editingPending && form.status === 'ACTIVE'"><option value="" disabled>请选择同部门团队长或以上人员</option><option v-for="m in availableManagers" :key="m.id" :value="m.id">{{ m.name }}（{{ stateName[m.role] || m.role }}）</option></select></label>

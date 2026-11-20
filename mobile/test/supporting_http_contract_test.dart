@@ -203,12 +203,14 @@ void main() {
         Command('update', {
           '个人介绍': '更新介绍',
           '姓名': '不得提交的新姓名',
+          'idCardNumber': '11010519491231002X',
           '头像': 'local.png',
           'avatarAttachmentId': profile.fields['avatarAttachmentId'],
         }, version: profile.version),
       );
       expect(adapter.requests.last.data, {
         'introduction': '更新介绍',
+        'idCardNumber': '11010519491231002X',
         'avatarAttachmentId': 'owned-avatar',
         'version': 7,
       });
