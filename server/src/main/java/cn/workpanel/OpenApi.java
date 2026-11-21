@@ -104,7 +104,7 @@ public class OpenApi {
         indexJob.addProperty("failedJobs",new ArraySchema().items(failedIndex));c.addSchemas("KnowledgeIndexRebuild",indexJob);
         var indexRetry=object("id","type","state");indexRetry.addProperty("id",text());indexRetry.addProperty("type",new StringSchema()._enum(List.of("KNOWLEDGE_INDEX")));indexRetry.addProperty("state",new StringSchema()._enum(List.of("QUEUED")));c.addSchemas("KnowledgeIndexRetry",indexRetry);
         var forgetJob=object("id","state");forgetJob.addProperty("id",text());forgetJob.addProperty("state",new StringSchema()._enum(List.of("PENDING","SUCCEEDED","FAILED")));forgetJob.addProperty("error",text());forgetJob.addProperty("message",text());c.addSchemas("MemoryForgetJob",forgetJob);
-        var error=object("code","message","traceId"); for(String field:List.of("code","message","traceId")) error.addProperty(field,text()); c.addSchemas("Error",error);
+        var error=object("code","message","traceId"); for(String field:List.of("code","message","traceId")) error.addProperty(field,text()); error.addProperty("fieldErrors",new MapSchema().additionalProperties(new StringSchema()).description("Web员工录入重复字段提示，仅管理员接口可能返回")); c.addSchemas("Error",error);
         MobileP0OpenApi.register(c);
         CalendarOpenApi.register(c);
         return new OpenAPI().servers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/"))).info(new Info().title("企业协作智能面板 API").version("1.0.0").description("UTC 时间，Asia/Shanghai 业务日期，周一为周首。重要修改提交候选审核；任务列表以只读phase反映正式完成情况，派发表单不接受状态。分页 cursor 是非负偏移量。" )).components(c).addSecurityItem(new SecurityRequirement().addList("bearer"));

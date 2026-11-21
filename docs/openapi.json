@@ -525,7 +525,7 @@
         "admin-console-controller"
       ],
       "summary": "管理员直接创建员工账号",
-      "description": "固定ACTIVE/EMPLOYEE，首次登录改密；账号或手机号重复409，禁止角色和公司注入，不返回密码或哈希。",
+      "description": "固定ACTIVE/EMPLOYEE，首次登录改密。businessPosition可选NONE/GENERAL_MANAGER/DEPUTY_GENERAL_MANAGER，与权限角色独立。姓名、手机号及身份证校验；账号、手机或证件任一重复409，fieldErrors分别说明。不返回密码、哈希或证件原文。",
       "operationId": "create_7",
       "requestBody": {
         "content": {
@@ -639,6 +639,7 @@
   },
   "/api/admin/console/employees/{id}/revisions": {
     "post": {
+      "description": "管理员直接修改员工及businessPosition，必填version/reason；任职与权限角色独立，不返回证件原文。重复409含fieldErrors，版本冲突409；无幂等键，不自动重试。",
       "tags": [
         "admin-console-controller"
       ],
@@ -24548,7 +24549,224 @@
         },
         "summary": "管理员分页查询直接生效修改记录"
       }
-    }},
+    },
+    "/api/admin/console/teams": {
+      "get": {
+        "tags": [
+          "admin-console-controller"
+        ],
+        "operationId": "teams",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "summary": "本公司团队选项",
+        "description": "仅ACTIVE ADMIN可读；只返回本公司在职选项。含department_id。"
+      }
+    },
+    "/api/admin/console/managers": {
+      "get": {
+        "tags": [
+          "admin-console-controller"
+        ],
+        "operationId": "managers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "错误码及 traceId，详情参见后端接口说明",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "summary": "本公司直属上级候选（含业务职位）",
+        "description": "仅ACTIVE ADMIN可读；只返回本公司在职选项。包含business_position；部门经理可跨部门选择创始人、总经理或分管副总，保存时校验资格和循环。"
+      }
+    }
+  },
   "components" : {
     "schemas" : {
       "PersonalTodoUpdate" : {
@@ -26417,7 +26635,9 @@
             "type" : "string",
             "maxLength" : 20000
           }
-        },
+        ,
+        "fieldErrors": {"type":"object","additionalProperties":{"type":"string"},"description":"Web员工录入重复字段提示，仅管理员接口可能返回"}
+      },
         "required" : [ "code", "message", "traceId" ]
       },
       "AiTaskConfirmationResult" : {

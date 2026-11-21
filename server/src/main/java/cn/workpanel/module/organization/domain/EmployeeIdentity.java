@@ -28,6 +28,7 @@ public final class EmployeeIdentity {
         String check="10X98765432";int sum=0;
         for(int i=0;i<17;i++) sum+=(card.charAt(i)-'0')*weight[i];
         if(card.charAt(17)!=check.charAt(sum%11)) throw ApiError.bad("INVALID_ID_CARD","身份证号校验位无效");
+        EmployeeInput.address(card);
         return card;
     }
     public static Integer age(Object value) {

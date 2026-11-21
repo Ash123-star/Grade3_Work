@@ -12,8 +12,9 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 class AdminConsoleIntegrationTest extends MemberBHttpSupport {
     private static final java.util.concurrent.atomic.AtomicInteger CARD_SERIAL=new java.util.concurrent.atomic.AtomicInteger(1);
-    private static String card() { String prefix="11010519900101"+String.format("%03d",CARD_SERIAL.getAndIncrement());int[] weights={7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2};int sum=0;for(int i=0;i<17;i++)sum+=(prefix.charAt(i)-'0')*weights[i];return prefix+"10X98765432".charAt(sum%11); }
+    private static String card() { String prefix="11010519900101"+String.format("%03d",CARD_SERIAL.getAndIncrement()*2);int[] weights={7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2};int sum=0;for(int i=0;i<17;i++)sum+=(prefix.charAt(i)-'0')*weights[i];return prefix+"10X98765432".charAt(sum%11); }
     Map<String,Object> employeeCommand() {
+        db.update("UPDATE users SET business_position='GENERAL_MANAGER' WHERE id=?",admin);
         String team=Db.id();db.update("INSERT INTO teams(id,company_id,department_id,name) VALUES (?,?,?,'测试组')",team,company,department);
         var command=new LinkedHashMap<String,Object>(Map.of("account","console-"+Db.id(),"password","Initial-password-2026","phone","138"+String.format("%08d",java.util.concurrent.ThreadLocalRandom.current().nextInt(100000000)),"name","新同事","departmentId",department,"teamId",team,"managerId",admin));command.put("gender","女");command.put("idCardNumber",card());return command;
     }
@@ -82,7 +83,7 @@ class AdminConsoleIntegrationTest extends MemberBHttpSupport {
         db.update("UPDATE users SET status='PENDING',team_id=NULL WHERE id=?",employee);
         db.update("INSERT INTO review_requests(id,company_id,applicant_id,kind,target_id,expected_version,before_value,candidate,reason) VALUES (?,?,?,?,?,1,'{}','{}','待确认')",request,company,employee,"MEMBERSHIP",employee);
         call(400,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","确认","status","ACTIVE","teamId",team,"managerId",""));
-        var result=call(200,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","确认","status","ACTIVE","teamId",team,"managerId",admin));
+        var result=call(200,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","确认","status","ACTIVE","teamId",team,"managerId",founder));
         assertEquals("APPLIED",result.get("status").asText());
         var changed=db.one("SELECT status,team_id,employment_start_date FROM users WHERE id=?",employee);
         assertEquals("ACTIVE",changed.get("status"));assertEquals(team,changed.get("team_id"));assertNotNull(changed.get("employment_start_date"));
@@ -120,5 +121,73 @@ class AdminConsoleIntegrationTest extends MemberBHttpSupport {
         for(int i=0;i<10;i++) db.update("INSERT INTO dashboard_items(id,company_id,owner_id,kind,title,body,pinned) VALUES (?,?,?,'COMPANY',?,'{}',true)",Db.id(),company,admin,"事项"+i);
         call(400,"POST","/admin/console/priorities/revisions",admin,priority("第十一项"));
         assertEquals(10,db.count("SELECT count(*) FROM dashboard_items WHERE company_id=?",company));
+    }
+
+    @Test void explainsEveryDuplicateFieldWithoutLeakingExistingIdentity() throws Exception {
+        var original=employeeCommand();call(200,"POST","/admin/console/employees",admin,original);
+        for(String field:List.of("account","phone","idCardNumber")) {
+            var candidate=employeeCommand();candidate.put(field,original.get(field));
+            var error=call(409,"POST","/admin/console/employees",admin,candidate);
+            assertTrue(error.get("fieldErrors").has(field));assertEquals(1,error.get("fieldErrors").size());
+            assertFalse(error.toString().contains(original.get("idCardNumber").toString()));
+        }
+        var error=call(409,"POST","/admin/console/employees",admin,original);
+        assertEquals(3,error.get("fieldErrors").size());
+        assertEquals(1,db.count("SELECT count(*) FROM users WHERE account=?",original.get("account")));
+    }
+    @Test void directorCanReportAcrossDepartmentsToBusinessExecutiveButNotBareAdministrator() throws Exception {
+        String boss=user(company,otherDepartment,"","FOUNDER",false);
+        var updated=call(200,"POST","/admin/console/employees/"+director+"/revisions",admin,Map.of("version",1,"reason","明确汇报关系","managerId",boss));
+        assertEquals("APPLIED",updated.get("status").asText());
+        assertEquals(boss,db.one("SELECT manager_id FROM reporting_relations WHERE employee_id=?",director).get("manager_id"));
+        call(400,"POST","/admin/console/employees/"+director+"/revisions",admin,Map.of("version",2,"reason","错误上级","managerId",admin));
+        db.update("UPDATE users SET business_position='GENERAL_MANAGER' WHERE id=?",outside);
+        call(200,"POST","/admin/console/employees/"+director+"/revisions",admin,Map.of("version",2,"reason","总经理负责","managerId",outside));
+        var row=call(200,"GET","/admin/console/employees?search=org-"+director,admin,null).get("items").get(0);
+        assertEquals("GENERAL_MANAGER",row.get("manager_business_position").asText());assertFalse(row.has("id_card_number"));
+        assertEquals("DIRECTOR",row.get("role").asText());
+    }
+    @Test void changingBusinessPositionKeepsRoleAndVersionProtection() throws Exception {
+        call(200,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","任命副总","businessPosition","DEPUTY_GENERAL_MANAGER","managerId",founder));
+        var row=db.one("SELECT business_position,role,version FROM users WHERE id=?",employee);
+        assertEquals("DEPUTY_GENERAL_MANAGER",row.get("business_position"));assertEquals("EMPLOYEE",row.get("role"));assertEquals(2,row.get("version"));
+        call(409,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",1,"reason","过期修改","businessPosition","NONE","managerId",founder));
+        assertEquals("DEPUTY_GENERAL_MANAGER",db.one("SELECT business_position FROM users WHERE id=?",employee).get("business_position"));
+        // A director reporting to the executive cannot be selected as that executive's manager.
+        db.update("INSERT INTO reporting_relations VALUES (?,?,?)",director,employee,company);
+        db.update("UPDATE users SET business_position='GENERAL_MANAGER' WHERE id=?",director);
+        call(400,"POST","/admin/console/employees/"+employee+"/revisions",admin,Map.of("version",2,"reason","循环应拒绝","managerId",director));
+    }
+    @Test void identityUpdateExcludesSelfButRejectsAnotherEmployeeCard() throws Exception {
+        var first=employeeCommand();String one=call(200,"POST","/admin/console/employees",admin,first).get("id").asText();
+        var second=employeeCommand();String two=call(200,"POST","/admin/console/employees",admin,second).get("id").asText();
+        call(200,"POST","/admin/console/employees/"+one+"/revisions",admin,Map.of("version",1,"reason","核对资料","idCardNumber",first.get("idCardNumber")));
+        var error=call(409,"POST","/admin/console/employees/"+one+"/revisions",admin,Map.of("version",2,"reason","重复资料应拒绝","idCardNumber",second.get("idCardNumber")));
+        assertTrue(error.get("fieldErrors").has("idCardNumber"));
+        assertEquals(2,db.one("SELECT version FROM users WHERE id=?",one).get("version"));
+    }
+    @Test void concurrentDuplicateInsertCreatesOnlyOneAccount() throws Exception {
+        var first=employeeCommand();var second=employeeCommand();second.put("phone",first.get("phone"));
+        var gate=new java.util.concurrent.CountDownLatch(1);
+        try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var a=executor.submit(()->{gate.await();return postEmployee(first);});var b=executor.submit(()->{gate.await();return postEmployee(second);});gate.countDown();
+            var results=List.of(a.get(30,java.util.concurrent.TimeUnit.SECONDS),b.get(30,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(1,results.stream().filter(r->r.statusCode()==200).count());
+            var conflict=results.stream().filter(r->r.statusCode()==409).findFirst().orElseThrow();
+            assertTrue(JSON.readTree(conflict.body()).get("fieldErrors").has("phone"));
+        }
+        assertEquals(1,db.count("SELECT count(*) FROM users WHERE phone=?",first.get("phone")));
+    }
+    java.net.http.HttpResponse<String> postEmployee(Map<String,Object> command) throws Exception {
+        return http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+port+"/api/admin/console/employees")).timeout(java.time.Duration.ofSeconds(20)).header("Authorization","Bearer "+tokens.get(admin)).header("Content-Type","application/json").POST(java.net.http.HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(command))).build(),java.net.http.HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test void openApiDocumentsOptionalFieldErrorsAndManagerOptions() throws Exception {
+        var contract=call(200,"GET","/openapi",admin,null);
+        var error=contract.get("components").get("schemas").get("Error");
+        assertTrue(error.get("properties").has("fieldErrors"));
+        assertFalse(error.get("required").toString().contains("fieldErrors"));
+        assertTrue(contract.get("paths").has("/api/admin/console/managers"));
+        assertTrue(contract.get("paths").has("/api/admin/console/teams"));
     }
 }

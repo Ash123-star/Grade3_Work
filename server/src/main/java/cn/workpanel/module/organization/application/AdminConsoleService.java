@@ -3,6 +3,8 @@ package cn.workpanel.module.organization.application;
 import cn.workpanel.*;
 import cn.workpanel.module.organization.domain.EmployeeProvisioning;
 import cn.workpanel.module.organization.domain.EmployeeIdentity;
+import cn.workpanel.module.organization.domain.EmployeeInput;
+import cn.workpanel.module.organization.domain.EmployeeConflict;
 import cn.workpanel.module.organization.infrastructure.AdminConsoleRepository;
 import cn.workpanel.module.dashboard.application.DashboardReviewedRevisionApplication;
 import cn.workpanel.module.review.api.ReviewActors;
@@ -44,36 +46,42 @@ public class AdminConsoleService {
     public List<Map<String,Object>> managers(Actor request) { return repository.managers(admin(request)); }
     @Transactional public Map<String,Object> create(Actor request,Map<String,Object> body) {
         Actor a=admin(request);var c=EmployeeProvisioning.parse(body);
+        var conflicts=repository.conflicts("",c.account(),c.phone(),c.idCardNumber());if(!conflicts.isEmpty())throw new EmployeeConflict(conflicts);
         try { return repository.create(a,c,passwords.encode(c.password())); }
-        catch(DuplicateKeyException e) { throw new ApiError(409,"ACCOUNT_OR_PHONE_EXISTS","账号或手机号已被使用"); }
+        catch(DuplicateKeyException e) { throw repository.duplicate(e); }
     }
     @Transactional public Map<String,Object> reviseEmployee(Actor request,String id,Map<String,Object> body) {
-        Actor a=admin(request);Db.fields(body,"version","reason","name","departmentId","teamId","managerId","status","gender","idCardNumber");
+        Actor a=admin(request);Db.fields(body,"version","reason","name","departmentId","teamId","managerId","status","gender","idCardNumber","businessPosition");
         String gender=body.containsKey("gender")?EmployeeIdentity.gender(body.get("gender")):null;
         String idCardNumber=body.containsKey("idCardNumber")?EmployeeIdentity.idCard(body.get("idCardNumber")):null;
-        if(body.containsKey("name")&&Db.required(body,"name").length()>100) throw ApiError.bad("INVALID_NAME","姓名最多100字");
+        String name=body.containsKey("name")?EmployeeInput.name(body.get("name")):null;
         if(body.containsKey("status")&&!Set.of("ACTIVE","DISABLED").contains(Db.str(body,"status"))) throw ApiError.bad("INVALID_STATUS","仅支持启用或停用");
         var old=repository.employee(a,id);
+        String businessPosition=body.containsKey("businessPosition")?EmployeeInput.position(body.get("businessPosition")):Db.str(old,"business_position");
+        if(gender!=null||idCardNumber!=null) EmployeeInput.genderMatches(gender!=null?gender:Db.str(old,"gender").isBlank()?null:Db.str(old,"gender"),idCardNumber!=null?idCardNumber:old.get("id_card_number")==null?null:Db.str(old,"id_card_number"));
+        if(idCardNumber!=null) { var conflicts=repository.conflicts(id,null,null,idCardNumber);if(!conflicts.isEmpty())throw new EmployeeConflict(conflicts); }
         var candidate=new LinkedHashMap<String,Object>();
         candidate.put("name",old.get("name"));candidate.put("departmentId",Db.str(old,"department_id"));candidate.put("teamId",Db.str(old,"team_id"));
         candidate.put("role",old.get("role"));candidate.put("status",old.get("status"));candidate.put("dispatchEnabled",old.get("dispatch_enabled"));
         candidate.put("companyReviewer",old.get("company_reviewer"));candidate.put("managerId",repository.manager(id,a.company()));
-        var before=new LinkedHashMap<>(candidate);
+        var before=new LinkedHashMap<>(candidate);before.put("businessPosition",old.get("business_position"));
         for(String key:List.of("name","departmentId","teamId","managerId","status")) if(body.containsKey(key)) candidate.put(key,body.get(key));
+        if(name!=null)candidate.put("name",name);
         if(body.containsKey("departmentId")&&!Db.str(old,"department_id").equals(Db.str(body,"departmentId"))&&!body.containsKey("teamId")) candidate.put("teamId","");
         if("PENDING".equals(old.get("status"))&&"ACTIVE".equals(candidate.get("status"))) {
             Db.required(candidate,"departmentId");Db.required(candidate,"teamId");Db.required(candidate,"managerId");
         }
-        if(!Db.str(candidate,"managerId").isBlank()) repository.eligibleManager(a,Db.str(candidate,"managerId"),Db.str(candidate,"departmentId"));
+        if(!Db.str(candidate,"managerId").isBlank()) repository.eligibleManager(a,Db.str(candidate,"managerId"),Db.str(candidate,"departmentId"),Db.str(candidate,"role"),businessPosition);
         validation.user(a.company(),id,candidate);
         var context=ReviewActors.context(a);
         organizationApply.apply("USER",context,context,id,Db.version(body),candidate,Db.required(body,"reason"));
         if(gender!=null||idCardNumber!=null) {
             try { repository.updateIdentity(a,id,gender,idCardNumber); }
-            catch(DuplicateKeyException e) { throw new ApiError(409,"ID_CARD_EXISTS","身份证号已被使用"); }
+            catch(DuplicateKeyException e) { throw repository.duplicate(e); }
         }
+        repository.position(a,id,businessPosition);
         if("PENDING".equals(old.get("status"))) repository.finishPendingAccount(a,id,"ACTIVE".equals(candidate.get("status")));
-        var safeAfter=new LinkedHashMap<>(candidate);if(gender!=null) safeAfter.put("gender",gender);if(idCardNumber!=null) safeAfter.put("idCardUpdated",true);
+        var safeAfter=new LinkedHashMap<>(candidate);safeAfter.put("businessPosition",businessPosition);if(gender!=null) safeAfter.put("gender",gender);if(idCardNumber!=null) safeAfter.put("idCardUpdated",true);
         repository.audit(a,"ADMIN_EMPLOYEE_UPDATED",id,before,safeAfter,Db.str(body,"reason"));
         return Map.of("id",id,"status","APPLIED","version",Db.version(body)+1);
     }
