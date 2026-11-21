@@ -181,21 +181,29 @@ GET /organization/people沿用原组织数据范围，追加可空team_name，�
 
 ## 管理员简易后台（2026-11-11）
 
-新增 `/api/admin/console`，每次重新验证 ACTIVE ADMIN、公司和首次改密状态；其他角色403、无效会话401。公开注册和Android接口不变。无新增数据库结构/迁移。
+新增 `/api/admin/console`，每次重新验证 ACTIVE ADMIN、公司和首次改密状态；其他角色403、无效会话401。公开注册角色规则保持不变。本轮新增业务职位字段及V36迁移，见下方维护补充。
 
 | 方法与路径（前缀省略） | 契约 |
 | --- | --- |
-| GET /employees | search最多100字，cursor>=0、limit 1..100；含停用账号，按本公司过滤后分页，items/total/nextCursor；仅返回id/account/phone/name/department_id/department/role/status/version/must_change_password，不含哈希 |
-| POST /employees | account/password/phone/name/departmentId，固定ACTIVE/EMPLOYEE/首次改密；姓名最多100字，密码至少12字符且UTF-8最多72字节；未知字段400、外公司部门404、重复账号/手机409 ACCOUNT_OR_PHONE_EXISTS；无幂等键，不自动重试，唯一约束防重复；响应不含密码或哈希，同事务写角色和脱敏审计 |
+| GET /employees | search最多100字，支持departmentId，cursor>=0、limit 1..100；按公司/部门分页；增加组、直属上级、业务职位、性别及证件录入标记/派生年龄，不含完整证件号和哈希 |
+| POST /employees | account/password/phone/name/departmentId/teamId/managerId/gender/idCardNumber必填，businessPosition可选；固定ACTIVE/EMPLOYEE/首次改密；姓名2–50个Unicode字符，密码至少12字符且UTF-8最多72字节；未知字段400、外公司部门404、账号/手机/身份证任一重复409，fieldErrors区分字段；无幂等键，不自动重试，唯一约束防重复；响应不含密码或哈希，同事务写角色和脱敏审计 |
 | GET /departments | 本公司id/name目录，只读幂等 |
-| POST /employees/{id}/revisions | name/departmentId/status可选，version/reason必填；status仅ACTIVE/DISABLED，跨部门调动随候选清空原团队；返回USER审核申请，旧值审核前有效，不能改角色；无幂等键，外公司404、最终版本冲突409 |
+| POST /employees/{id}/revisions | name/departmentId/teamId/managerId/gender/idCardNumber/businessPosition/status可选，version/reason必填；status仅ACTIVE/DISABLED；管理员直接生效并留审计，返回APPLIED和新版本，不能改系统角色；无幂等键，外公司404、最终版本冲突409 |
 | GET /priorities | 含撤下的本公司事项，cursor/limit分页，items/total/nextCursor，只读幂等 |
-| POST /priorities/revisions | id更新时必填、version新建为0、title/text/pinned/archived/position/reason；标题最多200字，正文最多20000字，position为0..10000整数；返回COMPANY_ITEM审核申请，无幂等键，最终审批最多十条置顶/版本校验，不允许自审 |
-| GET /reviews | cursor/limit分页，items/total/nextCursor；仅本人申请或当前分配审核，沿用原review数据范围 |
+| POST /priorities/revisions | id更新时必填、version新建为0、title/text/pinned/archived/position/reason；标题最多200字，正文最多20000字，position为0..10000整数；管理员直接生效并审计，返回APPLIED和新版本；无幂等键，保留最多十条置顶/版本校验 |
+| GET /reviews | cursor/limit分页，items/total/nextCursor；仅当前有效待审申请，沿用原review数据范围；已决/过期成员申请不占待办 |
 | GET /reviews/{id} | 候选、步骤、原因和版本；本人或有权审核人，只读幂等；越权403/未知404 |
 | POST /reviews/{id}/decision | approve/reason/expectedVersion；驳回原因必填，自审403、已决或版本冲突409；无幂等键，不自动重放 |
 
-以上契约v1，错误沿用code/message/traceId。首次改密复用 `/api/auth/password`，失权前端清空页面和会话。公司事项与员工变更仍由当前直属独立审核人处理，后台不提供管理员免审。详见 [本地与云端说明](admin-console.md)。
+以上契约v1，错误沿用code/message/traceId。首次改密复用 `/api/auth/password`，失权前端清空页面和会话。Web管理员修改员工和公司事项直接生效并审计；其他入口沿用原有审核规则。详见 [本地与云端说明](admin-console.md)。
 
 ### 本人身份证与年龄（2026-11-18）
 PUT /api/profiles/me 不接受 idCardNumber（400 ID_CARD_READ_ONLY）或 age（400 AGE_READ_ONLY）。证件号仅由管理员维护；年龄按北京时间从证件出生日期计算，无证件为 null。本人读取仅返回 hasIdCard/idCardMasked，其他人不返回证件信息，完整号码不进入响应或审计。
+
+### Web 员工维护补充（Issue #101）
+
+仅ACTIVE ADMIN且已修改初始密码可调用。POST /api/admin/console/employees 仍固定创建EMPLOYEE/ACTIVE，新增可选businessPosition，值为NONE（默认）、GENERAL_MANAGER、DEPUTY_GENERAL_MANAGER；创建任职不授予管理员权限。姓名/手机号/身份证校验规则见docs/admin-console.md。POST /employees/{id}/revisions允许businessPosition，仍必填version/reason并原子写入组织、身份、任职和审计。只修改姓名时不强制补录旧证件。已有手机号仍只读。
+
+GET /employees与GET /managers增加business_position；目录增加manager_role/manager_business_position，已有manager_id/manager_name保持。部门经理或具有公司级任职的员工，可跨部门选择本公司在职创始人或总经理/分管副总；普通岗位仅同部门业务管理人员。候选列表不授予写入权限，服务端在保存时再次校验及检查循环。
+
+重复返回409 ACCOUNT_EXISTS、PHONE_EXISTS、ID_CARD_EXISTS，多个预检查冲突为EMPLOYEE_FIELDS_EXIST；均保留code/message/traceId并增加fieldErrors（account/phone/idCardNumber到中文提示的映射），不得返回冲突人员信息或证件原文。并发唯一约束冲突同样映射字段。非法格式400 INVALID_NAME/INVALID_ACCOUNT/INVALID_PHONE/INVALID_PHONE_PREFIX/INVALID_ID_CARD/INVALID_ID_ADDRESS/IDENTITY_GENDER_MISMATCH/INVALID_BUSINESS_POSITION；非法上级400 INVALID_MANAGER。无幂等键，写请求不自动重试；重复与旧版本都不会产生成功审计。
