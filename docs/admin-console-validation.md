@@ -3,7 +3,7 @@
 
 ## 2026-11-21 员工录入与目录改进（Issue #101）
 
-基线main `ddcbf67`，独立分支 `codex/admin-directory-validation`；Windows、Java 21.0.11、Node 24.14.0、Docker临时PostgreSQL/Redis/Neo4j、系统Chrome。此次没有操作云端或展示数据库。
+交付PR [#102](https://github.com/Ash123-star/Grade3_Work/pull/102)，关联Issue [#101](https://github.com/Ash123-star/Grade3_Work/issues/101)，功能提交 `4d963df`。基线main `ddcbf67`，独立分支 `codex/admin-directory-validation`；Windows、Java 21.0.11、Node 24.14.0、Docker临时PostgreSQL/Redis/Neo4j、系统Chrome。此次没有操作云端或展示数据库。
 
 - `npm.cmd run build`：退出0。
 - `npm.cmd run test:e2e`：38/38通过。桌面与手机项目覆盖新建/编辑、三项重复字段提示、姓名和手机预校验、部门经理跨部门候选、只读脱敏详情；测试1920/1366/1280/1093/1024/854/640/390的CSS视口，长账号/长姓名/部门内容不导致页面或目录横向溢出。缩放采用等效可用宽度覆盖，不宣称测试了所有电脑的原生显示缩放组合。
