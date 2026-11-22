@@ -23,10 +23,11 @@ public class TaskReviewedRevisionApplication implements ReviewedRevisionApplicat
         Actor applicant=ReviewActors.actor(applicantContext),approver=ReviewActors.actor(approverContext);
         if(!applicant.company().equals(approver.company())) throw ApiError.forbidden();
         switch(kind) {
-            case "TASK_CREATE" -> {
-                applicant.requireDispatch();
+            case "TASK_CREATE", "TASK_CREATE_CONFIRMED" -> {
+                boolean proposal=kind.equals("TASK_CREATE_CONFIRMED");
+                if(!proposal) applicant.requireDispatch();
                 if(!db.rows("SELECT id FROM tasks WHERE id=?",target).isEmpty()) throw ApiError.conflict();
-                var draft=TaskDraftNormalizer.normalize(c); TaskParticipants.validate(db,applicant,draft); TaskLabels.validate(db,applicant,draft);
+                var draft=TaskDraftNormalizer.normalize(c); TaskParticipants.validate(db,applicant,draft,!proposal); TaskLabels.validate(db,applicant,draft);
                 TaskAttachments.verify(db,applicant,null,draft.attachments());
                 db.update("INSERT INTO tasks(id,company_id,owner_id,issuer_id,title,start_at,deadline,body,phase,version) VALUES (?,?,?,?,?,?::timestamptz,?::timestamptz,?::jsonb,'DISPATCHED',1)",
                         target,applicant.company(),draft.ownerId(),applicant.id(),draft.title(),draft.startAt(),draft.deadline(),db.write(draft.body()));

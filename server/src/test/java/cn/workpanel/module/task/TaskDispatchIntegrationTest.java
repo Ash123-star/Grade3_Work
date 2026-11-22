@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties={
     // 与全仓端到端测试复用同一个临时数据库时，必须采用同一初始管理员，避免测试顺序导致登录夹具不一致。
     "app.admin-account=integration-admin", "app.admin-password=Initial-test-password-2026",
-    "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.jobs-enabled=false", "workpanel.calendar.move-enabled=true"
+    "app.admin-phone=13900000001", "app.deepseek-key=local-mock-only", "app.jobs-enabled=false", "workpanel.calendar.move-enabled=true", "workpanel.task.proposals-enabled=true"
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @org.springframework.context.annotation.Import(cn.workpanel.storage.StorageTestConfiguration.class)
@@ -97,6 +97,7 @@ class TaskDispatchIntegrationTest {
     HttpResponse<String> send(String method,String path,String who,Object body,String key) throws Exception {
         var b=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api"+path)).timeout(Duration.ofSeconds(15));
         if(who!=null) b.header("Authorization","Bearer "+token.get(who));
+        if("POST".equals(method)&&"/tasks".equals(path)&&key!=null&&key.startsWith("proposal-")) b.header("Task-Dispatch-Policy","recipient-confirmation-v1");
         if(key!=null) b.header("Idempotency-Key",key);
         if(body!=null) b.header("Content-Type","application/json");
         return http.send(b.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -132,6 +133,102 @@ class TaskDispatchIntegrationTest {
     int version(String taskId,String who) throws Exception { return call(200,"GET","/tasks/"+taskId,who,null,null).get("version").asInt(); }
 
     JsonNode list(int status,String query,String who) throws Exception { return call(status,"GET","/tasks?"+query,who,null,null); }
+
+    @Test void uploadEnforcesExactTenMiBBoundaryOverMultipartHttp() throws Exception {
+        int max=10*1024*1024;
+        for (int size : new int[]{0,max-1,max,max+1}) {
+            long before=count("SELECT count(*) FROM attachments WHERE company_id=?",company);
+            String boundary="size-"+key();
+            var data=HttpRequest.BodyPublishers.concat(
+                HttpRequest.BodyPublishers.ofString("--"+boundary+"\r\nContent-Disposition: form-data; name=\"file\"; filename=\"boundary.dat\"\r\nContent-Type: application/octet-stream\r\n\r\n"),
+                HttpRequest.BodyPublishers.ofByteArray(new byte[size]), HttpRequest.BodyPublishers.ofString("\r\n--"+boundary+"--\r\n"));
+            var r=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/attachments"))
+                .timeout(Duration.ofSeconds(60)).header("Authorization","Bearer "+token.get("leader"))
+                .header("Content-Type","multipart/form-data; boundary="+boundary).POST(data).build(),HttpResponse.BodyHandlers.ofString());
+            if (size==0 || size>max) {
+                assertEquals(size==0?400:413,r.statusCode(),r.body());
+                assertEquals(size==0?"INVALID_FILE":"FILE_TOO_LARGE",JSON.readTree(r.body()).path("code").asText());
+                assertEquals(before,count("SELECT count(*) FROM attachments WHERE company_id=?",company));
+            } else {
+                assertEquals(200,r.statusCode(),r.body()); assertEquals(before+1,count("SELECT count(*) FROM attachments WHERE company_id=?",company));
+                assertFalse(JSON.readTree(r.body()).path("id").asText().isBlank());
+            }
+        }
+    }
+
+    /** Explicit acceptance run for the proposed policy; never substitute the old 403 for a pass. */
+    @Test
+    void proposedDispatchScenarios() throws Exception {
+        user("proposal-manager",company,"LEADER","d1","t1","ACTIVE",true);
+        user("proposal-staff",company,"EMPLOYEE","d1","t1","ACTIVE",false);
+        jdbc.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?),(?,?,?)",
+            id.get("proposal-staff"),id.get("proposal-manager"),company,id.get("proposal-manager"),id.get("founder"),company);
+        assertAll("新版派发验收",
+            ()->proposedDispatch("同团队","amy",false,true),
+            ()->proposedDispatch("直属上级一次批准并接受","proposal-manager",false,true),
+            ()->proposedDispatch("越级创始人确认","founder",true,true),
+            ()->proposedDispatch("跨部门拒绝","mia",true,false),
+            ()->proposedDispatch("多人中一人拒绝整项不生效","mia",true,false,"amy"));
+    }
+    @Test void proposalEligibilityDirectoryAndIsolation() throws Exception {
+        var people=call(200,"GET","/organization/task-proposal-people?limit=100","alice",null,null).path("items");
+        var names=new HashSet<String>();for(var person:people) {
+            names.add(person.path("name").asText()); assertFalse(person.has("phone"));assertFalse(person.has("todayLogStatus"));
+        }
+        assertTrue(names.containsAll(List.of("founder","mia")));assertFalse(names.contains("pending"));assertFalse(names.contains("disabled"));assertFalse(names.contains("outsider"));
+        for(String target:List.of("disabled","pending","outsider")) call(404,"POST","/tasks","alice",body("无效目标",target),"proposal-"+key());
+        var orphan=requestTask("mia",body("无上级不放行","founder"),"proposal-"+key());
+        assertEquals("PENDING",orphan.path("status").asText());assertFalse(orphan.path("reviewer_configured").asBoolean());
+        assertEquals(0,count("SELECT count(*) FROM tasks WHERE id=?",orphan.path("target_id").asText()));
+        var founder=requestTask("founder",body("创始人权限内免审","amy"),"proposal-"+key());assertEquals("APPROVED",founder.path("status").asText());
+    }
+    @Test void proposalRequiresEveryConfirmationAndRechecksReportingLine() throws Exception {
+        String staff="multi-staff",manager="multi-manager";user(staff,company,"EMPLOYEE","d1","t1","ACTIVE",false);
+        user(manager,company,"LEADER","d1","t1","ACTIVE",true);
+        jdbc.update("INSERT INTO reporting_relations(employee_id,manager_id,company_id) VALUES (?,?,?)",id.get(staff),id.get(manager),company);
+        for(boolean changeManager:List.of(false,true)) {
+            var request=requestTask(staff,body("两名接收人确认","founder","mia"),"proposal-"+key());
+            String path="/reviews/"+request.path("id").asText()+"/decision",target=request.path("target_id").asText();
+            var yes=Map.of("approve",true,"reason","接受","expectedVersion",0);
+            var pending=call(200,"POST",path,manager,yes,null);assertEquals(id.get("founder"),pending.path("reviewer_id").asText());
+            pending=call(200,"POST",path,"founder",yes,null);assertEquals(id.get("mia"),pending.path("reviewer_id").asText());
+            assertEquals(0,count("SELECT count(*) FROM tasks WHERE id=?",target));
+            if(changeManager) {
+                jdbc.update("UPDATE reporting_relations SET manager_id=? WHERE employee_id=?",id.get("leader2"),id.get(staff));
+                assertEquals("STALE_TASK_APPROVAL",call(409,"POST",path,"mia",yes,null).path("code").asText());
+                assertEquals(0,count("SELECT count(*) FROM tasks WHERE id=?",target));
+            } else {
+                assertEquals("APPROVED",call(200,"POST",path,"mia",yes,null).path("status").asText());
+                call(409,"POST",path,"mia",yes,null);
+                assertEquals(1,count("SELECT count(*) FROM tasks WHERE id=?",target));
+                assertEquals(2,count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='TASK_ASSIGNED'",target));
+            }
+        }
+    }
+    private void proposedDispatch(String label,String recipient,boolean needsConsent,boolean accept,String... others) throws Exception {
+        var b=body(label,recipient,others); String k="proposal-"+key(),staff="proposal-staff",manager="proposal-manager";
+        var review=requestTask(staff,b,k); String reviewId=review.path("id").asText(), target=review.path("target_id").asText();
+        assertFalse(target.isBlank()); assertEquals(reviewId,requestTask(staff,b,k).path("id").asText());
+        assertEquals(0,count("SELECT count(*) FROM tasks WHERE id=?",target));
+        var decision=Map.of("approve",true,"expectedVersion",0,"reason","同意提出任务");
+        call(403,"POST","/reviews/"+reviewId+"/decision",staff,decision,null);
+        var after=call(200,"POST","/reviews/"+reviewId+"/decision",manager,decision,null);
+        if(needsConsent) {
+            assertEquals("PENDING",after.path("status").asText());
+            assertEquals(0,count("SELECT count(*) FROM tasks WHERE id=?",target));
+            assertEquals(0,count("SELECT count(*) FROM task_participants WHERE task_id=?",target));
+            assertEquals(0,count("SELECT count(*) FROM outbox_events WHERE object_id=? AND type='TASK_ASSIGNED'",target));
+            call(403,"POST","/reviews/"+reviewId+"/decision","leader2",decision,null);
+            call(409,"POST","/reviews/"+reviewId+"/reroute",staff,Map.of(),null);
+            call(404,"GET","/tasks/"+target,recipient,null,null);
+            after=call(200,"POST","/reviews/"+reviewId+"/decision",recipient,
+                Map.of("approve",accept,"expectedVersion",0,"reason",accept?"接受安排":"无法参与"),null);
+        }
+        assertEquals(accept?"APPROVED":"REJECTED",after.path("status").asText());
+        assertEquals(accept?1:0,count("SELECT count(*) FROM tasks WHERE id=?",target));
+        assertEquals(accept?1+others.length:0,count("SELECT count(*) FROM task_participants WHERE task_id=?",target));
+        if(accept) call(200,"GET","/tasks/"+target,recipient,null,null);
+    }
 
     @Test void taskCreateIsInvisibleUntilReviewApproval() throws Exception {
         var request=requestTask("leader",body("待审核创建","alice"),key());
@@ -856,6 +953,10 @@ class TaskDispatchIntegrationTest {
 
     @Test void exportRuntimeCalendarOpenApiForDelivery() throws Exception {
         var response=send("GET","/openapi","leader",null,null);assertEquals(200,response.statusCode());
+        var paths=JSON.readTree(response.body()).path("paths");
+        assertTrue(paths.has("/api/organization/task-proposal-people"));
+        assertTrue(java.util.stream.StreamSupport.stream(paths.path("/api/tasks").path("post").path("parameters").spliterator(),false)
+            .anyMatch(p->p.path("name").asText().equals("Task-Dispatch-Policy") && p.path("in").asText().equals("header")));
         java.nio.file.Files.writeString(java.nio.file.Path.of("target/calendar-openapi.json"),response.body(),StandardCharsets.UTF_8);
     }
 

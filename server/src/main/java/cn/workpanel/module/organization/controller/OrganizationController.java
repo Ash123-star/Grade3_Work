@@ -36,6 +36,12 @@ public class OrganizationController {
             @RequestParam(defaultValue = "false") boolean dispatch, @RequestParam(defaultValue = "0") int cursor, @RequestParam(defaultValue = "30") int limit) {
         return service.people(Actor.current(request), search, dispatch, cursor, limit);
     }
+    /** v1 opt-in task picker: active company members only; paginated minimal work identity, no personal or activity data.
+     * Read only; invalid pagination 400, inactive actor 403, disabled policy 409. */
+    @GetMapping("/task-proposal-people") public Map<String,Object> proposalPeople(HttpServletRequest request,
+        @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="30") int limit) {
+        return service.proposalPeople(Actor.current(request),search,cursor,limit);
+    }
     /** ACTIVE 非复核人申请公司复核职责：version/reason；已具备409、无效400；当前直属上级批准，员工角色不改变；此职责不授予多级审核权限。 */
     @PostMapping("/reviewer-application") public Map<String, Object> reviewer(HttpServletRequest request, @RequestBody Map<String, Object> body) { return service.reviewer(Actor.current(request), body); }
     /** 管理员申请人员变更：version/reason及组织/角色/状态字段；非法400、范围外404；审核通过前旧值有效，最终版本冲突409。

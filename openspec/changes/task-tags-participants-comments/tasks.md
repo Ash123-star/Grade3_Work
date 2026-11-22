@@ -39,3 +39,8 @@
 - [ ] 6.1 运行 `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven`，记录明确退出码与报告。2026-10-23 当前合并工作区运行 400 项，其中 106 项失败：任务模块既有 `TaskDispatchIntegrationTest` 的 23 项通过；剩余失败集中于共享 `BackendIntegrationTest` 的测试库隔离/会话级联，以及 AI 办事模块仍按旧任务“负责人、创建即生效”契约调用。未获得全仓绿灯前不得报告全量后端回归通过。
 - [x] 6.2 运行 `openspec.cmd validate --all --strict`（2026-10-23：33 项通过，0 项失败）
 - [ ] 6.3 提交前检查差异、无密钥/构建产物/个人文件；由用户自行提交、推送和创建 PR
+
+## 受控派发验收
+
+- [x] 新策略：隔离环境验证同团队、直属经理、越级创始人、跨部门、多人确认/拒绝、组织变化、公司隔离、幂等和旧客户端兼容。`scripts/test-backend.ps1 -Tests TaskDispatchIntegrationTest`：45 项通过，真实 HTTP/PostgreSQL/Redis，隔离存储替身。Flutter 实际请求适配器验证普通员工能打开表单、选择人员并携带新版头；不作为真机签收。
+- [ ] 真机双账号从“公司 → 提出任务”至接收人确认、看板出现和系统通知签收；验收通过并确认业务规则后再决定是否开启部署开关。

@@ -2271,6 +2271,12 @@ class MockRepository implements Repository {
     if (key != null && store.responses.containsKey(key)) {
       return store.responses[key]!;
     }
+    if (resource == 'task-labels' && action == 'create') {
+      if (session.role != UserRole.founder) throw const ApiFailure(FailureKind.forbidden, '仅创始人可创建标签');
+      final label = Record(id: 'label-${DateTime.now().microsecondsSinceEpoch}', title: v['name'] as String, fields: {...v, 'status': 'ACTIVE'});
+      rows('task-labels').add(label);
+      return label;
+    }
     if (resource == 'tasks/pin') return _togglePin(command);
     if (resource == 'auth') {
       if (v.containsKey('role')) {

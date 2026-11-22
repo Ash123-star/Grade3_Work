@@ -926,7 +926,7 @@ class _MonthGrid extends StatelessWidget {
                 8,
           );
           final gridLast = start.add(Duration(days: weeks * 7 - 1));
-          final lanes = _monthLanes(events, start, gridLast);
+          final lanes = _monthLanes(events, first, last);
           final folded = calendarMonthPreview(
             first: start,
             last: gridLast,
@@ -935,8 +935,8 @@ class _MonthGrid extends StatelessWidget {
                 .map(
                   (event) => CalendarLaneInterval(
                     event.record.id,
-                    event.firstDay,
-                    event.lastDay,
+                    event.firstDay.isBefore(first) ? first : event.firstDay,
+                    event.lastDay.isAfter(last) ? last : event.lastDay,
                     lanes[event.record.id]!,
                   ),
                 ),
@@ -1355,12 +1355,11 @@ List<Widget> _monthWeekBars(
   for (final event in candidates) {
     final lane = lanes[_calendarEventKey(event)];
     if (lane == null) continue;
-    // Neighbouring dates can preview and open records, but never gain write
-    // capabilities from the current month's loaded schedule constraints.
-    final visibleStart = previewDay == null || !weekStart.isBefore(monthStart)
+    // Padding dates navigate to their own month; only draw this month’s records.
+    final visibleStart = !weekStart.isBefore(monthStart)
         ? weekStart
         : monthStart;
-    final visibleEnd = previewDay == null || !weekEnd.isAfter(monthEnd)
+    final visibleEnd = !weekEnd.isAfter(monthEnd)
         ? weekEnd
         : monthEnd;
     final first = event.firstDay.isBefore(visibleStart)
@@ -1376,47 +1375,13 @@ List<Widget> _monthWeekBars(
             last: last,
             days: foldedDays,
           );
-    final segments = <CalendarLaneInterval>[];
-    for (final interval in visible) {
-      var beginning = interval.first;
-      for (final boundary in [
-        monthStart,
-        monthEnd.add(const Duration(days: 1)),
-      ]) {
-        if (boundary.isAfter(beginning) && !boundary.isAfter(interval.last)) {
-          segments.add(
-            CalendarLaneInterval(
-              event.record.id,
-              beginning,
-              boundary.subtract(const Duration(days: 1)),
-              interval.lane,
-            ),
-          );
-          beginning = boundary;
-        }
-      }
-      segments.add(
-        CalendarLaneInterval(
-          event.record.id,
-          beginning,
-          interval.last,
-          interval.lane,
-        ),
-      );
-    }
-    var mainIndex = 0, adjacentIndex = 0;
-    for (final segment in segments) {
+    for (var index=0; index<visible.length; index++) {
+      final segment=visible[index];
       final from = segment.first, to = segment.last;
-      final currentMonth = !from.isBefore(monthStart) && !to.isAfter(monthEnd);
-      final index = currentMonth ? mainIndex++ : adjacentIndex++;
       final keyDate =
           '${weekStart.toIso8601String().replaceFirst('Z', '')}'
           '${index == 0 ? '' : ':${businessDateText(from)}'}';
-      final keyPrefix = previewDay != null
-          ? 'drag-span'
-          : currentMonth
-          ? 'month-span'
-          : 'adjacent-month-span';
+      final keyPrefix = previewDay != null ? 'drag-span' : 'month-span';
       final col = from.difference(weekStart).inDays,
           days = to.difference(from).inDays + 1;
       final starts = sameDay(from, event.firstDay),
@@ -1495,7 +1460,7 @@ List<Widget> _monthWeekBars(
               : Builder(
                   builder: (handleContext) => CalendarTaskHandle(
                     record: event.record,
-                    constraints: currentMonth ? constraints : null,
+                    constraints: constraints,
                     onTap: (point) {
                       final box = handleContext.findRenderObject();
                       final offset = box is RenderBox

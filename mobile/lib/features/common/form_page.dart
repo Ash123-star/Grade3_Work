@@ -500,6 +500,7 @@ class _FormPageState extends ConsumerState<FormPage> {
       isScrollControlled: true,
       builder: (_) => PersonPicker(
         dispatch: ['dispatch', 'transfer', 'ai-draft'].contains(widget.kind),
+        proposal: taskProposalsEnabled && widget.kind=='dispatch' && widget.id==null,
         multiSelect: multiple,
         initialSelected: multiple ? participants.values.toList() : const [],
       ),
@@ -1715,10 +1716,11 @@ class _FormPageState extends ConsumerState<FormPage> {
         ),
       );
     }
-    final denied =
+    final proposal = taskProposalsEnabled && user.canReadBusiness && widget.kind=='dispatch' && widget.id==null;
+    final denied = !proposal && (
         (spec.manager && !user.manager) ||
         (spec.admin && !user.administrator) ||
-        (['dispatch', 'ai-draft'].contains(widget.kind) && !user.dispatch);
+        (['dispatch', 'ai-draft'].contains(widget.kind) && !user.dispatch));
     final auth = ['login', 'register'].contains(widget.kind);
     if (auth) return _authPage();
     if (denied) {
@@ -1985,10 +1987,12 @@ class PersonPicker extends ConsumerStatefulWidget {
   const PersonPicker({
     super.key,
     this.dispatch = false,
+    this.proposal = false,
     this.multiSelect = false,
     this.initialSelected = const [],
   });
   final bool dispatch;
+  final bool proposal;
   final bool multiSelect;
   final List<Record> initialSelected;
   @override
@@ -2046,7 +2050,7 @@ class _PersonPickerState extends ConsumerState<PersonPicker> {
     });
     try {
       final page = await repository.list(
-        widget.dispatch ? 'organization/dispatch-people' : 'organization',
+        widget.proposal ? 'organization/task-proposal-people' : widget.dispatch ? 'organization/dispatch-people' : 'organization',
         Query(search: querySearch, cursor: reset ? null : cursor),
       );
       if (!mounted || ticket != generation || !_sameSession) {

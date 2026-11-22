@@ -198,9 +198,8 @@ void main() {
           'adjacent-month-span:tasks:adjacent:2026-09-28T00:00:00.000',
         ),
       );
-      expect(adjacent, findsOneWidget);
-      final rect = t.getRect(adjacent);
-      await t.tapAt(Offset(rect.right - 8, rect.center.dy));
+      expect(adjacent, findsNothing);
+      await t.tap(find.byKey(const ValueKey('month-day:2026-9-30')));
       await t.pumpAndSettle();
       expect(
         sameDay(c.read(selectedDateProvider), DateTime(2026, 9, 30)),

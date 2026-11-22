@@ -4,6 +4,8 @@
 
 本文说明当前运行 Spring Boot 后端使用的 PostgreSQL 数据库。实际启动时使用 `server/src/main/resources/db/migration/` 的 Flyway 迁移；`deploy/postgresql/` 是独立的数据基础设施包，字段模型和 ID 类型不同，不能把两套脚本混合执行。
 
+V37 仅扩展 `review_requests` 的审核模式和决定来源约束，`TASK_MANAGER`、`TASK_RECIPIENT` 只允许用于 `TASK_CREATE`。历史行不回填、不重路由；新机制沿用带公司外键、禁止自审的 `review_steps`，关闭新入口不删除历史决定。依赖 V36 的员工职位与目录基线。
+
 ## 使用约定
 
 - `company_id`：公司租户标识。所有业务表都必须沿公司外键关联，服务端查询还要额外执行角色和组织范围检查。

@@ -79,7 +79,7 @@ class AttachmentAdapter implements HttpClientAdapter {
         );
       }
       status = downloadStatus;
-    } else if (o.path == '/organization/people') {
+    } else if (o.path == '/organization/people' || o.path == '/organization/task-proposal-people') {
       final waiting = peopleHold;
       if (waiting != null) await waiting.future;
       status = peopleStatus;
@@ -363,6 +363,7 @@ void main() {
     String route, {
     AttachmentPicker? picker,
     AttachmentSaver? saver,
+    Session actingUser = user,
     GlobalKey? boundary,
     double scale = 1,
   }) async {
@@ -373,7 +374,7 @@ void main() {
     addTearDown(t.view.resetDevicePixelRatio);
     final c = testContainer(
       overrides: [
-        sessionProvider.overrideWith((ref) => user),
+        sessionProvider.overrideWith((ref) => actingUser),
         fontScaleProvider.overrideWith((ref) => scale),
         repositoryProvider.overrideWith((ref) {
           final r = ref.watch(httpRepositoryProvider);
@@ -849,6 +850,7 @@ void main() {
       await launch(
         t,
         '/form/dispatch',
+        actingUser: taskProposalsEnabled ? const Session(id:'u1',name:'小橙',role:UserRole.employee,dispatch:false,token:'token') : user,
         picker: (_) async => [
           SelectedAttachment('说明.txt', Uint8List.fromList([65, 66])),
         ],
@@ -984,7 +986,7 @@ void main() {
       await t.tap(find.widgetWithText(FilledButton, '派发任务'));
       await settle(t);
       expect(
-        adapter.requests.any((o) => o.path == '/tasks' && o.method == 'POST'),
+        adapter.requests.any((o) => o.path == '/tasks' && o.method == 'POST' && (!taskProposalsEnabled || o.headers['Task-Dispatch-Policy']=='recipient-confirmation-v1')),
         isTrue,
         reason: t
             .widgetList<Text>(find.byType(Text))

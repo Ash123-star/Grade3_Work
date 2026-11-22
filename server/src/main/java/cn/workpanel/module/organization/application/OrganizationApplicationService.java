@@ -39,6 +39,13 @@ public class OrganizationApplicationService implements OrganizationApi {
     }
     public List<Map<String, Object>> departments(Actor actor) { requireActive(actor); return repository.departments(actor.company()); }
     public List<Map<String, Object>> teams(Actor actor) { requireActive(actor); return repository.treeTeams(actor); }
+    @org.springframework.beans.factory.annotation.Value("${workpanel.task.proposals-enabled:false}") private boolean proposalsEnabled;
+    public Map<String,Object> proposalPeople(Actor actor,String search,int cursor,int limit) {
+        requireActive(actor);Business.page(cursor,limit);
+        if(!proposalsEnabled) throw new ApiError(409,"DISPATCH_POLICY_UNAVAILABLE","当前环境尚未启用此派发策略");
+        if(search.length()>100) throw ApiError.bad("INVALID_SEARCH","关键词最多100字");
+        return repository.proposalPeople(actor.company(),search.trim(),cursor,limit);
+    }
     public Map<String, Object> people(Actor actor, String search, boolean dispatch, int cursor, int limit) {
         requireActive(actor); Business.page(cursor, limit); if (dispatch) actor.requireDispatch();
         return repository.people(actor, search, dispatch, cursor, limit);

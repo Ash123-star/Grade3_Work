@@ -89,3 +89,14 @@
 - **THEN** 数据层 SHALL 映射服务端返回的 `participants`、`label`、`start_at` 和 `deadline`
 - **AND** 标签颜色 SHALL 直接使用服务端返回值
 - **AND** 任务列表数据层 MUST NOT 接收、返回或显示完成情况、阶段或替代状态字段；任务详情仅可根据事件时间线提供既有操作所需的本地展示状态
+
+### Requirement: Opt-in task proposals and recipient consent
+P0：隔离验收启用新策略并显式请求时，在职且已确认的成员 SHALL 可向同公司在职人员提出任务。服务端 MUST 在直属上级批准且越出其指派权限的每位接收人已同意后才原子创建正式任务。旧客户端和默认关闭的环境保持原派发规则。
+
+#### Scenario: Upward or cross-department request
+- **WHEN** 员工向创始人或跨部门员工提交任务且直属经理同意
+- **THEN** 申请 SHALL 等待相应接收人确认，不出现在正式任务、参与人或派发通知中；任一接收人拒绝则整项不生效。
+
+#### Scenario: Same-team and direct manager
+- **WHEN** 当前直属上级有权指派全部目标，或其本人就是唯一接收人
+- **THEN** 一次独立批准 SHALL 生效一次；申请人自审、无权限代接受或重复决定 MUST 不产生正式任务。

@@ -10,10 +10,13 @@ public final class TaskParticipants {
     private TaskParticipants() {}
 
     public static void validate(Db db,Actor a,TaskDraft d) {
+        validate(db,a,d,true);
+    }
+    static void validate(Db db,Actor a,TaskDraft d,boolean restrictScope) {
         for(String person:d.participants()) {
             var rows=db.rows("SELECT * FROM users WHERE id=? AND company_id=? AND status='ACTIVE'",person,a.company());
             if(rows.isEmpty()) throw ApiError.notFound();
-            if(!a.canSeeUser(rows.getFirst())) throw ApiError.forbidden();
+            if(restrictScope&&!a.canSeeUser(rows.getFirst())) throw ApiError.forbidden();
         }
     }
 

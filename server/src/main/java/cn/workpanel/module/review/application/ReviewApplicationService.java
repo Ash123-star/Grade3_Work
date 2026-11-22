@@ -51,6 +51,59 @@ public class ReviewApplicationService {
         return get(actor,id);
     }
 
+    private static boolean proposal(Map<String,Object> row) {
+        return "TASK_CREATE".equals(row.get("kind")) && Set.of("TASK_MANAGER","TASK_RECIPIENT").contains(row.get("approval_mode"));
+    }
+    /** Called only by task dispatch after validating the feature opt-in and candidate. */
+    @Transactional public Map<String,Object> createTaskProposal(Actor actor,String target,Map<String,Object> candidate) {
+        actor=fresh(actor); if(!actor.status().equals("ACTIVE")||actor.mustChange()) throw ApiError.forbidden();
+        boolean exempt=actor.role().equals("FOUNDER")&&actor.dispatch();
+        String id=Db.id(),mode=exempt?"TASK_RECIPIENT":"TASK_MANAGER";
+        repository.create(id,actor,"TASK_CREATE",target,0,Map.of("founderExempt",exempt),candidate,"提出任务",mode);
+        repository.audit(actor,"REVIEW_REQUESTED",id,Map.of(),candidate,"提出任务");
+        if(!exempt) route(actor,id,mode);
+        else advanceProposal(actor,actor,repository.request(actor.company(),id,true));
+        return get(actor,id);
+    }
+    private void advanceProposal(Actor actor,Actor applicant,Map<String,Object> row) {
+        String id=Db.str(row,"id"),company=applicant.company();
+        if(!applicant.status().equals("ACTIVE")||applicant.mustChange()) throw ApiError.forbidden();
+        var candidate=repository.json(row.get("candidate"));
+        if(!java.time.OffsetDateTime.parse(Db.str(candidate,"deadline")).toInstant().isAfter(java.time.Instant.now())) throw new ApiError(409,"PROPOSAL_EXPIRED","期限已过，请修订后重提");
+        boolean exempt=Boolean.TRUE.equals(repository.json(row.get("before_value")).get("founderExempt"));
+        var approvals=repository.steps(id).stream().filter(s->"APPROVED".equals(s.get("state"))).map(s->Db.str(s,"reviewer_id")).toList();
+        Actor authority;
+        if(exempt) {
+            if(!applicant.role().equals("FOUNDER")||!applicant.dispatch()) throw ApiError.forbidden();
+            authority=applicant;
+        } else {
+            if(approvals.isEmpty() || !approvals.getFirst().equals(repository.directManager(company,applicant.id()))) throw new ApiError(409,"STALE_TASK_APPROVAL","直属关系已变更，请重新提交申请");
+            authority=Actor.from(repository.proposalPerson(company,approvals.getFirst()));
+        }
+        String next=null;
+        for(String target:Business.strings(candidate,"participants").stream().sorted().toList()) {
+            var person=repository.proposalPerson(company,target);
+            if(target.equals(applicant.id())||target.equals(authority.id())||approvals.contains(target)) continue;
+            // Organization visibility includes peers and higher positions. It is not by itself an assignment right.
+            boolean lower=rank(authority.role())>rank(Db.str(person,"role"));
+            boolean companyExecutive=Set.of("GENERAL_MANAGER","DEPUTY_GENERAL_MANAGER").contains(Db.str(person,"business_position"));
+            boolean assignable=authority.manager()&&authority.dispatch()&&authority.canSeeUser(person)&&lower&&!companyExecutive
+                    && !repository.targetManagesAuthority(company,target,authority.id());
+            if(!assignable && next==null) next=target;
+        }
+        if(next!=null) {
+            repository.mode(id,"TASK_RECIPIENT"); int pos=(int)repository.lastPosition(id)+1;
+            repository.step(id,next,applicant,pos); repository.notify(actor,next,"REVIEW_PENDING",id,"review:"+id+":"+next+":"+pos);
+        } else {
+            apply(actor,row); String source=exempt&&approvals.isEmpty()?"FOUNDER_EXEMPT":Db.str(row,"approval_mode");
+            repository.status(id,"APPROVED",source);repository.audit(actor,"REVIEW_APPROVED",id,Map.of(),Map.of("decisionSource",source),"必要确认已完成");
+            repository.notify(actor,applicant.id(),"REVIEW_APPROVED",id,"review-result:"+id+":0");
+        }
+    }
+    private static int rank(String role) {
+        return switch(role) { case "FOUNDER","ADMIN" -> 4; case "DIRECTOR" -> 3; case "LEADER" -> 2; default -> 1; };
+    }
+
     /** 申请人当前适用的审核模式；null 表示创始人权限内免审。 */
     String mode(Actor applicant,String kind) {
         if(kind.equals("MEMBERSHIP")) return "ADMIN_MEMBERSHIP";
@@ -111,6 +164,8 @@ public class ReviewApplicationService {
             if(!Db.str(row,"kind").equals("MEMBERSHIP")||!actor.admin()||!actor.reviewer()) throw ApiError.forbidden();
         } else if(mode.equals("FOUNDER_PEER")) {
             throw new ApiError(409,"REVIEW_RULE_RETIRED","旧创始人互审已停用，请重新提交");
+        } else if(proposal(row)&&mode.equals("TASK_RECIPIENT")) {
+            if(!Business.strings(repository.json(row.get("candidate")),"participants").contains(actor.id())) throw ApiError.forbidden();
         } else if(!repository.directManager(Db.str(row,"company_id"),Db.str(row,"applicant_id")).equals(actor.id())) {
             throw ApiError.forbidden();
         }
@@ -119,6 +174,12 @@ public class ReviewApplicationService {
         repository.decideStep(steps.getFirst().get("id"),approve,reason);
         String source=mode.equals("ADMIN_MEMBERSHIP")||mode.equals("FOUNDER_PEER")?mode:"DIRECT_MANAGER";
         Actor applicant=repository.actor(Db.str(row,"company_id"),Db.str(row,"applicant_id"));
+        if(proposal(row)) {
+            repository.audit(actor,"TASK_PROPOSAL_DECISION",id,Map.of(),Map.of("stage",mode,"approved",approve),reason);
+            if(approve) advanceProposal(actor,applicant,row);
+            else { repository.status(id,"REJECTED",mode); repository.notify(actor,applicant.id(),"REVIEW_REJECTED",id,"review-result:"+id+":0"); }
+            return view(repository.request(actor.company(),id,false),id);
+        }
         if(!approve) repository.status(id,"REJECTED",source);
         else { apply(actor,row); repository.status(id,"APPROVED",source); }
         repository.audit(actor,approve?"REVIEW_APPROVED":"REVIEW_REJECTED",id,Map.of("status","PENDING"),Map.of("status",approve?"APPROVED":"REJECTED","decisionSource",source),reason);
@@ -133,6 +194,7 @@ public class ReviewApplicationService {
         var row=repository.request(actor.company(),id,true);
         if(!actor.id().equals(row.get("applicant_id"))) throw ApiError.forbidden();
         if(Db.str(row,"status").equals("APPROVED")&&Db.str(row,"decision_source").equals("FOUNDER_EXEMPT")) return view(row,id);
+        if(proposal(row)) throw new ApiError(409,"PROPOSAL_REROUTE_UNSUPPORTED","不能跳过任务确认，请重新提交申请");
         if(Db.str(row,"approval_mode").equals("FOUNDER_PEER")) throw new ApiError(409,"REVIEW_RULE_RETIRED","旧创始人互审已作废，请重新提交");
         if(!row.get("status").equals("PENDING")) throw ApiError.conflict();
         // 历史已决定步骤只作为审计保留，不阻止仍待审的申请按当前关系重新路由。
@@ -190,10 +252,11 @@ public class ReviewApplicationService {
             if(row==null) continue;
             Actor applicant=repository.actor(actor.company(),Db.str(row,"applicant_id"));
             String kind=Db.str(row,"kind"),current=Db.str(row,"approval_mode");
+            if(current.equals("TASK_RECIPIENT")) continue; // Never replace recipient consent with managerial approval.
             if(current.equals("FOUNDER_PEER")) continue; // 已由前向迁移作废，旧候选不得重新路由。
             if(!kind.equals("MEMBERSHIP")&&(!applicant.status().equals("ACTIVE")||applicant.mustChange())) continue;
             // 仅剩一位创始人时不自动免审：保持原模式，等待申请人显式 reroute。
-            String desired=Objects.requireNonNullElse(mode(applicant,kind),current);
+            String desired=current.equals("TASK_MANAGER")?current:Objects.requireNonNullElse(mode(applicant,kind),current);
             if(desired.equals(current)&&!repository.currentReviewerView(id).isEmpty()) continue;
             boolean hadStep=!repository.pending(id).isEmpty();
             repository.supersedePending(id,"组织变更后审核人失效");
@@ -218,7 +281,7 @@ public class ReviewApplicationService {
         if((!applicant.status().equals("ACTIVE")||applicant.mustChange())&&!kind.equals("MEMBERSHIP")) throw ApiError.forbidden();
         var application=applications.get(kind);
         if(application==null) throw ApiError.bad("REVIEW_KIND","不支持的复核类型");
-        application.apply(kind,ReviewActors.context(applicant),ReviewActors.context(approver),target,version,candidate,Db.str(row,"reason"));
+        application.apply(proposal(row)?"TASK_CREATE_CONFIRMED":kind,ReviewActors.context(applicant),ReviewActors.context(approver),target,version,candidate,Db.str(row,"reason"));
         repository.audit(approver,"REVISION_APPLIED",target,repository.json(row.get("before_value")),candidate,Db.str(row,"reason"));
         // 人员停用、改角色、改直属上级或新增管理员审核人会改变其他待审申请的有效审核人，在同一事务内重新分配。
         if(kind.equals("USER")||kind.equals("REVIEWER")) reconcile(approver,Db.str(row,"id"));

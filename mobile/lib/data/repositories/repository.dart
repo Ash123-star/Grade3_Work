@@ -348,6 +348,7 @@ class HttpRepository implements Repository {
     'dashboard/personal' => '/dashboard/personal',
     'organization' ||
     'organization/admin' ||
+    'organization/task-proposal-people' => '/organization/task-proposal-people',
     'organization/dispatch-people' => '/organization/people',
     'audit' => '/organization/audit',
     'analytics' => '/analytics',
@@ -1157,6 +1158,7 @@ class HttpRepository implements Repository {
         receiveTimeout: movement ? const Duration(seconds: 15) : null,
         headers: {
           'Idempotency-Key': ?idempotencyKey,
+          if (taskProposalsEnabled && path=='/tasks') 'Task-Dispatch-Policy':'recipient-confirmation-v1',
           'If-Schedule-Constraints-Match': ?scheduleRevision,
         },
       ),
