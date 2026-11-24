@@ -1,5 +1,28 @@
 # 管理员简易后台验收记录
 
+
+## 2026-11-21 员工录入与目录改进（Issue #101）
+
+交付PR [#102](https://github.com/Ash123-star/Grade3_Work/pull/102)，关联Issue [#101](https://github.com/Ash123-star/Grade3_Work/issues/101)，功能提交 `4d963df`。基线main `ddcbf67`，独立分支 `codex/admin-directory-validation`；Windows、Java 21.0.11、Node 24.14.0、Docker临时PostgreSQL/Redis/Neo4j、系统Chrome。此次没有操作云端或展示数据库。
+
+- `npm.cmd run build`：退出0。
+- `npm.cmd run test:e2e`：38/38通过。桌面与手机项目覆盖新建/编辑、三项重复字段提示、姓名和手机预校验、部门经理跨部门候选、只读脱敏详情；测试1920/1366/1280/1093/1024/854/640/390的CSS视口，长账号/长姓名/部门内容不导致页面或目录横向溢出。缩放采用等效可用宽度覆盖，不宣称测试了所有电脑的原生显示缩放组合。
+- `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1`：退出0，579项，0失败、0错误、3外部条件跳过。
+- 复核最后的原始姓名控制字符与接口错误schema后：`powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests AdminConsoleIntegrationTest,EmployeeProvisioningTest`：退出0，24/24通过，包括真实HTTP→认证→应用事务→PostgreSQL、并发唯一约束、编辑排除自身、任职不提升角色、旧版本回滚及循环汇报拒绝。
+- `openspec.cmd validate --all --strict`：50/50通过。
+
+安全/隐私：非ADMIN和跨公司读写拒绝，身份证原文不返回目录或审计；任职与系统角色分离。可靠性：数据库唯一约束处理同时录入，失败无部分用户及成功审计。易用性：长内容换行、窄屏卡片、字段错误定位、键盘焦点及详情无可编辑身份原文。
+
+新增 `V36__employee_business_position.sql`，只新增业务职位列与值域约束，默认NONE，不推断现有人员任职，不改现有汇报关系；手机端继续读取同一reporting_relations。上线前须执行迁移并与后端配套发布；回滚应用时保留字段、个人资料及审计。区划字典固定来源/提交/许可及5893个现行历史县区码见 `server/src/main/resources/identity/input-data.md`，后续区划/号段新增需要维护。不能据格式校验宣称已实名认证。
+
+下面截图均使用自动化测试夹具中的合成人员资料：
+
+![桌面员工目录](screenshots/admin-directory/desktop-employees.png)
+![员工详情](screenshots/admin-directory/desktop-person-detail.png)
+![窄屏员工目录](screenshots/admin-directory/mobile-employees.png)
+
+命令日志保存在忽略目录 `output/backend-final.log`、`output/backend-focused-final.log`；浏览器原图在 `output/admin-console/`。历史真实员工身份空值补录任务7.3仍待授权资料，不编造。
+
 ## 2026-11-13整合验收（当前结论）
 
 后台PR #89已纳入整合PR #83的本地历史，保留默认简易后台、原组织/权限/公司事项管理及AI深链。完整后端规定脚本退出0：556项中553通过、3外部条件跳过，0失败、0错误；新后台浏览器20通过，原管理/AI浏览器48通过、6真实服务条件跳过，Web类型检查/构建及OpenSpec49项严格校验均退出0。真实HTTP/PostgreSQL账号开通、首次改密、公司隔离、独立审核、版本冲突和事务回滚断言未放宽；运行时OpenAPI已同步9个管理操作的错误响应。
