@@ -25,6 +25,7 @@
 | OSS资源 | [私有文件、静态素材发布、历史迁移与回滚](oss-storage.md) |
 | 认证/组织/审核 | [认证](member-b-auth.md)、[组织](member-b-organization.md)、[审核](member-b-review.md)；后续权限增量以当前契约与对应规格为准 |
 | 个人事项 | [接口与权限](personal-todos-interface.md)、[客户端设计](../mobile/docs/home-daily-todos-direction.md) |
+| 二期客户/会员 | [客户、会员、权益与核销](customer-membership.md) |
 | 任务与月历发布 | [任务生命周期](task-lifecycle-release.md)、[月历移动/完整行/证据/回滚](calendar-task-drag-release.md)；不再分散维护批次发布文件 |
 
 ## AI专题

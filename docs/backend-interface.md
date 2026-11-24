@@ -24,7 +24,7 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 写请求只接受文档列出的字段。更新请求携带 `version`；创建请求可携带 `Idempotency-Key`。版本冲突返回 `409`，越权对象通常返回 `404`，明确的人员筛选越权返回 `403`。
 
-每日事项与首页任务看板新增契约见 [personal-todos-interface.md](personal-todos-interface.md)（Issue #63）。事项仅本人可见，所有写请求必须有幂等键；该约束比下文通用创建规则更严格。
+每日事项与首页任务看板新增契约见 [personal-todos-interface.md](personal-todos-interface.md)（Issue #63）。事项仅本人可见，所有写请求必须有幂等键；该约束比下文通用创建规则更严格。二期客户/会员/权益接口见 [customer-membership.md](customer-membership.md)（首版仅 ADMIN，商城外部 ID 公司内唯一）。
 
 ## Web 管理控制台 `/api/admin/console`
 
