@@ -144,3 +144,16 @@ test('不同电脑尺寸及放大后的有效宽度下长资料不产生横向�
     await expect(page.getByRole('button',{name:'编辑资料',exact:true})).toBeVisible();
   }
 });
+
+test('CRM 默认关闭，既有管理员入口不变', async ({ page }) => {
+  const crmRequests: string[] = [];
+  await page.route('**/api/**', route => {
+    if (new URL(route.request().url()).pathname.startsWith('/api/crm/')) crmRequests.push(route.request().url());
+    return route.fulfill({ status: 404 });
+  });
+  await page.goto('/crm/customers/closed-example');
+  await expect(page.getByRole('heading', { name: '客户工作台尚未开放' })).toBeVisible();
+  await page.getByRole('link', { name: '返回管理员后台入口' }).click();
+  await expect(page.getByLabel('管理员账号')).toBeVisible();
+  expect(crmRequests).toEqual([]);
+});

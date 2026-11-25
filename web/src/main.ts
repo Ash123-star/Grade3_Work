@@ -3,7 +3,9 @@ import { initializeProductAssets } from './assets';
 void initializeProductAssets();
 
 // Keep existing management and AI deep links alongside the new employee console.
-if (window.location.pathname.startsWith('/admin/') || window.location.pathname === '/legacy') {
+if (window.location.pathname === '/crm' || window.location.pathname.startsWith('/crm/')) {
+  void import('./crm/main');
+} else if (window.location.pathname.startsWith('/admin/') || window.location.pathname === '/legacy') {
   void import('./management');
 } else {
   void Promise.all([import('./AdminConsole.vue'), import('./admin.css')]).then(([{ default: AdminConsole }]) => {
