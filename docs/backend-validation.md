@@ -9,6 +9,7 @@
 - `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven -Tests CommerceImportParserTest,CommerceIntegrationTest,CommerceMigrationUpgradeTest,CustomerDraftTest,CustomerIntegrationTest,AdminConsoleIntegrationTest` 退出 0，36 项通过。覆盖 Flyway 空库和 V36→V39、同文件并发只生效一次、旧版本保护、错误整批回滚、同条件精确金额、C 客户绑定及跨角色、跨公司拒绝。
 - `mvn.cmd -B -f server/pom.xml "-Dtest=CommerceIntegrationTest#publishesCommerceOpenApi" verify` 在同一隔离数据环境退出 0，最终运行时契约断言通过。商城 5 个路径及其响应 schema 同步至快照。
 - `npm.cmd run build` 与 `npm.cmd run test:e2e -- --workers=2` 退出 0，46 项通过。其中 2 项使用本地真实 HTTP/数据库，在桌面和窄屏分别验证 C 客户绑定、商城文件导入、重放、金额分组和批次回查。夹具用例验证 320px、键盘操作、异常定位和失权清理。
+- 商城接入原后台布局后，Web 构建通过，46 项桌面和窄屏浏览器回归通过，2 项单独启用的真实导入用例沿用上轮验收。本轮在独立演示库用 1440px 和 390px 复验共用会话、原有四个栏目往返、订单批次回查及原文件幂等重放。截图位于 `output/commerce-preview/shared-desktop.png` 和 `shared-mobile.png`。
 - `openspec.cmd validate --all --strict` 共 52 项通过。复验截图位于工作树忽略目录 `output/commerce-verification/`。对接条件及联合验收未完成项见 [二期商城任务](../openspec/changes/phase2-commerce-overview/tasks.md)。
 
 ## 首页月历复用与日志关联任务（2026-11-17，Issue #94）

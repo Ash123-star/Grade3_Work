@@ -18,12 +18,13 @@ const sample = {
   importId: receipt.id,
   sourceRow: 1,
 };
+const admin = { id: 'admin', name: '管理员', role: 'ADMIN', status: 'ACTIVE', must_change_password: false };
 
-async function fillLogin(page: Page, account: string, password: string) {
-  await page.goto('/commerce');
-  await page.getByLabel('账号').fill(account);
-  await page.getByLabel('密码', { exact: true }).fill(password);
-  await page.getByRole('button', { name: '登录', exact: true }).click();
+async function fillLogin(page: Page, account: string, password: string, path = '/commerce') {
+  await page.goto(path);
+  await page.getByLabel('管理员账号').fill(account);
+  await page.getByLabel('登录密码').fill(password);
+  await page.getByRole('button', { name: '登录后台' }).click();
 }
 
 async function mockCommerce(page: Page, forbidden = false) {
@@ -32,8 +33,12 @@ async function mockCommerce(page: Page, forbidden = false) {
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     if (url.pathname === '/api/auth/login') {
-      await route.fulfill({ json: { token: 'test-session', user: { id: 'admin', name: '管理员', role: 'ADMIN',
-        status: 'ACTIVE', must_change_password: false } } });
+      await route.fulfill({ json: { token: 'test-session', user: admin } });
+    } else if (url.pathname === '/api/auth/me') {
+      await route.fulfill({ json: admin });
+    } else if (url.pathname.startsWith('/api/admin/console/')) {
+      const list = /\/(?:employees|priorities|history|reviews)$/.test(url.pathname);
+      await route.fulfill({ json: list ? { items: [], total: 0, nextCursor: 0 } : [] });
     } else if (forbidden) {
       await route.fulfill({ status: 403, json: { message: '不在授权范围内', traceId: 'test-scope' } });
     } else if (url.pathname === '/api/commerce/overview') {
@@ -64,7 +69,7 @@ test('商城导入回执、条件保留和金额来源', async ({ page }) => {
   await expect(page.getByText('没有符合条件的订单。')).toBeVisible();
 
   await page.getByRole('button', { name: '文件导入', exact: true }).click();
-  await page.getByLabel('商城文件').setInputFiles('public/commerce-import-example.json');
+  await page.getByLabel('商城文件', { exact: true }).setInputFiles('public/commerce-import-example.json');
   const submit = page.getByRole('button', { name: '开始导入' });
   await submit.click();
   await expect(page.getByRole('heading', { name: '导入完成' })).toBeVisible();
@@ -88,12 +93,31 @@ test('商城导入回执、条件保留和金额来源', async ({ page }) => {
   await expect(page.getByText(receipt.sha256)).toBeVisible();
 });
 
+test('商城沿用后台布局与登录，可往返全部既有栏目', async ({ page }) => {
+  await mockCommerce(page);
+  await fillLogin(page, 'admin', 'test-password', '/');
+  await expect(page.getByRole('heading', { name: '员工与账号', exact: true })).toBeVisible();
+
+  const nav = page.getByRole('navigation', { name: '后台导航' });
+  const commerce = nav.getByRole('link', { name: '商城经营' });
+  for (const section of ['公司重要事项', '修改记录', '申请与审核', '员工与账号']) {
+    await commerce.click();
+    await expect(page).toHaveURL(/\/commerce$/);
+    await expect(commerce).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { name: '经营概览' })).toBeVisible();
+    await nav.getByRole('button', { name: section, exact: true }).click();
+    await expect(page.getByRole('heading', { name: section, exact: true })).toBeVisible();
+    await expect(nav.getByRole('button', { name: section, exact: true })).toHaveAttribute('aria-current', 'page');
+  }
+  expect(await page.evaluate(() => sessionStorage.getItem('workpanel-token'))).toBe('test-session');
+});
+
 test('商城导入异常可定位且 320px 页面无横向溢出', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await mockCommerce(page);
   await fillLogin(page, 'admin', 'test-password');
   await page.getByRole('button', { name: '文件导入', exact: true }).click();
-  await page.getByLabel('商城文件').setInputFiles({
+  await page.getByLabel('商城文件', { exact: true }).setInputFiles({
     name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('invalid'),
   });
   await page.getByRole('button', { name: '开始导入' }).click();
@@ -105,9 +129,10 @@ test('商城导入异常可定位且 320px 页面无横向溢出', async ({ page
 test('商城授权失效时清理业务界面并回到登录', async ({ page }) => {
   await mockCommerce(page, true);
   await fillLogin(page, 'admin', 'test-password');
-  await expect(page.getByRole('heading', { name: '登录商城经营' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('不在授权范围内');
   await expect(page.getByRole('navigation', { name: '商城经营' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: '后台导航' })).toHaveCount(0);
   expect(await page.evaluate(() => sessionStorage.getItem('workpanel-token'))).toBeNull();
 });
 
@@ -138,7 +163,7 @@ test('商城真实 HTTP 导入、重放和钻取 @commerce-live', async ({ page 
     orders: [{ externalOrderId: orderId, externalMemberId: memberId, status: 'PAID', currency: 'CNY',
       amount: '12.34', orderedAt: '2026-11-24T00:00:00+08:00', sourceUpdatedAt: '2026-11-24T01:00:00+08:00' }],
   };
-  await page.getByLabel('商城文件').setInputFiles({
+  await page.getByLabel('商城文件', { exact: true }).setInputFiles({
     name: 'live.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)),
   });
   await page.getByRole('button', { name: '开始导入' }).click();

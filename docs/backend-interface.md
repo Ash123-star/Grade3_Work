@@ -32,7 +32,7 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 ## 二期商城 `/api/commerce`
 
-独立 Web 入口 `/commerce` 复用账号登录。商城接口统一要求已改初始密码的 ACTIVE ADMIN，公司取自会话。会话失效返回 401，其他角色或待确认账号返回 403，不可见的客户或批次返回 404。接口成功响应禁止缓存。关联 Issue #107 及 [OpenSpec](../openspec/changes/phase2-commerce-overview/specs/commerce-overview/spec.md)。
+Web 管理后台的「商城经营」栏目对应 `/commerce`，也可用该地址直接进入，复用原有后台登录。商城接口统一要求已改初始密码的 ACTIVE ADMIN，公司取自会话。会话失效返回 401，其他角色或待确认账号返回 403，不可见的客户或批次返回 404。接口成功响应禁止缓存。关联 Issue #107 及 [OpenSpec](../openspec/changes/phase2-commerce-overview/specs/commerce-overview/spec.md)。
 
 本地启动 Web 时将 `VITE_API_TARGET` 指向已运行并完成迁移的本地后端，并把实际 Vite 源加入后端 `CORS_ORIGINS`（如 `http://127.0.0.1:5173`）。登录后可在 `/commerce` 操作。
 
