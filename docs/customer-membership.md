@@ -30,6 +30,8 @@
 
 核销规则：同权益同 key 只记一次并返回原结果；权益停用、上海当天不在有效期、次数用完均 409；客户/权益不匹配或跨公司 404。外部 ID 冲突 409，不自动合并客户。
 
+E 按当前客户的 `membership.mallMemberId` 匹配公司内商城快照。A 可使用统一客户 ID 调用 [商城会员与订单查询](backend-interface.md#二期商城-apicommerce)，由服务端执行绑定和权限校验。
+
 ## 权限与边界
 
 - 首版 `CustomerService.admin()` 刷新 ACTIVE ADMIN 并拒绝首次改密；普通员工、创始人等角色待 B 确认后放开。
