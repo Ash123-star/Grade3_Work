@@ -113,6 +113,96 @@ test('商城导入回执、条件保留和金额来源', async ({ page }) => {
   await expect(page.getByText(receipt.sha256)).toBeVisible();
 });
 
+test('订单切换等待期间保留表格，返回全部订单恢复原页', async ({ page }) => {
+  await mockCommerce(page);
+  const allOrders = Array.from({ length: 24 }, (_, index) => ({
+    ...sample,
+    externalOrderId: '商城订单-' + (index + 1),
+    status: index >= 22 ? 'CANCELLED' : 'PAID',
+    sourceRow: index + 1,
+  }));
+  let finishDrill!: () => void;
+  const waitForDrill = new Promise<void>(resolve => { finishDrill = resolve; });
+  let failNextDrill = false;
+  await page.route(/\/api\/commerce\/(?:overview|orders)(?:\?|$)/, async route => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/overview')) {
+      await route.fulfill({ json: { orderCount: allOrders.length, groups: [
+        { orderCount: 2, status: 'CANCELLED', currency: 'CNY', amount: '99.00' },
+        { orderCount: 22, status: 'PAID', currency: 'CNY', amount: '690.00' },
+      ] } });
+      return;
+    }
+    const status = url.searchParams.get('status');
+    if (status) await waitForDrill;
+    if (status && failNextDrill) {
+      failNextDrill = false;
+      await route.fulfill({ status: 503, json: { message: '商城明细暂时无法加载' } });
+      return;
+    }
+    const items = status ? allOrders.filter(order => order.status === status) : allOrders;
+    const offset = Number(url.searchParams.get('cursor') ?? 0);
+    const end = offset + Number(url.searchParams.get('limit'));
+    await route.fulfill({ json: {
+      items: items.slice(offset, end), total: items.length, nextCursor: end < items.length ? String(end) : null,
+    } });
+  });
+
+  await fillLogin(page, 'admin', 'test-password', '/commerce?customerId=crm-customer');
+  const pager = page.getByRole('navigation', { name: '订单分页' });
+  const rows = page.getByRole('region', { name: '商城订单' }).getByRole('rowheader');
+  const heading = page.getByRole('heading', { name: '订单明细' });
+  await expect(pager).toContainText('共 24 笔 · 第 1/3 页');
+  await expect(rows).toHaveCount(10);
+  await expect(pager.getByRole('button', { name: '上一页' })).toBeDisabled();
+  await pager.getByRole('button', { name: '下一页' }).click();
+  await expect(pager).toContainText('第 2/3 页');
+  await expect(rows.first()).toHaveText('商城订单-11');
+
+  const sectionTop = () => heading.evaluate(element => element.getBoundingClientRect().top + window.scrollY);
+  const originalTop = await sectionTop();
+  const drill = page.getByRole('button', { name: '查看 2 笔明细' });
+  const started = page.waitForRequest(request => {
+    const url = new URL(request.url());
+    return url.pathname === '/api/commerce/orders' && url.searchParams.get('status') === 'CANCELLED';
+  });
+  try {
+    await drill.click();
+    const params = new URL((await started).url()).searchParams;
+    expect(params.get('currency')).toBe('CNY');
+    expect(params.get('customerId')).toBe('crm-customer');
+    expect(params.get('limit')).toBe('10');
+    await expect(rows).toHaveCount(10);
+    await expect(rows.first()).toHaveText('商城订单-11');
+    await expect(drill).toHaveAttribute('aria-pressed', 'false');
+    expect(await sectionTop()).toBeCloseTo(originalTop, 1);
+  } finally {
+    finishDrill();
+  }
+
+  await expect(rows).toHaveCount(2);
+  await expect(heading).toBeFocused();
+  await expect(drill).toHaveAttribute('aria-pressed', 'true');
+  const back = page.getByRole('button', { name: '返回全部订单' });
+  await expect(back).toBeInViewport({ ratio: 0.95 });
+  await back.click();
+  await expect(pager).toContainText('共 24 笔 · 第 2/3 页');
+  await expect(rows.first()).toHaveText('商城订单-11');
+  await expect(drill).toHaveAttribute('aria-pressed', 'false');
+  await pager.getByRole('button', { name: '下一页' }).click();
+  await expect(pager).toContainText('第 3/3 页');
+  await expect(rows).toHaveCount(4);
+  await expect(pager.getByRole('button', { name: '下一页' })).toBeDisabled();
+
+  failNextDrill = true;
+  await drill.click();
+  await expect(page.getByRole('alert')).toHaveText('商城明细暂时无法加载');
+  await expect(pager).toContainText('第 3/3 页');
+  await expect(rows).toHaveCount(4);
+  await page.getByRole('button', { name: '重试' }).click();
+  await expect(rows).toHaveCount(2);
+});
+
 test('商城会员用中文显示示例编号，原号可展开', async ({ page }) => {
   await mockCommerce(page);
   await fillLogin(page, 'admin', 'test-password');

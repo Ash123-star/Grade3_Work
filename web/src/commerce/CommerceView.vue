@@ -25,10 +25,20 @@ const overview = ref<Overview | null>(null);
 const orders = ref<Page<Order> | null>(null);
 const members = ref<Page<Member> | null>(null);
 const group = ref<OrderGroup | null>(null);
-const cursor = ref('0');
-const pageSize = 20;
+const orderPageSize = 10;
+const memberPageSize = 20;
+const orderCursor = ref('0');
+const memberCursor = ref('0');
+let allOrdersCursor = '0';
+const orderPage = computed(() => Math.floor(Number(orderCursor.value) / orderPageSize) + 1);
+const orderPageCount = computed(() => Math.ceil((orders.value?.total ?? 0) / orderPageSize));
+const orderScope = computed(() => {
+  const selected = group.value;
+  return selected ? `${orderStatuses[selected.status]} · ${currencyName(selected.currency)}` : '全部订单';
+});
 const loading = ref(false);
 const readError = ref('');
+const orderPanel = ref<HTMLElement | null>(null);
 const orderHeading = ref<HTMLElement | null>(null);
 let readTask: AbortController | undefined;
 let retryRead: (() => void) | undefined;
@@ -101,56 +111,61 @@ async function read(action: (signal: AbortSignal) => Promise<void>, retry: () =>
   }
 }
 
-function loadOverview() {
-  source.value = null;
-  overview.value = null;
-  orders.value = null;
-  group.value = null;
-  cursor.value = '0';
+function loadOverview(criteria = applied) {
   void read(async signal => {
-    const [summary, page] = await Promise.all([
-      commerceApi<Overview>('/overview', signal, applied),
-      commerceApi<Page<Order>>('/orders', signal, { ...applied, limit: String(pageSize) }),
+    const [summary, result] = await Promise.all([
+      commerceApi<Overview>('/overview', signal, criteria),
+      commerceApi<Page<Order>>('/orders', signal, { ...criteria, limit: String(orderPageSize) }),
     ]);
     if (!signal.aborted) {
+      applied = criteria;
       overview.value = summary;
-      orders.value = page;
+      orders.value = result;
+      group.value = null;
+      source.value = null;
+      orderCursor.value = '0';
+      allOrdersCursor = '0';
     }
-  }, loadOverview);
+  }, () => loadOverview(criteria));
 }
 
 function searchOrders() {
-  if (invalidDateRange.value) return;
-  applied = { ...filters.value };
-  loadOverview();
+  if (!invalidDateRange.value) loadOverview({ ...filters.value });
 }
 
 function loadOrders(next: string, selected: OrderGroup | null = group.value) {
-  source.value = null;
-  orders.value = null;
-  group.value = selected;
-  cursor.value = next;
   const groupFilter: Record<string, string> = selected ? { status: selected.status, currency: selected.currency } : {};
+  const query = { ...applied, ...groupFilter, limit: String(orderPageSize) };
   void read(async signal => {
-    const result = await commerceApi<Page<Order>>('/orders', signal, {
-      ...applied, ...groupFilter, cursor: next, limit: String(pageSize),
-    });
-    if (!signal.aborted) orders.value = result;
-  }, () => loadOrders(next, selected));
-}
+    let offset = next;
+    let result = await commerceApi<Page<Order>>('/orders', signal, { ...query, cursor: offset });
+    if (!signal.aborted && offset !== '0' && !result.items.length) {
+      offset = '0';
+      result = await commerceApi<Page<Order>>('/orders', signal, { ...query, cursor: offset });
+    }
+    if (signal.aborted) return;
+    orders.value = result;
+    group.value = selected;
+    source.value = null;
+    orderCursor.value = offset;
+    if (!selected) allOrdersCursor = offset;
 
-async function drill(selected: OrderGroup) {
-  loadOrders('0', selected);
-  await nextTick();
-  orderHeading.value?.focus();
+    await nextTick();
+    if (signal.aborted) return;
+    orderHeading.value?.focus({ preventScroll: true });
+    orderPanel.value?.scrollIntoView({
+      block: 'nearest',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }, () => loadOrders(next, selected));
 }
 
 function loadMembers(next = '0') {
   members.value = null;
-  cursor.value = next;
+  memberCursor.value = next;
   void read(async signal => {
     const result = await commerceApi<Page<Member>>('/members', signal, {
-      ...appliedMember, cursor: next, limit: String(pageSize),
+      ...appliedMember, cursor: next, limit: String(memberPageSize),
     });
     if (!signal.aborted) members.value = result;
   }, () => loadMembers(next));
@@ -162,6 +177,7 @@ function searchMembers() {
 }
 
 function loadSource(id: string) {
+  if (loading.value) return;
   source.value = null;
   void read(async signal => {
     const result = await commerceApi<Receipt>('/imports/' + encodeURIComponent(id), signal);
@@ -213,7 +229,7 @@ async function importFile() {
   }
 }
 
-function previous() { return String(Math.max(0, Number(cursor.value) - pageSize)); }
+function previous(cursor: string, pageSize: number) { return String(Math.max(0, Number(cursor) - pageSize)); }
 onMounted(loadOverview);
 onBeforeUnmount(() => {
   readTask?.abort();
@@ -236,7 +252,8 @@ onBeforeUnmount(() => {
       <button v-for="(label, key) in tabs" :key="key" type="button" :class="{ primary: tab === key }"
         :aria-pressed="tab === key" @click="selectTab(key)">{{ label }}</button>
     </nav>
-    <p v-if="loading" role="status" class="muted commerce-feedback">正在加载…</p>
+    <p v-if="loading && (tab === 'overview' ? !overview?.orderCount : !members)" role="status"
+      class="muted commerce-feedback">正在加载…</p>
     <div v-if="readError" class="alert error commerce-feedback">
       <p role="alert">{{ readError }}</p>
       <button v-if="retryRead" type="button" @click="retryRead()">重试</button>
@@ -270,24 +287,35 @@ onBeforeUnmount(() => {
               <li v-for="item in overview.groups" :key="item.status + item.currency">
                 <span class="muted">{{ orderStatuses[item.status] }} · {{ currencyName(item.currency) }}</span>
                 <strong>{{ displayAmount(item.amount) }}</strong>
-                <button type="button" class="text-button"
+                <button type="button" class="text-button" aria-controls="commerce-order-details" :disabled="loading"
                   :aria-pressed="group?.status === item.status && group?.currency === item.currency"
-                  @click="drill(item)">查看 {{ item.orderCount }} 笔明细</button>
+                  @click="loadOrders('0', item)">查看 {{ item.orderCount }} 笔明细</button>
               </li>
             </ul>
           </template>
         </div>
       </section>
 
-      <section v-if="overview?.orderCount" class="data-panel commerce-panel">
-        <div class="panel-toolbar">
+      <section v-if="overview?.orderCount" id="commerce-order-details" ref="orderPanel" class="data-panel commerce-panel">
+        <div class="panel-toolbar commerce-order-toolbar">
           <div>
             <h2 ref="orderHeading" tabindex="-1">订单明细</h2>
-            <span v-if="group" class="muted">{{ orderStatuses[group.status] }} · {{ currencyName(group.currency) }}</span>
+            <p class="muted commerce-order-status" role="status">
+              {{ loading ? '正在加载…' : orderScope }}
+            </p>
           </div>
-          <button v-if="group" type="button" @click="loadOrders('0', null)">全部明细</button>
+          <button v-if="group" type="button" :disabled="loading" @click="loadOrders(allOrdersCursor, null)">返回全部订单</button>
         </div>
         <template v-if="orders">
+          <nav v-if="orders.total" class="pagination commerce-order-pagination" aria-label="订单分页">
+            <span>共 {{ orders.total }} 笔<template v-if="orderPageCount > 1"> · 第 {{ orderPage }}/{{ orderPageCount }} 页</template></span>
+            <div v-if="orderPageCount > 1">
+              <button type="button" :disabled="loading || orderCursor === '0'"
+                @click="loadOrders(previous(orderCursor, orderPageSize))">上一页</button>
+              <button type="button" :disabled="loading || !orders.nextCursor"
+                @click="orders.nextCursor && loadOrders(orders.nextCursor)">下一页</button>
+            </div>
+          </nav>
           <p v-if="!orders.items.length" class="empty-state commerce-empty">没有符合条件的订单。</p>
           <div v-else class="table-scroll commerce-table" role="region" aria-label="商城订单" tabindex="0">
             <table role="table">
@@ -303,18 +331,12 @@ onBeforeUnmount(() => {
                   <td data-label="下单时间">{{ displayTime(order.orderedAt) }}</td>
                   <td data-label="状态"><span class="badge">{{ orderStatuses[order.status] }}</span></td>
                   <td data-label="原始金额" class="commerce-amount">{{ currencyName(order.currency) }} {{ displayAmount(order.amount) }}</td>
-                  <td data-label="来源"><button type="button" class="text-button" @click="loadSource(order.importId)">批次 · 第 {{ order.sourceRow }} 条</button></td>
+                  <td data-label="来源"><button type="button" class="text-button" :aria-disabled="loading"
+                    @click="loadSource(order.importId)">批次 · 第 {{ order.sourceRow }} 条</button></td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <nav v-if="orders.total > pageSize" class="pagination" aria-label="订单分页">
-            <span>共 {{ orders.total }} 条</span>
-            <div>
-              <button type="button" :disabled="cursor === '0'" @click="loadOrders(previous())">上一页</button>
-              <button type="button" :disabled="!orders.nextCursor" @click="orders.nextCursor && loadOrders(orders.nextCursor)">下一页</button>
-            </div>
-          </nav>
         </template>
         <section v-if="source" class="commerce-source">
           <h3>导入来源</h3>
@@ -344,10 +366,10 @@ onBeforeUnmount(() => {
             </tr></tbody>
           </table>
         </div>
-        <nav v-if="members.total > pageSize" class="pagination" aria-label="会员分页">
+        <nav v-if="members.total > memberPageSize" class="pagination" aria-label="会员分页">
           <span>共 {{ members.total }} 条</span>
           <div>
-            <button type="button" :disabled="cursor === '0'" @click="loadMembers(previous())">上一页</button>
+            <button type="button" :disabled="memberCursor === '0'" @click="loadMembers(previous(memberCursor, memberPageSize))">上一页</button>
             <button type="button" :disabled="!members.nextCursor" @click="members.nextCursor && loadMembers(members.nextCursor)">下一页</button>
           </div>
         </nav>

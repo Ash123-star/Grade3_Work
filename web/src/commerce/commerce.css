@@ -72,6 +72,16 @@
 
 .commerce-workspace .commerce-groups .text-button { justify-self: start; }
 .commerce-workspace .commerce-groups [aria-pressed="true"] { background: #e5f0e8; }
+.commerce-workspace .commerce-order-toolbar { min-height: 92px; flex-wrap: nowrap; }
+.commerce-workspace .commerce-order-toolbar button { flex-shrink: 0; }
+.commerce-workspace .commerce-order-status { margin: 4px 0 0; }
+.commerce-workspace .commerce-order-pagination {
+  padding-block: 10px;
+  border-top: 1px solid #edf0eb;
+  color: #586e62;
+  font-size: 13px;
+}
+
 .commerce-workspace .commerce-table table { white-space: normal; table-layout: fixed; }
 .commerce-workspace .commerce-table th,
 .commerce-workspace .commerce-table td { overflow-wrap: anywhere; padding-inline: 15px; text-align: left; }
@@ -134,4 +144,6 @@
   .commerce-workspace .commerce-import,
   .commerce-workspace .commerce-summary { padding: 16px; }
   .commerce-workspace .commerce-tabs button { flex: 1; padding-inline: 8px; font-size: 13px; }
+  .commerce-workspace .commerce-order-toolbar { min-height: 72px; }
+  .commerce-workspace .commerce-order-pagination { font-size: 12px; }
 }

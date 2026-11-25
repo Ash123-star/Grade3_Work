@@ -18,7 +18,7 @@ const label = computed(() => {
 <template>
   <details v-if="label !== value" class="commerce-reference">
     <summary>{{ label }}</summary>
-    <p class="muted">原始编号 <code>{{ value }}</code></p>
+    <p class="muted">商城原编号 <code>{{ value }}</code></p>
   </details>
   <span v-else>{{ value }}</span>
 </template>

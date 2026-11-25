@@ -11,6 +11,7 @@
 - `npm.cmd run build` 与 `npm.cmd run test:e2e -- --workers=2` 退出 0，46 项通过。其中 2 项使用本地真实 HTTP/数据库，在桌面和窄屏分别验证 C 客户绑定、商城文件导入、重放、金额分组和批次回查。夹具用例验证 320px、键盘操作、异常定位和失权清理。
 - 商城接入原后台布局后，使用独立演示库在 1440px 和 390px 复验共用会话、原有四个栏目往返、订单批次回查及文件幂等重放。截图位于 `output/commerce-preview/shared-desktop.png` 和 `shared-mobile.png`。
 - 中文展示调整后，Web 构建通过，48 项桌面和窄屏浏览器回归通过，2 项需单独启用的写入式真实导入用例沿用首轮验收。本轮在英语浏览器中用 1700px 和 390px 加载已有演示数据，复验中文日历、人民币和美元、原编号展开及查询、日期筛选和批次回查。截图位于 `output/commerce-preview/` 下的 `overview-zh-*.png` 和 `members-zh-*.png`。
+- 订单明细调整后，Web 构建通过，50 项浏览器回归通过，2 项写入式真实导入用例沿用首轮验收。使用已有 24 笔数据在 1700px 和 390px 核对 10、10、4 笔分页与页码。延迟真实明细请求时，保留原列表和滚动位置。响应后显示 2 笔已取消订单及可见的返回按钮，返回可恢复第 2 页。浏览器回归同时覆盖筛选条件、请求失败后保留原页及重试。截图位于 `output/commerce-preview/` 下的 `orders-page-*.png` 和 `orders-group-*.png`。
 - `openspec.cmd validate --all --strict` 共 52 项通过。复验截图位于工作树忽略目录 `output/commerce-verification/`。对接条件及联合验收未完成项见 [二期商城任务](../openspec/changes/phase2-commerce-overview/tasks.md)。
 
 ## 首页月历复用与日志关联任务（2026-11-17，Issue #94）
