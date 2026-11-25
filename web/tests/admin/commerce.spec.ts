@@ -8,11 +8,11 @@ const receipt = {
   orders: { applied: 1, unchanged: 0, stale: 0 },
 };
 const sample = {
-  externalOrderId: 'order-demo',
-  externalMemberId: 'member-demo',
+  externalOrderId: 'OVERVIEW-DEMO-20261125-O23',
+  externalMemberId: 'OVERVIEW-DEMO-20261125-M01',
   status: 'PAID',
   currency: 'CNY',
-  amount: '139.5000',
+  amount: '12345.6789',
   orderedAt: '2026-11-24T09:20:00+08:00',
   sourceUpdatedAt: '2026-11-24T09:30:00+08:00',
   importId: receipt.id,
@@ -47,6 +47,9 @@ async function mockCommerce(page: Page, forbidden = false) {
     } else if (url.pathname === '/api/commerce/orders') {
       requests.push(url);
       await route.fulfill({ json: { items: imported ? [sample] : [], total: imported ? 1 : 0, nextCursor: null } });
+    } else if (url.pathname === '/api/commerce/members') {
+      await route.fulfill({ json: { items: [{ externalMemberId: sample.externalMemberId, level: '金卡',
+        status: 'ACTIVE', joinedAt: '2026-11-01', expiresAt: '2027-10-31' }], total: 1, nextCursor: null } });
     } else if (url.pathname === '/api/commerce/imports') {
       if (route.request().postData()?.includes('invalid')) {
         await route.fulfill({ status: 400, json: { message: '金额须为非负十进制字符串', section: 'orders',
@@ -77,20 +80,48 @@ test('商城导入回执、条件保留和金额来源', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '此文件此前已导入' })).toBeVisible();
 
   await page.getByRole('button', { name: '查看经营概览' }).click();
-  await page.getByLabel('开始日期').fill('2026-11-24');
-  await page.getByLabel('结束日期').fill('2026-11-24');
-  await page.getByLabel('订单 ID').fill('order-demo');
+  const from = page.getByRole('combobox', { name: '开始日期' });
+  const to = page.getByRole('combobox', { name: '结束日期' });
+  await expect(from).toHaveAttribute('placeholder', '选择开始日期');
+  await expect(to).toHaveAttribute('placeholder', '选择结束日期');
+  await to.fill('2026-11-24');
+  await to.press('Enter');
+  await from.fill('2026-11-25');
+  await from.press('Enter');
+  await expect(page.getByRole('alert')).toHaveText('结束日期不能早于开始日期。');
+  const previousOrderRequests = requests.length;
+  await page.getByRole('button', { name: '查询', exact: true }).click();
+  expect(requests).toHaveLength(previousOrderRequests);
+  await from.fill('2026-11-24');
+  await from.press('Enter');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByLabel('订单原编号').fill(sample.externalOrderId);
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await page.getByRole('button', { name: '查看 1 笔明细' }).press('Enter');
   await expect(page.getByRole('heading', { name: '订单明细' })).toBeFocused();
   expect(requests.at(-1)?.searchParams.get('from')).toBe('2026-11-24');
   expect(requests.at(-1)?.searchParams.get('to')).toBe('2026-11-24');
-  expect(requests.at(-1)?.searchParams.get('externalOrderId')).toBe('order-demo');
+  expect(requests.at(-1)?.searchParams.get('externalOrderId')).toBe(sample.externalOrderId);
   expect(requests.at(-1)?.searchParams.get('status')).toBe('PAID');
   expect(requests.at(-1)?.searchParams.get('currency')).toBe('CNY');
-  await expect(page.getByRole('cell', { name: /CNY 139\.5000/ })).toBeVisible();
+  await expect(page.getByRole('cell', { name: /人民币 12,345\.6789/ })).toBeVisible();
+  const order = page.getByRole('rowheader').filter({ hasText: '演示订单 20261125-23' });
+  await expect(order.getByText(sample.externalOrderId, { exact: true })).not.toBeVisible();
+  await order.getByText('演示订单 20261125-23', { exact: true }).press('Enter');
+  await expect(order.getByText(sample.externalOrderId, { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '批次 · 第 1 条' }).click();
   await expect(page.getByText(receipt.sha256)).toBeVisible();
+});
+
+test('商城会员用中文显示示例编号，原号可展开', async ({ page }) => {
+  await mockCommerce(page);
+  await fillLogin(page, 'admin', 'test-password');
+  await page.getByRole('button', { name: '商城会员', exact: true }).click();
+  const member = page.getByRole('rowheader').filter({ hasText: '演示会员 01' });
+  await expect(member).toBeVisible();
+  await expect(member.getByText(sample.externalMemberId, { exact: true })).not.toBeVisible();
+  await member.getByText('演示会员 01', { exact: true }).click();
+  await expect(member.getByText(sample.externalMemberId, { exact: true })).toBeVisible();
 });
 
 test('商城沿用后台布局与登录，可往返全部既有栏目', async ({ page }) => {
@@ -121,7 +152,7 @@ test('商城导入异常可定位且 320px 页面无横向溢出', async ({ page
     name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('invalid'),
   });
   await page.getByRole('button', { name: '开始导入' }).click();
-  await expect(page.getByRole('alert')).toContainText('订单列表 · 第 2 条 · amount');
+  await expect(page.getByRole('alert')).toContainText('订单列表 · 第 2 条 · 金额');
   await expect(page.getByRole('alert')).toContainText('test-row');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
 });
@@ -171,11 +202,11 @@ test('商城真实 HTTP 导入、重放和钻取 @commerce-live', async ({ page 
   await page.getByRole('button', { name: '开始导入' }).click();
   await expect(page.getByRole('heading', { name: '此文件此前已导入' })).toBeVisible();
   await page.getByRole('button', { name: '查看经营概览' }).click();
-  await page.getByLabel('客户 ID').fill(customerId);
+  await page.getByLabel('客户编号').fill(customerId);
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await page.getByRole('button', { name: '查看 1 笔明细' }).click();
   await expect(page.getByRole('rowheader', { name: new RegExp(orderId) })).toBeVisible();
-  await expect(page.getByRole('cell', { name: /CNY 12\.3400/ })).toBeVisible();
+  await expect(page.getByRole('cell', { name: /人民币 12\.34/ })).toBeVisible();
   await page.getByRole('button', { name: '批次 · 第 1 条' }).click();
   await expect(page.getByRole('heading', { name: '导入来源' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(page.viewportSize()?.width);

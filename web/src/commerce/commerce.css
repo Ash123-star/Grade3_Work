@@ -25,6 +25,20 @@
 .commerce-workspace label { min-width: 0; margin: 0; }
 .commerce-workspace input { min-width: 0; max-width: 100%; }
 
+.commerce-workspace .el-date-editor.el-input {
+  width: 100%;
+  height: 46px;
+  display: flex;
+  margin-top: 7px;
+  --el-input-border-radius: 10px;
+  --el-input-border-color: #d5dfd9;
+  --el-input-focus-border-color: #73b59f;
+}
+.commerce-workspace .el-date-editor .el-input__wrapper { width: 100%; }
+.commerce-workspace .el-date-editor input { min-height: 0; margin: 0; padding: 0; outline: none; }
+.commerce-date-popper { --el-color-primary: #28775f; }
+.commerce-workspace .commerce-date-error { margin: 0 25px 18px; }
+
 .commerce-workspace .commerce-summary {
   padding: 18px 25px 23px;
   border-top: 1px solid #edf0eb;
@@ -63,6 +77,10 @@
 .commerce-workspace .commerce-table td { overflow-wrap: anywhere; padding-inline: 15px; text-align: left; }
 .commerce-workspace .commerce-table tbody th { font-weight: 600; }
 .commerce-workspace .commerce-table .text-button { white-space: normal; text-align: left; }
+.commerce-workspace .commerce-reference summary { color: #28775f; cursor: pointer; }
+.commerce-workspace .commerce-reference summary:focus-visible { outline: 2px solid #448a75; outline-offset: 2px; }
+.commerce-workspace .commerce-reference p { margin: 6px 0 0; font-size: 12px; }
+.commerce-workspace .commerce-reference code { display: block; overflow-wrap: anywhere; }
 .commerce-workspace .commerce-amount { font-variant-numeric: tabular-nums; }
 .commerce-workspace h2[tabindex]:focus-visible,
 .commerce-workspace .commerce-table:focus-visible { outline: 3px solid #448a75; outline-offset: -3px; }
