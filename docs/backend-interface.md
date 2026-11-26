@@ -75,6 +75,8 @@ A 的 CRM 可按统一 `customerId` 调用会员和订单接口。该参数与 `
 
 2026-10-30（Issue #49）：`GET /tasks/received-card` 仅返回当前用户本人参与的任务（包括本人派发且参与），包含全部生命周期状态，不再返回仅下属参与的授权范围任务。`items/total/nextCursor`使用相同过滤；每项增加`issuer_id`。导图卡片与完整列表共用该资源，管理任务表继续使用`GET /tasks`授权范围查询。
 
+受控新版派发（#28，V40）：服务端 `TASK_PROPOSALS_ENABLED=true` 且 `POST /api/tasks` 同时携带 `Task-Dispatch-Policy: recipient-confirmation-v1` 和原幂等键时，允许本公司已确认在职人员发起；开关关闭或策略名不支持返回 409 `DISPATCH_POLICY_UNAVAILABLE`，无策略头使用既有规则。新只读 `/api/organization/task-proposal-people?search=&cursor=0&limit=30` 仅返回同公司有效成员标识、工作姓名和组织归属，不包含手机号、日志或任务计数。任务仍返回 `TASK_CREATE` 申请；`TASK_MANAGER` 为直属审批，`TASK_RECIPIENT` 为当前接收人本人确认。两者复用 `/reviews/{id}/decision` 和 `expectedVersion`；任一驳回须原因，全部必要确认后才原子建单并通知。旧申请不提升权限；新申请不支持通用 reroute 越过同意，关系失效时重新发起。App 验收包另加 `--dart-define=TASK_PROPOSALS_ENABLED=true`。停用开关后不再接收新策略请求，已产生的申请继续按固化的模式完成。此增量面向 App 的人工新建入口；AI 自动写入、任务转派、月历移动和查看他人面板不因申请权开放而放宽。
+
 `GET /tasks` 使用显式授权投影，不返回主负责人或协作人；参与人使用无角色的 `participants` 集合，标签以本文“统一集成兼容约定”的 `labels` 集合及旧 `label` 兼容规则为准。流转事件在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,labelIds,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
 
 **2026-11-05实现增量（部署与验证状态另见统一验证入口）**：复用Issue #53确认的可选只读 `phase`，任务管理在开始时间前展示完成情况，派发表单仍不显示或接收该字段。映射为 `DISPATCHED` 待接收、`RECEIVED` 进行中、`FEEDBACK` 待验收、`ACCEPTED` 已验收、`ARCHIVED` 已归档、`WITHDRAWN` 已撤回；`RETURNED`是事件，生效后phase为RECEIVED。缺失/未知显示“情况未知”，不从截止时间、备注或任一参与人反馈推断。另返回可空 `dispatchAt`，取同公司同任务最早真实DISPATCHED事件时间，旧数据缺失为null，不能拿created_at伪造派发时间。增量字段向后兼容，旧客户端可忽略，新客户端连接旧服务端时显示未知/未提供；列表授权范围、分页与审核政策不变，不暴露未过滤body/事件。任务状态只读，创建/修订伪造状态仍由服务端拒绝。验收见 [A03](app-requirements-acceptance.md)。

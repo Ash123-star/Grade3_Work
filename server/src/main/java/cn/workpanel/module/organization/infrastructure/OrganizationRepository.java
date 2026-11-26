@@ -22,6 +22,12 @@ public class OrganizationRepository {
         if (actor.role().equals("DIRECTOR")) return db.rows("SELECT * FROM teams WHERE company_id=? AND department_id=? ORDER BY id", actor.company(), actor.department());
         return db.rows("SELECT * FROM teams WHERE company_id=? AND id=? ORDER BY id", actor.company(), actor.team());
     }
+    public Map<String,Object> proposalPeople(String company,String search,int cursor,int limit) {
+        String from=" FROM users u LEFT JOIN departments d ON d.company_id=u.company_id AND d.id=u.department_id LEFT JOIN teams tm ON tm.company_id=u.company_id AND tm.id=u.team_id WHERE u.company_id=? AND u.status='ACTIVE' AND (u.name ILIKE ? OR d.name ILIKE ? OR tm.name ILIKE ?)";
+        String q="%"+search+"%";
+        var items=db.rows("SELECT u.id,u.name,u.status,u.department_id,d.name department_name,u.team_id,tm.name team_name"+from+" ORDER BY u.name,u.id LIMIT ? OFFSET ?",company,q,q,q,limit,cursor);
+        return Map.of("items",items,"nextCursor",Integer.toString(cursor+items.size()),"total",db.count("SELECT count(*)"+from,company,q,q,q));
+    }
     public Map<String, Object> people(Actor actor, String search, boolean dispatch, int cursor, int limit) {
         var args = new ArrayList<Object>(List.of(actor.company())); args.addAll(Arrays.asList(actor.scopeArgs()));
         args.add("%" + search + "%"); args.add("%" + search + "%"); args.add("%" + search + "%");

@@ -38,6 +38,11 @@ class LabelAdapter implements HttpClientAdapter {
     requests.add(options);
     final waiting = hold;
     if (waiting != null) await waiting.future;
+    if (options.path == '/task-labels' && options.method == 'POST') {
+      final item = {'id':'created-label','name':'本周巡检','color':'#CFE5FF','status':'ACTIVE'};
+      labels.add(item);
+      return ResponseBody.fromString(jsonEncode(item),200,headers:{Headers.contentTypeHeader:['application/json']});
+    }
     final body = options.path == '/task-labels'
         ? status == 200
               ? {'items': labels}
@@ -105,11 +110,23 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('founder creates a label without losing existing selections', (t) async {
+    container.updateOverrides([sessionProvider.overrideWith((r)=>const Session(token:'test-token',role:UserRole.founder)),repositoryProvider.overrideWithValue(repository)]);
+    controller.text='db-custom-927';
+    await mount(t); await t.pumpAndSettle();
+    await t.tap(find.text('新建任务标签')); await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField),'本周巡检');
+    await t.tap(find.text('保存并选中')); await t.pumpAndSettle();
+    expect(controller.text,'db-custom-927,created-label');
+    expect(form.currentState!.validate(),isTrue);
+    expect(adapter.requests.where((r)=>r.method=='POST').single.data['name'],'本周巡检');
+  });
   testWidgets(
     'reads real catalog, supports zero or multiple selections and submits database IDs',
     (t) async {
       await mount(t);
       await t.pumpAndSettle();
+      expect(find.text('新建任务标签'),findsNothing);
       expect(adapter.requests.single.path, '/task-labels');
       expect(
         adapter.requests.single.headers['Authorization'],

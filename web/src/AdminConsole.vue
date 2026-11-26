@@ -29,8 +29,9 @@ const availableManagers = computed(() => managers.value.filter(m => m.id !== for
   : m.department_id === form.value.departmentId && (['LEADER','DIRECTOR','FOUNDER'].includes(m.role) || ['GENERAL_MANAGER','DEPUTY_GENERAL_MANAGER'].includes(m.business_position)))));
 function changeDepartment() { form.value.teamId = ''; form.value.managerId = ''; }
 function ageFromIdCard(value: unknown): number | null {
-  if (typeof value !== 'string' || !/^[0-9]{17}[0-9Xx]$/.test(value)) return null;
+  if (typeof value !== 'string') return null;
   value=value.trim().toUpperCase();
+  if (!/^[0-9]{17}[0-9X]$/.test(value as string)) return null;
   const weights=[7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2];
   const card=value as string;
   if(card[17]!=='10X98765432'[weights.reduce((sum,w,i)=>sum+Number(card[i])*w,0)%11]) return null;
@@ -127,6 +128,8 @@ function keepDialogFocus(event: KeyboardEvent) {
 function save() { void run(async () => {
   fieldErrors.value = {};
   if (editor.value === 'create' || editor.value === 'employee') {
+    form.value.idCardNumber=String(form.value.idCardNumber ?? '').trim().toUpperCase();
+    if (form.value.idCardNumber && !/^[0-9]{17}[0-9X]$/.test(form.value.idCardNumber)) fieldErrors.value.idCardNumber='须为18位，末位可为X';
     const invalidName = nameError(form.value.name);
     if (!invalidName) form.value.name = form.value.name.normalize('NFC').trim(); if (invalidName) fieldErrors.value.name = invalidName;
     if (editor.value === 'create') { const invalidPhone = phoneError(form.value.phone); if (invalidPhone) fieldErrors.value.phone = invalidPhone; }
@@ -218,7 +221,7 @@ onMounted(() => { if (token.value) void run(enter); });
           <p v-if="fieldErrors.name" id="name-error" class="field-error">{{ fieldErrors.name }}</p><p v-if="editor === 'create' || editor === 'employee'" class="muted">姓名2–50个字符，支持汉字、字母和姓名内部的 ·、空格、连字符或撇号。</p>
           <label v-if="editor === 'employee'">员工姓名<input v-model="form.name" aria-label="员工姓名" required :aria-invalid="!!fieldErrors.name" aria-describedby="name-error" @input="delete fieldErrors.name"></label>
           <label v-if="editor === 'create' || editor === 'employee'">性别<select v-model="form.gender" :required="editor === 'create'"><option value="" disabled>请选择性别</option><option value="男">男</option><option value="女">女</option></select></label>
-          <label v-if="editor === 'create' || editor === 'employee'">身份证号<input v-model="form.idCardNumber" :aria-invalid="!!fieldErrors.idCardNumber" aria-describedby="id-error" @input="delete fieldErrors.idCardNumber" :required="editor === 'create'" pattern="[0-9]{17}[0-9Xx]" maxlength="18" autocomplete="off" :placeholder="editor === 'employee' && form.hasIdCard ? '已录入，留空保持原号码' : '18位身份证号'"><small v-if="editor === 'employee'" class="muted">{{ form.hasIdCard ? '已录入，留空不修改' : '尚未录入' }}</small></label>
+          <label v-if="editor === 'create' || editor === 'employee'">身份证号<input v-model.trim="form.idCardNumber" :aria-invalid="!!fieldErrors.idCardNumber" aria-describedby="id-error" @input="delete fieldErrors.idCardNumber" :required="editor === 'create'"  autocomplete="off" :placeholder="editor === 'employee' && form.hasIdCard ? '已录入，留空保持原号码' : '18位身份证号'"><small v-if="editor === 'employee'" class="muted">{{ form.hasIdCard ? '已录入，留空不修改' : '尚未录入' }}</small></label>
           <p v-if="fieldErrors.idCardNumber" id="id-error" class="field-error">{{ fieldErrors.idCardNumber }}</p><p v-if="fieldErrors.gender" class="field-error">{{ fieldErrors.gender }}</p>
           <label v-if="editor === 'create' || editor === 'employee'">年龄<input aria-label="年龄" :value="form.idCardNumber ? (ageFromIdCard(form.idCardNumber) ?? '') : (form.age ?? '')" readonly placeholder="从身份证号自动计算"></label>
           <label v-if="editor === 'create' || editor === 'employee'">所属部门<select v-model="form.departmentId" required @change="changeDepartment"><option value="" disabled>请选择部门</option><option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option></select></label>

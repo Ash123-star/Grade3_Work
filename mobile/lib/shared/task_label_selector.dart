@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
+import 'package:pandora_mobile/core/errors/api_failure.dart';
 import 'package:pandora_mobile/data/models/models.dart';
 
 /// Existing task-form label surface with optional, zero-or-more selection.
@@ -155,6 +156,52 @@ class TaskLabelSelector extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (ref.watch(sessionProvider).role == UserRole.founder)
+                  TextButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('新建任务标签'),
+                    onPressed: !enabled
+                        ? null
+                        : () async {
+                            final session = ref.read(sessionProvider);
+                            final created = await showDialog<Record>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => _CreateLabelDialog(
+                                save: (name, color) {
+                                  final current = ref.read(sessionProvider);
+                                  if (current.token != session.token ||
+                                      current.id != session.id) {
+                                    throw StateError('会话已切换');
+                                  }
+                                  return ref
+                                      .read(repositoryProvider)
+                                      .execute(
+                                        'task-labels',
+                                        Command('create', {
+                                          'name': name,
+                                          'category': '自定义',
+                                          'color': color,
+                                        }),
+                                      );
+                                },
+                              ),
+                            );
+                            if (!context.mounted || created == null) return;
+                            final current = ref.read(sessionProvider);
+                            if (session.token != current.token ||
+                                session.id != current.id) {
+                              return;
+                            }
+                            ref.invalidate(recordsProvider('task-labels'));
+                            controller.text = {
+                              ..._ids(controller.text),
+                              created.id,
+                            }.join(',');
+                            state.didChange(controller.text);
+                            onChanged?.call();
+                          },
+                  ),
                 if (labels.isEmpty)
                   TextButton(
                     onPressed: enabled
@@ -199,6 +246,82 @@ class TaskLabelSelector extends ConsumerWidget {
 
   static Color _foreground(dynamic raw) =>
       _color(raw).computeLuminance() > .45 ? Colors.black87 : Colors.white;
+}
+
+class _CreateLabelDialog extends StatefulWidget {
+  const _CreateLabelDialog({required this.save});
+  final Future<Record> Function(String, String) save;
+  @override
+  State<_CreateLabelDialog> createState() => _CreateLabelDialogState();
+}
+
+class _CreateLabelDialogState extends State<_CreateLabelDialog> {
+  String name = '', color = '#CFE5FF';
+  String? error;
+  bool saving = false;
+  Future<void> submit() async {
+    if (saving) return;
+    if (name.trim().isEmpty) {
+      setState(() => error = '请填写标签名称');
+      return;
+    }
+    setState(() {
+      saving = true;
+      error = null;
+    });
+    try {
+      final label = await widget.save(name.trim(), color);
+      if (mounted) Navigator.pop(context, label);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          saving = false;
+          error = e is ApiFailure ? e.message : '创建失败，请重试';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !saving,
+    child: AlertDialog(
+      title: const Text('新建公司任务标签'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              autofocus: true,
+              enabled: !saving,
+              maxLength: 100,
+              decoration: InputDecoration(labelText: '标签名称', errorText: error),
+              onChanged: (v) => name = v,
+            ),
+            DropdownButton<String>(
+              value: color,
+              items: const [
+                DropdownMenuItem(value: '#CFE5FF', child: Text('浅蓝')),
+                DropdownMenuItem(value: '#D5EBD6', child: Text('浅绿')),
+                DropdownMenuItem(value: '#FFE1C7', child: Text('浅橙')),
+              ],
+              onChanged: saving ? null : (v) => setState(() => color = v!),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: saving ? null : () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: saving ? null : submit,
+          child: Text(saving ? '正在保存' : '保存并选中'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _TaskLabelSheet extends StatefulWidget {

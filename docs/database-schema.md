@@ -4,6 +4,8 @@
 
 本文说明当前运行 Spring Boot 后端使用的 PostgreSQL 数据库。实际启动时使用 `server/src/main/resources/db/migration/` 的 Flyway 迁移；`deploy/postgresql/` 是独立的数据基础设施包，字段模型和 ID 类型不同，不能把两套脚本混合执行。
 
+V40 仅扩展 `review_requests` 的审核模式和决定来源约束，`TASK_MANAGER`、`TASK_RECIPIENT` 只允许用于 `TASK_CREATE`。历史行不回填、不重路由；新机制沿用带公司外键、禁止自审的 `review_steps`，关闭新入口不删除历史决定。依赖 V36 的员工职位与目录基线。
+
 ## 使用约定
 
 - `company_id`：公司租户标识。所有业务表都必须沿公司外键关联，服务端查询还要额外执行角色和组织范围检查。
@@ -119,7 +121,7 @@ V39 在 `server` Flyway 新增三张表。
 
 公司行锁覆盖文件查重、快照写入、回执和审计，各表唯一键保证并发下的外部身份一致性。订单索引支持公司下单窗口和按商城会员查询。C 的 `customer_memberships.mall_member_id` 保存显式客户关联。导入方保留原文件并用 SHA-256 对照，服务端保存凭据及当前快照来源。
 
-合入前协调 [#104](https://github.com/Ash123-star/Grade3_Work/pull/104) 和 [#103](https://github.com/Ash123-star/Grade3_Work/pull/103) 的 V37 冲突。实际部署按合并后唯一版本顺序执行。回滚配套应用时保留 V39 表与数据。
+客户与会员使用 V37/V38，商城导入使用 V39，任务申请使用 V40。回滚配套应用时保留 V39 表与数据。
 
 ## 开发规则
 

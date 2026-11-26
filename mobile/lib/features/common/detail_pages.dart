@@ -1350,7 +1350,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   f['reviewKind'] == 'TASK_CREATE' || f['baseVersion'] == 0;
               final assigned = f['reviewerId'] == user.id;
               if (!self && pending && assigned) {
-                bottom = button('通过申请', () => action(item, 'approve'));
+                bottom = button(f['approval_mode']=='TASK_RECIPIENT' ? '接受这项任务' : '通过申请', () => action(item, 'approve'));
               }
               children.addAll([
                 PaperSurface(
@@ -1432,7 +1432,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                       const SizedBox(height: 12),
                       Text(
                         switch (f['reviewState']) {
-                          '待审' => creating ? '审核通过后创建记录' : '审核通过后生效，审核前保留原内容',
+                          '待审' => f['approval_mode']=='TASK_RECIPIENT' ? '等待接收人确认，任务尚未生效' : creating ? '审核通过后创建记录' : '审核通过后生效，审核前保留原内容',
                           '已通过' => '申请已通过，以上为本次申请获批时的内容',
                           '已驳回' => '申请已驳回，以上内容未生效',
                           '已失效' => f['approvalMode'] == 'FOUNDER_PEER' ? '旧创始人互审申请已作废，请重新提交；以上内容未生效' : '申请已失效，以上内容不再等待审核',

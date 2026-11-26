@@ -50,7 +50,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final page = PageFrame(
       title: '公司',
       showTitle: false,
-      fab: user.manager && user.dispatch
+      fab: (user.manager && user.dispatch || taskProposalsEnabled && user.canReadBusiness)
           ? FloatingActionButton(
               heroTag: 'view-dispatch',
               tooltip: '新增任务',
@@ -75,13 +75,13 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     ? CalendarContent(availableHeight: viewport.maxHeight)
                     : ListView(
                         padding: EdgeInsets.only(
-                          bottom: user.manager && user.dispatch ? 80 : 16,
+                          bottom: (user.manager && user.dispatch || taskProposalsEnabled && user.canReadBusiness) ? 80 : 16,
                         ),
                         children: [
                           CalendarContent(
                             availableHeight:
                                 viewport.maxHeight -
-                                (user.manager && user.dispatch ? 104 : 40),
+                                ((user.manager && user.dispatch || taskProposalsEnabled && user.canReadBusiness) ? 104 : 40),
                           ),
                           const DemoLabel(),
                         ],
@@ -265,6 +265,9 @@ class ProfilePage extends ConsumerWidget {
                                     fontSize: 12,
                                   ),
                                 ),
+                              if (profile.valueOrNull case final p?)
+                                Text('所属部门：${p.fields['departmentName'] ?? p.fields['部门'] ?? '未分配'}',
+                                  key: const ValueKey('profile-department')),
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8,

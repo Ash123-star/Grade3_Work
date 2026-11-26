@@ -25,7 +25,11 @@ public class TaskDispatchService {
     }
 
     @Transactional public Map<String,Object> dispatch(Actor a,Map<String,Object> raw,String key,String constraintRevision) {
-        a.requireDispatch();
+        return submit(a,raw,key,constraintRevision,false);
+    }
+    @Transactional public Map<String,Object> submit(Actor a,Map<String,Object> raw,String key,String constraintRevision,boolean proposal) {
+        if(proposal) { if(!"ACTIVE".equals(a.status())||a.mustChange()||reviews==null) throw ApiError.forbidden(); }
+        else a.requireDispatch();
         if(key==null||key.isBlank()||key.length()>128) throw ApiError.bad("IDEMPOTENCY_REQUIRED","需要 1–128 位幂等键");
         TaskDraft d=TaskDraftNormalizer.normalize(raw);
         // 事务级锁把同一派发人同一键的并发请求串行化。
@@ -37,14 +41,19 @@ public class TaskDispatchService {
             boolean matches=version==1?TaskDraftNormalizer.legacyHash(db,raw).equals(stored):version==2&&TaskDraftNormalizer.matchesHash(db,d,stored);
             if(!matches) throw new ApiError(409,"IDEMPOTENCY_CONFLICT","同一幂等键内容不同");
             String reviewId=Db.str(record,"review_id");
-            if(!reviewId.isBlank()&&reviews!=null) return reviews.get(a,reviewId);
+            if(!reviewId.isBlank()&&reviews!=null) {
+                var receipt=reviews.get(a,reviewId);
+                if(proposal!=Set.of("TASK_MANAGER","TASK_RECIPIENT").contains(Db.str(receipt,"approval_mode"))) throw new ApiError(409,"IDEMPOTENCY_CONFLICT","同一幂等键不能切换派发策略");
+                return receipt;
+            }
+            if(proposal) throw ApiError.conflict();
             return detail(TaskAccess.issued(db,a,Db.str(record,"task_id")));
         }
         if(constraintRevision!=null) { constraints.match(constraintRevision);constraints.validate(d.startAt(),d.deadline()); }
-        TaskParticipants.validate(db,a,d); TaskLabels.validate(db,a,d); TaskAttachments.verify(db,a,null,d.attachments());
+        TaskParticipants.validate(db,a,d,!proposal); TaskLabels.validate(db,a,d); TaskAttachments.verify(db,a,null,d.attachments());
         String id=Db.id(); var body=d.body();
         if(reviews==null) return legacyDispatch(a,key,id,d,body);
-        var request=reviews.create(a,"TASK_CREATE",id,0,Map.of(),body,"创建任务");
+        var request=proposal ? reviews.createTaskProposal(a,id,body) : reviews.create(a,"TASK_CREATE",id,0,Map.of(),body,"创建任务");
         db.update("INSERT INTO idempotency_keys(company_id,actor_id,key,request_hash,task_id,hash_version,review_id) VALUES (?,?,?,?,?,2,?)",a.company(),a.id(),key,TaskDraftNormalizer.hash(db,d),id,Db.str(request,"id"));
         return request;
     }

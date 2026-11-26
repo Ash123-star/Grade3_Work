@@ -145,6 +145,14 @@ test('不同电脑尺寸及放大后的有效宽度下长资料不产生横向�
   }
 });
 
+test('粘贴身份证首尾空格及小写末位仍能预览周岁并提交规范号码',async({page})=>{
+  const commands=await fixture(page);await login(page);await fillEmployee(page);
+  await page.getByLabel('身份证号').fill(' 11010519491231002x ');
+  await expect(page.getByLabel('年龄')).toHaveValue(/^[0-9]+$/);
+  await page.getByRole('button',{name:'开通员工账号',exact:true}).click();
+  await expect(page.locator('.alert.success')).toContainText('已开通');expect(commands[0].idCardNumber).toBe('11010519491231002X');
+});
+
 test('CRM 默认关闭，既有管理员入口不变', async ({ page }) => {
   const crmRequests: string[] = [];
   await page.route('**/api/**', route => {
