@@ -11,9 +11,10 @@ import java.net.*;
 import java.net.http.*;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Real HTTP -> CustomerService -> PostgreSQL, including V37 and ADMIN scope. */
+/** Real HTTP -> CustomerService -> PostgreSQL, including receipt migrations and ADMIN scope. */
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
     "app.admin-account=integration-admin","app.admin-password=Initial-test-password-2026",
     "app.admin-phone=13900000001","app.deepseek-key=local-mock-only","app.jobs-enabled=false"
@@ -91,16 +92,23 @@ class CustomerIntegrationTest {
         assertEquals("黑卡",call(200,"PUT","/customers/"+id+"/membership","admin",member,null).get("level").asText());
         var benefit=call(201,"POST","/customers/"+id+"/benefits","admin",benefitBody("2020-01-01","2100-12-31",2),null);
         String benefitId=benefit.get("id").asText();
-        var first=call(201,"POST","/customers/"+id+"/benefits/"+benefitId+"/redemptions","admin",Map.of("note","入场"),"redeem-1");
+        String path="/customers/"+id+"/benefits/"+benefitId+"/redemptions";
+        var first=call(201,"POST",path,"admin",Map.of("note","入场"),"redeem-1");
         assertEquals(1,first.get("used").asInt());assertEquals(1,first.get("remaining").asInt());
-        var replay=call(201,"POST","/customers/"+id+"/benefits/"+benefitId+"/redemptions","admin",Map.of("note","入场"),"redeem-1");
-        assertEquals(first.get("redemption").get("id"),replay.get("redemption").get("id"));assertEquals(1,replay.get("used").asInt());
-        var history=call(200,"GET","/customers/"+id+"/benefits/"+benefitId+"/redemptions","admin",null,null);
-        assertEquals(1,history.size());
-        call(201,"POST","/customers/"+id+"/benefits/"+benefitId+"/redemptions","admin",Map.of(),"redeem-2");
-        call(409,"POST","/customers/"+id+"/benefits/"+benefitId+"/redemptions","admin",Map.of(),"redeem-3");
-        call(400,"POST","/customers/"+id+"/benefits/"+benefitId+"/redemptions","admin",Map.of(),null);
-        call(404,"POST","/customers/"+id+"/benefits/"+benefitId+"/redemptions","otherAdmin",Map.of(),"foreign");
+        var second=call(201,"POST",path,"admin",Map.of(),"redeem-2");
+        assertEquals(2,second.get("used").asInt());assertEquals(0,second.get("remaining").asInt());
+        assertEquals(first,call(201,"POST",path,"admin",Map.of("note","重试"),"redeem-1"));
+        call(409,"POST",path,"admin",Map.of(),"redeem-3");
+        call(400,"POST",path,"admin",Map.of(),null);
+        call(404,"POST",path,"otherAdmin",Map.of(),"redeem-1");
+        var another=call(201,"POST","/customers","admin",Map.of("kind","INDIVIDUAL","name","另一客户"),null);
+        call(404,"POST","/customers/"+another.get("id").asText()+"/benefits/"+benefitId+"/redemptions",
+            "admin",Map.of(),"redeem-1");
+        var history=call(200,"GET",path,"admin",null,null);
+        assertEquals(2,history.size());
+        assertFalse(history.get(0).has("used"));
+        assertEquals(2,db.count("SELECT count(*) FROM audit_records WHERE company_id=? AND type='CUSTOMER_BENEFIT_REDEEMED' AND object_id=?",
+            company,benefitId));
     }
     @Test void expiredDisabledAndArchivedBenefitsCannotRedeem()throws Exception{
         var customer=create();String id=customer.get("id").asText();
@@ -108,12 +116,40 @@ class CustomerIntegrationTest {
         call(409,"POST","/customers/"+id+"/benefits/"+expired.get("id").asText()+"/redemptions","admin",Map.of(),"expired");
         var benefit=call(201,"POST","/customers/"+id+"/benefits","admin",benefitBody("2020-01-01","2100-12-31",null),null);
         String benefitId=benefit.get("id").asText();
+        String path="/customers/"+id+"/benefits/"+benefitId+"/redemptions";
+        var receipt=call(201,"POST",path,"admin",Map.of(),"original");
+        assertTrue(receipt.get("remaining").isNull());
+        db.update("UPDATE customer_benefits SET valid_from='2000-01-01',valid_to='2000-12-31' WHERE id=?",benefitId);
+        assertEquals(receipt,call(201,"POST",path,"admin",Map.of(),"original"));
         db.update("UPDATE customer_benefits SET status='DISABLED' WHERE id=?",benefitId);
-        call(409,"POST","/customers/"+id+"/benefits/"+benefitId+"/redemptions","admin",Map.of(),"disabled");
+        call(409,"POST",path,"admin",Map.of(),"disabled");
+        assertEquals(receipt,call(201,"POST",path,"admin",Map.of(),"original"));
         var archived=customerBody();archived.put("status","ARCHIVED");archived.put("version",1);
         call(200,"PUT","/customers/"+id,"admin",archived,null);
-        call(409,"POST","/customers/"+id+"/benefits/"+benefitId+"/redemptions","admin",Map.of(),"archived");
+        call(409,"POST",path,"admin",Map.of(),"archived");
+        assertEquals(receipt,call(201,"POST",path,"admin",Map.of(),"original"));
         call(400,"POST","/customers/"+id+"/benefits","admin",benefitBody("2026-12-31","2026-01-01",null),null);
+    }
+    @Test void simultaneousRetryReturnsOneReceiptAndOnlyConsumesOneUse()throws Exception{
+        String customerId=create().get("id").asText();
+        String prefix="/customers/"+customerId+"/benefits";
+        var benefit=call(201,"POST",prefix,"admin",benefitBody("2020-01-01","2100-12-31",1),null);
+        String path=prefix+"/"+benefit.get("id").asText()+"/redemptions";
+        var start=new CyclicBarrier(2);
+        Callable<JsonNode> attempt=()->{
+            start.await(5,TimeUnit.SECONDS);
+            return call(201,"POST",path,"admin",Map.of(),"same-key");
+        };
+        try(var requests=Executors.newVirtualThreadPerTaskExecutor()) {
+            var first=requests.submit(attempt);
+            var second=requests.submit(attempt);
+            var receipt=first.get(25,TimeUnit.SECONDS);
+            assertEquals(receipt,second.get(25,TimeUnit.SECONDS));
+            assertEquals(1,receipt.get("used").asInt());
+            assertEquals(0,receipt.get("remaining").asInt());
+        }
+        assertEquals(1,call(200,"GET",path,"admin",null,null).size());
+        call(409,"POST",path,"admin",Map.of(),"new-key");
     }
     @Test void progressIsReturnedWithCustomer()throws Exception{
         var customer=create();String id=customer.get("id").asText();

@@ -10,10 +10,9 @@
 - [x] 2.2 所有客户接口首版仅 ACTIVE ADMIN；跨公司读取和核销 404；验证为员工 403、跨公司 404。
 
 ## 3. 验收
-- [ ] 3.1 在 PostgreSQL 执行 V37：空库 v37 已通过；V36→V37 升级库和唯一约束的独立升级测试待补。
-- [x] 3.2 `scripts/test-backend.ps1 -DockerMaven -Tests CustomerDraftTest,CustomerIntegrationTest`：9 项通过、0 失败；覆盖创建/外部 ID 冲突、会员、权益、重复/过期/停用/归档核销、越权读取和进度。
+- [x] 3.1 在隔离 PostgreSQL 验证空库及含业务数据的 V36 库升级至 V38、核销唯一约束与跨客户/公司复合外键；有 V37 核销记录则安全停止升级。
+- [x] 3.2 `scripts/test-backend.ps1 -Tests CustomerDraftTest,CustomerIntegrationTest,CustomerMigrationUpgradeTest`：12 项通过、0 失败；覆盖原有客户域链路及并发、首次回执和归属校验。
 - [ ] 3.3 与 A/D/E 联调：客户详情、线下业务保存客户 ID、商城外部 ID 反查；确认最终角色权限。
 
 ## 验证记录
-- 2026-11-24：`scripts/test-backend.ps1 -DockerMaven -Tests CustomerDraftTest,CustomerIntegrationTest`，隔离 PostgreSQL 16 + Flyway 空库迁移至 v37，9 项通过、0 失败、BUILD SUCCESS。
-- 未覆盖：V36 已有库升级、A/D/E 端到端联调、最终角色权限、真实商城接口。
+- 2026-11-26：Windows、Java 21、隔离 PostgreSQL 16.15；专项验收命令见 3.2，BUILD SUCCESS。共享环境 Flyway 状态及 A/D/E 联调尚未验证。

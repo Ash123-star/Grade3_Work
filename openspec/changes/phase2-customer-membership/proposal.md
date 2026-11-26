@@ -16,7 +16,7 @@
 无。本变更不修改任务、日志、审批、组织权限或商城侧实现。
 
 ## Impact
-- 新增 server `module/customer`、Flyway `V37__customer_membership.sql`、客户/会员/权益/核销/进度接口与单元测试。
+- 新增 server `module/customer`、Flyway V37 客户表与 V38 核销回执、客户/会员/权益/核销/进度接口与测试。
 - 不新增 Flutter 页面；A 的 CRM 界面和 E 的商城同步使用本接口。D 的线下业务只保存客户 ID。
 - 首版入口为 `/api/customers`，仅 ADMIN；权限不足 403，跨公司一律 404。
-- 验证：`javac` 局部编译通过；完整 Maven/PostgreSQL 集成测试与真实商城联调尚未执行。
+- 验证入口：[tasks.md](tasks.md)。真实商城联调不在本变更的隔离回归范围内。

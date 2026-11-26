@@ -88,13 +88,9 @@ public class JdbcCustomerRepository implements CustomerRepository {
         return benefit(db.one("SELECT * FROM customer_benefits WHERE company_id=? AND customer_id=? AND id=?"+(lock?" FOR UPDATE":""),a.company(),customerId,benefitId));
     }
 
-    @Override public Map<String,Object> benefitById(Actor a,String benefitId,boolean lock) {
-        return benefit(db.one("SELECT * FROM customer_benefits WHERE company_id=? AND id=?"+(lock?" FOR UPDATE":""),a.company(),benefitId));
-    }
-
-    @Override public Map<String,Object> redemptionByKey(Actor a,String benefitId,String eventKey) {
+    @Override public RedemptionReceipt redemptionByKey(Actor a,String benefitId,String eventKey) {
         var rows=db.rows("SELECT * FROM customer_benefit_redemptions WHERE company_id=? AND benefit_id=? AND event_key=?",a.company(),benefitId,eventKey);
-        return rows.isEmpty()?null:redemption(rows.getFirst());
+        return rows.isEmpty()?null:receipt(rows.getFirst());
     }
 
     @Override public List<Map<String,Object>> redemptions(Actor a,String benefitId) {
@@ -102,11 +98,13 @@ public class JdbcCustomerRepository implements CustomerRepository {
             .stream().map(JdbcCustomerRepository::redemption).toList();
     }
 
-    @Override public Map<String,Object> insertRedemption(Actor a,String customerId,String benefitId,String eventKey,String note) {
+    @Override public RedemptionReceipt insertRedemption(Actor a,String customerId,String benefitId,String eventKey,String note,long used,Long remaining) {
         String id="red_"+Db.id();
-        db.update("INSERT INTO customer_benefit_redemptions(id,company_id,benefit_id,customer_id,event_key,note) VALUES (?,?,?,?,?,?)",
-            id,a.company(),benefitId,customerId,eventKey,note);
-        return redemption(db.one("SELECT * FROM customer_benefit_redemptions WHERE company_id=? AND id=?",a.company(),id));
+        return receipt(db.one("""
+            INSERT INTO customer_benefit_redemptions
+                (id,company_id,benefit_id,customer_id,event_key,note,used_at_redemption,remaining_at_redemption)
+            VALUES (?,?,?,?,?,?,?,?) RETURNING *
+            """,id,a.company(),benefitId,customerId,eventKey,note,used,remaining));
     }
 
     @Override public long redemptionCount(Actor a,String benefitId) {
@@ -160,6 +158,10 @@ public class JdbcCustomerRepository implements CustomerRepository {
         m.put("id",Db.str(r,"id")); m.put("benefitId",Db.str(r,"benefit_id")); m.put("customerId",Db.str(r,"customer_id"));
         m.put("eventKey",Db.str(r,"event_key")); m.put("note",Db.str(r,"note")); m.put("redeemedAt",instant(r.get("redeemed_at")));
         return m;
+    }
+    private static RedemptionReceipt receipt(Map<String,Object> r) {
+        return new RedemptionReceipt(redemption(r),((Number)r.get("used_at_redemption")).longValue(),
+            r.get("remaining_at_redemption") instanceof Number remaining?remaining.longValue():null);
     }
     private static Map<String,Object> progress(Map<String,Object> r) {
         var m=new LinkedHashMap<String,Object>();

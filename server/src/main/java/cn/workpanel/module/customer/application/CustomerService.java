@@ -84,35 +84,27 @@ public class CustomerService {
         String note=body.get("note")==null?"":Db.str(body,"note").trim();
         if(note.length()>500) throw ApiError.bad("INVALID_NOTE","核销备注最多500字");
         var customer=repo.get(a,customerId);
-        if("ARCHIVED".equals(Db.str(customer,"status"))) throw new ApiError(409,"CUSTOMER_ARCHIVED","客户已归档");
         var benefit=repo.benefit(a,customerId,benefitId,true);
         var existing=repo.redemptionByKey(a,benefitId,key);
-        if(existing!=null) return redemptionResult(a,benefitId,existing);
+        if(existing!=null) return redemptionResult(existing);
+        if("ARCHIVED".equals(Db.str(customer,"status"))) throw new ApiError(409,"CUSTOMER_ARCHIVED","客户已归档");
         if(!"ACTIVE".equals(Db.str(benefit,"status"))) throw new ApiError(409,"BENEFIT_DISABLED","权益已停用");
         LocalDate today=LocalDate.now(ZoneId.of("Asia/Shanghai"));
         LocalDate from=LocalDate.parse(Db.str(benefit,"validFrom"));
         LocalDate to=LocalDate.parse(Db.str(benefit,"validTo"));
         if(today.isBefore(from)||today.isAfter(to)) throw new ApiError(409,"BENEFIT_EXPIRED","权益不在有效期内");
-        Object max=benefit.get("maxUses");
-        if(max!=null&&repo.redemptionCount(a,benefitId)>=((Number)max).longValue()) throw new ApiError(409,"BENEFIT_EXHAUSTED","权益可用次数已用完");
-        try {
-            var redemption=repo.insertRedemption(a,customerId,benefitId,key,note);
-            repo.audit(a,"CUSTOMER_BENEFIT_REDEEMED",benefitId,null,redemption,"");
-            return redemptionResult(a,benefitId,redemption);
-        } catch(DuplicateKeyException e) {
-            var replay=repo.redemptionByKey(a,benefitId,key);
-            if(replay==null) throw e;
-            return redemptionResult(a,benefitId,replay);
-        }
-    }
-    private Map<String,Object> redemptionResult(Actor a,String benefitId,Map<String,Object> redemption) {
-        var benefit=repo.benefitById(a,benefitId,false);
+        Long max=benefit.get("maxUses") instanceof Number limit?limit.longValue():null;
         long used=repo.redemptionCount(a,benefitId);
+        if(max!=null&&used>=max) throw new ApiError(409,"BENEFIT_EXHAUSTED","权益可用次数已用完");
+        var receipt=repo.insertRedemption(a,customerId,benefitId,key,note,used+1,max==null?null:max-used-1);
+        repo.audit(a,"CUSTOMER_BENEFIT_REDEEMED",benefitId,null,receipt.redemption(),"");
+        return redemptionResult(receipt);
+    }
+    private static Map<String,Object> redemptionResult(CustomerRepository.RedemptionReceipt receipt) {
         var result=new LinkedHashMap<String,Object>();
-        result.put("redemption",redemption);
-        result.put("used",used);
-        Object max=benefit.get("maxUses");
-        result.put("remaining",max==null?null:Math.max(0,((Number)max).longValue()-used));
+        result.put("redemption",receipt.redemption());
+        result.put("used",receipt.used());
+        result.put("remaining",receipt.remaining());
         return result;
     }
     public List<Map<String,Object>> progress(Actor request,String id) {
