@@ -1,0 +1,397 @@
+<script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { ElConfigProvider, ElDatePicker } from 'element-plus';
+import zhCn from 'element-plus/es/locale/lang/zh-cn';
+import 'element-plus/es/components/date-picker/style/css';
+import { CommerceError, commerceApi, memberStatuses, orderStatuses } from './api';
+import type { Member, Order, OrderGroup, Overview, Page, Receipt } from './api';
+import CommerceReference from './CommerceReference.vue';
+import './commerce.css';
+
+const emit = defineEmits<{ accessLost: [message: string] }>();
+type Tab = 'overview' | 'members' | 'imports';
+const tabs: Record<Tab, string> = { overview: '经营概览', members: '商城会员', imports: '文件导入' };
+const tab = ref<Tab>('overview');
+const initialCustomer = new URLSearchParams(window.location.search).get('customerId') ?? '';
+const filters = ref({ from: '', to: '', customerId: initialCustomer, externalOrderId: '' });
+const invalidDateRange = computed(() => {
+  const { from, to } = filters.value;
+  return from !== '' && to !== '' && to < from;
+});
+const memberFilters = ref({ customerId: initialCustomer, externalMemberId: '' });
+let applied = { ...filters.value };
+let appliedMember = { ...memberFilters.value };
+const overview = ref<Overview | null>(null);
+const orders = ref<Page<Order> | null>(null);
+const members = ref<Page<Member> | null>(null);
+const group = ref<OrderGroup | null>(null);
+const orderPageSize = 10;
+const memberPageSize = 20;
+const orderCursor = ref('0');
+const memberCursor = ref('0');
+let allOrdersCursor = '0';
+const orderPage = computed(() => Math.floor(Number(orderCursor.value) / orderPageSize) + 1);
+const orderPageCount = computed(() => Math.ceil((orders.value?.total ?? 0) / orderPageSize));
+const orderScope = computed(() => {
+  const selected = group.value;
+  return selected ? `${orderStatuses[selected.status]} · ${currencyName(selected.currency)}` : '全部订单';
+});
+const loading = ref(false);
+const readError = ref('');
+const orderPanel = ref<HTMLElement | null>(null);
+const orderHeading = ref<HTMLElement | null>(null);
+let readTask: AbortController | undefined;
+let retryRead: (() => void) | undefined;
+
+const file = ref<File | null>(null);
+const importing = ref(false);
+const importError = ref('');
+const receipt = ref<Receipt | null>(null);
+const source = ref<Receipt | null>(null);
+let importTask: AbortController | undefined;
+
+const dateTime = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+function displayTime(value: string) { return dateTime.format(new Date(value)); }
+
+const currencyNames = new Intl.DisplayNames('zh-CN', { type: 'currency' });
+function currencyName(currency: string) { return currencyNames.of(currency) ?? currency; }
+
+function displayAmount(value: string) {
+  const [integer, fraction = ''] = value.split('.');
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const decimals = fraction.replace(/0+$/, '').padEnd(2, '0');
+  return grouped + '.' + decimals;
+}
+
+function beforeStartDate(date: Date) {
+  return !!filters.value.from && date.getTime() < new Date(filters.value.from + 'T00:00:00').getTime();
+}
+
+const importFields: Record<string, string> = {
+  members: '会员列表', orders: '订单列表', externalMemberId: '会员原编号', externalOrderId: '订单原编号',
+  level: '会员等级', status: '状态', joinedAt: '加入日期', expiresAt: '到期日期',
+  amount: '金额', currency: '币种', orderedAt: '下单时间', sourceUpdatedAt: '源更新时间',
+};
+
+function message(error: unknown) {
+  if (!(error instanceof CommerceError)) return '无法连接服务，请稍后重试';
+  const data = error.data;
+  const section = data.section === 'members' ? '会员列表' : data.section === 'orders' ? '订单列表' : '';
+  const row = data.row ? `第 ${data.row} 条` : '';
+  const location = [section, row, data.field && (importFields[data.field] ?? data.field)].filter(Boolean).join(' · ');
+  const trace = data.traceId ? `（追踪号：${data.traceId}）` : '';
+  return `${location ? location + '：' : ''}${error.message}${trace}`;
+}
+
+function handleError(error: unknown, target: typeof readError) {
+  const detail = message(error);
+  if (error instanceof CommerceError && (error.status === 401 || error.status === 403)) {
+    emit('accessLost', detail);
+    return;
+  }
+  target.value = detail;
+}
+
+async function read(action: (signal: AbortSignal) => Promise<void>, retry: () => void) {
+  readTask?.abort();
+  const request = new AbortController();
+  readTask = request;
+  retryRead = retry;
+  loading.value = true;
+  readError.value = '';
+  try {
+    await action(request.signal);
+  } catch (error) {
+    if (!request.signal.aborted) handleError(error, readError);
+  } finally {
+    if (readTask === request) loading.value = false;
+  }
+}
+
+function loadOverview(criteria = applied) {
+  void read(async signal => {
+    const [summary, result] = await Promise.all([
+      commerceApi<Overview>('/overview', signal, criteria),
+      commerceApi<Page<Order>>('/orders', signal, { ...criteria, limit: String(orderPageSize) }),
+    ]);
+    if (!signal.aborted) {
+      applied = criteria;
+      overview.value = summary;
+      orders.value = result;
+      group.value = null;
+      source.value = null;
+      orderCursor.value = '0';
+      allOrdersCursor = '0';
+    }
+  }, () => loadOverview(criteria));
+}
+
+function searchOrders() {
+  if (!invalidDateRange.value) loadOverview({ ...filters.value });
+}
+
+function loadOrders(next: string, selected: OrderGroup | null = group.value) {
+  const groupFilter: Record<string, string> = selected ? { status: selected.status, currency: selected.currency } : {};
+  const query = { ...applied, ...groupFilter, limit: String(orderPageSize) };
+  void read(async signal => {
+    let offset = next;
+    let result = await commerceApi<Page<Order>>('/orders', signal, { ...query, cursor: offset });
+    if (!signal.aborted && offset !== '0' && !result.items.length) {
+      offset = '0';
+      result = await commerceApi<Page<Order>>('/orders', signal, { ...query, cursor: offset });
+    }
+    if (signal.aborted) return;
+    orders.value = result;
+    group.value = selected;
+    source.value = null;
+    orderCursor.value = offset;
+    if (!selected) allOrdersCursor = offset;
+
+    await nextTick();
+    if (signal.aborted) return;
+    orderHeading.value?.focus({ preventScroll: true });
+    orderPanel.value?.scrollIntoView({
+      block: 'nearest',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }, () => loadOrders(next, selected));
+}
+
+function loadMembers(next = '0') {
+  members.value = null;
+  memberCursor.value = next;
+  void read(async signal => {
+    const result = await commerceApi<Page<Member>>('/members', signal, {
+      ...appliedMember, cursor: next, limit: String(memberPageSize),
+    });
+    if (!signal.aborted) members.value = result;
+  }, () => loadMembers(next));
+}
+
+function searchMembers() {
+  appliedMember = { ...memberFilters.value };
+  loadMembers();
+}
+
+function loadSource(id: string) {
+  if (loading.value) return;
+  source.value = null;
+  void read(async signal => {
+    const result = await commerceApi<Receipt>('/imports/' + encodeURIComponent(id), signal);
+    if (!signal.aborted) source.value = result;
+  }, () => loadSource(id));
+}
+
+function selectTab(next: Tab) {
+  if (tab.value === next) return;
+  tab.value = next;
+  readTask?.abort();
+  retryRead = undefined;
+  loading.value = false;
+  readError.value = '';
+  if (next === 'overview') loadOverview();
+  if (next === 'members') loadMembers();
+}
+
+function chooseFile(event: Event) {
+  file.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+  importError.value = '';
+  receipt.value = null;
+}
+
+async function importFile() {
+  if (!file.value || importing.value) return;
+  receipt.value = null;
+  importError.value = '';
+  if (file.value.size > 1024 * 1024) {
+    importError.value = '文件大小上限为 1 MiB';
+    return;
+  }
+  const data = new FormData();
+  data.append('file', file.value);
+  const request = new AbortController();
+  importTask = request;
+  importing.value = true;
+  try {
+    const result = await commerceApi<Receipt>('/imports', request.signal, {}, data);
+    if (!request.signal.aborted) {
+      receipt.value = result;
+      if (tab.value === 'overview') loadOverview();
+      if (tab.value === 'members') loadMembers();
+    }
+  } catch (error) {
+    if (!request.signal.aborted) handleError(error, importError);
+  } finally {
+    importing.value = false;
+  }
+}
+
+function previous(cursor: string, pageSize: number) { return String(Math.max(0, Number(cursor) - pageSize)); }
+onMounted(loadOverview);
+onBeforeUnmount(() => {
+  readTask?.abort();
+  importTask?.abort();
+});
+</script>
+
+<template>
+  <div class="commerce-workspace" :aria-busy="loading">
+    <header class="page-heading">
+      <div>
+        <h1>{{ tabs[tab] }}</h1>
+        <p v-if="tab === 'overview'" class="muted">按上海下单日、订单状态和币种核对原始订单金额。</p>
+        <p v-else-if="tab === 'imports'" class="muted">上传 UTF-8 JSON。每批最多 500 条会员及订单记录，文件上限 1 MiB。</p>
+      </div>
+      <button v-if="tab === 'overview'" type="button" class="primary" @click="selectTab('imports')">导入文件</button>
+    </header>
+
+    <nav class="commerce-tabs" aria-label="商城经营">
+      <button v-for="(label, key) in tabs" :key="key" type="button" :class="{ primary: tab === key }"
+        :aria-pressed="tab === key" @click="selectTab(key)">{{ label }}</button>
+    </nav>
+    <p v-if="loading && (tab === 'overview' ? !overview?.orderCount : !members)" role="status"
+      class="muted commerce-feedback">正在加载…</p>
+    <div v-if="readError" class="alert error commerce-feedback">
+      <p role="alert">{{ readError }}</p>
+      <button v-if="retryRead" type="button" @click="retryRead()">重试</button>
+    </div>
+
+    <template v-if="tab === 'overview'">
+      <section class="data-panel commerce-panel" aria-label="订单汇总">
+        <form class="commerce-filters" @submit.prevent="searchOrders">
+          <ElConfigProvider :locale="zhCn">
+            <label>开始日期
+              <ElDatePicker :model-value="filters.from" aria-label="开始日期" placeholder="选择开始日期"
+                type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" popper-class="commerce-date-popper"
+                @update:model-value="filters.from = typeof $event === 'string' ? $event : ''" />
+            </label>
+            <label>结束日期
+              <ElDatePicker :model-value="filters.to" aria-label="结束日期" placeholder="选择结束日期"
+                type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" popper-class="commerce-date-popper"
+                :disabled-date="beforeStartDate" @update:model-value="filters.to = typeof $event === 'string' ? $event : ''" />
+            </label>
+          </ElConfigProvider>
+          <label>客户编号<input v-model.trim="filters.customerId" maxlength="200"></label>
+          <label>订单原编号<input v-model.trim="filters.externalOrderId" maxlength="200"></label>
+          <button class="primary">查询</button>
+        </form>
+        <p v-if="invalidDateRange" class="alert error commerce-date-error" role="alert">结束日期不能早于开始日期。</p>
+        <div v-if="overview" class="commerce-summary">
+          <p v-if="!overview.orderCount" class="empty-state commerce-empty">没有符合条件的订单。</p>
+          <template v-else>
+            <p class="commerce-total"><strong>{{ overview.orderCount }}</strong> 笔订单</p>
+            <ul class="commerce-groups">
+              <li v-for="item in overview.groups" :key="item.status + item.currency">
+                <span class="muted">{{ orderStatuses[item.status] }} · {{ currencyName(item.currency) }}</span>
+                <strong>{{ displayAmount(item.amount) }}</strong>
+                <button type="button" class="text-button" aria-controls="commerce-order-details" :disabled="loading"
+                  :aria-pressed="group?.status === item.status && group?.currency === item.currency"
+                  @click="loadOrders('0', item)">查看 {{ item.orderCount }} 笔明细</button>
+              </li>
+            </ul>
+          </template>
+        </div>
+      </section>
+
+      <section v-if="overview?.orderCount" id="commerce-order-details" ref="orderPanel" class="data-panel commerce-panel">
+        <div class="panel-toolbar commerce-order-toolbar">
+          <div>
+            <h2 ref="orderHeading" tabindex="-1">订单明细</h2>
+            <p class="muted commerce-order-status" role="status">
+              {{ loading ? '正在加载…' : orderScope }}
+            </p>
+          </div>
+          <button v-if="group" type="button" :disabled="loading" @click="loadOrders(allOrdersCursor, null)">返回全部订单</button>
+        </div>
+        <template v-if="orders">
+          <nav v-if="orders.total" class="pagination commerce-order-pagination" aria-label="订单分页">
+            <span>共 {{ orders.total }} 笔<template v-if="orderPageCount > 1"> · 第 {{ orderPage }}/{{ orderPageCount }} 页</template></span>
+            <div v-if="orderPageCount > 1">
+              <button type="button" :disabled="loading || orderCursor === '0'"
+                @click="loadOrders(previous(orderCursor, orderPageSize))">上一页</button>
+              <button type="button" :disabled="loading || !orders.nextCursor"
+                @click="orders.nextCursor && loadOrders(orders.nextCursor)">下一页</button>
+            </div>
+          </nav>
+          <p v-if="!orders.items.length" class="empty-state commerce-empty">没有符合条件的订单。</p>
+          <div v-else class="table-scroll commerce-table" role="region" aria-label="商城订单" tabindex="0">
+            <table role="table">
+              <thead><tr><th scope="col">订单编号</th><th scope="col">商城会员</th><th scope="col">下单时间</th>
+                <th scope="col">状态</th><th scope="col">原始金额</th><th scope="col">来源</th></tr></thead>
+              <tbody>
+                <tr v-for="order in orders.items" :key="order.externalOrderId">
+                  <th scope="row" data-label="订单编号"><CommerceReference :value="order.externalOrderId" /></th>
+                  <td data-label="商城会员">
+                    <CommerceReference v-if="order.externalMemberId" :value="order.externalMemberId" />
+                    <span v-else>访客</span>
+                  </td>
+                  <td data-label="下单时间">{{ displayTime(order.orderedAt) }}</td>
+                  <td data-label="状态"><span class="badge">{{ orderStatuses[order.status] }}</span></td>
+                  <td data-label="原始金额" class="commerce-amount">{{ currencyName(order.currency) }} {{ displayAmount(order.amount) }}</td>
+                  <td data-label="来源"><button type="button" class="text-button" :aria-disabled="loading"
+                    @click="loadSource(order.importId)">批次 · 第 {{ order.sourceRow }} 条</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+        <section v-if="source" class="commerce-source">
+          <h3>导入来源</h3>
+          <dl><dt>批次编号</dt><dd>{{ source.id }}</dd><dt>导入时间</dt><dd>{{ displayTime(source.importedAt) }}</dd>
+            <dt>文件校验值</dt><dd>{{ source.sha256 }}</dd></dl>
+        </section>
+      </section>
+    </template>
+
+    <section v-else-if="tab === 'members'" class="data-panel commerce-panel" aria-label="商城会员">
+      <form class="commerce-filters" @submit.prevent="searchMembers">
+        <label>客户编号<input v-model.trim="memberFilters.customerId" maxlength="200"></label>
+        <label>会员原编号<input v-model.trim="memberFilters.externalMemberId" maxlength="200"></label>
+        <button class="primary">查询</button>
+      </form>
+      <template v-if="members">
+        <p v-if="!members.items.length" class="empty-state commerce-empty">没有符合条件的商城会员。</p>
+        <div v-else class="table-scroll commerce-table" role="region" aria-label="商城会员列表" tabindex="0">
+          <table role="table">
+            <thead><tr><th scope="col">会员编号</th><th scope="col">等级</th><th scope="col">状态</th>
+              <th scope="col">加入日期</th><th scope="col">到期日期</th></tr></thead>
+            <tbody><tr v-for="member in members.items" :key="member.externalMemberId">
+              <th scope="row" data-label="会员编号"><CommerceReference :value="member.externalMemberId" /></th>
+              <td data-label="等级">{{ member.level || '—' }}</td>
+              <td data-label="状态"><span class="badge" :class="{ inactive: member.status !== 'ACTIVE' }">{{ memberStatuses[member.status] }}</span></td>
+              <td data-label="加入日期">{{ member.joinedAt ?? '—' }}</td><td data-label="到期日期">{{ member.expiresAt ?? '—' }}</td>
+            </tr></tbody>
+          </table>
+        </div>
+        <nav v-if="members.total > memberPageSize" class="pagination" aria-label="会员分页">
+          <span>共 {{ members.total }} 条</span>
+          <div>
+            <button type="button" :disabled="memberCursor === '0'" @click="loadMembers(previous(memberCursor, memberPageSize))">上一页</button>
+            <button type="button" :disabled="!members.nextCursor" @click="members.nextCursor && loadMembers(members.nextCursor)">下一页</button>
+          </div>
+        </nav>
+      </template>
+    </section>
+
+    <section v-else class="data-panel commerce-panel commerce-import" aria-label="商城文件导入">
+      <a class="text-button" href="/commerce-import-example.json" download>下载导入示例</a>
+      <form class="commerce-upload" @submit.prevent="importFile">
+        <label>商城文件<input type="file" accept=".json,application/json" required :disabled="importing" @change="chooseFile"></label>
+        <button class="primary" :disabled="!file || importing">{{ importing ? '正在导入…' : '开始导入' }}</button>
+      </form>
+      <p v-if="importError" class="alert error" role="alert">{{ importError }}</p>
+      <section v-if="receipt" class="commerce-source" role="status">
+        <h2>{{ receipt.replayed ? '此文件此前已导入' : '导入完成' }}</h2>
+        <dl>
+          <dt>批次编号</dt><dd>{{ receipt.id }}</dd>
+          <dt>会员</dt><dd>应用 {{ receipt.members.applied }} · 相同 {{ receipt.members.unchanged }} · 旧版 {{ receipt.members.stale }}</dd>
+          <dt>订单</dt><dd>应用 {{ receipt.orders.applied }} · 相同 {{ receipt.orders.unchanged }} · 旧版 {{ receipt.orders.stale }}</dd>
+        </dl>
+        <button type="button" @click="selectTab('overview')">查看经营概览</button>
+      </section>
+    </section>
+  </div>
+</template>

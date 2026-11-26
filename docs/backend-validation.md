@@ -2,6 +2,18 @@
 
 需求验收目标见 [APP需求验收基准](app-requirements-acceptance.md)。本文件记录实际环境、命令、结果与限制，逐用例签收留在关联Issue；历史通过不外推到当前代码或线上环境。
 
+## 二期商城文件导入与经营概览（2026-11-25，Issue #107）
+
+本次工作树基于 C 的提交 `f57725c72f21eeeaeb05cbeee119112cd033ef6e`。环境为 Windows、Docker Maven 3.9.9 / Java 21、PostgreSQL 16.15 和 Redis，浏览器为 Chromium。输入为合成文件和隔离账户。
+
+- `powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -DockerMaven -Tests CommerceImportParserTest,CommerceIntegrationTest,CommerceMigrationUpgradeTest,CustomerDraftTest,CustomerIntegrationTest,AdminConsoleIntegrationTest` 退出 0，36 项通过。覆盖 Flyway 空库和 V36→V39、同文件并发只生效一次、旧版本保护、错误整批回滚、同条件精确金额、C 客户绑定及跨角色、跨公司拒绝。
+- `mvn.cmd -B -f server/pom.xml "-Dtest=CommerceIntegrationTest#publishesCommerceOpenApi" verify` 在同一隔离数据环境退出 0，最终运行时契约断言通过。商城 5 个路径及其响应 schema 同步至快照。
+- `npm.cmd run build` 与 `npm.cmd run test:e2e -- --workers=2` 退出 0，46 项通过。其中 2 项使用本地真实 HTTP/数据库，在桌面和窄屏分别验证 C 客户绑定、商城文件导入、重放、金额分组和批次回查。夹具用例验证 320px、键盘操作、异常定位和失权清理。
+- 商城接入原后台布局后，使用独立演示库在 1440px 和 390px 复验共用会话、原有四个栏目往返、订单批次回查及文件幂等重放。截图位于 `output/commerce-preview/shared-desktop.png` 和 `shared-mobile.png`。
+- 中文展示调整后，Web 构建通过，48 项桌面和窄屏浏览器回归通过，2 项需单独启用的写入式真实导入用例沿用首轮验收。本轮在英语浏览器中用 1700px 和 390px 加载已有演示数据，复验中文日历、人民币和美元、原编号展开及查询、日期筛选和批次回查。截图位于 `output/commerce-preview/` 下的 `overview-zh-*.png` 和 `members-zh-*.png`。
+- 订单明细调整后，Web 构建通过，50 项浏览器回归通过，2 项写入式真实导入用例沿用首轮验收。使用已有 24 笔数据在 1700px 和 390px 核对 10、10、4 笔分页与页码。延迟真实明细请求时，保留原列表和滚动位置。响应后显示 2 笔已取消订单及可见的返回按钮，返回可恢复第 2 页。浏览器回归同时覆盖筛选条件、请求失败后保留原页及重试。截图位于 `output/commerce-preview/` 下的 `orders-page-*.png` 和 `orders-group-*.png`。
+- `openspec.cmd validate --all --strict` 共 52 项通过。复验截图位于工作树忽略目录 `output/commerce-verification/`。对接条件及联合验收未完成项见 [二期商城任务](../openspec/changes/phase2-commerce-overview/tasks.md)。
+
 ## 首页月历复用与日志关联任务（2026-11-17，Issue #94）
 
 基线 `70f97503dc4ee5dd0f5fac163baa61118b0b4782`，工作分支 `feature/94-home-calendar-diary-tasks`，本段结果对应本次提交前的实现工作树。首页摘要等高、顶部排列并增加深棕圆点，个人事项直接复用公司月历；日志正文下以紧凑黄色“关联任务”下拉框多选本人参与且 RECEIVED 的任务，排除 FEEDBACK 待验收候选，保留可读的历史关联，详情/历史回显，移除右上角下属日志入口。用户在本机验收并提出调整后，已明确授权提交及创建 PR；该授权不替代未完成的设备验证。未部署线上服务。产品边界由现有 [首页 tasks](../openspec/changes/home-company-daily-todos/tasks.md#7-首页月历复用与摘要布局2026-11-17) 和 [日志 tasks](../openspec/changes/log-task-linkage/tasks.md#今日任务选择2026-11-17) 维护。

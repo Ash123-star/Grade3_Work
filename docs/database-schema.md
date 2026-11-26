@@ -107,6 +107,20 @@ V22将旧待审步骤标记为SUPERSEDED并保留历史，每个申请至多一�
 | `ai_map_nodes` | `owner_id`, `job_id`, `body` | 归用户所有的 AI 地图节点及来源 |
 | `ai_map_edges` | `owner_id`, `source_id`, `target_id`, `body` | 节点关系；复合外键保证节点属于同一用户和公司 |
 
+## 二期商城快照与来源（Issue #107）
+
+V39 在 `server` Flyway 新增三张表。
+
+| 表 | 标识与约束 | 数据 |
+| --- | --- | --- |
+| `commerce_imports` | `(company_id,id)` 主键，`(company_id,sha256)` 唯一 | 执行人、时间、原文件 SHA-256、会员及订单写入与跳过计数。复合外键限制执行人公司。 |
+| `commerce_members` | `(company_id,external_member_id)` 主键 | 会员等级、状态、加入和到期日、源更新时间、导入批次和文件行。 |
+| `commerce_orders` | `(company_id,external_order_id)` 主键，会员及批次复合外键限制同公司 | 可空会员 ID、下单时间、状态、币种、`numeric(19,4)` 原始金额、源更新时间、导入批次和文件行。 |
+
+公司行锁覆盖文件查重、快照写入、回执和审计，各表唯一键保证并发下的外部身份一致性。订单索引支持公司下单窗口和按商城会员查询。C 的 `customer_memberships.mall_member_id` 保存显式客户关联。导入方保留原文件并用 SHA-256 对照，服务端保存凭据及当前快照来源。
+
+合入前协调 [#104](https://github.com/Ash123-star/Grade3_Work/pull/104) 和 [#103](https://github.com/Ash123-star/Grade3_Work/pull/103) 的 V37 冲突。实际部署按合并后唯一版本顺序执行。回滚配套应用时保留 V39 表与数据。
+
 ## 开发规则
 
 新增字段先判断是否是稳定关系。跨表引用、统计维度、权限边界和需要唯一性的内容应使用列或关系表；仅用于展示且结构变化频繁的内容才放入 JSONB。已发布迁移不可修改，必须追加新的 `V` 版本，并同步 OpenSpec、后端代码、字段字典和集成测试。

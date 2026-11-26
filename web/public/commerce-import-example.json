@@ -1,0 +1,22 @@
+{
+  "members": [
+    {
+      "externalMemberId": "DEMO-MEMBER-01",
+      "level": "示例会员",
+      "status": "ACTIVE",
+      "joinedAt": "2026-11-01",
+      "sourceUpdatedAt": "2026-11-24T09:30:00+08:00"
+    }
+  ],
+  "orders": [
+    {
+      "externalOrderId": "DEMO-ORDER-01",
+      "externalMemberId": "DEMO-MEMBER-01",
+      "status": "PAID",
+      "currency": "CNY",
+      "amount": "139.50",
+      "orderedAt": "2026-11-24T09:20:00+08:00",
+      "sourceUpdatedAt": "2026-11-24T09:30:00+08:00"
+    }
+  ]
+}

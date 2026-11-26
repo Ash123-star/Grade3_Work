@@ -50,6 +50,13 @@ public class CustomerService {
         if(key.isEmpty()||key.length()>200) throw ApiError.bad("INVALID_EXTERNAL_ID","商城外部ID无效");
         return repo.byExternal(a,key);
     }
+    /** 同公司管理员查询当前客户明确绑定的商城会员 ID。只读，客户不可见时返回 404。 */
+    public Optional<String> mallMemberId(Actor request, String customerId) {
+        Actor actor = admin(request);
+        repo.get(actor, customerId);
+        return Optional.ofNullable(repo.membership(actor, customerId))
+                .map(membership -> Db.str(membership, "mallMemberId"));
+    }
     @Transactional public Map<String,Object> update(Actor request,String id,Map<String,Object> body) {
         Actor a=admin(request);var before=repo.get(a,id);var draft=CustomerDraft.parse(body,true);
         try { var updated=repo.update(a,id,draft);repo.audit(a,"CUSTOMER_UPDATED",id,before,updated,"");return updated; }
