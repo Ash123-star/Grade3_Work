@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/shared/sibling_swipe.dart';
 import 'package:pandora_mobile/shared/attachment_widgets.dart';
 import 'package:flutter/material.dart';
@@ -64,7 +65,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           children: [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: period == '月' ? 12 : 0),
-              child: const DateControls(showTaskManagement: true),
+              child: DateControls(
+                showTaskManagement: true,
+                showCustomerDirectory: AppConfig.mock && user.canReadBusiness,
+              ),
             ),
             Expanded(
               child: LayoutBuilder(

@@ -30,14 +30,14 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       assert.match(await text(), /没有找到匹配客户/); await click('clear');
       await page.locator('#search').fill('禾屿'); await page.locator('#search').press('Enter');
       assert.equal(await page.locator('.customer').count(), 1);
-      await click('customer', 'heyu'); await click('directory');
+      await click('customer', 'heyu'); await click('back');
       assert.equal(await page.locator('#search').inputValue(), '禾屿');
       await page.locator('#search').fill(''); await page.locator('#search').press('Enter');
       await shot('01-directory-390');
     });
     await check('客户分页与详情返回保持页码', async () => {
       await click('list-page', '1'); assert.match(await text(), /沈予安/);
-      await click('customer', 'shen'); await click('directory'); assert.match(await text(), /沈予安/);
+      await click('customer', 'shen'); await click('back'); assert.match(await text(), /沈予安/);
       assert.equal(await page.locator('#dock .pager span').innerText(), '2 / 2'); await click('list-page', '-1');
     });
     await check('筛选弹层、键盘关闭与焦点恢复', async () => {
@@ -53,15 +53,17 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       await click('customer', 'lin'); await shot('02-profile-390');
       assert.doesNotMatch(await text(), /秋日会员精选礼盒/);
       await click('tab', 'member'); assert.match(await text(), /拾光商城会员/);
+      assert.equal(await page.locator('#dock button').count(),3);
+      assert.equal(await page.getByRole('button',{name:'返回客户目录',exact:true}).count(),1);
       await click('member', '1'); assert.match(await text(), /余 2 次/);
       await shot('03-membership-390');
       await page.getByText('权益使用记录 · 4 条', { exact: true }).click();
       assert.match(await text(), /城市之声/);
-      await click('directory'); await click('customer', 'zhou'); await click('tab', 'member');
+      await click('back'); await click('customer', 'zhou'); await click('tab', 'member');
       assert.match(await text(), /该资格已到期/);
     });
     await check('企业联系人、活动分类与负责人参与人', async () => {
-      await click('directory'); await click('customer', 'heyu'); assert.match(await text(), /顾言/);
+      await click('back'); await click('customer', 'heyu'); assert.match(await text(), /顾言/);
       await click('tab', 'member'); assert.match(await text(), /暂无会员资格/);
       await click('go-business'); await click('kind', 'activities'); await shot('04-business-390');
       assert.match(await text(), /企业参访/); await click('record', 'a3');
@@ -71,7 +73,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       await click('record', 'a6'); await click('back'); assert.match(await text(), /秋季工坊参访/);
     });
     await check('服务进度、订单金额与退款分别展示', async () => {
-      await click('directory'); await click('customer', 'lin'); await click('tab', 'business');
+      await click('back'); await click('customer', 'lin'); await click('tab', 'business');
       assert.match(await text(), /待完成服务 · 2/); await click('service-status');
       assert.match(await text(), /已完成/); await click('business-page', '1'); assert.match(await text(), /已取消/);
       await click('kind', 'activities'); assert.match(await text(), /赛演/); assert.match(await text(), /私宴/);
@@ -116,7 +118,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
             assert.deepEqual(geometry.smallTargets, []); assert.equal(geometry.broken, 0);
             if (font === '1.5' && tab === 'member') await shot(`09-large-${width}`);
           }
-          await click('back'); await click('directory');
+          await click('back'); await click('back');
         }
       }
     });
@@ -169,7 +171,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       await page.locator('#content').evaluate(e=>e.scrollTop=100);
       const scroll=await page.locator('#content').evaluate(e=>e.scrollTop);
       await page.locator('.customer-directory-entry').evaluate(e=>e.click());
-      await click('customer','heyu'); await click('tab','business'); await click('directory'); await click('company-back');
+      await click('customer','heyu'); await click('tab','business'); await click('back'); await click('company-back');
       assert.equal(await page.locator('#content').evaluate(e=>e.scrollTop),scroll);
       await page.setViewportSize({width:390,height:844});
     });
@@ -181,7 +183,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       await page.locator('[form="customer-form"]').click(); assert.equal(await page.evaluate(()=>document.activeElement.id),'edit-phone');
       await page.locator('#edit-phone').fill('+86 100-000-0000');
       await page.locator('[form="customer-form"]').click(); assert.match(await text(), /已保存至原型示例/);
-      assert.match(await text(), /原型测试客户/); await click('directory');
+      assert.match(await text(), /原型测试客户/); await click('back');
       await page.locator('#search').fill('原型测试客户'); await page.locator('#search').press('Enter');
       assert.equal(await page.locator('.customer').count(),1); await page.locator('.customer').click();
     });
@@ -192,7 +194,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       await tools({ save:'error' }); await page.locator('[form="customer-form"]').click();
       assert.match(await text(),/保存未成功/); assert.equal(await page.locator('#edit-name').inputValue(),'修改后客户');
       await shot('14-save-error'); await page.locator('[form="customer-form"]').click();
-      assert.match(await text(),/修改后客户/); await click('directory');
+      assert.match(await text(),/修改后客户/); await click('back');
       assert.equal(await page.locator('#search').inputValue(),'原型测试客户');
       await click('clear'); await click('customer','lin'); await click('edit-customer');
       assert.equal(await page.locator('#edit-phone').inputValue(),'');
@@ -201,7 +203,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       assert.match(await text(), /林小满/); assert.doesNotMatch(await text(), /不会保存/);
     });
     await check('疑似重复核对、保留草稿与明确新建', async () => {
-      await click('directory'); await click('new-customer'); await page.locator('#edit-name').fill('林小满');
+      await click('back'); await click('new-customer'); await page.locator('#edit-name').fill('林小满');
       await page.locator('[form="customer-form"]').click(); assert.match(await page.locator('#sheet').innerText(),/避免重复/);
       await shot('15-duplicate'); await click('peek-duplicate','lin'); assert.match(await page.locator('#sheet').innerText(),/已有客户/);
       await click('duplicate-back'); await click('close'); assert.equal(await page.locator('#edit-name').inputValue(),'林小满');
@@ -233,7 +235,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
     await check('维护与字段权限分开，受限编辑保留旧号码', async () => {
       await page.goto(url); await click('directory'); await click('customer','lin');
       await tools({permission:'readonly'}); assert.equal(await page.locator('[data-action="edit-customer"]').count(),0);
-      await click('directory'); assert.equal(await page.locator('[data-action="new-customer"]').count(),0);
+      await click('back'); assert.equal(await page.locator('[data-action="new-customer"]').count(),0);
       await tools({permission:'manage',access:'limited'}); await click('customer','lin'); await click('edit-customer');
       assert.equal(await page.locator('#edit-phone').count(),0); assert.doesNotMatch(await text(),/138/);
       await page.locator('#edit-owner').selectOption('许禾'); await page.locator('[form="customer-form"]').click();
