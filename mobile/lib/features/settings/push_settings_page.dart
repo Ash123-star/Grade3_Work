@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/push/push_controller.dart';
@@ -69,7 +70,7 @@ class PushSettingsPage extends ConsumerWidget {
                 ])
                   SizedBox(
                     width: 130,
-                    child: DropdownButtonFormField<int>(
+                    child: PremiumDropdownField<int>(
                       isExpanded: true,
                       key: ValueKey('${row.$1}:${row.$3}'),
                       initialValue: row.$3,

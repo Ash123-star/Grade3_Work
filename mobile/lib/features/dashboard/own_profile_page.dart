@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/shared/curated_assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -465,7 +466,7 @@ class _OwnProfilePageState extends ConsumerState<OwnProfilePage> {
                             ),
                             const SizedBox(height: 5),
                             if (editing && entries[i].$1 == '性别')
-                              DropdownButtonFormField<String>(
+                              PremiumDropdownField<String>(
                                 key: ValueKey('gender:$accountId'),
                                 initialValue: gender,
                                 decoration: const InputDecoration(
