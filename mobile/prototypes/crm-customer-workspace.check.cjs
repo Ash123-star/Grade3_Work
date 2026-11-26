@@ -24,7 +24,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
     await click('apply-tools');
   }
   try {
-    await page.goto(url); await page.evaluate(() => document.fonts.ready);
+    await page.goto(url); await click('directory'); await page.evaluate(() => document.fonts.ready);
     await check('客户搜索、空结果与清空恢复', async () => {
       await page.locator('#search').fill('不存在的客户'); await page.locator('#search').press('Enter');
       assert.match(await text(), /没有找到匹配客户/); await click('clear');
@@ -97,7 +97,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
     });
     await check('320/390/412px、1.5 倍字、底部操作与横向布局', async () => {
       for (const [width, height] of [[320, 568], [390, 844], [412, 915]]) {
-        await page.setViewportSize({ width, height }); await page.goto(url);
+        await page.setViewportSize({ width, height }); await page.goto(url); await click('directory');
         for (const font of ['1', '1.5']) {
           await tools({ font });
           for (const tab of ['directory', 'profile', 'member', 'business', 'record']) {
@@ -121,8 +121,8 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       }
     });
     await check('公司入口与键盘主链路', async () => {
-      await page.setViewportSize({ width: 390, height: 844 }); await page.goto(url);
-      await click('main-nav', '1'); await shot('10-company-entry-390'); await click('directory');
+      await page.setViewportSize({ width: 390, height: 844 }); await page.goto(url); await click('directory');
+      await click('company-back'); await shot('10-company-entry-390'); await click('directory');
       await page.locator('#search').focus(); await page.keyboard.type(''); await page.keyboard.insertText('林小满'); await page.keyboard.press('Enter');
       await page.locator('[data-action="customer"]').focus(); await page.keyboard.press('Enter');
       assert.match(await text(), /基本资料/);
@@ -130,6 +130,96 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       await page.keyboard.press('Tab');
       await page.locator('#tab-member').focus(); await page.keyboard.press('ArrowRight');
       assert.equal(await page.locator('#tab-business').getAttribute('aria-selected'), 'true');
+    });
+    await check('公司首屏目录、新增和待完成服务入口', async () => {
+      await page.goto(url);
+      assert.match(await text(), /工作视图/);
+      const visible = await page.locator('[data-action="new-customer"]').evaluate(e => {const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;});
+      assert(visible); await shot('12-company-entry');
+      await click('pending-customers'); assert.equal(await page.locator('.customer').count(),2);
+      assert.match(await text(), /有待完成服务/);
+      await click('company-back'); await click('new-customer'); assert.match(await text(), /客户姓名/);
+      await click('cancel-edit'); assert.match(await text(), /工作视图/);
+    });
+    await check('新建个人、字段错误聚焦和成功后查询', async () => {
+      await page.goto(url); await click('directory'); await click('new-customer'); await shot('13-new-person');
+      await page.locator('[form="customer-form"]').click();
+      assert.equal(await page.evaluate(()=>document.activeElement.id),'edit-name');
+      await page.locator('#edit-name').fill('原型测试客户'); await page.locator('#edit-phone').fill('abc');
+      await page.locator('[form="customer-form"]').click(); assert.equal(await page.evaluate(()=>document.activeElement.id),'edit-phone');
+      await page.locator('#edit-phone').fill('+86 100-000-0000');
+      await page.locator('[form="customer-form"]').click(); assert.match(await text(), /已保存至原型示例/);
+      assert.match(await text(), /原型测试客户/); await click('directory');
+      await page.locator('#search').fill('原型测试客户'); await page.locator('#search').press('Enter');
+      assert.equal(await page.locator('.customer').count(),1); await page.locator('.customer').click();
+    });
+    await check('编辑不改会员订单、取消保护、失败保留并重试', async () => {
+      await click('edit-customer'); await page.locator('#edit-name').fill('修改后客户');
+      await click('cancel-edit'); assert.match(await page.locator('#sheet').innerText(),/尚未保存/);
+      await click('keep-edit'); assert.equal(await page.locator('#edit-name').inputValue(),'修改后客户');
+      await tools({ save:'error' }); await page.locator('[form="customer-form"]').click();
+      assert.match(await text(),/保存未成功/); assert.equal(await page.locator('#edit-name').inputValue(),'修改后客户');
+      await shot('14-save-error'); await page.locator('[form="customer-form"]').click();
+      assert.match(await text(),/修改后客户/); await click('directory');
+      assert.equal(await page.locator('#search').inputValue(),'原型测试客户');
+      await click('clear'); await click('customer','lin'); await click('edit-customer');
+      assert.equal(await page.locator('#edit-phone').inputValue(),'');
+      assert.doesNotMatch(await text(), /余 2 次|订单金额/);
+      await page.locator('#edit-name').fill('不会保存'); await click('cancel-edit'); await click('discard-edit');
+      assert.match(await text(), /林小满/); assert.doesNotMatch(await text(), /不会保存/);
+    });
+    await check('疑似重复核对、保留草稿与明确新建', async () => {
+      await click('directory'); await click('new-customer'); await page.locator('#edit-name').fill('林小满');
+      await page.locator('[form="customer-form"]').click(); assert.match(await page.locator('#sheet').innerText(),/避免重复/);
+      await shot('15-duplicate'); await click('peek-duplicate','lin'); assert.match(await page.locator('#sheet').innerText(),/已有客户/);
+      await click('duplicate-back'); await click('close'); assert.equal(await page.locator('#edit-name').inputValue(),'林小满');
+      await page.locator('[form="customer-form"]').click(); await click('confirm-duplicate');
+      assert.match(await text(), /已保存至原型示例/);
+    });
+    await check('企业新建及联系人添加、编辑、取消保护', async () => {
+      await page.goto(url); await click('new-customer'); await click('edit-type','企业');
+      assert.equal(await page.locator('#sheet').evaluate(e=>e.open),false);
+      await page.locator('#edit-name').fill('原型演示企业'); await page.locator('#edit-contactName').fill('示例对接人');
+      await shot('16-new-company'); await page.locator('[form="customer-form"]').click(); assert.match(await text(), /示例对接人/);
+      await click('add-contact'); await page.locator('#contact-name').fill('示例乙'); await page.locator('#contact-role').fill('行政对接');
+      await page.keyboard.press('Escape'); assert.match(await page.locator('#sheet').innerText(), /放弃联系人修改/);
+      await click('keep-contact'); assert.equal(await page.locator('#contact-name').inputValue(),'示例乙');
+      await shot('17-contact-sheet'); await page.locator('#contact-form [type="submit"]').click();
+      assert.match(await text(),/示例乙/); await click('edit-contact','1'); await page.locator('#contact-role').fill('资料对接');
+      await page.locator('#contact-form [type="submit"]').click(); assert.match(await text(),/资料对接/);
+      await click('add-contact'); await page.locator('#contact-name').fill('不保存联系人');
+      await page.locator('#sheet-close').click(); assert.match(await page.locator('#sheet').innerText(), /放弃联系人修改/);
+      await click('discard-contact'); assert.doesNotMatch(await text(), /不保存联系人/);
+    });
+    await check('版本冲突不能直接覆盖，重载后重新编辑', async () => {
+      await click('edit-customer'); await page.locator('#edit-name').fill('冲突中的名称'); await tools({save:'conflict'});
+      await page.locator('[form="customer-form"]').click(); assert.match(await text(),/资料已有更新/);
+      assert(await page.locator('[form="customer-form"]').isDisabled());
+      await click('reload-edit'); await click('discard-edit'); assert.equal(await page.locator('#edit-name').inputValue(),'原型演示企业');
+      await click('cancel-edit');
+    });
+    await check('维护与字段权限分开，受限编辑保留旧号码', async () => {
+      await page.goto(url); await click('directory'); await click('customer','lin');
+      await tools({permission:'readonly'}); assert.equal(await page.locator('[data-action="edit-customer"]').count(),0);
+      await click('directory'); assert.equal(await page.locator('[data-action="new-customer"]').count(),0);
+      await tools({permission:'manage',access:'limited'}); await click('customer','lin'); await click('edit-customer');
+      assert.equal(await page.locator('#edit-phone').count(),0); assert.doesNotMatch(await text(),/138/);
+      await page.locator('#edit-owner').selectOption('许禾'); await page.locator('[form="customer-form"]').click();
+      await tools({access:'full'}); assert.match(await text(),/138 \*\*\*\* 0268/); assert.match(await text(),/许禾/);
+      await click('edit-customer'); await page.locator('#edit-name').fill('未保存'); await tools({permission:'readonly'});
+      assert(await page.locator('[form="customer-form"]').isDisabled()); await click('cancel-edit'); await click('discard-edit');
+    });
+    await check('新增编辑页面与联系人弹层的小屏大字布局', async () => {
+      for(const [width,height] of [[320,568],[390,844],[412,915]]) {
+        await page.setViewportSize({width,height}); await page.goto(url); await click('new-customer');
+        await tools({font:'1.5'}); await click('edit-type','企业');
+        const fit=async()=>{const g=await page.evaluate(()=>({w:innerWidth,sw:document.documentElement.scrollWidth,cw:document.querySelector('#content').clientWidth,cs:document.querySelector('#content').scrollWidth,dock:document.querySelector('#dock').getBoundingClientRect().bottom,h:innerHeight}));assert(g.sw<=g.w+1&&g.cs<=g.cw+1&&g.dock<=g.h+1,JSON.stringify(g));};
+        await fit(); await shot(`18-editor-large-${width}`); await click('cancel-edit'); await click('discard-edit');
+        await click('directory'); await click('customer','heyu'); await click('add-contact');
+        assert(await page.locator('#contact-form [type="submit"]').isVisible());
+        assert(await page.locator('#sheet').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
+        await page.keyboard.press('Escape');
+      }
     });
     await page.setViewportSize({ width: 1366, height: 980 }); await page.goto(url); await shot('11-desktop-studio');
     assert.deepEqual(errors, []);
