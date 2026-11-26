@@ -22,7 +22,7 @@
 `customer_memberships` 一个客户一条商城会员绑定；`customer_benefits` 一个客户多条权益，带 `valid_from/valid_to/max_uses`。年卡作为 `ANNUAL_CARD` 权益，不在客户表硬编码有效期。
 
 ### 3. 核销以唯一键保证幂等
-`customer_benefit_redemptions` 对 `(company_id,benefit_id,event_key)` 唯一。先按 key 查已有记录，命中直接返回；未命中再校验权益归属、状态、有效期和次数，插入冲突时回查。这样重试不会多扣，过期后的同键重放仍返回原结果。
+`customer_benefit_redemptions` 对 `(company_id,benefit_id,event_key)` 唯一，复合外键保证核销记录与权益归属同一公司和客户。事务先校验归属并锁定权益行，再按 key 查回执；若未命中，才校验客户状态、权益状态、有效期和次数。写入核销记录时同时保存首次 `used/remaining`，重放不按当前次数重新计算。相比由历史记录重算，持久化快照可保留首次使用上限和准确的并发顺序，同时不改变接口响应。
 
 ### 4. 权限首版集中收口
 所有 `/api/customers` 接口经 `CustomerService.admin()` 刷新 ACTIVE ADMIN 并拒绝首次改密。B 与甲方确认角色后，只需改该入口和查询范围；不向普通员工或现有管理员后台之外的角色放开。
@@ -34,8 +34,8 @@
 - [商城字段未确认] → 只保存 `mallMemberId/level/joinedAt/expiresAt/status`；E 提供字段后扩展。
 
 ## Migration Plan
-1. 新增 V37 建表与索引；不改已发布迁移。
-2. 空库和升级库执行 Flyway，验证客户/会员/权益/核销外键与唯一约束。
+1. V37 建表与索引；V38 加入归属一致性和回执快照，不改 V37。
+2. 空库和 V36 升级库执行 Flyway，验证已有数据保留、核销复合外键与唯一约束。若 V37 已存在核销记录，V38 停止并保留原数据；V37 未记录首次计数，不根据事务时间猜测历史回执。
 3. 接口先仅 ADMIN；联调 A/D/E 前确认字段和权限。
 
 ## Open Questions
