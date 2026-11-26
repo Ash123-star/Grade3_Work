@@ -21,18 +21,68 @@ function canContact() { return canManage() && state.access === 'full'; }
 function localDate() {
   return new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Shanghai'}).format(new Date()).replaceAll('-', '.');
 }
+// Calendar scaffolding mirrors the existing DateControls and month timeline.
+// It is only an entry-placement preview; production calendar/dispatch stays unchanged.
+function companyToday(){const [y,m,d]=localDate().split('.').map(Number);return new Date(y,m-1,d);}
+const companyCalendar={date:companyToday(),period:'月'};
+const companySamples=[{a:2,b:6,title:'首页视觉评审',tone:''},{a:10,b:13,title:'接口联调',tone:'blue'},
+  {a:16,b:19,title:'组件交付',tone:'blue'},{a:23,b:27,title:'冬日活动筹备',tone:''},
+  {a:26,b:26,title:'沙龙资料整理',tone:'coral'},{a:30,b:30,title:'月末复盘',tone:'blue'}];
+function companyItems(){return companyCalendar.date.getFullYear()===2026&&companyCalendar.date.getMonth()===10?companySamples:[];}
+function renderCompanyHeader(){
+  const d=companyCalendar.date;
+  $('#app-header').innerHTML=`<div class="company-datebar" aria-label="公司日期导航"><button class="calendar-arrow" data-action="calendar-move" data-value="-1" aria-label="上一个${companyCalendar.period}">‹</button><button class="calendar-month" data-action="calendar-picker" aria-label="选择年月"><span class="calendar-month-label"><span>${d.getFullYear()}年</span><span>${d.getMonth()+1}月</span></span><span aria-hidden="true">⌄</span></button><button class="calendar-arrow" data-action="calendar-move" data-value="1" aria-label="下一个${companyCalendar.period}">›</button><button class="calendar-today" data-action="calendar-today" aria-label="回到今天"><span>今天</span></button></div>`;
+}
+function companyMonth(){
+  const d=companyCalendar.date,y=d.getFullYear(),m=d.getMonth(),first=(new Date(y,m,1).getDay()+6)%7,days=new Date(y,m+1,0).getDate(),weeks=Math.ceil((first+days)/7),today=companyToday();
+  let html=`<section class="company-month-grid" aria-label="公司月视图"><div class="company-weekdays">${['一','二','三','四','五','六','日'].map(x=>`<span>${x}</span>`).join('')}</div><div class="company-weeks">`;
+  for(let w=0;w<weeks;w++){
+    const start=w*7-first+1,end=start+6;
+    html+='<div class="company-week"><div class="company-dates">';
+    for(let i=0;i<7;i++){
+      const n=start+i,other=n<1||n>days,isToday=!other&&y===today.getFullYear()&&m===today.getMonth()&&n===today.getDate();
+      html+=other?'<span class="calendar-outside" aria-hidden="true"></span>':`<button data-action="calendar-day" data-value="${n}" class="calendar-day ${n===d.getDate()?'selected':''} ${isToday?'is-today':''}" aria-pressed="${n===d.getDate()}" aria-label="${m+1}月${n}日${isToday?'，今天':''}"><span>${n}</span></button>`;
+    }
+    html+='</div><div class="company-bars">';
+    companyItems().filter(item=>item.a<=end&&item.b>=start).forEach(item=>{
+      const a=Math.max(start,item.a)-start,b=Math.min(end,item.b)-start;
+      html+=`<div class="calendar-bar ${item.tone}" style="grid-column:${a+1}/${b+2}" title="${item.title}">${item.title}</div>`;
+    });
+    html+='</div></div>';
+  }
+  return html+'</div></section>';
+}
+function companyAgenda(){
+  const d=companyCalendar.date;
+  let week='';
+  if(companyCalendar.period==='周'){
+    const start=new Date(d.getFullYear(),d.getMonth(),d.getDate()-(d.getDay()+6)%7);
+    week=`<div class="company-agenda-week">${Array.from({length:7},(_,i)=>{const day=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i);return `<span class="${day.getTime()===d.getTime()?'selected':''}"><small>${['一','二','三','四','五','六','日'][i]}</small><b>${day.getDate()}</b></span>`;}).join('')}</div>`;
+  }
+  const items=companyItems().filter(item=>item.a<=d.getDate()&&item.b>=d.getDate());
+  return `<section class="company-agenda" aria-label="公司${companyCalendar.period}视图">${week}<h3>${d.getMonth()+1}月${d.getDate()}日 · 公司安排</h3>${items.length?items.map(item=>`<div class="company-agenda-item"><span class="calendar-bar ${item.tone}">${item.title}</span><p class="small">工作安排示例</p></div>`).join(''):'<p class="small">当前日期暂无示例安排</p>'}</section>`;
+}
 function renderCompanyEntry() {
-  const pendingCustomers = customers.filter(c => c.pending > 0).length;
-  return `<div class="company-heading"><div><p class="eyebrow">PANDORA WORKSPACE</p><h3>一起，把事情做好。</h3></div><img src="../assets/generated_ui/sunshine/mascots/welcome.png" alt=""></div>
-    <section class="customer-hub" aria-labelledby="hub-title">
-      <div class="hub-heading"><img src="${asset('members')}" alt=""><div class="grow"><h3 id="hub-title">客户与业务</h3><p class="small">客户、会员和每一次服务</p></div></div>
-      <div class="hub-actions"><button class="primary" data-action="directory">客户目录 <span aria-hidden="true">›</span></button>${canManage()?'<button class="secondary" data-action="new-customer">＋ 新增客户</button>':''}</div>
-      <button class="hub-pending" data-action="pending-customers"><span>待完成服务的客户</span><b>${pendingCustomers} 位 <span aria-hidden="true">›</span></b></button>
-    </section>
-    <div class="section-title"><h3>工作视图</h3><span class="small">11 月 · 工作安排示意</span></div>
-    <section class="company-work"><div class="work-week" aria-label="本周日期示意">${['一|23','二|24','三|25','四|26','五|27','六|28','日|29'].map(v=>{const [day,n]=v.split('|');return `<span class="${n==='26'?'today':''}"><small>${day}</small><b>${n}</b></span>`;}).join('')}</div>
-    <div class="work-row"><span class="work-dot"></span><div><b>沙龙会后资料整理</b><p class="small">今天 15:00 · 许禾</p></div></div><div class="work-row"><span class="work-dot blue"></span><div><b>冬日活动筹备沟通</b><p class="small">今天 16:30 · 陈晨</p></div></div></section>
-    <p class="small company-caption">客户入口置于工作视图上方；正式工作月历沿用现有页面。</p>`;
+  return `<div class="company-view-controls">${sections(['日','周','月'].map(x=>[x,x]),companyCalendar.period,'calendar-period')}<div class="company-action-row"><button class="secondary" data-action="company-dispatch"><img src="${asset('task')}" alt="">派发任务</button><button class="secondary customer-directory-entry" data-action="directory"><img src="${asset('members')}" alt="">客户目录</button></div></div>${companyCalendar.period==='月'?companyMonth():companyAgenda()}`;
+}
+function companyAction(action,value){
+  if(action==='calendar-today'){companyCalendar.date=companyToday();render();return true;}
+  if(action==='calendar-period'){companyCalendar.period=value;render();return true;}
+  if(action==='calendar-day'){companyCalendar.date.setDate(Number(value));render({restore:true});return true;}
+  if(action==='calendar-move'){
+    const d=companyCalendar.date,step=Number(value);
+    const next=companyCalendar.period==='月'?new Date(d.getFullYear(),d.getMonth()+step,1):new Date(d.getFullYear(),d.getMonth(),d.getDate()+step*(companyCalendar.period==='周'?7:1));
+    if(next.getFullYear()>=1900&&next.getFullYear()<=2100)companyCalendar.date=next;
+    render();return true;
+  }
+  if(action==='calendar-picker'){
+    const d=companyCalendar.date;
+    openSheet('选择年月',`<form id="company-month-form"><label for="company-month">跳转到月份</label><input id="company-month" type="month" min="1900-01" max="2100-12" required value="${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}"><div class="actions"><button type="button" class="secondary" data-action="close">取消</button><button type="submit" class="primary">确定</button></div></form>`);return true;
+  }
+  if(action==='company-dispatch'){
+    openSheet('派发任务','<p class="small">沿用现有移动端派发任务入口。本原型仅预览客户目录入口的位置。</p><button class="primary wide" data-action="close">返回公司视图</button>');return true;
+  }
+  return false;
 }
 function renderEditableProfile() {
   const c=customer();
@@ -180,10 +230,10 @@ function saveContact(){
   c.version++;contactDraft=null;contactClosing=false;closeSheet(true);notice='联系人已保存至原型示例';render({restore:true,focus:true});
 }
 function maintenanceAction(action,value) {
+  if(companyAction(action,value))return true;
   if(action==='new-customer'){startEditor('new');return true;}
   if(action==='edit-customer'){startEditor('edit');return true;}
   if(action==='company-back'){transition(()=>{state.page='company';state.feedback='normal';},true);return true;}
-  if(action==='pending-customers'){transition(()=>{state.page='directory';state.query='';state.owner='全部';state.type='全部';state.pending=true;state.listPage=0;});return true;}
   if(action==='cancel-edit'||(action==='back'&&state.page==='editor')){cancelEditor();return true;}
   if(action==='edit-type'){captureEditor();draft.fields.type=value;draft.errors={};render();return true;}
   if(action==='discard-edit'){const fn=pendingLeave;pendingLeave=null;draft=null;closeSheet(true);fn?.();return true;}
@@ -209,6 +259,11 @@ function maintenanceAction(action,value) {
   return false;
 }
 document.addEventListener('submit',e=>{
+  if(e.target.id==='company-month-form'){
+    e.preventDefault();const value=$('#company-month').value;
+    if(!/^(19\d{2}|20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(value))return;
+    const [y,m]=value.split('-').map(Number);companyCalendar.date=new Date(y,m-1,1);closeSheet();render();
+  }
   if(e.target.id==='customer-form'){e.preventDefault();submitCustomer();}
   if(e.target.id==='contact-form'){e.preventDefault();saveContact();}
 });

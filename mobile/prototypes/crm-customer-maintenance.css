@@ -1,28 +1,42 @@
-/* Maintenance surfaces reuse the existing cream/yellow tokens. */
-.company-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 12px; }
-.company-heading h3 { font-size:calc(19px * var(--scale)); line-height:1.5; margin-top:7px; }
-.company-heading img { width:78px; height:86px; }
-.customer-hub { background:#fff5cd; border:1px solid #e9d79c; border-radius:22px; padding:15px; }
-.hub-heading { display:flex; align-items:center; gap:10px; }
-.hub-heading img { width:40px; height:40px; background:var(--surface); border-radius:13px; padding:7px; }
-.hub-heading h3 { font-size:calc(19px * var(--scale)); }
-.hub-heading p { margin-top:3px; }
-.hub-actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:14px 0 8px; }
-.hub-actions button { font-size:calc(14px * var(--scale)); padding:10px; }
-.hub-actions:has(button:only-child) { grid-template-columns:1fr; }
-.hub-pending { border-top:1px solid #e7dcae; display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; padding:10px 0 0; font-size:calc(12px * var(--scale)); text-align:left; }
-.hub-pending b { color:var(--accent); flex-shrink:0; }
-.company-work { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:12px; }
-.work-week { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; }
-.work-week>span { display:flex; flex-direction:column; align-items:center; gap:5px; padding:9px 1px; border-radius:12px; font-size:calc(13px * var(--scale)); }
-.work-week small { font-size:calc(11px * var(--scale)); color:var(--muted); }
-.work-week .today { background:var(--yellow); }
-.work-row { border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; margin-top:10px; padding:12px 2px 3px; }
-.work-row b { font-size:calc(14px * var(--scale)); }
-.work-row p { margin-top:5px; }
-.work-dot { flex-shrink:0; width:8px; height:8px; border-radius:50%; background:#d0aa27; }
-.work-dot.blue { background:#6b8b9a; }
-.company-caption { margin-top:10px; }
+/* Keep the company calendar as the main surface; reuse its existing action row. */
+.company-view .app-header { min-height:56px; padding:2px 12px 6px; }
+.company-datebar { display:flex; align-items:center; width:100%; gap:2px; }
+.company-datebar button { min-width:48px; padding:4px; }
+.company-datebar .calendar-month { flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:4px; font-size:calc(19px * var(--scale)); font-weight:800; white-space:nowrap; }
+.calendar-month-label { display:flex; flex-wrap:wrap; justify-content:center; min-width:0; gap:0 3px; }
+.calendar-month-label>span { white-space:nowrap; }
+.calendar-arrow { font-size:24px; color:var(--accent); }
+.calendar-today { flex:none; font-size:calc(12px * var(--scale)); color:var(--accent); }
+.calendar-today span { display:block; padding:5px 6px; border:1px solid var(--line); background:var(--surface); border-radius:8px; }
+.company-view #content { display:flex; flex-direction:column; padding:0 12px 8px; }
+.company-view-controls { flex:none; }
+.company-action-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:8px 0 10px; }
+.company-action-row button { min-height:48px; display:flex; align-items:center; justify-content:center; gap:6px; padding:6px; border-color:var(--line); border-radius:14px; font-size:calc(14px * var(--scale)); }
+.company-action-row img { width:18px; height:18px; }
+.company-action-row .customer-directory-entry { background:var(--butter); }
+.company-month-grid { flex:1; display:flex; flex-direction:column; min-height:390px; background:var(--surface); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+.company-weekdays { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); text-align:center; padding:8px 0; flex:none; font-size:calc(11px * var(--scale)); color:var(--muted); }
+.company-weeks { display:flex; flex-direction:column; flex:1; }
+.company-week { flex:1; min-height:70px; border-top:1px solid var(--line); background:repeating-linear-gradient(to right,transparent 0,transparent calc(100% / 7 - 1px),var(--line) calc(100% / 7 - 1px),var(--line) calc(100% / 7)); }
+.company-dates { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); }
+.calendar-day { min-width:0; min-height:48px; padding:2px; font-size:calc(12px * var(--scale)); display:grid; place-items:center; }
+.calendar-day span { display:grid; place-items:center; min-width:28px; min-height:28px; border-radius:10px; }
+.calendar-day.is-today span { box-shadow:inset 0 0 0 1px #c29b28; }
+.calendar-day.selected span { background:var(--yellow); font-weight:700; }
+.company-bars { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:3px 0; padding-bottom:5px; }
+.calendar-bar { border-radius:5px; background:#fff0ac; color:#6a521b; padding:3px 4px; margin:0 2px; font-size:calc(10px * var(--scale)); line-height:1.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.calendar-bar.blue { background:#e4eef2; color:#456175; }
+.calendar-bar.coral { background:#f9e7de; color:#92523a; }
+.company-agenda { flex:1; padding:12px; border:1px solid var(--line); border-radius:16px; background:var(--surface); }
+.company-agenda h3 { margin:16px 0; font-size:calc(17px * var(--scale)); }
+.company-agenda-week { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:2px; }
+.company-agenda-week>span { display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0; border-radius:10px; font-size:calc(13px * var(--scale)); }
+.company-agenda-week .selected { background:var(--yellow); }
+.company-agenda-item { padding:12px 0; border-bottom:1px solid var(--line); }
+.company-agenda-item .calendar-bar { display:block; font-size:calc(14px * var(--scale)); }
+.company-agenda-item p { margin:8px 4px 0; }
+#company-month { width:100%; min-height:48px; border:1px solid var(--outline); border-radius:12px; padding:10px; background:var(--canvas); font:inherit; }
+@media (max-width:350px) { .company-datebar .calendar-month { font-size:calc(15px * var(--scale)); } }
 .add-customer { margin-top:8px; font-size:calc(15px * var(--scale)); }
 .readonly-note { font-size:calc(12px * var(--scale)); color:var(--muted); text-align:center; margin:12px 0 4px; }
 .contact-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
@@ -53,4 +67,3 @@
 #contact-form { overflow-wrap:anywhere; }
 #sheet { --scale:1; }
 #sheet .actions { position:sticky; bottom:-24px; background:var(--surface); padding:10px 0; }
-@media (max-height:620px) { .company-heading { margin-bottom:8px; } .company-heading img { height:60px; width:60px; } }

@@ -131,15 +131,47 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       await page.locator('#tab-member').focus(); await page.keyboard.press('ArrowRight');
       assert.equal(await page.locator('#tab-business').getAttribute('aria-selected'), 'true');
     });
-    await check('公司首屏目录、新增和待完成服务入口', async () => {
+    await check('公司原操作排入口、年月与今天、返回恢复日期视图', async () => {
       await page.goto(url);
-      assert.match(await text(), /工作视图/);
-      const visible = await page.locator('[data-action="new-customer"]').evaluate(e => {const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;});
-      assert(visible); await shot('12-company-entry');
-      await click('pending-customers'); assert.equal(await page.locator('.customer').count(),2);
-      assert.match(await text(), /有待完成服务/);
-      await click('company-back'); await click('new-customer'); assert.match(await text(), /客户姓名/);
-      await click('cancel-edit'); assert.match(await text(), /工作视图/);
+      assert.equal(await page.locator('.customer-hub,[data-action="new-customer"]').count(),0);
+      assert.equal(await page.locator('.company-action-row button').count(),2);
+      assert.match(await page.locator('.company-action-row').innerText(), /派发任务[\s\S]*客户目录/);
+      const geometry=await page.evaluate(()=>{const entry=document.querySelector('.customer-directory-entry').getBoundingClientRect(),today=document.querySelector('.calendar-today').getBoundingClientRect(),month=document.querySelector('.calendar-month').getBoundingClientRect(),grid=document.querySelector('.company-month-grid').getBoundingClientRect();return {entry:entry.bottom,today:today.y,month:month.y,right:today.x>month.x,grid:grid.height,visible:entry.bottom<innerHeight};});
+      assert(geometry.visible&&geometry.right&&Math.abs(geometry.today-geometry.month)<2&&geometry.grid>390,JSON.stringify(geometry));
+      await shot('12-company-entry');
+      await click('calendar-picker'); await page.locator('#company-month').fill('2026-12'); await page.locator('#company-month-form [type="submit"]').click();
+      assert.match(await page.locator('.calendar-month').textContent(),/2026年12月/);
+      assert.equal(await page.locator('.calendar-bar').count(),0);
+      await click('calendar-period','周'); await click('directory'); await click('new-customer'); await click('cancel-edit'); await click('company-back');
+      assert.match(await page.locator('.calendar-month').textContent(),/2026年12月/);
+      assert.equal(await page.locator('[data-action="calendar-period"][aria-pressed="true"]').innerText(),'周');
+      await click('calendar-today');
+      const expected=await page.evaluate(()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date()));
+      const [y,m]=expected.split('-').map(Number);
+      assert.match(await page.locator('.calendar-month').textContent(),new RegExp(`${y}年${m}月`));
+      await click('calendar-period','月'); assert.equal(await page.locator('.calendar-day.selected.is-today').count(),1);
+      await click('calendar-move','-1'); await click('calendar-move','1'); assert.match(await page.locator('.calendar-month').textContent(),new RegExp(`${y}年${m}月`));
+      await click('calendar-period','日'); assert.equal(await page.locator('.company-agenda').count(),1); await click('calendar-period','月');
+      await click('directory'); await click('filters'); await page.locator('#filter-pending').check(); await click('apply-filters');
+      assert.equal(await page.locator('.customer').count(),2);
+    });
+    await check('公司日历主体及日期快捷栏的小屏大字布局', async () => {
+      for(const [width,height] of [[320,568],[390,844],[412,915]]) {
+        await page.setViewportSize({width,height}); await page.goto(url);
+        for(const font of ['1','1.5']) {
+          await tools({font});
+          const fit=await page.evaluate(()=>{const header=document.querySelector('#app-header'),content=document.querySelector('#content'),today=document.querySelector('.calendar-today'),month=document.querySelector('.calendar-month');return {overflow:document.documentElement.scrollWidth>innerWidth||header.scrollWidth>header.clientWidth||content.scrollWidth>content.clientWidth,clipped:month.scrollWidth>month.clientWidth,touch:today.getBoundingClientRect().height,entry:document.querySelector('.customer-directory-entry').getBoundingClientRect().bottom,h:innerHeight,dock:document.querySelector('#dock').getBoundingClientRect().top};});
+          assert(!fit.overflow&&!fit.clipped&&fit.touch>=48&&fit.entry<fit.dock,JSON.stringify(fit));
+          await shot(`19-company-${width}-${font}`);
+        }
+      }
+      await page.setViewportSize({width:320,height:568}); await page.goto(url);
+      await page.locator('#content').evaluate(e=>e.scrollTop=100);
+      const scroll=await page.locator('#content').evaluate(e=>e.scrollTop);
+      await page.locator('.customer-directory-entry').evaluate(e=>e.click());
+      await click('customer','heyu'); await click('tab','business'); await click('directory'); await click('company-back');
+      assert.equal(await page.locator('#content').evaluate(e=>e.scrollTop),scroll);
+      await page.setViewportSize({width:390,height:844});
     });
     await check('新建个人、字段错误聚焦和成功后查询', async () => {
       await page.goto(url); await click('directory'); await click('new-customer'); await shot('13-new-person');
@@ -177,7 +209,7 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
       assert.match(await text(), /已保存至原型示例/);
     });
     await check('企业新建及联系人添加、编辑、取消保护', async () => {
-      await page.goto(url); await click('new-customer'); await click('edit-type','企业');
+      await page.goto(url); await click('directory'); await click('new-customer'); await click('edit-type','企业');
       assert.equal(await page.locator('#sheet').evaluate(e=>e.open),false);
       await page.locator('#edit-name').fill('原型演示企业'); await page.locator('#edit-contactName').fill('示例对接人');
       await shot('16-new-company'); await page.locator('[form="customer-form"]').click(); assert.match(await text(), /示例对接人/);
@@ -211,11 +243,11 @@ const url = pathToFileURL(path.join(__dirname, 'crm-customer-workspace.html')).h
     });
     await check('新增编辑页面与联系人弹层的小屏大字布局', async () => {
       for(const [width,height] of [[320,568],[390,844],[412,915]]) {
-        await page.setViewportSize({width,height}); await page.goto(url); await click('new-customer');
+        await page.setViewportSize({width,height}); await page.goto(url); await click('directory'); await click('new-customer');
         await tools({font:'1.5'}); await click('edit-type','企业');
         const fit=async()=>{const g=await page.evaluate(()=>({w:innerWidth,sw:document.documentElement.scrollWidth,cw:document.querySelector('#content').clientWidth,cs:document.querySelector('#content').scrollWidth,dock:document.querySelector('#dock').getBoundingClientRect().bottom,h:innerHeight}));assert(g.sw<=g.w+1&&g.cs<=g.cw+1&&g.dock<=g.h+1,JSON.stringify(g));};
         await fit(); await shot(`18-editor-large-${width}`); await click('cancel-edit'); await click('discard-edit');
-        await click('directory'); await click('customer','heyu'); await click('add-contact');
+        await click('customer','heyu'); await click('add-contact');
         assert(await page.locator('#contact-form [type="submit"]').isVisible());
         assert(await page.locator('#sheet').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
         await page.keyboard.press('Escape');
