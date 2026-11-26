@@ -15,8 +15,8 @@ import java.util.*;
 /** 私有上传、正式用途绑定和受保护读取；管理角色不获得私人材料读取特权。 */
 @Service
 public class AttachmentApplicationService implements AttachmentApi {
-    private final Db db;private final Business business;private final CurrentActors actors;private final ProcedureAccess procedures;private final BinaryFiles files;private final GeneratedSourcePolicy generatedPolicy;
-    public AttachmentApplicationService(Db db,Business business,CurrentActors actors,ProcedureAccess procedures,BinaryFiles files,GeneratedSourcePolicy generatedPolicy){this.db=db;this.business=business;this.actors=actors;this.procedures=procedures;this.files=files;this.generatedPolicy=generatedPolicy;}
+    private final cn.workpanel.module.organization.application.HrAccess hr; private final Db db;private final Business business;private final CurrentActors actors;private final ProcedureAccess procedures;private final BinaryFiles files;private final GeneratedSourcePolicy generatedPolicy;
+    public AttachmentApplicationService(cn.workpanel.module.organization.application.HrAccess hr,Db db,Business business,CurrentActors actors,ProcedureAccess procedures,BinaryFiles files,GeneratedSourcePolicy generatedPolicy){this.hr=hr;this.db=db;this.business=business;this.actors=actors;this.procedures=procedures;this.files=files;this.generatedPolicy=generatedPolicy;}
     public Map<String,Object> upload(ActorContext context,Object source){
         return upload(context,source,"");
     }
@@ -40,6 +40,7 @@ public class AttachmentApplicationService implements AttachmentApi {
             &&db.count("SELECT count(*) FROM attachment_bindings b JOIN ai_work_items w ON w.company_id=b.company_id AND w.id=b.resource_id WHERE b.company_id=? AND b.attachment_id=? AND b.resource_type='WORK' AND w.deleted_at IS NULL",a.company(),id)==0
             &&db.count("SELECT count(*) FROM attachment_bindings WHERE company_id=? AND attachment_id=? AND resource_type IN ('PROCEDURE','DELIVERY')",a.company(),id)==0
             &&db.count("SELECT count(*) FROM users WHERE company_id=? AND profile->>'avatarAttachmentId'=?",a.company(),id)==0)throw new ApiError(404,"NOT_FOUND","内容不存在或已清除");
+        if(hr.isContract(id)){hr.attachment(a,id);return f;}
         boolean visible=a.id().equals(f.get("owner_id"));
         if(!visible){
             var owner=db.one("SELECT * FROM users WHERE id=? AND company_id=?",f.get("owner_id"),a.company());
@@ -55,12 +56,12 @@ public class AttachmentApplicationService implements AttachmentApi {
         }
         if(!visible){if(f.get("task_id")!=null)business.task(a,Db.str(f,"task_id"),false);throw ApiError.forbidden();}generatedPolicy.attachment(a,id);return f;
     }
-    public Map<String,Object> owned(Actor a,String id){var f=metadata(a,id);if(!a.id().equals(f.get("owner_id")))throw ApiError.forbidden();return read(a,id);}
+    public Map<String,Object> owned(Actor a,String id){if(hr.isContract(id))throw ApiError.forbidden();var f=metadata(a,id);if(!a.id().equals(f.get("owner_id")))throw ApiError.forbidden();return read(a,id);}
     public List<Map<String,Object>> intake(Actor a,List<String> ids){
         if(ids.size()>AiFilePolicy.FILES)throw ApiError.bad("FILE_LIMIT","一次最多添加 5 份材料");long total=0;var files=new ArrayList<Map<String,Object>>();
         for(String id:ids){var f=owned(a,id);byte[] bytes=(byte[])f.get("data");AiFilePolicy.validate(Db.str(f,"filename"),bytes);total+=bytes.length;files.add(f);}
         if(total>AiFilePolicy.TOTAL_BYTES)throw ApiError.bad("FILE_LIMIT","材料总大小不能超过 30MB");return files;
     }
-    @Transactional public void bind(Actor a,String attachment,String type,String id){db.one("SELECT id FROM attachments WHERE company_id=? AND id=? AND storage_state='READY' AND (expires_at IS NULL OR expires_at>now()) AND NOT EXISTS(SELECT 1 FROM generated_files g WHERE g.attachment_id=attachments.id) FOR UPDATE",a.company(),attachment);var f=metadata(a,attachment);if(!a.id().equals(f.get("owner_id")))throw ApiError.forbidden();db.update("INSERT INTO attachment_bindings(company_id,attachment_id,resource_type,resource_id) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",a.company(),attachment,type,id);}
+    @Transactional public void bind(Actor a,String attachment,String type,String id){db.one("SELECT id FROM attachments WHERE company_id=? AND id=? AND storage_state='READY' AND (expires_at IS NULL OR expires_at>now()) AND NOT EXISTS(SELECT 1 FROM generated_files g WHERE g.attachment_id=attachments.id) FOR UPDATE",a.company(),attachment);var f=metadata(a,attachment);if(hr.isContract(attachment))throw ApiError.forbidden();if(!a.id().equals(f.get("owner_id")))throw ApiError.forbidden();db.update("INSERT INTO attachment_bindings(company_id,attachment_id,resource_type,resource_id) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",a.company(),attachment,type,id);}
     public static String hash(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception e){throw new IllegalStateException(e);}}
 }
