@@ -49,7 +49,7 @@ public class NotificationQueryService {
             var types=CATEGORIES.get(category);from+=" AND n.type IN ("+placeholders(types.size())+")";args.addAll(types);
         }
         if(unreadOnly) from+=" AND NOT n.is_read";
-        String title="CASE n.type"
+        String title="CASE n.type WHEN 'CONTRACT_EXPIRY' THEN '合同到期提醒'"
             +" WHEN 'TASK_DISPATCHED' THEN '收到新任务' WHEN 'TASK_ASSIGNED' THEN '收到新任务'"
             +" WHEN 'TASK_EVENT' THEN '任务进度更新' WHEN 'TASK_REVISED' THEN '任务内容已更新'"
             +" WHEN 'TASK_REASSIGNED' THEN '任务参与安排已调整' WHEN 'TASK_RESCHEDULED' THEN '任务截止时间已调整'"
