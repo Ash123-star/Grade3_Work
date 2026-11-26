@@ -6,6 +6,7 @@
 
 | 主题 | 入口 |
 | --- | --- |
+| 二期客户手帐 | [任务 A 范围与分层设计](../../openspec/changes/crm-customer-workspace/design.md)、[移动 HTML 原型](../prototypes/crm-customer-workspace.html)；移动优先、Web 后置，原型评审后再迁移 Flutter |
 | 视觉与素材 | [团团设计系统](tuantuan-ui-design-system.md)、[品牌开屏/图标](brand-splash-design.md)、[任务表格与人员目录原型](task-management-ui-direction.md) |
 | 首页与个人事项 | [页面设计与卡通主题重构提案](home-daily-todos-direction.md)、[交互原型](../prototypes/home-daily-todos.html)；视觉提案待评审，导航为首页、公司、日志、AI地图、我的，默认首页 |
 | APP验收对齐 | [两轮需求统一验收基准](../../docs/app-requirements-acceptance.md)；含完成情况列、五行折叠、同页人员树的最新确认及合并后回归，不代表已实现 |

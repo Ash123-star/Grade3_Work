@@ -10,7 +10,7 @@
 | 核心规则及协作 | [AGENTS](../AGENTS.md)、[开发流程与Git比较](development-workflow.md)、[PR模板](../.github/pull_request_template.md) |
 | 分工与候选范围 | [MVP分工](mvp-team-division.md)、[OpenSpec指南](openspec-guide.md)、[活动变更](../openspec/changes/)、[同步规格](../openspec/specs/) |
 | APP需求验收基准 | [两轮需求、冲突决议与验收用例](app-requirements-acceptance.md)；唯一跨模块验收目标入口，包含合并保真和发版门槛；实际结果仍写统一验证入口及Issue |
-| 二期 CRM 客户查询 | [任务 A 的范围、契约与发布门槛](../openspec/changes/crm-customer-workspace/design.md)；实际接口和字段授权须经联调确认 |
+| 二期 CRM 客户查询 | [任务 A 的范围、契约与发布门槛](../openspec/changes/crm-customer-workspace/design.md)、[移动 HTML 原型](../mobile/prototypes/crm-customer-workspace.html)；移动首版、Web 后置，真实接口和字段授权须经联调确认 |
 | 客户端入口 | [Flutter运行](../mobile/README.md)、[移动端专题索引](../mobile/docs/README.md) |
 | 脚本 | [脚本索引](../scripts/README.md)；运行参数以脚本为准 |
 

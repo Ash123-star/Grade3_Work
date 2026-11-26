@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>潘多拉 · 客户手帐</title>
+  <link rel="stylesheet" href="crm-customer-workspace.css">
+</head>
+<body>
+<div class="studio">
+  <aside class="guide">
+    <div class="brand"><img src="../assets/generated_ui/sunshine/icons/organization.png" alt=""><span>潘多拉 / 移动端设计</span></div>
+    <p class="eyebrow">CUSTOMER NOTEBOOK · 01</p>
+    <h1>客户有来往，<br>服务有着落。</h1>
+    <p class="lead">把散落的客户记录，收进一本有条理的手帐。</p>
+    <div class="guide-rule"><b>先找到人，再看业务</b><p>档案、会员、业务独立切换。详细记录单独打开，返回仍在刚才的位置。</p></div>
+    <div class="guide-rule"><b>常用操作，靠近拇指</b><p>底部切换与翻页；筛选轻量展开。每屏阅读一小组内容。</p></div>
+    <p class="footnote">交互原型 · 全部为虚构样例<br>当前仅演示任务 A 的查询体验。</p>
+    <a href="sunshine-workspace.html">查看现有奶油黄工作台 ↗</a>
+  </aside>
+
+  <section class="device" id="device" aria-label="移动端交互原型">
+    <div class="prototype-line">设计预览 · 示例数据 <button id="tools-open" aria-label="打开原型演示设置">演示设置</button></div>
+    <header class="app-header" id="app-header"></header>
+    <main id="content" tabindex="-1"></main>
+    <footer id="dock"></footer>
+  </section>
+
+  <aside class="inspector">
+    <p class="eyebrow">预览工具</p>
+    <h2>从这里开始体验</h2>
+    <div class="scene-links">
+      <button data-scene="directory">01　查找客户 <span>↗</span></button>
+      <button data-scene="person">02　个人会员 <span>↗</span></button>
+      <button data-scene="company">03　企业业务 <span>↗</span></button>
+    </div>
+    <label>屏幕宽度<select id="preview-width"><option value="390">390 px · 标准手机</option><option value="320">320 px · 小屏</option><option value="412">412 px · 大屏</option></select></label>
+    <label>文字大小<select id="preview-font"><option value="1">标准</option><option value="1.5">放大 1.5 倍</option></select></label>
+    <label>返回数据示例<select id="preview-access"><option value="full">字段完整</option><option value="limited">联系信息 / 金额受限</option></select></label>
+    <label>页面反馈<select id="preview-state"><option value="normal">正常</option><option value="loading">加载中</option><option value="empty">没有记录</option><option value="error">请求失败</option><option value="unavailable">来源暂不可用</option><option value="forbidden">无权访问</option><option value="expired">登录失效</option></select></label>
+    <p class="footnote">权限选项仅演示界面反馈，真实授权由服务端决定。原型不执行录入、核销或付款。</p>
+  </aside>
+</div>
+<dialog id="sheet" aria-labelledby="sheet-title"><div class="sheet-handle"></div><div class="sheet-head"><h2 id="sheet-title"></h2><button id="sheet-close" class="icon-button" aria-label="关闭弹层">×</button></div><div id="sheet-body"></div></dialog>
+<div id="live" class="sr-only" role="status" aria-live="polite"></div>
+<script src="crm-customer-workspace.js"></script>
+</body>
+</html>
