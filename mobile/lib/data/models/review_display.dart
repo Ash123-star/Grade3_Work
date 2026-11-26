@@ -2,6 +2,12 @@ import 'models.dart';
 
 const _labels = <String, String>{
   'title': '标题',
+  'action': '申请操作',
+  'customerName': '客户',
+  'businessDate': '业务日期',
+  'kind': '类型',
+  'activityStatus': '活动状态',
+  'deliveryStatus': '服务交付',
   'name': '名称',
   'content': '内容',
   'text': '说明',
@@ -68,6 +74,16 @@ const _enums = <String, String>{
   'ACCEPTED': '已验收',
   'ARCHIVED': '已归档',
   'WITHDRAWN': '已撤回',
+  'EDIT': '修改资料',
+  'END_ACTIVITY': '结束活动',
+  'CONFIRM_DELIVERY': '确认交付',
+  'PERFORMANCE': '赛演',
+  'PRIVATE_BANQUET': '私宴',
+  'COMPANY_VISIT': '企业参访',
+  'SALON': '沙龙',
+  'SCHEDULED': '待结束',
+  'ENDED': '已结束',
+  'DELIVERED': '已交付',
 };
 
 String reviewSnapshotText(Object? snapshot, Object? references) {
@@ -93,6 +109,12 @@ String reviewSnapshotText(Object? snapshot, Object? references) {
       'issuer_id',
       'deleted',
       'deleted_at',
+      'customerId',
+      'customerStatus',
+      'ownerName',
+      'participantDetails',
+      'endedAt',
+      'deliveredAt',
     ].contains(key)) {
       continue;
     }
@@ -148,6 +170,15 @@ String reviewSnapshotText(Object? snapshot, Object? references) {
                 .join('\n');
     } else if (value == null || '$value'.trim().isEmpty) {
       display = '未设置';
+    } else if (key == 'deliveryStatus' && value == 'PENDING') {
+      display = '待交付';
+    } else if ([
+      'action',
+      'kind',
+      'activityStatus',
+      'deliveryStatus',
+    ].contains(key)) {
+      display = _enums['$value'] ?? '$value';
     } else if (['urgency', 'phase', 'status', 'role'].contains(key)) {
       display = _enums['$value'] ?? '状态暂不可用';
     } else {

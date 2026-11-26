@@ -12,7 +12,7 @@ import java.util.*;
 @org.springframework.stereotype.Service
 public class ReviewApplicationService {
     final ReviewRepository repository;
-    static final Set<String> SUPPORTED_KINDS=Set.of("POLICY","MEMBERSHIP","REVIEWER","USER","DEPARTMENT","TEAM","COMPANY_ITEM","LOG","TASK","TASK_REASSIGN","TASK_RESCHEDULE","MEMORY","PROCEDURE","TASK_CREATE","TASK_DELETE");
+    static final Set<String> SUPPORTED_KINDS=Set.of("POLICY","MEMBERSHIP","REVIEWER","USER","DEPARTMENT","TEAM","COMPANY_ITEM","LOG","TASK","TASK_REASSIGN","TASK_RESCHEDULE","MEMORY","PROCEDURE","TASK_CREATE","TASK_DELETE",ReviewPolicy.OFFLINE_DELIVERY);
     final Map<String,ReviewedRevisionApplication> applications;
 
     public ReviewApplicationService(ReviewRepository repository,List<ReviewedRevisionApplication> handlers) {
@@ -35,6 +35,7 @@ public class ReviewApplicationService {
     public Map<String,Object> create(Actor actor,String kind,String target,int version,Object before,Map<String,Object> candidate,String reason) {
         actor=fresh(actor);
         if(!SUPPORTED_KINDS.contains(kind)) throw ApiError.bad("REVIEW_KIND","不支持的复核类型");
+        requireKindAccess(actor,kind);
         if(kind.equals("LOG")) throw new ApiError(409,"DIRECT_CONTENT_REQUIRED","日报正文请使用24小时内直接更新接口");
         if(!kind.equals("MEMBERSHIP")&&!actor.status().equals("ACTIVE")) throw ApiError.forbidden();
         if(reason==null||reason.isBlank()) throw ApiError.bad("REASON_REQUIRED","关键变更需填写理由");
@@ -47,7 +48,7 @@ public class ReviewApplicationService {
             repository.status(id,"APPROVED","FOUNDER_EXEMPT");
             repository.audit(actor,"REVIEW_APPROVED",id,Map.of("status","PENDING"),Map.of("status","APPROVED","decisionSource","FOUNDER_EXEMPT"),"创始人权限内免审");
             repository.notify(actor,actor.id(),"REVIEW_APPROVED",id,"review-result:"+id+":FOUNDER_EXEMPT");
-        } else route(actor,id,mode);
+        } else route(actor,id,mode,kind);
         return get(actor,id);
     }
 
@@ -61,7 +62,7 @@ public class ReviewApplicationService {
         String id=Db.id(),mode=exempt?"TASK_RECIPIENT":"TASK_MANAGER";
         repository.create(id,actor,"TASK_CREATE",target,0,Map.of("founderExempt",exempt),candidate,"提出任务",mode);
         repository.audit(actor,"REVIEW_REQUESTED",id,Map.of(),candidate,"提出任务");
-        if(!exempt) route(actor,id,mode);
+        if(!exempt) route(actor,id,mode,"TASK_CREATE");
         else advanceProposal(actor,actor,repository.request(actor.company(),id,true));
         return get(actor,id);
     }
@@ -107,17 +108,20 @@ public class ReviewApplicationService {
     /** 申请人当前适用的审核模式；null 表示创始人权限内免审。 */
     String mode(Actor applicant,String kind) {
         if(kind.equals("MEMBERSHIP")) return "ADMIN_MEMBERSHIP";
+        if(kind.equals(ReviewPolicy.OFFLINE_DELIVERY)) return "DIRECT_MANAGER";
         if(!applicant.role().equals("FOUNDER")) return "DIRECT_MANAGER";
         return null;
     }
 
     /** 按模式只创建一个当前有效审核人；找不到时保持待审并提醒申请人和管理员。返回是否已分配。 */
-    boolean route(Actor actor,String id,String mode) {
+    boolean route(Actor actor,String id,String mode,String kind) {
         String reviewer=switch(mode) {
             case "ADMIN_MEMBERSHIP" -> repository.membershipReviewer(actor.company(),actor.id());
             case "FOUNDER_PEER" -> throw new ApiError(409,"REVIEW_RULE_RETIRED","旧创始人互审已停用，请重新提交");
             default -> repository.directManager(actor.company(),actor.id());
         };
+        if(kind.equals(ReviewPolicy.OFFLINE_DELIVERY) && !reviewer.isBlank()
+                && !ReviewPolicy.eligibleOfflineAdmin(repository.actor(actor.company(),reviewer))) reviewer="";
         int position=(int)repository.lastPosition(id)+1;
         if(reviewer.isBlank()) { unassigned(actor,id,position); return false; }
         repository.step(id,reviewer,actor,position);
@@ -133,6 +137,7 @@ public class ReviewApplicationService {
     public Map<String,Object> get(Actor actor,String id) {
         actor=fresh(actor);
         var row=repository.request(actor.company(),id,false);
+        requireKindAccess(actor,Db.str(row,"kind"));
         if(!actor.id().equals(row.get("applicant_id"))&&!repository.canReadAssigned(id,actor.id())) throw ApiError.forbidden();
         return view(row,id);
     }
@@ -155,7 +160,10 @@ public class ReviewApplicationService {
         var row=repository.request(actor.company(),id,true);
         actor=repository.actor(actor.company(),actor.id());
         if(!actor.status().equals("ACTIVE")||actor.mustChange()) throw ApiError.forbidden();
+        requireKindAccess(actor,Db.str(row,"kind"));
         ReviewPolicy.request(actor.id(),Db.str(row,"applicant_id"),Db.str(row,"status"));
+        Actor applicant=repository.actor(Db.str(row,"company_id"),Db.str(row,"applicant_id"));
+        requireKindAccess(applicant,Db.str(row,"kind"));
         if(((Number)row.get("expected_version")).intValue()!=expectedVersion) throw ApiError.conflict();
         var steps=repository.pending(id);
         if(steps.isEmpty()||!steps.getFirst().get("reviewer_id").equals(actor.id())) throw ApiError.forbidden();
@@ -173,7 +181,6 @@ public class ReviewApplicationService {
         if(reason==null) reason="";
         repository.decideStep(steps.getFirst().get("id"),approve,reason);
         String source=mode.equals("ADMIN_MEMBERSHIP")||mode.equals("FOUNDER_PEER")?mode:"DIRECT_MANAGER";
-        Actor applicant=repository.actor(Db.str(row,"company_id"),Db.str(row,"applicant_id"));
         if(proposal(row)) {
             repository.audit(actor,"TASK_PROPOSAL_DECISION",id,Map.of(),Map.of("stage",mode,"approved",approve),reason);
             if(approve) advanceProposal(actor,applicant,row);
@@ -192,6 +199,7 @@ public class ReviewApplicationService {
     public Map<String,Object> reroute(Actor actor,String id) {
         actor=fresh(actor);
         var row=repository.request(actor.company(),id,true);
+        requireKindAccess(actor,Db.str(row,"kind"));
         if(!actor.id().equals(row.get("applicant_id"))) throw ApiError.forbidden();
         if(Db.str(row,"status").equals("APPROVED")&&Db.str(row,"decision_source").equals("FOUNDER_EXEMPT")) return view(row,id);
         if(proposal(row)) throw new ApiError(409,"PROPOSAL_REROUTE_UNSUPPORTED","不能跳过任务确认，请重新提交申请");
@@ -206,9 +214,26 @@ public class ReviewApplicationService {
             apply(actor,row); repository.status(id,"APPROVED","FOUNDER_EXEMPT");
             repository.audit(actor,"REVIEW_APPROVED",id,Map.of("status","PENDING"),Map.of("status","APPROVED","decisionSource","FOUNDER_EXEMPT"),"创始人明确继续历史申请");
             repository.notify(actor,actor.id(),"REVIEW_APPROVED",id,"review-result:"+id+":FOUNDER_EXEMPT");
-        } else { repository.mode(id,mode); route(actor,id,mode); }
+        } else { repository.mode(id,mode); route(actor,id,mode,Db.str(row,"kind")); }
         repository.audit(actor,"REVIEW_REROUTED",id,Map.of("approvalMode",Db.str(row,"approval_mode")),Map.of("approvalMode",mode==null?"FOUNDER_EXEMPT":mode),"按当前有效关系替换待审步骤，保留历史决定");
         return get(actor,id);
+    }
+
+    /** 撤回尚未处理的线下业务申请；原申请人已失权时，由当前公司管理员清理。 */
+    @Transactional
+    public Map<String,Object> withdrawOffline(Actor actor,String id) {
+        var row=repository.request(actor.company(),id,true);
+        actor=fresh(actor);
+        if(!ReviewPolicy.OFFLINE_DELIVERY.equals(row.get("kind")) || !ReviewPolicy.eligibleOfflineAdmin(actor)) throw ApiError.forbidden();
+        Actor applicant=repository.actor(actor.company(),Db.str(row,"applicant_id"));
+        if(!actor.id().equals(applicant.id()) && ReviewPolicy.eligibleOfflineAdmin(applicant)) throw ApiError.forbidden();
+        if("SUPERSEDED".equals(row.get("status"))) return Map.of("id",id,"status","SUPERSEDED");
+        if(!"PENDING".equals(row.get("status"))) throw ApiError.conflict();
+        String reason=actor.id().equals(applicant.id())?"申请人撤回线下业务申请":"管理员清理已失权申请";
+        repository.supersedePending(id,reason);
+        repository.status(id,"SUPERSEDED",null);
+        repository.audit(actor,"REVIEW_WITHDRAWN",id,Map.of("status","PENDING"),Map.of("status","SUPERSEDED"),reason);
+        return Map.of("id",id,"status","SUPERSEDED");
     }
 
     /** 创始人互审申请的候选审核人：申请人以外的有效创始人，current 标记当前审核人。 */
@@ -236,6 +261,7 @@ public class ReviewApplicationService {
         return get(actor,id);
     }
     private Map<String,Object> selectable(Actor actor,Map<String,Object> row) {
+        requireKindAccess(actor,Db.str(row,"kind"));
         if(!actor.id().equals(row.get("applicant_id"))) throw ApiError.forbidden();
         if(!Db.str(row,"status").equals("PENDING")) throw ApiError.conflict();
         throw new ApiError(409,"REVIEWER_SELECTION_UNSUPPORTED","审核人由直属关系确定，不支持更换");
@@ -255,13 +281,14 @@ public class ReviewApplicationService {
             if(current.equals("TASK_RECIPIENT")) continue; // Never replace recipient consent with managerial approval.
             if(current.equals("FOUNDER_PEER")) continue; // 已由前向迁移作废，旧候选不得重新路由。
             if(!kind.equals("MEMBERSHIP")&&(!applicant.status().equals("ACTIVE")||applicant.mustChange())) continue;
+            if(kind.equals(ReviewPolicy.OFFLINE_DELIVERY)&&!ReviewPolicy.eligibleOfflineAdmin(applicant)) continue;
             // 仅剩一位创始人时不自动免审：保持原模式，等待申请人显式 reroute。
             String desired=current.equals("TASK_MANAGER")?current:Objects.requireNonNullElse(mode(applicant,kind),current);
             if(desired.equals(current)&&!repository.currentReviewerView(id).isEmpty()) continue;
             boolean hadStep=!repository.pending(id).isEmpty();
             repository.supersedePending(id,"组织变更后审核人失效");
             if(!desired.equals(current)) repository.mode(id,desired);
-            boolean assigned=route(applicant,id,desired);
+            boolean assigned=route(applicant,id,desired,kind);
             if(assigned||hadStep||!desired.equals(current))
                 repository.audit(actor,"REVIEW_AUTO_REROUTED",id,Map.of("approvalMode",current),Map.of("approvalMode",desired,"assigned",assigned),"组织变更后按当前规则重新分配审核人");
         }
@@ -271,6 +298,10 @@ public class ReviewApplicationService {
         Actor current=repository.actor(actor.company(),actor.id());
         if(current.status().equals("DISABLED")||current.mustChange()) throw ApiError.forbidden();
         return current;
+    }
+
+    private static void requireKindAccess(Actor actor,String kind) {
+        if(kind.equals(ReviewPolicy.OFFLINE_DELIVERY)&&!ReviewPolicy.eligibleOfflineAdmin(actor)) throw ApiError.forbidden();
     }
 
     void apply(Actor approver,Map<String,Object> row) {

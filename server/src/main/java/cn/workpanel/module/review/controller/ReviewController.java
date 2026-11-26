@@ -27,6 +27,13 @@ public class ReviewController {
     }
     /** 申请人按当前关系重路由PENDING申请；保留已决历史。旧FOUNDER_PEER申请已作废，不能恢复；其他历史创始人申请沿用权限/版本守卫。其他终态409、越权403；无幂等键。 */
     @PostMapping("/{id}/reroute") public Map<String, Object> reroute(HttpServletRequest request, @PathVariable String id) { return service.reroute(Actor.current(request), id); }
+    /** 线下申请原管理员撤回，或其他在职已改密的同公司管理员清理已失权申请；返回 id/status，可重复，无需版本。 */
+    @io.swagger.v3.oas.annotations.Operation(operationId="withdrawOfflineDeliveryReview",summary="撤回线下业务审核",
+            description="仅原申请管理员或清理失权申请的同公司管理员。其他种类或无权限 403，跨公司 404，已通过或驳回 409。")
+    @PostMapping("/{id}/withdraw-offline")
+    public Map<String, Object> withdrawOffline(HttpServletRequest request, @PathVariable String id) {
+        return service.withdrawOffline(Actor.current(request), id);
+    }
     /** 已停用的候选接口，保留旧客户端兼容：验证登录及申请归属后返回409；越权403，不产生写入。 */
     @GetMapping("/{id}/reviewer-candidates") public Map<String, Object> reviewerCandidates(HttpServletRequest request, @PathVariable String id) { return service.reviewerCandidates(Actor.current(request), id); }
     /** 已停用的换人接口；reviewerId/expectedVersion仍校验，合法请求返回409，无幂等副作用。直属上级由组织关系确定。 */
