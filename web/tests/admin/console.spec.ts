@@ -152,3 +152,16 @@ test('粘贴身份证首尾空格及小写末位仍能预览周岁并提交规�
   await page.getByRole('button',{name:'开通员工账号',exact:true}).click();
   await expect(page.locator('.alert.success')).toContainText('已开通');expect(commands[0].idCardNumber).toBe('11010519491231002X');
 });
+
+test('CRM 默认关闭，既有管理员入口不变', async ({ page }) => {
+  const crmRequests: string[] = [];
+  await page.route('**/api/**', route => {
+    if (new URL(route.request().url()).pathname.startsWith('/api/crm/')) crmRequests.push(route.request().url());
+    return route.fulfill({ status: 404 });
+  });
+  await page.goto('/crm/customers/closed-example');
+  await expect(page.getByRole('heading', { name: '客户工作台尚未开放' })).toBeVisible();
+  await page.getByRole('link', { name: '返回管理员后台入口' }).click();
+  await expect(page.getByLabel('管理员账号')).toBeVisible();
+  expect(crmRequests).toEqual([]);
+});

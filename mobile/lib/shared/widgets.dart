@@ -1,3 +1,5 @@
+import '../features/crm/crm_components.dart';
+import 'calendar/civil_date.dart';
 import 'premium_pickers.dart';
 export 'paper_layout.dart'
     show TuantuanDialog, TuantuanSheet, showTuantuanBottomSheet;
@@ -320,8 +322,12 @@ Color _resourceAccent(BuildContext context, String resource) =>
     };
 
 class DateControls extends ConsumerWidget {
-  const DateControls({super.key, this.showTaskManagement = false});
-  final bool showTaskManagement;
+  const DateControls({
+    super.key,
+    this.showTaskManagement = false,
+    this.showCustomerDirectory = false,
+  });
+  final bool showTaskManagement, showCustomerDirectory;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final date = ref.watch(selectedDateProvider),
@@ -330,14 +336,20 @@ class DateControls extends ConsumerWidget {
         ref.read(selectedDateProvider.notifier).state = period == '月'
         ? DateTime(date.year, date.month + direction, 1)
         : date.add(Duration(days: direction * (period == '周' ? 7 : 1)));
-    final tabs = PillTabs(
-      labels: const ['日', '周', '月'],
-      selected: ['日', '周', '月'].indexOf(period),
-      onChanged: (i) =>
-          ref.read(periodProvider.notifier).state = ['日', '周', '月'][i],
-    );
+    void selectPeriod(int i) =>
+        ref.read(periodProvider.notifier).state = const ['日', '周', '月'][i];
+    final selected = const ['日', '周', '月'].indexOf(period);
+    final tabs = showCustomerDirectory
+        ? CrmSegments(const ['日', '周', '月'], selected, selectPeriod)
+        : PillTabs(
+            labels: const ['日', '周', '月'],
+            selected: selected,
+            onChanged: selectPeriod,
+          );
     void todayAction() {
-      ref.read(selectedDateProvider.notifier).state = DateTime.now();
+      ref.read(selectedDateProvider.notifier).state = showCustomerDirectory
+          ? shanghaiToday()
+          : DateTime.now();
     }
 
     final Widget today = showTaskManagement
@@ -378,11 +390,11 @@ class DateControls extends ConsumerWidget {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          period == '月'
+                          (period == '月' || showCustomerDirectory)
                               ? '${date.year}年${date.month}月'
                               : '${date.month}月${date.day}日${period == '周' ? ' · 本周' : ''}',
-                          style: const TextStyle(
-                            fontSize: 22,
+                          style: TextStyle(
+                            fontSize: showCustomerDirectory ? 19 : 22,
                             fontWeight: FontWeight.w900,
                             color: CuteTokens.ink,
                           ),
@@ -400,9 +412,37 @@ class DateControls extends ConsumerWidget {
               onPressed: () => move(1),
               icon: const Icon(Icons.chevron_right),
             ),
+            if (showCustomerDirectory)
+              TextButton(
+                onPressed: todayAction,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.all(4),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: SunnyPalette.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: DogBrandPalette.line),
+                  ),
+                  child: const Text(
+                    '今天',
+                    semanticsLabel: '回到今天',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: SunnyPalette.primaryStrong,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         tabs,
+        if (showCustomerDirectory) const SizedBox(height: 8),
         if (showTaskManagement)
           Row(
             children: [
@@ -410,12 +450,22 @@ class DateControls extends ConsumerWidget {
                 child: _DateControlAction(
                   label: '派发任务',
                   icon: Icons.table_rows_rounded,
+                  asset: showCustomerDirectory ? 'task' : null,
                   onPressed: () => context.push('/me/tasks'),
                   emphasized: false,
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: today),
+              Expanded(
+                child: showCustomerDirectory
+                    ? _DateControlAction(
+                        label: '客户目录',
+                        icon: Icons.people_outline,
+                        asset: 'members',
+                        onPressed: () => context.push('/crm/customers'),
+                      )
+                    : today,
+              ),
             ],
           )
         else
@@ -432,7 +482,9 @@ class _DateControlAction extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.emphasized = true,
+    this.asset,
   });
+  final String? asset;
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
@@ -460,7 +512,15 @@ class _DateControlAction extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, size: 18, color: colors.primary),
+                  if (asset case final name?)
+                    Image.asset(
+                      'assets/generated_ui/sunshine/icons/$name.png',
+                      width: 18,
+                      height: 18,
+                      excludeFromSemantics: true,
+                    )
+                  else
+                    Icon(icon, size: 18, color: colors.primary),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(

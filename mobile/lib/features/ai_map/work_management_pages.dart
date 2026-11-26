@@ -209,7 +209,7 @@ class _WorkSettingsPageState extends ConsumerState<WorkSettingsPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<String>(
+                PremiumDropdownField<String>(
                   initialValue: action,
                   isExpanded: true,
                   items: [
@@ -248,7 +248,7 @@ class _WorkSettingsPageState extends ConsumerState<WorkSettingsPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
+                PremiumDropdownField<int>(
                   initialValue: days,
                   decoration: const InputDecoration(labelText: '有效期'),
                   items: [
@@ -258,7 +258,7 @@ class _WorkSettingsPageState extends ConsumerState<WorkSettingsPage> {
                   onChanged: (v) => state(() => days = v!),
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
+                PremiumDropdownField<int>(
                   initialValue: actions,
                   decoration: const InputDecoration(labelText: '每批最多办理'),
                   items: [
@@ -349,7 +349,7 @@ class _WorkSettingsPageState extends ConsumerState<WorkSettingsPage> {
                 for (final entry in limits.entries)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: DropdownButtonFormField<int>(
+                    child: PremiumDropdownField<int>(
                       initialValue: (values[entry.key] as num).toInt(),
                       decoration: InputDecoration(labelText: entry.value.$1),
                       items: [
@@ -598,7 +598,7 @@ class _ProcedureScopeEditorState extends ConsumerState<_ProcedureScopeEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DropdownButtonFormField<String>(
+        PremiumDropdownField<String>(
           initialValue: kind,
           decoration: const InputDecoration(labelText: '适用范围'),
           items: const [
@@ -615,7 +615,7 @@ class _ProcedureScopeEditorState extends ConsumerState<_ProcedureScopeEditor> {
           },
         ),
         if (kind != 'COMPANY')
-          DropdownButtonFormField<String>(
+          PremiumDropdownField<String>(
             key: ValueKey(kind),
             initialValue: units.any((u) => u['id'] == unit) ? unit : null,
             isExpanded: true,
@@ -751,7 +751,7 @@ class _ProcedurePageState extends ConsumerState<ProcedurePage> {
                   decoration: const InputDecoration(labelText: '标题'),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
+                PremiumDropdownField<String>(
                   initialValue: type,
                   items: const [
                     DropdownMenuItem(value: 'POLICY', child: Text('制度')),
@@ -768,7 +768,7 @@ class _ProcedurePageState extends ConsumerState<ProcedurePage> {
                   decoration: const InputDecoration(labelText: '正文'),
                 ),
                 _ProcedureScopeEditor(old ?? {}, (value) => scope = value),
-                DropdownButtonFormField<String>(
+                PremiumDropdownField<String>(
                   initialValue: workflow,
                   decoration: const InputDecoration(labelText: '关联办理'),
                   items: const [

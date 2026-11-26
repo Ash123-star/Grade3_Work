@@ -10,6 +10,7 @@
 | 核心规则及协作 | [AGENTS](../AGENTS.md)、[开发流程与Git比较](development-workflow.md)、[PR模板](../.github/pull_request_template.md) |
 | 分工与候选范围 | [MVP分工](mvp-team-division.md)、[OpenSpec指南](openspec-guide.md)、[活动变更](../openspec/changes/)、[同步规格](../openspec/specs/) |
 | APP需求验收基准 | [两轮需求、冲突决议与验收用例](app-requirements-acceptance.md)；唯一跨模块验收目标入口，包含合并保真和发版门槛；实际结果仍写统一验证入口及Issue |
+| 二期 CRM 客户查询 | [任务 A 的范围、契约与发布门槛](../openspec/changes/crm-customer-workspace/design.md)、[移动 HTML 原型](../mobile/prototypes/crm-customer-workspace.html)；移动首版、Web 后置，真实接口和字段授权须经联调确认 |
 | 客户端入口 | [Flutter运行](../mobile/README.md)、[移动端专题索引](../mobile/docs/README.md) |
 | 脚本 | [脚本索引](../scripts/README.md)；运行参数以脚本为准 |
 
@@ -25,6 +26,8 @@
 | OSS资源 | [私有文件、静态素材发布、历史迁移与回滚](oss-storage.md) |
 | 认证/组织/审核 | [认证](member-b-auth.md)、[组织](member-b-organization.md)、[审核](member-b-review.md)；后续权限增量以当前契约与对应规格为准 |
 | 个人事项 | [接口与权限](personal-todos-interface.md)、[客户端设计](../mobile/docs/home-daily-todos-direction.md) |
+| 二期客户/会员 | [客户、会员、权益与核销](customer-membership.md) |
+| 二期商城与经营 | [导入及查询接口](backend-interface.md#二期商城-apicommerce)、[迁移与数据](database-schema.md#二期商城快照与来源issue-107) |
 | 任务与月历发布 | [任务生命周期](task-lifecycle-release.md)、[月历移动/完整行/证据/回滚](calendar-task-drag-release.md)；不再分散维护批次发布文件 |
 
 ## AI专题

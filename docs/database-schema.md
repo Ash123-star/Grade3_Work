@@ -4,7 +4,7 @@
 
 本文说明当前运行 Spring Boot 后端使用的 PostgreSQL 数据库。实际启动时使用 `server/src/main/resources/db/migration/` 的 Flyway 迁移；`deploy/postgresql/` 是独立的数据基础设施包，字段模型和 ID 类型不同，不能把两套脚本混合执行。
 
-V37 仅扩展 `review_requests` 的审核模式和决定来源约束，`TASK_MANAGER`、`TASK_RECIPIENT` 只允许用于 `TASK_CREATE`。历史行不回填、不重路由；新机制沿用带公司外键、禁止自审的 `review_steps`，关闭新入口不删除历史决定。依赖 V36 的员工职位与目录基线。
+V40 仅扩展 `review_requests` 的审核模式和决定来源约束，`TASK_MANAGER`、`TASK_RECIPIENT` 只允许用于 `TASK_CREATE`。历史行不回填、不重路由；新机制沿用带公司外键、禁止自审的 `review_steps`，关闭新入口不删除历史决定。依赖 V36 的员工职位与目录基线。
 
 ## 使用约定
 
@@ -108,6 +108,20 @@ V22将旧待审步骤标记为SUPERSEDED并保留历史，每个申请至多一�
 | `ai_task_confirmations` | `job_version`, `action_index`, `request_hash`, `source_refs`, `response` | 原确认版本、0–2行动索引、规范化命令摘要、原来源和原响应；与TASK_CREATE审核同事务，重放前重验来源权限 |
 | `ai_map_nodes` | `owner_id`, `job_id`, `body` | 归用户所有的 AI 地图节点及来源 |
 | `ai_map_edges` | `owner_id`, `source_id`, `target_id`, `body` | 节点关系；复合外键保证节点属于同一用户和公司 |
+
+## 二期商城快照与来源（Issue #107）
+
+V39 在 `server` Flyway 新增三张表。
+
+| 表 | 标识与约束 | 数据 |
+| --- | --- | --- |
+| `commerce_imports` | `(company_id,id)` 主键，`(company_id,sha256)` 唯一 | 执行人、时间、原文件 SHA-256、会员及订单写入与跳过计数。复合外键限制执行人公司。 |
+| `commerce_members` | `(company_id,external_member_id)` 主键 | 会员等级、状态、加入和到期日、源更新时间、导入批次和文件行。 |
+| `commerce_orders` | `(company_id,external_order_id)` 主键，会员及批次复合外键限制同公司 | 可空会员 ID、下单时间、状态、币种、`numeric(19,4)` 原始金额、源更新时间、导入批次和文件行。 |
+
+公司行锁覆盖文件查重、快照写入、回执和审计，各表唯一键保证并发下的外部身份一致性。订单索引支持公司下单窗口和按商城会员查询。C 的 `customer_memberships.mall_member_id` 保存显式客户关联。导入方保留原文件并用 SHA-256 对照，服务端保存凭据及当前快照来源。
+
+客户与会员使用 V37/V38，商城导入使用 V39，任务申请使用 V40。回滚配套应用时保留 V39 表与数据。
 
 ## 开发规则
 

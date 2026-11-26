@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onMounted, ref } from 'vue';
 import { nameError, phoneError } from './employee-input';
 type Row = Record<string, any>;
+const CommerceView = defineAsyncComponent(() => import('./commerce/CommerceView.vue'));
+const commercePage = ['/commerce', '/commerce/'].includes(window.location.pathname);
+const titles: Record<string, string> = { employees: '员工与账号', priorities: '公司重要事项', history: '修改记录', reviews: '申请与审核' };
+const restoredSection = new URLSearchParams(window.location.search).get('section') ?? '';
 const user = ref<Row | null>(null), token = ref(sessionStorage.getItem('workpanel-token') || '');
 const loginAccount = ref(''), loginPassword = ref(''), oldPassword = ref(''), newPassword = ref('');
-const tab = ref('employees'), rows = ref<Row[]>([]), departments = ref<Row[]>([]), teams = ref<Row[]>([]), managers = ref<Row[]>([]), departmentFilter = ref('');
+const tab = ref(Object.hasOwn(titles, restoredSection) ? restoredSection : 'employees');
+const rows = ref<Row[]>([]), departments = ref<Row[]>([]), teams = ref<Row[]>([]), managers = ref<Row[]>([]), departmentFilter = ref('');
 const busy = ref(false), loading = ref(false), error = ref(''), notice = ref('');
 const search = ref(''), cursor = ref(0), nextCursor = ref(0), total = ref(0);
 const editor = ref(''), form = ref<Row>({}), detail = ref<Row | null>(null), decisionReason = ref(''), editingPending = ref(false);
@@ -13,7 +18,6 @@ const positionName: Record<string,string> = { NONE:'普通岗位', GENERAL_MANAG
 function managerLabel(row: Row): string { return row.manager_name ? `${row.manager_name}（${positionName[row.manager_business_position] && row.manager_business_position !== 'NONE' ? positionName[row.manager_business_position] : stateName[row.manager_role] || '管理人员'}）` : '未指定'; }
 const companyLevel = computed(() => form.value.role === 'DIRECTOR' || (form.value.businessPosition && form.value.businessPosition !== 'NONE'));
 let generation = 0, pageGeneration = 0;
-const titles: Record<string, string> = { employees: '员工与账号', priorities: '公司重要事项', history: '修改记录', reviews: '申请与审核' };
 const auditName: Record<string,string> = { EMPLOYEE_PROVISIONED:'录入员工', ADMIN_EMPLOYEE_UPDATED:'修改员工资料', ADMIN_COMPANY_ITEM_UPDATED:'修改公司事项' };
 const auditFieldName: Record<string,string> = { name:'姓名',role:'角色',status:'账号状态',departmentId:'部门',teamId:'组',managerId:'直接上级',businessPosition:'业务职位',title:'事项名称',text:'事项说明',gender:'性别',idCardUpdated:'身份证号已更新',pinned:'置顶',archived:'撤下',position:'内部排序' };
 const stateName: Record<string, string> = { ACTIVE: '已启用', DISABLED: '已停用', PENDING: '待确认', APPROVED: '已通过', REJECTED: '已驳回', SUPERSEDED: '已由管理员处理', EMPLOYEE: '员工', ADMIN: '管理员', FOUNDER: '创始人', DIRECTOR: '部门负责人', LEADER: '团队长' };
@@ -82,7 +86,7 @@ async function enter() {
   const me = await api('/api/auth/me');
   if (me.role !== 'ADMIN' || me.status !== 'ACTIVE') { clearSession(); throw new Error('此后台仅供管理员使用'); }
   user.value = me;
-  if (!me.must_change_password) { [departments.value, teams.value, managers.value] = await Promise.all(['/api/admin/console/departments','/api/admin/console/teams','/api/admin/console/managers'].map(path => api(path))); await load(); }
+  if (!me.must_change_password && !commercePage) { [departments.value, teams.value, managers.value] = await Promise.all(['/api/admin/console/departments','/api/admin/console/teams','/api/admin/console/managers'].map(path => api(path))); await load(); }
 }
 function login() { void run(async () => {
   const data = await api('/api/auth/login', 'POST', { account: loginAccount.value, password: loginPassword.value });
@@ -91,7 +95,18 @@ function login() { void run(async () => {
 }); }
 function changePassword() { void run(async () => { await api('/api/auth/password', 'POST', { oldPassword: oldPassword.value, newPassword: newPassword.value }); clearSession(); notice.value = '密码已更新，请使用新密码登录'; }); }
 function logout() { void run(async () => { try { await api('/api/auth/logout', 'POST'); } finally { clearSession(); } }); }
-async function selectTab(value: string) { if (busy.value) return; tab.value = value; rows.value = []; total.value = 0; search.value = ''; await load(); }
+async function selectTab(value: string) {
+  if (busy.value) return;
+  if (commercePage) {
+    window.location.assign(value === 'employees' ? '/' : '/?section=' + encodeURIComponent(value));
+    return;
+  }
+  tab.value = value; rows.value = []; total.value = 0; search.value = ''; await load();
+}
+function commerceAccessLost(message: string) {
+  clearSession();
+  error.value = message;
+}
 async function openEditor(type: string, row?: Row) {
   editor.value = type; detail.value = null; fieldErrors.value = {}; error.value = '';
   editingPending.value = type === 'employee' && row?.status === 'PENDING';
@@ -166,11 +181,17 @@ onMounted(() => { if (token.value) void run(enter); });
     </main>
     <div v-else class="console-layout">
       <aside class="sidebar"><a href="#" class="brand" @click.prevent="selectTab('employees')"><span class="brand-mark small">P</span><span>潘多拉<small>企业管理后台</small></span></a><p class="nav-caption">日常管理</p>
-        <nav aria-label="后台导航"><button v-for="(title, key) in titles" :key="key" :class="{ active: tab === key }" :aria-current="tab === key ? 'page' : undefined" :disabled="busy" @click="selectTab(key)"><span aria-hidden="true">{{ key === 'employees' ? '◎' : key === 'priorities' ? '◇' : '▤' }}</span>{{ title }}</button></nav>
+        <nav aria-label="后台导航">
+          <button v-for="(title, key) in titles" :key="key" :class="{ active: !commercePage && tab === key }" :aria-current="!commercePage && tab === key ? 'page' : undefined" :disabled="busy" @click="selectTab(key)"><span aria-hidden="true">{{ key === 'employees' ? '◎' : key === 'priorities' ? '◇' : '▤' }}</span>{{ title }}</button>
+          <a href="/commerce" class="sidebar-link" :class="{ active: commercePage }" :aria-current="commercePage ? 'page' : undefined"><span aria-hidden="true">▦</span>商城经营</a>
+        </nav>
         <div class="sidebar-bottom"><span class="avatar">{{ user.name?.slice(0, 1) }}</span><div>{{ user.name }}<small>管理员</small></div><button class="logout" :disabled="busy" @click="logout">退出</button></div>
       </aside>
-      <main class="console-main" :aria-busy="loading"><header class="topbar"><span>管理后台 <span class="separator">/</span> {{ titles[tab] }}</span><span class="admin-badge">管理员专属</span></header>
-        <section class="page-content"><div class="page-heading"><div><p class="eyebrow">{{ tab === 'employees' ? 'PEOPLE & ACCOUNTS' : tab === 'priorities' ? 'COMPANY PRIORITIES' : tab === 'history' ? 'CHANGE HISTORY' : 'REQUESTS & REVIEWS' }}</p><h1>{{ titles[tab] }}</h1><p class="muted">{{ tab === 'employees' ? '维护员工资料，为新同事开通工作账号。' : tab === 'priorities' ? '维护移动端展示的公司重点，让全员看见重要的事。' : tab === 'history' ? '查看管理员直接生效的员工和事项修改。' : '只显示当前有效的待审申请。历史决定保留在后台审计中。' }}</p></div><button v-if="tab === 'employees' || tab === 'priorities'" class="primary" :disabled="busy" @click="openEditor(tab === 'employees' ? 'create' : 'priority')">＋ {{ tab === 'employees' ? '录入员工并开通账号' : '新增重要事项' }}</button></div>
+      <main class="console-main" :aria-busy="loading"><header class="topbar"><span>管理后台 <span class="separator">/</span> {{ commercePage ? '商城经营' : titles[tab] }}</span><span class="admin-badge">管理员专属</span></header>
+        <section class="page-content">
+          <CommerceView v-if="commercePage" @access-lost="commerceAccessLost" />
+          <template v-else>
+          <div class="page-heading"><div><p class="eyebrow">{{ tab === 'employees' ? 'PEOPLE & ACCOUNTS' : tab === 'priorities' ? 'COMPANY PRIORITIES' : tab === 'history' ? 'CHANGE HISTORY' : 'REQUESTS & REVIEWS' }}</p><h1>{{ titles[tab] }}</h1><p class="muted">{{ tab === 'employees' ? '维护员工资料，为新同事开通工作账号。' : tab === 'priorities' ? '维护移动端展示的公司重点，让全员看见重要的事。' : tab === 'history' ? '查看管理员直接生效的员工和事项修改。' : '只显示当前有效的待审申请。历史决定保留在后台审计中。' }}</p></div><button v-if="tab === 'employees' || tab === 'priorities'" class="primary" :disabled="busy" @click="openEditor(tab === 'employees' ? 'create' : 'priority')">＋ {{ tab === 'employees' ? '录入员工并开通账号' : '新增重要事项' }}</button></div>
           <p v-if="error" role="alert" class="alert error">{{ error }}</p><p v-if="notice" role="status" class="alert success">{{ notice }}</p>
           <div class="info-strip"><span aria-hidden="true">i</span>{{ tab === 'employees' ? '新建账号默认为员工，首次登录须改密。管理员在此修改资料与停用会立即生效并留痕。' : tab === 'priorities' ? '管理员在此新增和修改事项会立即生效并留痕。' : tab === 'history' ? '这里展示管理员直接创建和修改的记录；当前待审申请请到申请与审核查看。' : '这里是其他入口提交后分配给当前管理员的有效审核待办；Web 管理员直接修改不进入此处。' }}</div>
           <section class="data-panel"><div class="panel-toolbar"><h2>{{ tab === 'employees' ? '员工目录' : tab === 'priorities' ? '事项列表' : tab === 'history' ? '管理员操作记录' : '申请与审核' }} <span class="count">{{ total }}</span></h2><form v-if="tab === 'employees'" class="search-form" @submit.prevent="load()"><select v-model="departmentFilter" aria-label="按部门筛选" @change="load()"><option value="">全部部门</option><option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option></select><input v-model="search" aria-label="搜索员工" placeholder="搜索姓名、账号或手机号" maxlength="100"><button :disabled="busy || loading">搜索</button></form><button v-else :disabled="busy || loading" @click="load(cursor)">刷新列表</button></div>
@@ -189,7 +210,9 @@ onMounted(() => { if (token.value) void run(enter); });
                 <template v-else-if="tab === 'history'"><td>{{ auditName[row.type] || row.type }}</td><td>{{ row.target_name }}</td><td>{{ row.actor_name || '—' }}</td><td>{{ row.reason }}</td><td>{{ row.created_at ? new Date(row.created_at).toLocaleString('zh-CN') : '—' }}</td><td><button class="text-button" :disabled="busy" @click="viewAudit(row)">查看详情</button></td></template>
                 <template v-else><td>{{ kindName[row.kind] || row.kind }}</td><td>{{ row.applicant_name || '—' }}</td><td class="title-cell">{{ row.reason }}</td><td><span class="badge" :class="{ inactive: row.status !== 'APPROVED' }">{{ stateName[row.status] || row.status }}</span><small v-if="row.status === 'PENDING'" class="cell-note">{{ row.reviewer_configured ? `审核人：${row.reviewer_name}` : '尚未分配审核人' }}</small></td><td><button class="text-button" :disabled="busy" @click="viewReview(row)">查看详情</button></td></template></tr></tbody></table></div>
             <footer class="pagination"><span>共 {{ total }} 条<span v-if="rows.length"> · 当前 {{ cursor + 1 }}–{{ cursor + rows.length }}</span></span><div><button :disabled="loading || busy || cursor === 0" @click="load(Math.max(0, cursor - 20))">上一页</button><button :disabled="loading || busy || nextCursor >= total || nextCursor <= cursor" @click="load(nextCursor)">下一页</button></div></footer>
-          </section><p class="page-footnote">潘多拉 · 企业协作管理</p>
+          </section>
+          </template>
+          <p class="page-footnote">潘多拉 · 企业协作管理</p>
         </section>
       </main>
       <div v-if="editor" class="drawer-shade" @click.self="closeEditor" @keydown.esc="closeEditor" @keydown="keepDialogFocus"><section class="drawer" role="dialog" aria-modal="true" aria-labelledby="editor-title"><div class="drawer-heading"><div><p class="eyebrow">{{ editor === 'create' ? 'NEW EMPLOYEE' : 'MANAGE' }}</p><h2 id="editor-title">{{ editor === 'create' ? '录入员工并开通账号' : editor === 'employee' ? '编辑员工资料' : editor === 'priority' ? '维护公司重要事项' : editor === 'person' ? '员工详情' : editor === 'audit' ? '管理员操作详情' : '修改申请详情' }}</h2></div><button aria-label="关闭面板" :disabled="busy" @click="closeEditor">×</button></div>

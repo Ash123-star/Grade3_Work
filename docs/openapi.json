@@ -11,7 +11,702 @@
   "security" : [ {
     "bearer" : [ ]
   } ],
+  "tags" : [ {
+    "name" : "commerce",
+    "description" : "二期商城文件导入与经营概览"
+  } ],
   "paths" : {
+    "/api/commerce/imports" : {
+      "post" : {
+        "tags" : [ "commerce" ],
+        "summary" : "导入商城文件",
+        "description" : "已改初始密码的在职管理员专用。multipart 字段 file，UTF-8 JSON，最多 1 MiB、500 条。相同文件返回原回执，源更新时间防旧快照覆盖。只提交全部通过校验的批次。",
+        "operationId" : "importCommerceFile",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "file" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "导入回执或相同文件的原回执",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportReceipt"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "文件或记录无效",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportFailure"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "文件超过限制",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportFailure"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "源版本或订单身份冲突",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportFailure"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commerce/overview" : {
+      "get" : {
+        "tags" : [ "commerce" ],
+        "summary" : "查询商城经营概览",
+        "description" : "按下单日及筛选范围，分订单状态和币种返回原始金额与条数。金额使用十进制字符串。客户或会员只能选一个。无版本或幂等键参数。",
+        "operationId" : "getCommerceOverview",
+        "parameters" : [ {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "name" : "customerId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "externalMemberId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "externalOrderId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "PENDING_PAYMENT", "PAID", "COMPLETED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED" ]
+          }
+        }, {
+          "name" : "currency",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "订单金额分组和订单总数",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commerce/orders" : {
+      "get" : {
+        "tags" : [ "commerce" ],
+        "summary" : "分页查询商城订单",
+        "description" : "与概览使用相同筛选条件；每条订单返回原始金额、导入凭据及文件行。无版本或幂等键参数。",
+        "operationId" : "listCommerceOrders",
+        "parameters" : [ {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "name" : "customerId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "externalMemberId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "externalOrderId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "PENDING_PAYMENT", "PAID", "COMPLETED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED" ]
+          }
+        }, {
+          "name" : "currency",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "商城订单分页",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseOrderView"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commerce/members" : {
+      "get" : {
+        "tags" : [ "commerce" ],
+        "summary" : "分页查询商城会员",
+        "description" : "按外部会员 ID 或 C 的统一客户 ID 精确筛选。无版本或幂等键参数。",
+        "operationId" : "listCommerceMembers",
+        "parameters" : [ {
+          "name" : "customerId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "externalMemberId",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "商城会员分页",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseMemberView"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commerce/imports/{id}" : {
+      "get" : {
+        "tags" : [ "commerce" ],
+        "summary" : "回查商城导入凭据",
+        "description" : "返回本公司批次的时间、文件指纹、处理计数。只读，无版本或幂等键参数。",
+        "operationId" : "getCommerceImport",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "导入来源",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportReceipt"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "错误码及 traceId，详情参见后端接口说明",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
       "/api/personal-todos/month": {
         "get": {
           "tags": [
@@ -24904,6 +25599,211 @@
   },
   "components" : {
     "schemas" : {
+      "Counts" : {
+        "type" : "object",
+        "properties" : {
+          "applied" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unchanged" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "stale" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ImportFailure" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "traceId" : {
+            "type" : "string"
+          },
+          "section" : {
+            "type" : "string"
+          },
+          "row" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "field" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ImportReceipt" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "sha256" : {
+            "type" : "string"
+          },
+          "importedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "members" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "orders" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "replayed" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "MemberView" : {
+        "type" : "object",
+        "properties" : {
+          "externalMemberId" : {
+            "type" : "string"
+          },
+          "level" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "ACTIVE", "EXPIRED", "DISABLED" ]
+          },
+          "joinedAt" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "sourceUpdatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "importId" : {
+            "type" : "string"
+          },
+          "sourceRow" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "OrderGroup" : {
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string",
+            "enum" : [ "PENDING_PAYMENT", "PAID", "COMPLETED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED" ]
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "orderCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "amount" : {
+            "type" : "string"
+          }
+        }
+      },
+      "OrderView" : {
+        "type" : "object",
+        "properties" : {
+          "externalOrderId" : {
+            "type" : "string"
+          },
+          "externalMemberId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "PENDING_PAYMENT", "PAID", "COMPLETED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED" ]
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "amount" : {
+            "type" : "string"
+          },
+          "orderedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "sourceUpdatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "importId" : {
+            "type" : "string"
+          },
+          "sourceRow" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "Overview" : {
+        "type" : "object",
+        "properties" : {
+          "orderCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "groups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrderGroup"
+            }
+          }
+        }
+      },
+      "PageResponseMemberView" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MemberView"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PageResponseOrderView" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrderView"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        }
+      },
       "PersonalTodoUpdate" : {
         "type" : "object",
         "additionalProperties" : false,

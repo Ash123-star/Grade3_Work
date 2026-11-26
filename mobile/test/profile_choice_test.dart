@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,7 +80,7 @@ void main() {
     expect(find.text('历史任意输入'), findsNothing);
     await tester.tap(find.byTooltip('编辑个人资料'));
     await tester.pumpAndSettle();
-    final dropdown = find.byType(DropdownButtonFormField<String>);
+    final dropdown = find.byType(PremiumDropdownField<String>);
     await tester.ensureVisible(dropdown);
     await tester.tap(dropdown);
     await tester.pumpAndSettle();
@@ -92,7 +93,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.ensureVisible(dropdown);
     expect(
-      tester.widget<DropdownButtonFormField<String>>(dropdown).initialValue,
+      tester.widget<PremiumDropdownField<String>>(dropdown).initialValue,
       isNull,
     );
     await tester.tap(dropdown);
@@ -110,7 +111,7 @@ void main() {
     expect(repository.saved?.version, 1);
     expect(repository.saved?.values.containsKey('年龄'), isFalse);
     expect(repository.saved?.values.containsKey('age'), isFalse);
-    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    expect(find.byType(PremiumDropdownField<String>), findsNothing);
     expect(find.text('男'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

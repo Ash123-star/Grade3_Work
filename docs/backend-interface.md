@@ -24,11 +24,33 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 写请求只接受文档列出的字段。更新请求携带 `version`；创建请求可携带 `Idempotency-Key`。版本冲突返回 `409`，越权对象通常返回 `404`，明确的人员筛选越权返回 `403`。
 
-每日事项与首页任务看板新增契约见 [personal-todos-interface.md](personal-todos-interface.md)（Issue #63）。事项仅本人可见，所有写请求必须有幂等键；该约束比下文通用创建规则更严格。
+每日事项与首页任务看板新增契约见 [personal-todos-interface.md](personal-todos-interface.md)（Issue #63）。事项仅本人可见，所有写请求必须有幂等键；该约束比下文通用创建规则更严格。二期客户/会员/权益接口见 [customer-membership.md](customer-membership.md)（首版仅 ADMIN，商城外部 ID 公司内唯一）。
 
 ## Web 管理控制台 `/api/admin/console`
 
 仅当前 ACTIVE 管理员可用。`GET /employees` 支持 `search` 与 `departmentId` 服务端筛选，返回部门、组、直属上级、性别、身份证号录入标记和年龄；完整身份证号不会出现在目录响应。`GET /departments`、`GET /teams`、`GET /managers` 提供录入选项；上级限同部门在职团队长及以上。`POST /employees` 必须提交部门、组、直属上级、性别和有效身份证号，固定创建 EMPLOYEE/ACTIVE 并要求首次改密。`POST /employees/{id}/revisions` 携带 `version`、`reason`，支持资料、组织关系及身份证资料修改，身份证号不会写入审计明文。`GET /history` 分页返回管理员直接操作审计；`GET /reviews` 仅返回当前有效待审项，历史申请仍保存在数据库。Web 管理员的员工及公司事项修改直接生效并保留版本校验和审计；手机端与普通员工原有审核链保持不变。年龄依据身份证出生日期按 Asia/Shanghai 时区计算，无身份证号时使用既有 `users.age`。
+
+## 二期商城 `/api/commerce`
+
+Web 管理后台的「商城经营」栏目对应 `/commerce`，也可用该地址直接进入，复用原有后台登录。商城接口统一要求已改初始密码的 ACTIVE ADMIN，公司取自会话。会话失效返回 401，其他角色或待确认账号返回 403，不可见的客户或批次返回 404。接口成功响应禁止缓存。关联 Issue #107 及 [OpenSpec](../openspec/changes/phase2-commerce-overview/specs/commerce-overview/spec.md)。
+
+本地启动 Web 时将 `VITE_API_TARGET` 指向已运行并完成迁移的本地后端，并把实际 Vite 源加入后端 `CORS_ORIGINS`（如 `http://127.0.0.1:5173`）。登录后可在 `/commerce` 操作。
+
+| 接口 | 参数 | 返回 |
+| --- | --- | --- |
+| `POST /api/commerce/imports` | multipart 字段 `file`，UTF-8 JSON | `id,sha256,importedAt,members,orders,replayed`；两类计数为 `applied,unchanged,stale` |
+| `GET /api/commerce/imports/{id}` | 导入批次 ID | 同公司导入凭据，可比对原文件 SHA-256 |
+| `GET /api/commerce/overview` | 订单共用筛选 | `orderCount,groups[]`，分组为 `status,currency,orderCount,amount` |
+| `GET /api/commerce/orders` | 订单共用筛选及分页 | `items,total,nextCursor`；每条含 `externalOrderId,externalMemberId,status,currency,amount,orderedAt,sourceUpdatedAt,importId,sourceRow` |
+| `GET /api/commerce/members` | `customerId` 或 `externalMemberId` 以及分页 | `items,total,nextCursor`；每条含外部会员 ID、等级、状态、加入和到期日期、源更新时间、导入批次与行号 |
+
+**导入格式。** 参见 [可下载示例](../web/public/commerce-import-example.json)。`members` 和 `orders` 可分别提供，合计 1–500 条，文件不超过 1 MiB。会员需要 `externalMemberId,status,sourceUpdatedAt`，可补充 `level,joinedAt,expiresAt`；状态为 `ACTIVE/EXPIRED/DISABLED`。订单需要 `externalOrderId,status,currency,amount,orderedAt,sourceUpdatedAt`；`externalMemberId` 为空表示访客，填写时会员须在同一公司已导入或随文件提交。订单状态为 `PENDING_PAYMENT/PAID/COMPLETED/CANCELLED/REFUNDED/PARTIALLY_REFUNDED`。时间用带时区偏移的 ISO 8601，最多微秒精度。金额用 0 或正十进制文本（最多 15 位整数和 4 位小数），币种用大写三位币种代码。
+
+**重试及错误。** 同公司相同文件 SHA-256 返回原凭据和 `replayed=true`，无需 `Idempotency-Key`。外部 ID 在公司内唯一，快照版本使用 `sourceUpdatedAt`；相同版本同内容跳过，旧版本计入 `stale`，同版本冲突或订单归属、币种、下单时间冲突返回 409 `COMMERCE_SNAPSHOT_CONFLICT`。文件或记录无效返回 400 `INVALID_COMMERCE_FILE`，超过应用文件大小限制返回 413 `COMMERCE_FILE_TOO_LARGE`。导入错误附 `section,row,field`，其中 `row` 为对应数组内从 1 开始的序号；文件整体格式错误时可无行号。任何记录错误均整批回滚。
+
+**统一查询和 CRM 接入。** 订单使用同一组可选筛选 `from,to,customerId,externalMemberId,externalOrderId,status,currency`。日期为上海下单自然日，包含首尾日期。金额以字符串返回，原始金额在同币种、同状态分组内汇总。明细按下单时间倒序及外部订单 ID 升序分页，`cursor` 为非负偏移量、`limit` 为 1–100，末页 `nextCursor=null`。钻取把原筛选与所选分组的 `status,currency` 一并用于订单列表，再以 `importId,sourceRow` 回查批次和原文件位置。
+
+A 的 CRM 可按统一 `customerId` 调用会员和订单接口。该参数与 `externalMemberId` 互斥，服务端通过 [C 的显式商城会员绑定](customer-membership.md) 查找当前记录，未绑定客户返回空结果。单笔钻取可同时传 `customerId,externalOrderId`，服务端同时校验角色和公司。客户绑定继续由 C 的版本接口维护。
 
 ## 认证 `/auth`
 
@@ -53,7 +75,7 @@ CSV导出和模板预填文件先持久化OSS再通过原接口返回，CSV额�
 
 2026-10-30（Issue #49）：`GET /tasks/received-card` 仅返回当前用户本人参与的任务（包括本人派发且参与），包含全部生命周期状态，不再返回仅下属参与的授权范围任务。`items/total/nextCursor`使用相同过滤；每项增加`issuer_id`。导图卡片与完整列表共用该资源，管理任务表继续使用`GET /tasks`授权范围查询。
 
-受控新版派发（#28，V37）：服务端 `TASK_PROPOSALS_ENABLED=true` 且 `POST /api/tasks` 同时携带 `Task-Dispatch-Policy: recipient-confirmation-v1` 和原幂等键时，允许本公司已确认在职人员发起；开关关闭或策略名不支持返回 409 `DISPATCH_POLICY_UNAVAILABLE`，无策略头使用既有规则。新只读 `/api/organization/task-proposal-people?search=&cursor=0&limit=30` 仅返回同公司有效成员标识、工作姓名和组织归属，不包含手机号、日志或任务计数。任务仍返回 `TASK_CREATE` 申请；`TASK_MANAGER` 为直属审批，`TASK_RECIPIENT` 为当前接收人本人确认。两者复用 `/reviews/{id}/decision` 和 `expectedVersion`；任一驳回须原因，全部必要确认后才原子建单并通知。旧申请不提升权限；新申请不支持通用 reroute 越过同意，关系失效时重新发起。App 验收包另加 `--dart-define=TASK_PROPOSALS_ENABLED=true`。停用开关后不再接收新策略请求，已产生的申请继续按固化的模式完成。此增量面向 App 的人工新建入口；AI 自动写入、任务转派、月历移动和查看他人面板不因申请权开放而放宽。
+受控新版派发（#28，V40）：服务端 `TASK_PROPOSALS_ENABLED=true` 且 `POST /api/tasks` 同时携带 `Task-Dispatch-Policy: recipient-confirmation-v1` 和原幂等键时，允许本公司已确认在职人员发起；开关关闭或策略名不支持返回 409 `DISPATCH_POLICY_UNAVAILABLE`，无策略头使用既有规则。新只读 `/api/organization/task-proposal-people?search=&cursor=0&limit=30` 仅返回同公司有效成员标识、工作姓名和组织归属，不包含手机号、日志或任务计数。任务仍返回 `TASK_CREATE` 申请；`TASK_MANAGER` 为直属审批，`TASK_RECIPIENT` 为当前接收人本人确认。两者复用 `/reviews/{id}/decision` 和 `expectedVersion`；任一驳回须原因，全部必要确认后才原子建单并通知。旧申请不提升权限；新申请不支持通用 reroute 越过同意，关系失效时重新发起。App 验收包另加 `--dart-define=TASK_PROPOSALS_ENABLED=true`。停用开关后不再接收新策略请求，已产生的申请继续按固化的模式完成。此增量面向 App 的人工新建入口；AI 自动写入、任务转派、月历移动和查看他人面板不因申请权开放而放宽。
 
 `GET /tasks` 使用显式授权投影，不返回主负责人或协作人；参与人使用无角色的 `participants` 集合，标签以本文“统一集成兼容约定”的 `labels` 集合及旧 `label` 兼容规则为准。流转事件在 `GET /tasks/{id}` 的 `events` 中返回。`POST /tasks` 提交创建审核，需 `title,participants,deadline`、可选 `startAt,labelId,labelIds,attachments,acceptanceChecklist` 和 `Idempotency-Key`；审核批准后才产生正式任务，同键重放返回同一审核申请。
 

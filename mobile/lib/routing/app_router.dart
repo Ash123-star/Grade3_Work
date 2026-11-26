@@ -1,3 +1,4 @@
+import '../features/crm/crm_workspace.dart';
 import '../core/push/push_controller.dart';
 import '../features/settings/push_settings_page.dart';
 import 'package:pandora_mobile/routing/branch_pager.dart';
@@ -76,6 +77,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/crm/customers',
+        builder: (_, _) => const CrmWorkspacePage(),
+      ),
       GoRoute(path: '/me/notifications', builder: (_, _) => const PushSettingsPage()),
       GoRoute(path: '/membership-result/:id', builder: (_, s) => MembershipResultPage(s.pathParameters['id']!)),
       GoRoute(
