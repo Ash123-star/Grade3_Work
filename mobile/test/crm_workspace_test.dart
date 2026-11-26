@@ -1,3 +1,4 @@
+import 'package:pandora_mobile/core/config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,6 +45,8 @@ Future<void> show(
 }
 
 void main() {
+  // The local interaction fixture is not a release data source.
+  if (!AppConfig.mock) return;
   testWidgets('公司双按钮排和顶部今天沿真实入口返回保留日期与视图', (t) async {
     final container = ProviderContainer();
     final date = container.read(selectedDateProvider.notifier);
@@ -164,6 +167,33 @@ void main() {
     expect(find.text('2 / 2'), findsOneWidget);
     await tap(t, '‹');
     expect(t.widget<TextField>(find.byType(TextField)).controller?.text, '林小满');
+  });
+
+  testWidgets('圆角负责人弹层取消保留筛选草稿，选择后保存负责人', (t) async {
+    final store = CrmDemoStore();
+    await show(t, store, width: 320, height: 568, scale: 1.5);
+    await tap(t, '筛选');
+    await tap(t, '全部');
+    expect(find.text('选择业务负责人'), findsOneWidget);
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    await tap(t, '取消');
+    expect(find.text('筛选客户'), findsOneWidget);
+    await tap(t, '全部');
+    await tap(t, '许禾');
+    await tap(t, '查看客户');
+    expect(find.text('禾屿设计工作室'), findsOneWidget);
+    expect(find.text('林小满'), findsNothing);
+    await tap(t, '＋ 新增客户');
+    expect(find.textContaining(RegExp('演示|原型|示例')), findsNothing);
+    await t.enterText(find.byType(TextField).first, '新客户');
+    await t.ensureVisible(find.text('陈晨'));
+    await t.pumpAndSettle();
+    await tap(t, '陈晨');
+    await tap(t, '许禾');
+    await tap(t, '保存客户');
+    expect(store.customers.first.owner, '许禾');
+    expect(find.text('客户资料已保存'), findsOneWidget);
+    expect(t.takeException(), isNull);
   });
 
   testWidgets('新增校验、重复核对、保存重试及遗留草稿保护', (t) async {

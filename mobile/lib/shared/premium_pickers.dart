@@ -19,6 +19,7 @@ class PremiumDropdownField<T> extends StatelessWidget {
     required this.onChanged,
     this.decoration = const InputDecoration(),
     this.validator,
+    this.sheetTitle,
     this.icon = const Icon(Icons.expand_more_rounded),
     this.isExpanded = true,
   });
@@ -28,6 +29,7 @@ class PremiumDropdownField<T> extends StatelessWidget {
   final ValueChanged<T?>? onChanged;
   final InputDecoration decoration;
   final FormFieldValidator<T>? validator;
+  final String? sheetTitle;
   final Widget icon;
   final bool isExpanded;
 
@@ -37,22 +39,29 @@ class PremiumDropdownField<T> extends StatelessWidget {
     validator: validator,
     builder: (field) {
       final item = items.where((e) => e.value == field.value).firstOrNull;
+      final enabled =
+          onChanged != null &&
+          decoration.enabled &&
+          items.any((item) => item.enabled);
       return InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onChanged == null
+        onTap: !enabled
             ? null
             : () async {
                 final value = await showModalBottomSheet<T>(
                   context: context,
                   isScrollControlled: true,
                   useSafeArea: true,
+                  showDragHandle: false,
                   backgroundColor: Colors.transparent,
                   builder: (sheet) => _PremiumShell(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _PremiumHeading(decoration.labelText ?? '请选择'),
+                        _PremiumHeading(
+                          sheetTitle ?? decoration.labelText ?? '请选择',
+                        ),
                         for (final option in items)
                           _PremiumOptionRow(
                             selected: option.value == field.value,
@@ -64,14 +73,14 @@ class PremiumDropdownField<T> extends StatelessWidget {
                     ),
                   ),
                 );
-                if (value == null || !context.mounted) return;
+                if (value == null || !field.mounted) return;
                 field.didChange(value);
                 onChanged?.call(value);
               },
         child: InputDecorator(
           isEmpty: item == null,
           decoration: decoration.copyWith(
-            enabled: onChanged != null,
+            enabled: enabled,
             errorText: field.errorText,
           ),
           child: Row(
@@ -136,9 +145,10 @@ class _PremiumOptionRow extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 52),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: selected
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceContainerLow,
+            color: selected ? SunshinePalette.butter : SunshinePalette.surface,
+            border: Border.all(
+              color: selected ? SunshinePalette.outline : SunshinePalette.line,
+            ),
             borderRadius: BorderRadius.circular(18),
           ),
           child: Row(
@@ -147,7 +157,7 @@ class _PremiumOptionRow extends StatelessWidget {
               if (selected)
                 Icon(
                   Icons.check_circle_rounded,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: SunshinePalette.accentInk,
                 ),
             ],
           ),

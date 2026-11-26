@@ -6,11 +6,8 @@ import 'package:cute_ui/cute_ui.dart'
     hide EmptyIllustration, ErrorPanel, LoadingSkeleton;
 import 'package:pandora_mobile/core/config.dart';
 import 'package:pandora_mobile/core/state/providers.dart';
-import 'package:pandora_mobile/data/models/models.dart';
-import 'package:pandora_mobile/data/repositories/mock_repository.dart';
 import 'package:pandora_mobile/shared/widgets.dart';
 import 'package:pandora_mobile/shared/paper_layout.dart';
-import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'package:pandora_mobile/features/common/demo_pages.dart';
 import 'diary_sync_page.dart';
 import 'package:pandora_mobile/shared/generated_assets.dart';
@@ -116,71 +113,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ],
           ),
         ),
-        if (AppConfig.mock &&
-            ref.watch(sessionProvider).token == null &&
-            ref.watch(sessionProvider).canReadBusiness) ...[
-          const SectionHeader('演示环境'),
-          PremiumDropdownField<UserRole>(
-            initialValue: ref.watch(sessionProvider).role,
-            decoration: const InputDecoration(labelText: '预览角色'),
-            items: UserRole.values
-                .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
-                .toList(),
-            onChanged: (r) {
-              if (r == null) return;
-              final account = demoAccounts.firstWhere((a) => a.role == r);
-              ref.read(sessionProvider.notifier).state = account.session();
-            },
-          ),
-          const SizedBox(height: 16),
-          PremiumDropdownField<String>(
-            key: ValueKey(ref.watch(sessionProvider).id),
-            initialValue: ref.watch(sessionProvider).id,
-            decoration: const InputDecoration(labelText: '演示账号'),
-            items: demoAccounts
-                .map(
-                  (account) => DropdownMenuItem(
-                    value: account.id,
-                    child: Text(
-                      '${account.name} · ${account.departmentName} · ${account.role.label}',
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: (id) {
-              if (id == null) return;
-              final account = demoAccounts.firstWhere((a) => a.id == id);
-              ref.read(sessionProvider.notifier).state = account.session();
-            },
-          ),
-          const SizedBox(height: 16),
-          PremiumDropdownField<DemoScenario>(
-            initialValue: ref.watch(scenarioProvider),
-            decoration: const InputDecoration(labelText: '数据场景'),
-            items: DemoScenario.values
-                .map(
-                  (s) => DropdownMenuItem(
-                    value: s,
-                    child: Text(['正常', '空数据', '网络超时', '权限拒绝'][s.index]),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) {
-              if (v != null) ref.read(scenarioProvider.notifier).state = v;
-            },
-          ),
-          SwitchListTile(
-            title: const Text('派发任务资格'),
-            value: ref.watch(sessionProvider).dispatch,
-            onChanged: (v) {
-              final u = ref.read(sessionProvider);
-              final account = demoAccounts.firstWhere((a) => a.id == u.id);
-              ref.read(sessionProvider.notifier).state = account.session(
-                dispatch: v,
-              );
-            },
-          ),
-        ],
         const SizedBox(height: 24),
         if (ref.watch(sessionStorageErrorProvider) != null)
           ErrorPanel(ref.watch(sessionStorageErrorProvider)!),

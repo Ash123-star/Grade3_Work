@@ -77,11 +77,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      if (AppConfig.mock)
-        GoRoute(
-          path: '/crm/customers',
-          builder: (_, _) => const CrmWorkspacePage(),
-        ),
+      GoRoute(
+        path: '/crm/customers',
+        builder: (_, _) => const CrmWorkspacePage(),
+      ),
       GoRoute(path: '/me/notifications', builder: (_, _) => const PushSettingsPage()),
       GoRoute(path: '/membership-result/:id', builder: (_, s) => MembershipResultPage(s.pathParameters['id']!)),
       GoRoute(

@@ -197,7 +197,7 @@ final holidayCalendarProvider = StreamProvider.autoDispose
     .family<HolidayCalendar, int>((ref, year) {
       if (AppConfig.mock) {
         return Stream.value(
-          HolidayCalendar(festivalCalendar(year).days, '离线节日，演示模式不加载放假调休'),
+          HolidayCalendar(festivalCalendar(year).days, '当前仅显示节日，放假调休信息暂不可用'),
         );
       }
       final repository = ref.watch(httpRepositoryProvider);

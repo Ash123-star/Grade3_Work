@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pandora_mobile/shared/calendar/civil_date.dart';
+import 'package:pandora_mobile/shared/premium_pickers.dart';
 
 import 'crm_components.dart';
 import 'crm_demo_store.dart';
@@ -16,15 +17,19 @@ class CrmSelect extends StatelessWidget {
   final List<String> values;
   final ValueChanged<String> onChanged;
   @override
-  Widget build(BuildContext context) => DropdownButtonFormField<String>(
+  Widget build(BuildContext context) => PremiumDropdownField<String>(
     initialValue: value,
     key: ValueKey(value),
     isExpanded: true,
-    dropdownColor: CrmTone.surface,
-    style: crmStyle(16),
+    sheetTitle: '选择业务负责人',
     decoration: _inputDecoration(),
     items: values
-        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+        .map(
+          (v) => DropdownMenuItem(
+            value: v,
+            child: Text(v, style: crmStyle(16)),
+          ),
+        )
         .toList(),
     onChanged: (v) {
       if (v != null) onChanged(v);
@@ -374,8 +379,6 @@ class _CrmEditorState extends State<CrmEditor> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          crmText('原型试填 · 仅演示数据，重启后重置', 12, color: CrmTone.accent, height: 1.6),
-          crmGap,
           if (existing == null)
             CrmSegments(
               const ['个人客户', '企业客户'],
@@ -585,7 +588,7 @@ class _CrmContactEditorState extends State<CrmContactEditor> {
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          crmText('${widget.customer.name} · 原型示例', 12, color: CrmTone.accent),
+          crmText(widget.customer.name, 12, color: CrmTone.accent),
           crmGap,
           if (message != null) ...[
             crmHint(message!, error: true),

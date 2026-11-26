@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 import 'dart:math' as math;
 
-import 'package:pandora_mobile/core/config.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/theme/sunshine_palette.dart';
 import 'package:file_picker/file_picker.dart';
@@ -389,7 +388,7 @@ class _ServerAnalyticsPageState extends ConsumerState<ServerAnalyticsPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              '${AppConfig.mock ? '演示数据 · ' : ''}${_statUpdated(f['updatedAt'])} 更新',
+                              '${_statUpdated(f['updatedAt'])} 更新',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),

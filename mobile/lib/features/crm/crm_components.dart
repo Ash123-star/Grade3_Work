@@ -214,7 +214,7 @@ class CrmFrame extends StatelessWidget {
     required this.subtitle,
     required this.back,
     required this.body,
-    required this.dock,
+    this.dock,
     this.help,
     this.backLabel = '返回',
     this.scroll,
@@ -222,7 +222,8 @@ class CrmFrame extends StatelessWidget {
   final String title, subtitle, backLabel;
   final VoidCallback back;
   final VoidCallback? help;
-  final Widget body, dock;
+  final Widget body;
+  final Widget? dock;
   final ScrollController? scroll;
   @override
   Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
@@ -300,17 +301,18 @@ class CrmFrame extends StatelessWidget {
                 child: body,
               ),
             ),
-            Container(
-              decoration: const BoxDecoration(
-                color: CrmTone.surface,
-                border: Border(top: BorderSide(color: CrmTone.line)),
+            if (dock != null)
+              Container(
+                decoration: const BoxDecoration(
+                  color: CrmTone.surface,
+                  border: Border(top: BorderSide(color: CrmTone.line)),
+                ),
+                child: SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  child: dock!,
+                ),
               ),
-              child: SafeArea(
-                top: false,
-                minimum: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                child: dock,
-              ),
-            ),
           ],
         ),
       ),
