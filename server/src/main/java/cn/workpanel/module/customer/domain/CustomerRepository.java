@@ -10,9 +10,13 @@ public interface CustomerRepository {
     Actor current(Actor actor);
     Map<String,Object> list(Actor actor,String search,String kind,int cursor,int limit);
     Map<String,Object> get(Actor actor,String id);
+    Map<String,Object> lock(Actor actor,String id);
     Map<String,Object> byExternal(Actor actor,String externalId);
-    Map<String,Object> create(Actor actor,CustomerDraft draft);
-    Map<String,Object> update(Actor actor,String id,CustomerDraft draft);
+    void lockProfileWrites(Actor actor);
+    boolean hasSimilarActiveProfile(Actor actor,CustomerDraft draft);
+    void requireActiveOwner(Actor actor,String ownerId);
+    Map<String,Object> create(Actor actor,CustomerDraft draft,List<CustomerDraft.Contact> contacts);
+    Map<String,Object> update(Actor actor,String id,CustomerDraft draft,List<CustomerDraft.Contact> contacts);
     Map<String,Object> membership(Actor actor,String customerId);
     Map<String,Object> upsertMembership(Actor actor,String customerId,MembershipDraft draft);
     List<Map<String,Object>> benefits(Actor actor,String customerId);
@@ -23,6 +27,7 @@ public interface CustomerRepository {
     RedemptionReceipt insertRedemption(Actor actor,String customerId,String benefitId,String eventKey,String note,long used,Long remaining);
     long redemptionCount(Actor actor,String benefitId);
     List<Map<String,Object>> progress(Actor actor,String customerId);
+    Map<String,Object> progressEntry(Actor actor,String customerId,String progressId);
     Map<String,Object> addProgress(Actor actor,String customerId,String stage,String note);
     void audit(Actor actor,String type,String id,Object before,Object after,String reason);
 }

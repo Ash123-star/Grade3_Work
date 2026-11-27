@@ -11,6 +11,9 @@ import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'crm_components.dart';
 import 'crm_live_api.dart';
 
+part 'crm_live_customer.dart';
+part 'crm_live_forms.dart';
+
 const _kinds = {
   'PERFORMANCE': '赛演',
   'PRIVATE_BANQUET': '私宴',
@@ -29,10 +32,12 @@ class LiveCrmWorkspace extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    if (!session.administrator || !session.canReadBusiness) {
+    final epoch = ref.watch(sessionEpochProvider);
+    if (!session.administrator ||
+        !session.canReadBusiness ||
+        ref.watch(liveCrmDeniedProvider(epoch))) {
       return const _AccessDenied(directory: true);
     }
-    final epoch = ref.watch(sessionEpochProvider);
     return _Directory(
       key: ValueKey(epoch),
       scope: _Scope(ref.watch(liveCrmApiProvider), epoch),
@@ -49,9 +54,15 @@ class _Scope {
       Navigator.of(context).push<T>(
         MaterialPageRoute(
           builder: (context) => Consumer(
-            builder: (_, ref, _) => ref.watch(sessionEpochProvider) == epoch
-                ? page
-                : const _AccessDenied(),
+            builder: (_, ref, _) {
+              final session = ref.watch(sessionProvider);
+              return ref.watch(sessionEpochProvider) == epoch &&
+                      session.administrator &&
+                      session.canReadBusiness &&
+                      !ref.watch(liveCrmDeniedProvider(epoch))
+                  ? page
+                  : const _AccessDenied();
+            },
           ),
         ),
       );
@@ -67,7 +78,7 @@ class _AccessDenied extends StatelessWidget {
     subtitle: '',
     backLabel: directory ? '返回公司' : '返回',
     back: () => context.canPop() ? context.pop() : context.go('/view'),
-    body: crmEmpty('无权访问客户目录', '仅在职管理员可查看。'),
+    body: crmEmpty('无权访问客户目录', '仅在职且已修改初始密码的管理员可查看。权限变更后请重新登录。'),
   );
 }
 
@@ -75,8 +86,15 @@ String _error(Object? error) => error is ApiFailure
     ? switch (error.code) {
         'DELIVERY_REVIEW_PENDING' => '已有待审申请，请刷新记录。',
         'INVALID_DELIVERY_TRANSITION' => '活动或交付状态已改变，请刷新记录。',
+        'VERSION_CONFLICT' => '这条记录已更新，请返回详情查看最新版本。',
         'INVALID_EMPLOYEE' => '负责人或参与员工已不可用，请重新选择。',
         'CUSTOMER_ARCHIVED' => '客户已归档，不能修改此记录。',
+        'CUSTOMER_EXTERNAL_CONFLICT' => '商城外部 ID 已被其他客户使用。',
+        'MALL_MEMBER_CONFLICT' => '该商城会员已绑定其他客户。',
+        'BENEFIT_EXPIRED' => '权益不在有效期内，无法核销。',
+        'BENEFIT_EXHAUSTED' => '权益可用次数已用完。',
+        'BENEFIT_DISABLED' => '这项权益已停用。',
+        'INVALID_DATE_RANGE' => '结束日期不能早于开始日期。',
         'NO_CHANGE' => '资料没有变化。',
         _ => error.message,
       }
@@ -85,7 +103,7 @@ String _error(Object? error) => error is ApiFailure
 Widget _failure(Object? error, VoidCallback retry) => Column(
   crossAxisAlignment: CrossAxisAlignment.stretch,
   children: [
-    crmHint(_error(error)),
+    crmHint(_error(error), error: true),
     if (error is! ApiFailure ||
         ![FailureKind.forbidden, FailureKind.unauthorized].contains(error.kind))
       CrmButton('重试', retry),
@@ -117,10 +135,12 @@ class _Paged extends StatefulWidget {
     required this.load,
     required this.row,
     this.empty = '暂无记录',
+    this.revision = 0,
   });
   final Future<CrmPage> Function(int cursor) load;
   final Widget Function(CrmRow row) row;
   final String empty;
+  final int revision;
 
   @override
   State<_Paged> createState() => _PagedState();
@@ -129,6 +149,14 @@ class _Paged extends StatefulWidget {
 class _PagedState extends State<_Paged> {
   final cursors = [0];
   late Future<CrmPage> page = widget.load(0);
+
+  @override
+  void didUpdateWidget(covariant _Paged oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.revision != widget.revision) {
+      page = widget.load(cursors.last);
+    }
+  }
 
   void reload() => setState(() {
     page = widget.load(cursors.last);
@@ -234,6 +262,24 @@ class _Directory extends StatefulWidget {
 class _DirectoryState extends State<_Directory> {
   int view = 0, type = 0;
   String search = '';
+  int revision = 0;
+
+  Future<void> openCustomer(CrmRow row) => widget.scope.open<void>(
+    context,
+    _Customer(widget.scope, row, () {
+      if (mounted) setState(() => revision++);
+    }),
+  );
+
+  Future<void> addCustomer() async {
+    final row = await widget.scope.open<CrmRow>(
+      context,
+      _ProfileForm(widget.scope),
+    );
+    if (!mounted || row == null) return;
+    setState(() => revision++);
+    await openCustomer(row);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -241,7 +287,7 @@ class _DirectoryState extends State<_Directory> {
     final scope = widget.scope;
     return CrmFrame(
       title: '客户手帐',
-      subtitle: '线下业务与服务交付',
+      subtitle: '客户档案、会员与服务交付',
       backLabel: '返回公司',
       back: () => context.canPop() ? context.pop() : context.go('/view'),
       body: Column(
@@ -270,10 +316,16 @@ class _DirectoryState extends State<_Directory> {
               type,
               (value) => setState(() => type = value),
             ),
+            crmGap,
+            Align(
+              alignment: Alignment.centerRight,
+              child: CrmButton('新增客户', addCustomer, primary: true),
+            ),
           ],
           crmGap,
           _Paged(
             key: ValueKey((view, type, search)),
+            revision: revision,
             load: (cursor) => employee
                 ? scope.api.employees(cursor, search, activeOnly: false)
                 : scope.api.customers(
@@ -291,10 +343,12 @@ class _DirectoryState extends State<_Directory> {
                   : row['kind'] == 'ENTERPRISE'
                   ? '企业客户'
                   : '个人客户',
-              () => scope.open<void>(
-                context,
-                _Records(scope, row, employee: employee),
-              ),
+              () => employee
+                  ? scope.open<void>(
+                      context,
+                      _Records(scope, row, employee: true),
+                    )
+                  : openCustomer(row),
             ),
           ),
         ],
@@ -393,7 +447,7 @@ class _Detail extends StatefulWidget {
 
 class _DetailState extends State<_Detail> {
   late Future<CrmRow> record = widget.scope.api.detail(widget.id);
-  bool withdrawing = false, submitted = false;
+  bool withdrawing = false;
   String? error;
 
   void reload() => setState(() {
@@ -402,14 +456,11 @@ class _DetailState extends State<_Detail> {
   });
 
   Future<void> change(String action, CrmRow row) async {
-    final value = await widget.scope.open<String>(
+    await widget.scope.open<String>(
       context,
       _Change(widget.scope, current: row, action: action),
     );
-    if (mounted) {
-      submitted = value != null;
-      reload();
-    }
+    if (mounted) reload();
   }
 
   Future<void> withdraw(String id) async {
@@ -420,10 +471,7 @@ class _DetailState extends State<_Detail> {
     });
     try {
       await widget.scope.api.withdraw(id);
-      if (mounted) {
-        submitted = false;
-        reload();
-      }
+      if (mounted) reload();
     } catch (e) {
       if (mounted) setState(() => error = _error(e));
     } finally {
@@ -432,80 +480,189 @@ class _DetailState extends State<_Detail> {
   }
 
   @override
-  Widget build(BuildContext context) => CrmFrame(
-    title: '线下业务详情',
-    subtitle: '',
-    back: () => Navigator.of(context).pop(),
-    body: FutureBuilder(
-      key: ObjectKey(record),
-      future: record,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return _failure(snapshot.error, reload);
-        if (!snapshot.hasData) return const LinearProgressIndicator();
-        final row = snapshot.requireData;
-        final review = row['pendingReview'] as CrmRow?;
-        final transition = row['activityStatus'] != 'ENDED'
-            ? 'END_ACTIVITY'
-            : row['deliveryStatus'] != 'DELIVERED'
-            ? 'CONFIRM_DELIVERY'
-            : null;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            crmText(crmValue(row, 'title'), 20, bold: true),
-            crmText(_status(row), 14),
-            crmGap,
-            for (final pair in [
-              ('客户', crmValue(row, 'customerName')),
-              ('业务类型', _kinds[row['kind']] ?? ''),
-              ('业务日期', crmValue(row, 'businessDate')),
-              ('业务负责人', crmValue(row, 'ownerName')),
-              (
-                '参与员工',
-                crmRows(
-                  row['participantDetails'],
-                ).map((p) => p['name']).join('、'),
-              ),
-            ]) ...[
-              crmSmall(pair.$1),
-              crmText(pair.$2.isEmpty ? '无' : pair.$2, 15),
-            ],
-            crmGap,
-            if (error != null) crmHint(error!),
-            if (review != null) ...[
-              crmHint(
-                '${_actions[review['action']] ?? '变更'}待审，正式记录尚未改变。',
-                success: submitted,
-              ),
-              if (review['canOpen'] == true)
-                CrmButton('查看审核申请', () async {
-                  await context.push(
-                    '/me/reviews/${Uri.encodeComponent(crmValue(review, 'id'))}',
-                  );
-                  if (mounted) reload();
-                }),
-              if (review['canWithdraw'] == true)
-                CrmButton(
-                  withdrawing ? '正在撤回' : '撤回申请',
-                  withdrawing ? null : () => withdraw(crmValue(review, 'id')),
-                ),
-            ] else if (row['customerStatus'] == 'ARCHIVED') ...[
-              crmHint('客户已归档，此记录仅供查看。'),
-            ] else ...[
-              if (transition != null)
-                CrmButton(
-                  _actions[transition]!,
-                  () => change(transition, row),
-                  primary: true,
-                ),
-              CrmButton('修改资料', () => change('EDIT', row)),
-            ],
-            CrmButton('刷新记录', withdrawing ? null : reload, plain: true),
-          ],
-        );
+  Widget build(BuildContext context) => PopScope(
+    canPop: !withdrawing,
+    child: CrmFrame(
+      title: '线下业务详情',
+      subtitle: '',
+      back: () {
+        if (!withdrawing) Navigator.of(context).pop();
       },
+      body: FutureBuilder(
+        key: ObjectKey(record),
+        future: record,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return _failure(snapshot.error, reload);
+          if (!snapshot.hasData) return const LinearProgressIndicator();
+          final row = snapshot.requireData;
+          final review = row['pendingReview'] as CrmRow?;
+          final ended = row['activityStatus'] == 'ENDED';
+          final delivered = row['deliveryStatus'] == 'DELIVERED';
+          final transition = !ended
+              ? 'END_ACTIVITY'
+              : !delivered
+              ? 'CONFIRM_DELIVERY'
+              : null;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    crmSmall(_kinds[row['kind']] ?? '线下业务'),
+                    const SizedBox(height: 4),
+                    crmText(crmValue(row, 'title'), 23, bold: true),
+                  ],
+                ),
+              ),
+              crmText('交付进度', 16, bold: true),
+              const SizedBox(height: 8),
+              _DeliveryStage(
+                label: '活动',
+                status: ended ? '活动已结束' : '活动待结束',
+                icon: Icons.event_outlined,
+                done: ended,
+              ),
+              _DeliveryStage(
+                label: '服务交付',
+                status: delivered ? '服务已交付' : '服务待交付',
+                icon: Icons.inventory_2_outlined,
+                done: delivered,
+              ),
+              const SizedBox(height: 16),
+              if (error != null) _DeliveryError(error!),
+              if (review != null) ...[
+                crmHint('${_actions[review['action']] ?? '变更'}待审，正式记录尚未改变。'),
+                const SizedBox(height: 8),
+                if (review['canOpen'] == true)
+                  CrmButton(
+                    '查看审核申请',
+                    withdrawing
+                        ? null
+                        : () async {
+                            await context.push(
+                              '/me/reviews/${Uri.encodeComponent(crmValue(review, 'id'))}',
+                            );
+                            if (mounted) reload();
+                          },
+                    primary: true,
+                  ),
+                if (review['canWithdraw'] == true)
+                  CrmButton(
+                    withdrawing ? '正在撤回' : '撤回申请',
+                    withdrawing ? null : () => withdraw(crmValue(review, 'id')),
+                    plain: true,
+                  ),
+                crmGap,
+              ],
+              if (row['customerStatus'] == 'ARCHIVED')
+                crmHint('客户已归档，此记录仅供查看。'),
+              if (review == null && row['customerStatus'] != 'ARCHIVED') ...[
+                if (transition != null) ...[
+                  CrmButton(
+                    _actions[transition]!,
+                    () => change(transition, row),
+                    primary: true,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                CrmButton('修改资料', () => change('EDIT', row)),
+                const SizedBox(height: 16),
+              ],
+              crmText('业务资料', 16, bold: true),
+              for (final pair in [
+                ('客户', crmValue(row, 'customerName')),
+                ('业务日期', crmValue(row, 'businessDate')),
+                ('业务负责人', crmValue(row, 'ownerName')),
+                (
+                  '参与员工',
+                  crmRows(
+                    row['participantDetails'],
+                  ).map((p) => p['name']).join('、'),
+                ),
+              ])
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      crmSmall(pair.$1),
+                      crmText(pair.$2.isEmpty ? '无' : pair.$2, 15),
+                    ],
+                  ),
+                ),
+              crmGap,
+              CrmButton('刷新记录', withdrawing ? null : reload, plain: true),
+            ],
+          );
+        },
+      ),
     ),
   );
+}
+
+class _DeliveryStage extends StatelessWidget {
+  const _DeliveryStage({
+    required this.label,
+    required this.status,
+    required this.icon,
+    required this.done,
+  });
+
+  final String label, status;
+  final IconData icon;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 6),
+    padding: const EdgeInsets.all(12),
+    decoration: crmBox(radius: 8),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 36,
+          height: 36,
+          child: DecoratedBox(
+            decoration: crmBox(
+              color: done ? const Color(0xffe5f1e7) : CrmTone.chips,
+              border: null,
+              radius: 8,
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: done ? CrmTone.green : CrmTone.ink,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [crmSmall(label), crmText(status, 14, bold: true)],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Icon(
+          done ? Icons.check_circle_outline : Icons.schedule,
+          color: done ? CrmTone.green : CrmTone.muted,
+          size: 20,
+        ),
+      ],
+    ),
+  );
+}
+
+class _DeliveryError extends StatelessWidget {
+  const _DeliveryError(this.message);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) =>
+      Semantics(liveRegion: true, child: crmHint(message, error: true));
 }
 
 class _Change extends StatefulWidget {
@@ -538,6 +695,7 @@ class _ChangeState extends State<_Change> {
   late final people = [...crmRows(widget.current?['participantDetails'])];
   bool busy = false;
   String? error;
+  bool refreshRequired = false;
   bool get editFields => widget.action == null || widget.action == 'EDIT';
 
   @override
@@ -564,12 +722,17 @@ class _ChangeState extends State<_Change> {
       } else {
         people.add(result);
       }
-      error = null;
+      if (!refreshRequired) error = null;
     });
   }
 
   Future<void> save() async {
-    if (busy || !form.currentState!.validate()) return;
+    if (busy || refreshRequired) return;
+    FocusScope.of(context).unfocus();
+    if (!form.currentState!.validate()) {
+      setState(() => error = '请检查表单中的必填项和日期格式。');
+      return;
+    }
     if (editFields && owner == null) {
       setState(() => error = '请选择业务负责人。');
       return;
@@ -604,7 +767,17 @@ class _ChangeState extends State<_Change> {
             );
       if (mounted) Navigator.of(context).pop(crmValue(result, 'id'));
     } catch (e) {
-      if (mounted) setState(() => error = _error(e));
+      if (mounted) {
+        setState(() {
+          error = _error(e);
+          refreshRequired =
+              e is ApiFailure &&
+              const {
+                'VERSION_CONFLICT',
+                'INVALID_DELIVERY_TRANSITION',
+              }.contains(e.code);
+        });
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -652,17 +825,28 @@ class _ChangeState extends State<_Change> {
       back: () {
         if (!busy) Navigator.of(context).pop();
       },
-      dock: SizedBox(
-        width: double.infinity,
-        child: CrmButton(
-          busy
-              ? '正在提交'
-              : widget.action == null
-              ? '登记'
-              : '提交审核',
-          busy ? null : save,
-          primary: true,
-        ),
+      dock: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (error != null && MediaQuery.viewInsetsOf(context).bottom == 0)
+            _DeliveryError(error!),
+          CrmButton(
+            busy
+                ? '正在提交'
+                : refreshRequired
+                ? '返回详情并刷新'
+                : widget.action == null
+                ? '登记'
+                : '提交审核',
+            busy
+                ? null
+                : refreshRequired
+                ? () => Navigator.of(context).pop()
+                : save,
+            primary: true,
+          ),
+        ],
       ),
       body: Form(
         key: form,
@@ -718,7 +902,6 @@ class _ChangeState extends State<_Change> {
               crmGap,
             ],
             if (widget.action != null) input(reason, '申请理由', 500),
-            if (error != null) crmHint(error!),
           ],
         ),
       ),

@@ -60,6 +60,24 @@ class CustomerMigrationUpgradeTest {
         assertEquals(before,sql.queryForList("SELECT * FROM "+table));
     }
 
+    @Test void upgradesExistingCustomersWithoutInventingOwnersOrContacts() {
+        flyway("41").migrate();
+        sql.update("INSERT INTO "+schema+".companies(id,name) VALUES ('other','Other Company')");
+        seedCustomersAndBenefit();
+
+        var upgrade=flyway("45");
+        assertEquals(2,upgrade.migrate().migrationsExecuted);
+        upgrade.validate();
+        assertEquals(0,upgrade.migrate().migrationsExecuted);
+        var profile=sql.queryForMap("SELECT name,owner_id,contacts::text FROM "+schema+".customers WHERE id='owner'");
+        assertEquals("Owner",profile.get("name"));
+        assertNull(profile.get("owner_id"));
+        assertEquals("[]",profile.get("contacts"));
+        assertThrows(DataIntegrityViolationException.class,()->sql.update(
+            "UPDATE "+schema+".customers SET contacts='[{\"name\":\"Contact\"}]' WHERE id='owner'"));
+        assertEquals(1,sql.queryForObject("SELECT count(*) FROM "+schema+".customer_benefits WHERE id='benefit'",Integer.class));
+    }
+
     private void seedCustomersAndBenefit() {
         sql.update("INSERT INTO "+schema+".customers(id,company_id,kind,name) VALUES"+
             " ('owner','default','INDIVIDUAL','Owner'), ('different','default','INDIVIDUAL','Different'),"+

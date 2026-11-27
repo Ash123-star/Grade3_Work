@@ -11,10 +11,19 @@ class CustomerDraftTest {
     @Test void normalizesCustomerAndRejectsUnknownFields() {
         var d=CustomerDraft.parse(body(),false);
         assertEquals("INDIVIDUAL",d.kind()); assertEquals("张三",d.name()); assertNull(d.externalId()); assertEquals("ACTIVE",d.status());
-        for(String key:List.of("ownerId","companyId","taskId","version")) {
+        for(String key:List.of("companyId","taskId","version")) {
             var b=body();b.put(key,"x");
             assertEquals("UNKNOWN_FIELD",assertThrows(ApiError.class,()->CustomerDraft.parse(b,false)).code);
         }
+    }
+    @Test void acceptsOwnerAndOnlyValidEnterpriseContacts() {
+        var b=body();b.put("ownerId","owner");b.put("contacts",List.of(Map.of("name","联系人")));
+        assertEquals("INVALID_CONTACTS",assertThrows(ApiError.class,()->CustomerDraft.parse(b,false)).code);
+        b.put("kind","ENTERPRISE");
+        assertEquals("owner",CustomerDraft.parse(b,false).ownerId());
+        assertEquals("联系人",CustomerDraft.parse(b,false).contacts().getFirst().name());
+        b.put("contacts",List.of(Map.of("id","other-contact","name","联系人")));
+        assertEquals("INVALID_CONTACTS",assertThrows(ApiError.class,()->CustomerDraft.parse(b,false)).code);
     }
     @Test void rejectsInvalidKindEmailAndOversized() {
         var badKind=body();badKind.put("kind","TEAM");assertThrows(ApiError.class,()->CustomerDraft.parse(badKind,false));

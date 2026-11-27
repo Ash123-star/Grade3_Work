@@ -11,7 +11,11 @@ import java.util.*;
 public class JdbcCustomerRepository implements CustomerRepository {
     private final Db db;
     public JdbcCustomerRepository(Db db) { this.db=db; }
-    private static final String CUSTOMER="id,kind,name,phone,email,external_id,note,status,version,created_at,updated_at";
+    private static final String PROFILE="""
+        id,kind,name,phone,email,external_id,note,status,version,created_at,updated_at,owner_id,
+        (SELECT u.name FROM users u WHERE u.company_id=customers.company_id AND u.id=customers.owner_id) owner_name
+        """;
+    private static final String CUSTOMER=PROFILE+",contacts";
 
     @Override public Actor current(Actor actor) { return Actor.from(db.one("SELECT * FROM users WHERE id=? AND company_id=?",actor.id(),actor.company())); }
 
@@ -20,12 +24,14 @@ public class JdbcCustomerRepository implements CustomerRepository {
         var args=new ArrayList<Object>(); args.add(a.company());
         if(kind!=null&&!kind.isBlank()) { where.append(" AND kind=?"); args.add(kind); }
         if(search!=null&&!search.isBlank()) {
-            where.append(" AND (name ILIKE ? OR phone ILIKE ? OR email ILIKE ? OR external_id ILIKE ?)");
-            String like="%"+search+"%"; args.addAll(List.of(like,like,like,like));
+            where.append(" AND (name ILIKE ? OR phone ILIKE ? OR email ILIKE ? OR external_id ILIKE ?"
+                +" OR EXISTS (SELECT 1 FROM users u WHERE u.company_id=customers.company_id AND u.id=owner_id AND u.name ILIKE ?))");
+            String like="%"+search.replace("\\","\\\\").replace("%","\\%").replace("_","\\_")+"%";
+            args.addAll(List.of(like,like,like,like,like));
         }
         long total=db.count("SELECT count(*) FROM customers WHERE "+where,args.toArray());
         var pageArgs=new ArrayList<>(args); pageArgs.add(limit+1); pageArgs.add(cursor);
-        var rows=db.rows("SELECT "+CUSTOMER+" FROM customers WHERE "+where+" ORDER BY created_at DESC,id LIMIT ? OFFSET ?",pageArgs.toArray());
+        var rows=db.rows("SELECT "+PROFILE+" FROM customers WHERE "+where+" ORDER BY created_at DESC,id LIMIT ? OFFSET ?",pageArgs.toArray());
         boolean more=rows.size()>limit;
         var items=rows.stream().limit(limit).map(JdbcCustomerRepository::customer).toList();
         var result=new LinkedHashMap<String,Object>();
@@ -37,21 +43,47 @@ public class JdbcCustomerRepository implements CustomerRepository {
         return customer(db.one("SELECT "+CUSTOMER+" FROM customers WHERE company_id=? AND id=?",a.company(),id));
     }
 
+    @Override public Map<String,Object> lock(Actor a,String id) {
+        return db.one("SELECT status FROM customers WHERE company_id=? AND id=? FOR UPDATE",a.company(),id);
+    }
+
     @Override public Map<String,Object> byExternal(Actor a,String externalId) {
         return customer(db.one("SELECT "+CUSTOMER+" FROM customers WHERE company_id=? AND external_id=?",a.company(),externalId));
     }
 
-    @Override public Map<String,Object> create(Actor a,CustomerDraft d) {
+    @Override public void lockProfileWrites(Actor a) {
+        db.one("SELECT pg_advisory_xact_lock(hashtextextended(?,0))","customer-profile:"+a.company());
+    }
+
+    @Override public boolean hasSimilarActiveProfile(Actor a,CustomerDraft d) {
+        return !db.rows("""
+            SELECT 1 FROM customers WHERE company_id=? AND status='ACTIVE'
+              AND ((kind=? AND lower(name)=lower(?)) OR (?<>'' AND phone=?) OR (?<>'' AND lower(email)=lower(?)))
+            LIMIT 1
+            """,a.company(),d.kind(),d.name(),d.phone(),d.phone(),d.email(),d.email()).isEmpty();
+    }
+
+    @Override public void requireActiveOwner(Actor a,String ownerId) {
+        if(db.rows("SELECT 1 FROM users WHERE company_id=? AND id=? AND status='ACTIVE' FOR SHARE",a.company(),ownerId).isEmpty())
+            throw ApiError.bad("INVALID_EMPLOYEE","业务负责人不是本公司在职员工");
+    }
+
+    @Override public Map<String,Object> create(Actor a,CustomerDraft d,List<CustomerDraft.Contact> contacts) {
         String id="cus_"+Db.id();
-        db.update("INSERT INTO customers(id,company_id,kind,name,phone,email,external_id,note,status,version) VALUES (?,?,?,?,?,?,?,?,?,1)",
-            id,a.company(),d.kind(),d.name(),d.phone(),d.email(),d.externalId(),d.note(),"ACTIVE");
+        db.update("""
+            INSERT INTO customers(id,company_id,kind,name,phone,email,external_id,note,status,version,owner_id,contacts)
+            VALUES (?,?,?,?,?,?,?,?,'ACTIVE',1,?,?::jsonb)
+            """,id,a.company(),d.kind(),d.name(),d.phone(),d.email(),d.externalId(),d.note(),d.ownerId(),db.write(contacts));
         return get(a,id);
     }
 
-    @Override public Map<String,Object> update(Actor a,String id,CustomerDraft d) {
-        get(a,id);
-        Db.conflict(db.update("UPDATE customers SET kind=?,name=?,phone=?,email=?,external_id=?,note=?,status=?,version=version+1,updated_at=now() WHERE company_id=? AND id=? AND version=?",
-            d.kind(),d.name(),d.phone(),d.email(),d.externalId(),d.note(),d.status(),a.company(),id,d.version()));
+    @Override public Map<String,Object> update(Actor a,String id,CustomerDraft d,List<CustomerDraft.Contact> contacts) {
+        Db.conflict(db.update("""
+            UPDATE customers SET kind=?,name=?,phone=?,email=?,external_id=?,note=?,status=?,version=version+1,updated_at=now(),
+                owner_id=CASE WHEN ? THEN ? ELSE owner_id END,contacts=COALESCE(?::jsonb,contacts)
+            WHERE company_id=? AND id=? AND version=?
+            """,d.kind(),d.name(),d.phone(),d.email(),d.externalId(),d.note(),d.status(),d.ownerProvided(),d.ownerId(),
+            contacts==null?null:db.write(contacts),a.company(),id,d.version()));
         return get(a,id);
     }
 
@@ -120,7 +152,12 @@ public class JdbcCustomerRepository implements CustomerRepository {
         String id="prg_"+Db.id();
         db.update("INSERT INTO customer_progress(id,company_id,customer_id,stage,note,actor_id) VALUES (?,?,?,?,?,?)",
             id,a.company(),customerId,stage,note,a.id());
-        return progress(db.one("SELECT * FROM customer_progress WHERE company_id=? AND id=?",a.company(),id));
+        return progressEntry(a,customerId,id);
+    }
+
+    @Override public Map<String,Object> progressEntry(Actor a,String customerId,String progressId) {
+        return progress(db.one("SELECT * FROM customer_progress WHERE company_id=? AND customer_id=? AND id=?",
+            a.company(),customerId,progressId));
     }
 
     @Override public void audit(Actor a,String type,String id,Object before,Object after,String reason) {
@@ -133,6 +170,8 @@ public class JdbcCustomerRepository implements CustomerRepository {
         m.put("phone",Db.str(r,"phone")); m.put("email",Db.str(r,"email"));
         m.put("externalId",r.get("external_id")); m.put("note",Db.str(r,"note"));
         m.put("status",Db.str(r,"status")); m.put("version",((Number)r.get("version")).intValue());
+        m.put("ownerId",r.get("owner_id"));m.put("ownerName",r.get("owner_name"));
+        if(r.containsKey("contacts")) m.put("contacts",r.get("contacts"));
         m.put("createdAt",instant(r.get("created_at"))); m.put("updatedAt",instant(r.get("updated_at")));
         return m;
     }

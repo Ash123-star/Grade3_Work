@@ -231,3 +231,9 @@ PUT /api/profiles/me 不接受 idCardNumber（400 ID_CARD_READ_ONLY）或 age（
 GET /employees与GET /managers增加business_position；目录增加manager_role/manager_business_position，已有manager_id/manager_name保持。部门经理或具有公司级任职的员工，可跨部门选择本公司在职创始人或总经理/分管副总；普通岗位仅同部门业务管理人员。候选列表不授予写入权限，服务端在保存时再次校验及检查循环。
 
 重复返回409 ACCOUNT_EXISTS、PHONE_EXISTS、ID_CARD_EXISTS，多个预检查冲突为EMPLOYEE_FIELDS_EXIST；均保留code/message/traceId并增加fieldErrors（account/phone/idCardNumber到中文提示的映射），不得返回冲突人员信息或证件原文。并发唯一约束冲突同样映射字段。非法格式400 INVALID_NAME/INVALID_ACCOUNT/INVALID_PHONE/INVALID_PHONE_PREFIX/INVALID_ID_CARD/INVALID_ID_ADDRESS/IDENTITY_GENDER_MISMATCH/INVALID_BUSINESS_POSITION；非法上级400 INVALID_MANAGER。无幂等键，写请求不自动重试；重复与旧版本都不会产生成功审计。
+
+## 二期人事接口
+独立 `/api/hr`，权限详见[合同权限规则](employee-contract-permissions.md)。GET `/me`、`/employees?cursor=0&limit=100`、`/contracts?cursor=0&limit=20`、`/contracts/{id}`、`/contracts/{id}/history`、`/reminders` 需要READ；POST `/contracts`、PUT `/contracts/{id}`、PUT `/employees/{id}/duties` 需要MANAGE。PUT `/grants/{id}` 和 POST `/reminders/run` 仅ADMIN。
+合同写入：employeeId/title/startsOn/endsOn/attachmentId/recipients/version；新建version=0，更新必须传当前版本。日期YYYY-MM-DD，接收人需有效授权。权限写入access=NONE/READ/MANAGE及version；职责写入duties/version。401认证、403权限、404不可见/不存在、400输入错误、409版本冲突。附件沿用 `/api/attachments/{id}`，合同权限优先于原上传者权限。
+
+员工目录返回数组，cursor为偏移、limit为1至100；合同列表返回items/total。合同详情返回数据库snake_case字段及recipients数组，历史返回version/snapshot/changed_by/changed_at。每次修订保留不可修改快照；附件不可替换，续签附件须新建合同。提醒列表返回本人最新100条仍有权限且仍在接收名单的合同提醒。POST提醒扫描仅处理本公司当天30/7/0节点，重复调用去重，不补发错过的历史节点。写接口不自动重试。

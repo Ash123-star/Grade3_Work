@@ -19,8 +19,9 @@ public final class TaskAttachments {
 
     /** 返回 true 表示需要绑定，false 表示已绑定到同一任务。 */
     static boolean check(Db db,Actor a,String sameTask,String id,boolean lock) {
-        var rows=db.rows("SELECT owner_id,task_id FROM attachments f WHERE id=? AND company_id=? AND storage_state='READY' AND (expires_at IS NULL OR expires_at>now()) AND NOT EXISTS(SELECT 1 FROM generated_files g WHERE g.attachment_id=f.id)"+(lock?" FOR UPDATE":""),id,a.company());
+        var rows=db.rows("SELECT owner_id,task_id FROM attachments f WHERE id=? AND company_id=? AND storage_state='READY' AND (expires_at IS NULL OR expires_at>now()) AND NOT EXISTS(SELECT 1 FROM employee_contracts ec WHERE ec.attachment_id=f.id) AND NOT EXISTS(SELECT 1 FROM generated_files g WHERE g.attachment_id=f.id)"+(lock?" FOR UPDATE":""),id,a.company());
         if(rows.isEmpty()) throw ApiError.notFound();
+        if(db.count("SELECT count(*) FROM employee_contracts WHERE attachment_id=?",id)>0) throw ApiError.notFound();
         var f=rows.getFirst(); String bound=Db.str(f,"task_id");
         if(sameTask!=null&&sameTask.equals(bound)) return false;
         if(!a.id().equals(Db.str(f,"owner_id"))) throw ApiError.forbidden();

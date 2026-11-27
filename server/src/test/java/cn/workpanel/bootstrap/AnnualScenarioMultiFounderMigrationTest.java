@@ -38,8 +38,6 @@ class AnnualScenarioMultiFounderMigrationTest {
             assertEquals("FOUNDER_EXEMPT", jdbc.queryForObject("SELECT decision_source FROM " + s + "review_requests WHERE id='annual-founder-collaboration-task-review'", String.class));
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_steps WHERE request_id='annual-founder-collaboration-task-review'", Integer.class));
             assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM " + s + "task_labels WHERE creator_id IN ('annual-founder-product','annual-founder-delivery')", Integer.class));
-            assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_requests WHERE kind='TASK_RESCHEDULE' AND status IN ('PENDING','REJECTED')", Integer.class));
-            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_steps rs JOIN " + s + "review_requests rr ON rr.id=rs.request_id WHERE rr.kind='TASK_RESCHEDULE' AND (rs.reviewer_id=rr.applicant_id OR NOT EXISTS (SELECT 1 FROM " + s + "reporting_relations r WHERE r.employee_id=rr.applicant_id AND r.manager_id=rs.reviewer_id))", Integer.class));
             assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + s + "flyway_annual2026_history WHERE script='B1__annual_workplace.sql' AND success", Integer.class));
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + s + "flyway_annual2026_history WHERE version='0'", Integer.class));
             assertEquals(0, annualScenario(schema).migrate().migrationsExecuted);
@@ -135,6 +133,11 @@ class AnnualScenarioMultiFounderMigrationTest {
                 scenario.migrate();
                 String s = schema + ".";
                 assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_requests WHERE kind='TASK_RESCHEDULE'", Integer.class), day);
+                for (String status : new String[]{"PENDING", "REJECTED"}) {
+                    assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_requests rr JOIN "
+                            + s + "review_steps rs ON rs.request_id=rr.id WHERE rr.kind='TASK_RESCHEDULE' AND rr.status=? AND rs.state=?",
+                            Integer.class, status, status), day + " " + status);
+                }
                 assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + s + "review_steps rs JOIN " + s + "review_requests rr ON rr.id=rs.request_id JOIN " + s + "users a ON a.id=rr.applicant_id WHERE rr.kind='TASK_RESCHEDULE' AND (a.role='FOUNDER' OR rs.reviewer_id=rr.applicant_id OR NOT EXISTS (SELECT 1 FROM " + s + "reporting_relations r WHERE r.employee_id=rr.applicant_id AND r.manager_id=rs.reviewer_id))", Integer.class), day);
                 assertEquals(0, scenario.migrate().migrationsExecuted, day);
             } finally {

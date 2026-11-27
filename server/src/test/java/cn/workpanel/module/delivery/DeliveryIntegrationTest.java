@@ -89,12 +89,48 @@ class DeliveryIntegrationTest {
         assertTrue(paths.path("/api" + DELIVERIES + "/employees").has("get"));
         assertTrue(paths.path("/api" + DELIVERIES + "/{id}").has("get"));
         assertTrue(paths.path("/api/reviews/{id}/withdraw-offline").has("post"));
+        assertTrue(paths.path("/api/hr/contracts").has("post"));
+        assertTrue(paths.path("/api/customers/{id}/membership").has("put"));
+        assertTrue(paths.path("/api/commerce/orders").has("get"));
         Files.writeString(Path.of("target", "offline-delivery-openapi.json"),
                 json.writerWithDefaultPrettyPrinter().writeValueAsString(contract));
     }
 
     @Test void companyVisitEndsBeforeSeparateDeliveryAndBothViewsOpenSameRecord() throws Exception {
-        var customerId = customer("applicant");
+        var profile = call(201, "POST", "/customers", "applicant", Map.of(
+                "kind", "ENTERPRISE", "name", "Foundry", "ownerId", uid("owner"),
+                "contacts", List.of(Map.of("name", "Operations"))), "profile");
+        var customerId = profile.path("id").asText();
+        String customerPath = "/customers/" + customerId;
+        call(200, "PUT", customerPath + "/membership", "applicant", Map.of("mallMemberId", "member-a", "version", 0), null);
+        var benefit = call(201, "POST", customerPath + "/benefits", "applicant",
+                Map.of("kind", "ANNUAL_CARD", "name", "Annual card", "maxUses", 1,
+                        "validFrom", "2020-01-01", "validTo", "2100-12-31"), "benefit");
+        var usage = call(201, "POST", customerPath + "/benefits/" + benefit.path("id").asText() + "/redemptions",
+                "applicant", Map.of(), "usage");
+        assertEquals(0, usage.path("remaining").asInt());
+        String boundary = "combined-" + Db.id();
+        String payload = json.writeValueAsString(Map.of(
+                "members", List.of(Map.of("externalMemberId", "member-a", "status", "ACTIVE",
+                        "sourceUpdatedAt", "2026-11-26T09:00:00Z")),
+                "orders", List.of(Map.of(
+                "externalOrderId", "order-a", "externalMemberId", "member-a", "status", "PAID",
+                "currency", "CNY", "amount", "100.00", "orderedAt", "2026-11-26T08:00:00Z",
+                "sourceUpdatedAt", "2026-11-26T09:00:00Z"))));
+        var uploaded = http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/commerce/imports"))
+                .timeout(Duration.ofSeconds(20)).header("Authorization", "Bearer " + tokens.get("applicant"))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(HttpRequest.BodyPublishers.ofString("--" + boundary
+                        + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"combined.json\"\r\n"
+                        + "Content-Type: application/json\r\n\r\n" + payload + "\r\n--" + boundary + "--\r\n"))
+                .build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, uploaded.statusCode(), uploaded.body());
+        String orderQuery = "/commerce/orders?externalOrderId=order-a&customerId=";
+        var rowsForCustomer = call(200, "GET", orderQuery + customerId, "applicant", null, null);
+        assertEquals("order-a", rowsForCustomer.path("items").get(0).path("externalOrderId").asText());
+        assertEquals(0, call(200, "GET", orderQuery + customer("applicant"), "applicant", null, null).path("total").asInt());
+        call(404, "GET", orderQuery + customerId, "outsider", null, null);
+        call(403, "GET", customerPath, "owner", null, null);
         var body = record(customerId);
         var created = call(201, "POST", DELIVERIES, "applicant", body, "new");
         assertEquals(created, call(201, "POST", DELIVERIES, "applicant", body, "new"));

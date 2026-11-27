@@ -26,6 +26,9 @@ public class MessageApplicationService {
     /** Explicit transactional delivery entry for operations and integration verification; no HTTP endpoint. */
     @Transactional public void deliverNow() {
         for(var e:db.rows("SELECT * FROM outbox_events WHERE delivered_at IS NULL AND type<>'MEMORY_SOURCE' ORDER BY created_at LIMIT 100 FOR UPDATE SKIP LOCKED")) {
+            if("CONTRACT_EXPIRY".equals(e.get("type"))) db.rows("SELECT id FROM users WHERE company_id=? AND id=? FOR UPDATE",e.get("company_id"),e.get("recipient_id"));
+            if("CONTRACT_EXPIRY".equals(e.get("type")) && db.count("SELECT count(*) FROM contract_recipients r JOIN employee_contracts c ON c.id=r.contract_id WHERE c.company_id=? AND c.id=? AND r.user_id=?",e.get("company_id"),e.get("object_id"),e.get("recipient_id"))==0){db.update("UPDATE outbox_events SET delivered_at=now() WHERE id=?",e.get("id"));continue;}
+            if("CONTRACT_EXPIRY".equals(e.get("type")) && db.count("SELECT count(*) FROM users u LEFT JOIN hr_grants g ON g.company_id=u.company_id AND g.user_id=u.id WHERE u.company_id=? AND u.id=? AND u.status='ACTIVE' AND NOT u.must_change_password AND (u.role='ADMIN' OR g.access IN ('READ','MANAGE'))",e.get("company_id"),e.get("recipient_id"))==0){db.update("UPDATE outbox_events SET delivered_at=now() WHERE id=?",e.get("id"));continue;}
             db.update("INSERT INTO notifications(id,company_id,recipient_id,type,object_id,body) VALUES (?,?,?,?,?,?::jsonb) ON CONFLICT(id) DO NOTHING",e.get("id"),e.get("company_id"),e.get("recipient_id"),e.get("type"),e.get("object_id"),db.write(e.get("body")));
             pushes.enqueue(e);
             db.update("UPDATE outbox_events SET delivered_at=now() WHERE id=?",e.get("id"));
