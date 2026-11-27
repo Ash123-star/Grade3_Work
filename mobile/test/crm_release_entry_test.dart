@@ -1,5 +1,10 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pandora_mobile/core/config.dart';
@@ -9,6 +14,8 @@ import 'package:pandora_mobile/data/repositories/repository.dart';
 import 'package:pandora_mobile/features/crm/crm_demo_store.dart';
 import 'package:pandora_mobile/routing/app_router.dart';
 import 'package:pandora_mobile/theme/app_theme.dart';
+
+import 'support/flutter_sdk_assets.dart';
 
 void main() {
   testWidgets('正式构建注册客户目录，遵守登录和待确认限制，不解析本地客户数据', (tester) async {
@@ -49,8 +56,45 @@ void main() {
   }, skip: AppConfig.mock);
 
   testWidgets('正式管理员在小屏登记、申请、查看审批及从员工入口打开同一记录', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(320, 650));
+    const evidence = String.fromEnvironment('DELIVERY_SCREENSHOTS');
+    const width = int.fromEnvironment('DELIVERY_TEST_WIDTH', defaultValue: 320);
+    await tester.binding.setSurfaceSize(
+      Size(width.toDouble(), evidence.isEmpty ? 650 : 880),
+    );
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    final boundary = GlobalKey();
+    if (evidence.isNotEmpty) {
+      for (final (family, path) in [
+        ('Roboto', 'C:/Windows/Fonts/msyh.ttc'),
+        ('TuantuanDisplay', 'assets/fonts/GenSenRoundedTW-B.ttf'),
+        ('MaterialIcons', materialIconsFontPath),
+      ]) {
+        await (FontLoader(family)..addFont(
+              Future.value(ByteData.sublistView(File(path).readAsBytesSync())),
+            ))
+            .load();
+      }
+    }
+    Future<void> capture(String name) async {
+      if (evidence.isEmpty) return;
+      final render =
+          boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      await tester.runAsync(() async {
+        final image = await render.toImage(pixelRatio: 2);
+        try {
+          final bytes = (await image.toByteData(
+            format: ui.ImageByteFormat.png,
+          ))!;
+          Directory(evidence).createSync(recursive: true);
+          File(
+            '$evidence/$name.png',
+          ).writeAsBytesSync(bytes.buffer.asUint8List());
+        } finally {
+          image.dispose();
+        }
+      });
+    }
+
     final repository = HttpRepository(
       'https://fixture.invalid/api',
       'fixture-token',
@@ -83,7 +127,7 @@ void main() {
             data: MediaQuery.of(
               context,
             ).copyWith(textScaler: const TextScaler.linear(1.5)),
-            child: child!,
+            child: RepaintBoundary(key: boundary, child: child!),
           ),
         ),
       ),
@@ -121,15 +165,19 @@ void main() {
     expect(fixture.create?['ownerId'], 'employee');
     expect(fixture.create?['kind'], 'COMPANY_VISIT');
     expect(find.text('确认交付'), findsNothing);
-    expect(find.text('活动待结束 · 服务待交付'), findsOneWidget);
+    expect(find.text('活动待结束'), findsOneWidget);
+    expect(find.text('服务待交付'), findsOneWidget);
+    await capture('01-activity-pending');
 
     await tap('结束活动');
     await tester.enterText(find.widgetWithText(TextFormField, '申请理由'), '活动完成');
     await tap('提交审核');
     expect(find.text('已有待审申请，请刷新记录。'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, '活动完成'), findsOneWidget);
     await tap('提交审核');
     expect(fixture.keys.take(2).toSet(), hasLength(1));
     expect(find.text('结束活动待审，正式记录尚未改变。'), findsOneWidget);
+    await capture('02-review-pending');
     await tap('查看审核申请');
     expect(fixture.reviewReads, isPositive);
     final reviewScroll = find.byType(Scrollable).hitTestable().first;
@@ -148,10 +196,29 @@ void main() {
     router.pop();
     await tester.pumpAndSettle();
     expect(find.text('线下业务详情'), findsOneWidget);
+    await tap('撤回申请');
+    expect(fixture.withdrawals, 1);
+    expect(find.text('查看审核申请'), findsNothing);
+    await tap('结束活动');
+    await tester.enterText(find.widgetWithText(TextFormField, '申请理由'), '活动完成');
+    await tap('提交审核');
+    expect(find.text('结束活动待审，正式记录尚未改变。'), findsOneWidget);
 
     fixture.endApproved = true;
     await tap('刷新记录');
-    expect(find.text('活动已结束 · 服务待交付'), findsOneWidget);
+    expect(find.text('活动已结束'), findsOneWidget);
+    expect(find.text('服务待交付'), findsOneWidget);
+    await tap('确认交付');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '申请理由'),
+      '已交付给客户',
+    );
+    fixture.stale = true;
+    await tap('提交审核');
+    expect(find.text('这条记录已更新，请返回详情查看最新版本。'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, '已交付给客户'), findsOneWidget);
+    await capture('03-version-conflict');
+    await tap('返回详情并刷新');
     await tap('确认交付');
     await tester.enterText(
       find.widgetWithText(TextFormField, '申请理由'),
@@ -159,8 +226,14 @@ void main() {
     );
     await tap('提交审核');
     expect(fixture.lastChange?['action'], 'CONFIRM_DELIVERY');
-    expect(fixture.lastChange?['version'], 2);
-    expect(find.text('活动已结束 · 服务待交付'), findsOneWidget);
+    expect(fixture.lastChange?['version'], 3);
+    expect(find.text('服务待交付'), findsOneWidget);
+    expect(find.text('确认交付待审，正式记录尚未改变。'), findsOneWidget);
+    fixture.delivered = true;
+    await tap('刷新记录');
+    expect(find.text('服务已交付'), findsOneWidget);
+    expect(find.text('确认交付'), findsNothing);
+    await capture('04-delivered');
 
     await back();
     await tap('待交付');
@@ -187,7 +260,8 @@ void main() {
 class _DeliveryFixture {
   Map? create, lastChange;
   bool endApproved = false;
-  int reviewReads = 0;
+  bool stale = false, versionBumped = false, delivered = false;
+  int reviewReads = 0, withdrawals = 0;
   final keys = <String>[];
   final filters = <Map<String, dynamic>>[];
   final details = <String>[];
@@ -205,9 +279,16 @@ class _DeliveryFixture {
     'participants': [],
     'participantDetails': [],
     'activityStatus': endApproved ? 'ENDED' : 'SCHEDULED',
-    'deliveryStatus': 'PENDING',
-    'version': endApproved ? 2 : 1,
-    if (lastChange != null &&
+    'deliveryStatus': delivered ? 'DELIVERED' : 'PENDING',
+    'version': delivered
+        ? 4
+        : versionBumped
+        ? 3
+        : endApproved
+        ? 2
+        : 1,
+    if (!delivered &&
+        lastChange != null &&
         (!endApproved || lastChange?['action'] == 'CONFIRM_DELIVERY'))
       'pendingReview': {
         'id': 'request',
@@ -241,14 +322,23 @@ class _DeliveryFixture {
           answer({'id': 'delivery', 'version': 1}, 201);
         } else {
           filters.add(req.queryParameters);
-          page([if (create != null) record]);
+          page([
+            if (create != null &&
+                !(delivered && req.queryParameters['pendingOnly'] == true))
+              record,
+          ]);
         }
       case '/offline-deliveries/delivery':
         details.add(req.path);
         answer(record);
       case '/offline-deliveries/delivery/changes':
         keys.add(req.headers['Idempotency-Key'] as String);
-        if (keys.length == 1) {
+        if (keys.length == 1 || stale) {
+          final conflict = stale;
+          if (conflict) {
+            stale = false;
+            versionBumped = true;
+          }
           handler.reject(
             DioException.badResponse(
               statusCode: 409,
@@ -257,8 +347,10 @@ class _DeliveryFixture {
                 requestOptions: req,
                 statusCode: 409,
                 data: {
-                  'code': 'DELIVERY_REVIEW_PENDING',
-                  'message': '该记录已有待审申请',
+                  'code': conflict
+                      ? 'VERSION_CONFLICT'
+                      : 'DELIVERY_REVIEW_PENDING',
+                  'message': conflict ? '版本已变化' : '该记录已有待审申请',
                 },
               ),
             ),
@@ -290,6 +382,10 @@ class _DeliveryFixture {
             'deliveryStatus': 'PENDING',
           },
         });
+      case '/reviews/request/withdraw-offline':
+        withdrawals++;
+        lastChange = null;
+        answer({'id': 'request', 'status': 'WITHDRAWN'});
       default:
         handler.reject(
           DioException(
