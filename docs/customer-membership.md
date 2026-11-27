@@ -9,7 +9,7 @@
 - `customer_benefits`：每客户多条年卡/权益，带有效期和可选次数上限。
 - `customer_benefit_redemptions`：核销记录，`(company, benefit, event_key)` 唯一，与权益使用同一公司和客户；保留首次核销的 `used/remaining`。
 - `customer_progress`：会员服务阶段和说明。
-- 仓库 Flyway：`V37__customer_membership.sql`、`V38__customer_redemption_receipts.sql`、`V43__customer_profile_contacts.sql`。V43 保留已有客户及关联资料。若部署环境使用外部迁移目录，以该库历史为准，只能追加迁移，不重排已应用版本。如某环境已单独应用 V37 且写入核销记录，V38 会停止并保留数据；需先确认历史回执处理方案，不要清空核销表。
+- 仓库 Flyway：`V37__customer_membership.sql`、`V38__customer_redemption_receipts.sql`、`V45__customer_profile_contacts.sql`。V45 保留已有客户及关联资料。若部署环境使用外部迁移目录，以该库历史为准，只能追加迁移，不重排已应用版本。如某环境已单独应用 V37 且写入核销记录，V38 会停止并保留数据；需先确认历史回执处理方案，不要清空核销表。
 
 ## 接口
 
@@ -64,4 +64,4 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests Custome
 
 12 项通过，0 失败，BUILD SUCCESS。覆盖客户与会员基础接口、隔离空库及有数据的 V36 库升级至 V38、同键并发仅扣一次、后续核销和状态变化不改写首次回执、跨客户与跨公司核销拒绝，以及 V37 已有核销时安全停止升级。
 
-2026-11-27 整合候选：隔离 PostgreSQL 的七组受影响后端测试共 41 项通过，覆盖 V41 旧数据升级、档案与企业联系人、权益核销、线下交付及商城关联。Flutter 正式配置 3 项通过，验证客户维护、核销后刷新次数、关联商城和线下记录；为客户端契约夹具。390px Flutter Web 连接真实隔离 API，验证登录、公司入口、建档及回读、同名重复提示。商城使用合成导入文件在真实隔离 API 上验证成功，未验证供应商连接。共享环境、最终岗位授权和真机仍待验收。D 的验收范围见 [CRM 任务](../openspec/changes/crm-customer-workspace/tasks.md)。
+2026-11-27 整合候选：隔离 PostgreSQL 覆盖 V41 旧数据升级至 V45、档案与企业联系人、权益核销、线下交付及商城关联。Flutter 正式配置 3 项通过，为客户端契约夹具。390px Flutter Web 连接真实隔离 API，验证公司入口、建档及回读、同名重复提示与明确确认、会员绑定、发放后核销、服务进度；同键重放返回原回执、次数耗尽拒绝再扣、跨客户核销拒绝。Web 使用合成 JSON 导入同一会员的商城订单，重放后批次不重复，概览可钻取批次；Flutter 回读同一订单及来源，无关客户不显示该订单。证据在 `output/phase2-screenshots/`。供应商实际文件、正式金额口径、岗位字段授权、共享环境和 Android 真机仍待验收。D 的验收范围见 [CRM 任务](../openspec/changes/crm-customer-workspace/tasks.md)。

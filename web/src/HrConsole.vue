@@ -3,6 +3,8 @@ import {nextTick,ref,onMounted,onBeforeUnmount} from 'vue';
 import {FolderOpened, Refresh, SwitchButton} from '@element-plus/icons-vue';
 type Row=Record<string,any>;
 const token=ref(sessionStorage.getItem('hr-token')??''), account=ref(''), password=ref(''), error=ref(''), message=ref(''), busy=ref(false);
+const needsPasswordChange=ref(false), oldPassword=ref(''), newPassword=ref('');
+const passwordHeading=ref<HTMLElement|null>(null), loginPasswordInput=ref<HTMLInputElement|null>(null);
 const capability=ref<Row|null>(null), people=ref<Row[]>([]), contracts=ref<Row[]>([]), total=ref(0), cursor=ref(0);
 const uploadKey=ref(0);
 const reminders=ref<Row[]>([]), selected=ref<Row|null>(null), history=ref<Row[]>([]);
@@ -13,7 +15,10 @@ let detailTrigger: HTMLElement | undefined;
 let editTrigger: HTMLElement | undefined;
 let mounted = true;
 function clearPrivate(){capability.value=null;people.value=[];contracts.value=[];reminders.value=[];selected.value=null;history.value=[];detailTrigger=undefined;cursor.value=0;total.value=0;reset();}
-function clearSession(){token.value='';password.value='';sessionStorage.removeItem('hr-token');clearPrivate();}
+function clearSession(){
+  token.value='';password.value='';oldPassword.value='';newPassword.value='';needsPasswordChange.value=false;
+  sessionStorage.removeItem('hr-token');clearPrivate();
+}
 async function request<T>(path:string, init:RequestInit, decode:(response:Response)=>Promise<T>):Promise<T>{
   const signal=operation!.signal;
   const headers=new Headers(init.headers);
@@ -23,7 +28,8 @@ async function request<T>(path:string, init:RequestInit, decode:(response:Respon
   if(!response.ok){
     const data=await response.json().catch(()=>null);
     signal.throwIfAborted();
-    if(response.status===401||response.status===403)clearSession();
+    const incorrectOldPassword=path==='/auth/password'&&response.status===401&&data?.code==='INVALID_CREDENTIALS';
+    if((response.status===401&&!incorrectOldPassword)||response.status===403)clearSession();
     throw new Error(data?.message ?? (response.status===403 ? '人事权限已撤销或不足' : '企业服务返回异常，请稍后重试'));
   }
   const data=await decode(response);
@@ -49,7 +55,23 @@ async function load(next=cursor.value){
   const list=await api('/hr/contracts?cursor='+next+'&limit=20');
   capability.value=access;people.value=staff;reminders.value=notifications;contracts.value=list.items;total.value=list.total;cursor.value=next;
 }
-async function login(){await act(async()=>{const data=await api('/auth/login','POST',{account:account.value,password:password.value});password.value='';token.value=data.token;sessionStorage.setItem('hr-token',token.value);await load();});}
+async function enter(user:Row|undefined){
+  needsPasswordChange.value=user?.must_change_password===true;
+  if(!needsPasswordChange.value){await load();return;}
+  await nextTick();
+  if(mounted&&token.value)passwordHeading.value?.focus();
+}
+async function login(){await act(async()=>{
+  const data=await api('/auth/login','POST',{account:account.value,password:password.value});
+  password.value='';token.value=data.token;sessionStorage.setItem('hr-token',token.value);
+  await enter(data.user);
+});}
+async function changePassword(){await act(async()=>{
+  await api('/auth/password','POST',{oldPassword:oldPassword.value,newPassword:newPassword.value});
+  clearSession();message.value='密码已更新，请使用新密码登录';
+  await nextTick();
+  if(mounted)loginPasswordInput.value?.focus();
+});}
 function logout(){
   const previous=token.value;
   operation?.abort();operation=undefined;busy.value=false;
@@ -100,12 +122,22 @@ async function download(row:Row){await act(async()=>{const blob=await request('/
 async function grant(person:Row,event:Event){const level=(event.target as HTMLSelectElement).value;await act(async()=>{await api('/hr/grants/'+person.id,'PUT',{access:level,version:person.grant_version});await load();message.value='授权已更新';});}
 async function duties(person:Row){await act(async()=>{await api('/hr/employees/'+person.id+'/duties','PUT',{duties:person.duties,version:person.duties_version});await load();message.value='职责已保存';});}
 async function page(delta:number){await act(()=>load(Math.max(0,cursor.value+delta)));}
-onMounted(()=>{if(token.value)void act(load);});
+onMounted(()=>{if(token.value)void act(async()=>{await enter(await api('/auth/me'));});});
 onBeforeUnmount(()=>{mounted=false;operation?.abort();});
 </script>
-<template><main class="hr-shell" :aria-busy="busy"><header class="hr-header"><div><div class="hr-category"><FolderOpened aria-hidden="true"/>人事管理</div><h1>员工档案与合同</h1></div><div v-if="token" class="hr-actions"><a v-if="capability?.admin" href="/">管理员后台</a><button aria-label="刷新" title="刷新" :disabled="busy" @click="act(load)"><Refresh aria-hidden="true"/></button><button aria-label="退出" title="退出" @click="logout"><SwitchButton aria-hidden="true"/></button></div></header>
+<template><main class="hr-shell" :aria-busy="busy"><header class="hr-header"><div><div class="hr-category"><FolderOpened aria-hidden="true"/>人事管理</div><h1>员工档案与合同</h1></div><div v-if="token" class="hr-actions"><a v-if="capability?.admin" href="/">管理员后台</a><button v-if="capability" aria-label="刷新" title="刷新" :disabled="busy" @click="act(load)"><Refresh aria-hidden="true"/></button><button aria-label="退出" title="退出" @click="logout"><SwitchButton aria-hidden="true"/></button></div></header>
 <p v-if="error" role="alert">{{error}}</p><p v-if="message" role="status">{{message}}</p>
-<form v-if="!token" @submit.prevent="login"><label>账号<input v-model="account" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button :disabled="busy">登录人事入口</button></form>
+<form v-if="!token" @submit.prevent="login"><label>账号<input v-model="account" autocomplete="username" required></label><label>密码<input ref="loginPasswordInput" v-model="password" type="password" autocomplete="current-password" required></label><button :disabled="busy">登录人事入口</button></form>
+<section v-else-if="needsPasswordChange">
+  <h2 ref="passwordHeading" tabindex="-1">设置新的登录密码</h2>
+  <form @submit.prevent="changePassword">
+    <fieldset :disabled="busy">
+      <label>初始密码<input v-model="oldPassword" type="password" autocomplete="current-password" required></label>
+      <label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" minlength="12" required></label>
+      <button>更新密码</button>
+    </fieldset>
+  </form>
+</section>
 <template v-else-if="capability">
 <section><h2>我的合同提醒</h2><p v-if="!reminders.length">暂无到期提醒</p><p v-for="n in reminders" :key="n.id"><button :disabled="busy" @click="view(n.object_id,$event)">{{n.title}} · 到期日 <time>{{String(n.ends_on).slice(0,10)}}</time></button></p></section>
 <section>

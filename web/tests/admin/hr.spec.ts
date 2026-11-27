@@ -5,6 +5,69 @@ test('人事入口只读与登录错误反馈',async({page})=>{
 });
 test('未授权账号收到拒绝反馈',async({page})=>{await page.route('**/api/**',async route=>{if(route.request().url().endsWith('/auth/login'))await route.fulfill({json:{token:'test'}});else await route.fulfill({status:403,json:{message:'无权访问'}});});await page.goto('/hr');await page.getByLabel('账号',{exact:true}).fill('employee');await page.getByLabel('密码',{exact:true}).fill('test');await page.getByRole('button',{name:'登录人事入口'}).click();await expect(page.getByRole('alert')).toHaveText('无权访问');await expect(page.getByRole('heading',{name:'已归档合同'})).toHaveCount(0);});
 
+test('首次登录可改密，刷新与原密码错误不提前读取人事数据', async ({ page }) => {
+  const initialPassword = 'initial-password';
+  const updatedPassword = 'updated-password';
+  let changed = false;
+  const hrRequests: string[] = [];
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const user = { must_change_password: !changed };
+    if (path === '/api/auth/me') return route.fulfill({ json: user });
+    if (path === '/api/auth/login') {
+      expect(request.postDataJSON().password).toBe(changed ? updatedPassword : initialPassword);
+      return route.fulfill({ json: { token: changed ? 'active' : 'initial', user } });
+    }
+    if (path === '/api/auth/password') {
+      expect(await request.headerValue('authorization')).toBe('Bearer initial');
+      const { oldPassword, newPassword } = request.postDataJSON();
+      if (oldPassword !== initialPassword) {
+        return route.fulfill({ status: 401, json: { code: 'INVALID_CREDENTIALS', message: '原密码错误' } });
+      }
+      expect(newPassword).toBe(updatedPassword);
+      changed = true;
+      return route.fulfill({ json: { reloginRequired: true } });
+    }
+    if (!path.startsWith('/api/hr/')) return route.fulfill({ status: 404, json: {} });
+    hrRequests.push(path);
+    expect(await request.headerValue('authorization')).toBe('Bearer active');
+    const json = path === '/api/hr/me' ? { admin: false, manage: false }
+      : path === '/api/hr/contracts' ? { items: [], total: 0 } : [];
+    return route.fulfill({ json });
+  });
+
+  await page.goto('/hr');
+  const account = page.getByLabel('账号', { exact: true });
+  const password = page.getByLabel('密码', { exact: true });
+  const login = page.getByRole('button', { name: '登录人事入口' });
+  const passwordHeading = page.getByRole('heading', { name: '设置新的登录密码' });
+  await account.fill('staff');
+  await password.fill(initialPassword);
+  await login.click();
+  await expect(passwordHeading).toBeFocused();
+  await page.reload();
+  await expect(passwordHeading).toBeFocused();
+  const oldPassword = page.getByLabel('初始密码', { exact: true });
+  const newPassword = page.getByLabel('新密码', { exact: true });
+  const submit = page.getByRole('button', { name: '更新密码' });
+  await oldPassword.fill('incorrect');
+  await newPassword.fill(updatedPassword);
+  await submit.click();
+  await expect(page.getByRole('alert')).toHaveText('原密码错误');
+  await expect(oldPassword).toBeVisible();
+  expect(hrRequests).toEqual([]);
+  await oldPassword.fill(initialPassword);
+  await submit.click();
+  await expect(page.getByRole('status')).toHaveText('密码已更新，请使用新密码登录');
+  await expect(password).toBeFocused();
+  expect(hrRequests).toEqual([]);
+  await account.fill('staff');
+  await password.fill(updatedPassword);
+  await login.click();
+  await expect(page.getByRole('heading', { name: '员工档案', exact: true })).toBeVisible();
+});
+
 test('合同归档与提醒详情保留历史',async({page},info)=>{
  let saved:Record<string,any>|null=null;
  await page.route('**/api/**',async route=>{

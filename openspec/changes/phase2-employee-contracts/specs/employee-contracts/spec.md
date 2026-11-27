@@ -25,6 +25,9 @@ P0。系统 SHALL 按北京时间在到期前30天、7天、当天向指定且�
 - **THEN** 不发送提醒且不能读取合同
 ### Requirement: Independent Web entry
 P0。系统 SHALL 提供独立Web人事入口，展示授权能力和错误状态，不开放原管理员后台。
+#### Scenario: Initial password change
+- **WHEN** 首次登录的账号需要更换初始密码
+- **THEN** 人事入口先允许改密并要求以新密码重新登录，在授权确认前不加载人事数据；原密码错误时保留改密入口并显示错误
 #### Scenario: Read only member
 - **WHEN** READ人员进入
 - **THEN** 可查合同但所有写操作在服务端拒绝
