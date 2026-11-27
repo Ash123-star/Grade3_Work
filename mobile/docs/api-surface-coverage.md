@@ -18,6 +18,7 @@
 | 日志评论 | list/comment | `GET/POST /logs/{id}/comments` | 当前服务端只接 `text` |
 | 评论回复/任务评论 | reply、tasks/comments | `GET/POST /tasks/{id}/comments`、`/logs/{id}/comments` | parentId同对象；任务写入需幂等键，日志写入不盲重试 |
 | 审批 | list/detail/approve/reject/reroute | `/reviews`、`/reviews/{id}`、`/reviews/{id}/decision`、`/reviews/{id}/reroute` | 自审拒绝、驳回原因、版本 |
+| 客户手帐：线下业务与服务交付 | 客户/员工列表、记录详情、登记、审核申请和撤回 | `/customers`、`/offline-deliveries`、`/offline-deliveries/employees`、`/offline-deliveries/{id}`、`/offline-deliveries/{id}/changes`、`/reviews/{id}/withdraw-offline` | 正式路径只接入 D 能力；[权限、状态、版本及幂等](../../docs/customer-membership.md#二期-d线下业务与服务交付) |
 | 组织/成员/策略 | tree/list/profile/revisions | `/organization`、`/organization/people`、`/profiles/{id}`、组织 revisions | 公司范围、管理员、版本和审核 |
 | 组织部门 | list | `GET /organization/departments` | 按组织范围 |
 | 组织团队单独列表 | list | GET /organization/teams | 沿用当前组织树范围，不扩大人员权限 |

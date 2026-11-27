@@ -35,7 +35,24 @@ E 按当前客户的 `membership.mallMemberId` 匹配公司内商城快照。A �
 ## 权限与边界
 
 - 首版 `CustomerService.admin()` 刷新 ACTIVE ADMIN 并拒绝首次改密；普通员工、创始人等角色待 B 确认后放开。
-- 不实现商城拉取、订单金额、经营概览（E），不实现线下业务表（D），不实现 CRM 页面（A），不含合同/员工档案（B）。
+- C 不实现商城拉取、订单金额、经营概览（E），不实现下文的线下业务（D），不实现 CRM 页面（A），不含合同/员工档案（B）。
+
+## 二期 D：线下业务与服务交付
+
+使用本模块的 `customerId` 和现有组织用户 ID 关联 `V41` 的独立线下记录，不写 `customer_progress` 或权益核销。正式 Flutter 从「公司 → 客户目录」进入，可切换客户目录和员工视角，均以同一个业务 ID 打开详情。当前交付仅接入客户目录读取及线下记录，不开启客户档案写入、商城或权益维护。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/offline-deliveries?customerId=…` 或 `?employeeId=…` | 两种筛选互斥，员工匹配负责人或参与人员；`pendingOnly=true` 只查待交付，含活动未结束和已结束两类 |
+| GET | `/api/offline-deliveries/employees` | `search` 按姓名，`activeOnly` 默认 true；false 还包含已停用人员，用于查询历史；仅返回 `id/name/status` |
+| GET | `/api/offline-deliveries/{id}` | 正式记录、版本、结束/交付时间及可选 `pendingReview`；摘要仅返回操作与查看/撤回能力，不返回候选 |
+| POST | `/api/offline-deliveries` | `customerId/kind/title/businessDate/ownerId/participants`；201 返回 `id/version` |
+| POST | `/api/offline-deliveries/{id}/changes` | `action/version/reason` 必填；`EDIT` 还须完整提供 `kind/title/businessDate/ownerId/participants`；202 返回 `id/reviewId/version/status` |
+| POST | `/api/reviews/{id}/withdraw-offline` | 无请求体、版本或幂等键；原申请人或清理失权申请的同公司管理员可撤回，重放返回 `SUPERSEDED` |
+
+分页接受非负偏移 `cursor` 和 `limit`（1–100），返回 `items/total/nextCursor`，末页为空游标。`kind` 为 `PERFORMANCE`（赛演）、`PRIVATE_BANQUET`（私宴）、`COMPANY_VISIT`（企业参访）或 `SALON`（沙龙）；业务日期为 `YYYY-MM-DD`。初始 `SCHEDULED/PENDING`；`END_ACTIVITY` 批准后为 `ENDED/PENDING`；该状态下才可申请 `CONFIRM_DELIVERY`，批准后为 `ENDED/DELIVERED`。申请不改正式版本或值，交付后仍可申请修改资料，不可修改类型或回退状态。
+
+登记和变更必须携带 1–128 位 `Idempotency-Key`；公司和操作者内同键同规范化输入返回原回执，同键异输入返回 409。当前 ACTIVE、已改密的同公司 ADMIN 才能操作；新关联员工必须是本公司在职人员，归档客户仅可查看。跨公司对象 404，角色或当前审核资格不符 403，无效字段/员工 400，旧版本、重复待审或非法状态 409。复用 `/api/reviews/{id}/decision`（`expectedVersion/approve/reason`），仅当前独立直属管理员可决定，驳回须理由；无合格审核人时保持待审，申请人可在关系修复后重新分配或撤回。
 
 ## 验证
 
@@ -47,4 +64,4 @@ powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests Custome
 
 12 项通过，0 失败，BUILD SUCCESS。覆盖客户与会员基础接口、隔离空库及有数据的 V36 库升级至 V38、同键并发仅扣一次、后续核销和状态变化不改写首次回执、跨客户与跨公司核销拒绝，以及 V37 已有核销时安全停止升级。
 
-未覆盖：共享环境的 Flyway 状态、A/D/E 端到端联调、最终角色权限、真实商城接口。
+未覆盖：共享环境的 Flyway 状态、A/E 端到端联调、最终角色权限、真实商城接口。D 的验收范围见 [CRM 任务](../openspec/changes/crm-customer-workspace/tasks.md)。

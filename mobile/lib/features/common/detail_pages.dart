@@ -1346,6 +1346,9 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             } else if (resource == 'reviews') {
               final self = item.ownerId == user.id;
               final pending = f['reviewState'] == '待审';
+              final offline = f['reviewKind'] == 'OFFLINE_DELIVERY';
+              final unassigned =
+                  f['reviewerConfigured'] == false || f['reviewerId'] == null;
               final creating =
                   f['reviewKind'] == 'TASK_CREATE' || f['baseVersion'] == 0;
               final assigned = f['reviewerId'] == user.id;
@@ -1449,8 +1452,10 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                 SectionHeader(reviewModeTitle(f['approvalMode'])),
                 if (pending)
                   Text(
-                    f['reviewerConfigured'] == false || f['reviewerId'] == null
-                        ? reviewUnassignedText(f['approvalMode'])
+                    unassigned
+                        ? offline
+                              ? '暂无符合条件的直属管理员，申请保持待审'
+                              : reviewUnassignedText(f['approvalMode'])
                         : '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
                   )
@@ -1458,6 +1463,15 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   Text(
                     '审核人 ${displayPersonName(f['reviewerName'])}',
                     style: const TextStyle(color: CuteTokens.muted),
+                  ),
+                if (offline && self && pending && unassigned)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: busy ? null : () => action(item, 'reroute'),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('重新分配审核人'),
+                    ),
                   ),
                 if (self &&
                     pending &&

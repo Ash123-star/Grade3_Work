@@ -1,40 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:pandora_mobile/core/config.dart';
 
 import 'crm_components.dart';
 import 'crm_demo_store.dart';
 import 'crm_editor.dart';
+import 'crm_live_workspace.dart';
 
 class CrmWorkspacePage extends ConsumerWidget {
   const CrmWorkspacePage({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!AppConfig.mock) return const _UnavailableDirectory();
+    if (!AppConfig.mock) return const LiveCrmWorkspace();
     final store = ref.watch(crmDemoProvider);
     return _Directory(key: ObjectKey(store), store: store);
   }
-}
-
-/// The signed-in route ships while the CRM read and write contracts are pending.
-/// This page does not resolve the local store or make requests to candidate URLs.
-class _UnavailableDirectory extends StatelessWidget {
-  const _UnavailableDirectory();
-
-  @override
-  Widget build(BuildContext context) => CrmFrame(
-    title: '客户手帐',
-    subtitle: '每一次来往，都有迹可循',
-    backLabel: '返回公司',
-    back: () => context.canPop() ? context.pop() : context.go('/view'),
-    body: crmEmpty(
-      '客户目录暂不可用',
-      '暂时无法读取客户资料，请稍后再来查看。',
-      icon: 'error',
-      useStatusIcon: true,
-    ),
-  );
 }
 
 Future<T?> _push<T>(BuildContext context, Widget child) =>

@@ -6,6 +6,8 @@
 
 V40 仅扩展 `review_requests` 的审核模式和决定来源约束，`TASK_MANAGER`、`TASK_RECIPIENT` 只允许用于 `TASK_CREATE`。历史行不回填、不重路由；新机制沿用带公司外键、禁止自审的 `review_steps`，关闭新入口不删除历史决定。依赖 V36 的员工职位与目录基线。
 
+V41 为二期 D 新增 `offline_deliveries`、`offline_delivery_participants`、`offline_delivery_commands`。前两者用复合公司外键关联客户、员工及线下记录；主记录存活动和交付的独立状态、对应时间及版本，约束要求交付不能早于活动结束。`review_requests` 增加 `OFFLINE_DELIVERY` 和同公司同记录的待审唯一索引；命令回执按公司、操作者及键隔离。应用回退前应先处理待审 D 申请，避免旧版本识别不了新审核类型；保留 V41 表和 Flyway 历史，不手工降级迁移。
+
 ## 使用约定
 
 - `company_id`：公司租户标识。所有业务表都必须沿公司外键关联，服务端查询还要额外执行角色和组织范围检查。

@@ -5,6 +5,12 @@ import java.util.Map;
 
 /** 审核输入、自审和终态规则；不依赖 HTTP 或数据库。 */
 public final class ReviewPolicy {
+    public static final String OFFLINE_DELIVERY = "OFFLINE_DELIVERY";
+
+    public static boolean eligibleOfflineAdmin(cn.workpanel.Actor actor) {
+        return actor.admin() && "ACTIVE".equals(actor.status()) && !actor.mustChange();
+    }
+
     private ReviewPolicy() { }
     public static boolean decision(Map<String, Object> command) {
         Db.fields(command, "approve", "reason", "expectedVersion");
