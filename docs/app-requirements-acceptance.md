@@ -196,4 +196,4 @@
 | 两名范围外接收人 / 关系变化 | L 同意，F 接受，X 再接受；另一次在 X 接受前更换 E 的上级 | 前一次只生成一条任务和两份派发通知；重复决定 409。后一次 409 `STALE_TASK_APPROVAL`，正式任务不存在 |
 | 无审核人 / 人员边界 | 未配置上级的有效成员提交；选择停用、待确认或外公司对象；创始人向范围内员工提交 | 无审核人保持待审；无效目标不可提交，目录不返回这些人员；权限内创始人免审仍留记录 |
 
-执行：`powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests TaskDispatchIntegrationTest`。测试应用启用服务端 `TASK_PROPOSALS_ENABLED` 对应配置；模拟新版客户端发送 `Task-Dispatch-Policy: recipient-confirmation-v1`，同测试类内旧客户端不发头。隔离 App 构建使用 `--dart-define=TASK_PROPOSALS_ENABLED=true`；线上两端默认关闭。不应用测试夹具到线上，不将 HTTP 验收当真机签收。
+执行：`powershell -ExecutionPolicy Bypass -File scripts/test-backend.ps1 -Tests TaskDispatchIntegrationTest`。测试应用启用服务端 `TASK_PROPOSALS_ENABLED` 对应配置；模拟新版客户端发送 `Task-Dispatch-Policy: recipient-confirmation-v1`，同测试类内旧客户端不发头。隔离 App 构建使用 `--dart-define=TASK_PROPOSALS_ENABLED=true`；两端默认开启，可设 `TASK_PROPOSALS_ENABLED=false` 关闭。不应用测试夹具到线上，不将 HTTP 验收当真机签收。

@@ -1,5 +1,5 @@
 /// Explicit acceptance build; ordinary clients retain the existing dispatch contract.
-const taskProposalsEnabled = bool.fromEnvironment('TASK_PROPOSALS_ENABLED');
+const taskProposalsEnabled = bool.fromEnvironment('TASK_PROPOSALS_ENABLED', defaultValue: true);
 
 enum UserRole { admin, founder, director, leader, employee }
 
