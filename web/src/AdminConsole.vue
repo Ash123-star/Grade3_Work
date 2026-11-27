@@ -184,6 +184,7 @@ onMounted(() => { if (token.value) void run(enter); });
         <nav aria-label="后台导航">
           <button v-for="(title, key) in titles" :key="key" :class="{ active: !commercePage && tab === key }" :aria-current="!commercePage && tab === key ? 'page' : undefined" :disabled="busy" @click="selectTab(key)"><span aria-hidden="true">{{ key === 'employees' ? '◎' : key === 'priorities' ? '◇' : '▤' }}</span>{{ title }}</button>
           <a href="/commerce" class="sidebar-link" :class="{ active: commercePage }" :aria-current="commercePage ? 'page' : undefined"><span aria-hidden="true">▦</span>商城经营</a>
+          <a href="/hr" class="sidebar-link"><span aria-hidden="true">▤</span>员工档案与合同</a>
         </nav>
         <div class="sidebar-bottom"><span class="avatar">{{ user.name?.slice(0, 1) }}</span><div>{{ user.name }}<small>管理员</small></div><button class="logout" :disabled="busy" @click="logout">退出</button></div>
       </aside>

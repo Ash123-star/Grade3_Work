@@ -11,6 +11,9 @@ import 'package:pandora_mobile/shared/premium_pickers.dart';
 import 'crm_components.dart';
 import 'crm_live_api.dart';
 
+part 'crm_live_customer.dart';
+part 'crm_live_forms.dart';
+
 const _kinds = {
   'PERFORMANCE': '赛演',
   'PRIVATE_BANQUET': '私宴',
@@ -29,10 +32,12 @@ class LiveCrmWorkspace extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    if (!session.administrator || !session.canReadBusiness) {
+    final epoch = ref.watch(sessionEpochProvider);
+    if (!session.administrator ||
+        !session.canReadBusiness ||
+        ref.watch(liveCrmDeniedProvider(epoch))) {
       return const _AccessDenied(directory: true);
     }
-    final epoch = ref.watch(sessionEpochProvider);
     return _Directory(
       key: ValueKey(epoch),
       scope: _Scope(ref.watch(liveCrmApiProvider), epoch),
@@ -49,9 +54,15 @@ class _Scope {
       Navigator.of(context).push<T>(
         MaterialPageRoute(
           builder: (context) => Consumer(
-            builder: (_, ref, _) => ref.watch(sessionEpochProvider) == epoch
-                ? page
-                : const _AccessDenied(),
+            builder: (_, ref, _) {
+              final session = ref.watch(sessionProvider);
+              return ref.watch(sessionEpochProvider) == epoch &&
+                      session.administrator &&
+                      session.canReadBusiness &&
+                      !ref.watch(liveCrmDeniedProvider(epoch))
+                  ? page
+                  : const _AccessDenied();
+            },
           ),
         ),
       );
@@ -67,7 +78,7 @@ class _AccessDenied extends StatelessWidget {
     subtitle: '',
     backLabel: directory ? '返回公司' : '返回',
     back: () => context.canPop() ? context.pop() : context.go('/view'),
-    body: crmEmpty('无权访问客户目录', '仅在职管理员可查看。'),
+    body: crmEmpty('无权访问客户目录', '仅在职且已修改初始密码的管理员可查看。权限变更后请重新登录。'),
   );
 }
 
@@ -78,6 +89,12 @@ String _error(Object? error) => error is ApiFailure
         'VERSION_CONFLICT' => '这条记录已更新，请返回详情查看最新版本。',
         'INVALID_EMPLOYEE' => '负责人或参与员工已不可用，请重新选择。',
         'CUSTOMER_ARCHIVED' => '客户已归档，不能修改此记录。',
+        'CUSTOMER_EXTERNAL_CONFLICT' => '商城外部 ID 已被其他客户使用。',
+        'MALL_MEMBER_CONFLICT' => '该商城会员已绑定其他客户。',
+        'BENEFIT_EXPIRED' => '权益不在有效期内，无法核销。',
+        'BENEFIT_EXHAUSTED' => '权益可用次数已用完。',
+        'BENEFIT_DISABLED' => '这项权益已停用。',
+        'INVALID_DATE_RANGE' => '结束日期不能早于开始日期。',
         'NO_CHANGE' => '资料没有变化。',
         _ => error.message,
       }
@@ -118,10 +135,12 @@ class _Paged extends StatefulWidget {
     required this.load,
     required this.row,
     this.empty = '暂无记录',
+    this.revision = 0,
   });
   final Future<CrmPage> Function(int cursor) load;
   final Widget Function(CrmRow row) row;
   final String empty;
+  final int revision;
 
   @override
   State<_Paged> createState() => _PagedState();
@@ -130,6 +149,14 @@ class _Paged extends StatefulWidget {
 class _PagedState extends State<_Paged> {
   final cursors = [0];
   late Future<CrmPage> page = widget.load(0);
+
+  @override
+  void didUpdateWidget(covariant _Paged oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.revision != widget.revision) {
+      page = widget.load(cursors.last);
+    }
+  }
 
   void reload() => setState(() {
     page = widget.load(cursors.last);
@@ -235,6 +262,24 @@ class _Directory extends StatefulWidget {
 class _DirectoryState extends State<_Directory> {
   int view = 0, type = 0;
   String search = '';
+  int revision = 0;
+
+  Future<void> openCustomer(CrmRow row) => widget.scope.open<void>(
+    context,
+    _Customer(widget.scope, row, () {
+      if (mounted) setState(() => revision++);
+    }),
+  );
+
+  Future<void> addCustomer() async {
+    final row = await widget.scope.open<CrmRow>(
+      context,
+      _ProfileForm(widget.scope),
+    );
+    if (!mounted || row == null) return;
+    setState(() => revision++);
+    await openCustomer(row);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +287,7 @@ class _DirectoryState extends State<_Directory> {
     final scope = widget.scope;
     return CrmFrame(
       title: '客户手帐',
-      subtitle: '线下业务与服务交付',
+      subtitle: '客户档案、会员与服务交付',
       backLabel: '返回公司',
       back: () => context.canPop() ? context.pop() : context.go('/view'),
       body: Column(
@@ -271,10 +316,16 @@ class _DirectoryState extends State<_Directory> {
               type,
               (value) => setState(() => type = value),
             ),
+            crmGap,
+            Align(
+              alignment: Alignment.centerRight,
+              child: CrmButton('新增客户', addCustomer, primary: true),
+            ),
           ],
           crmGap,
           _Paged(
             key: ValueKey((view, type, search)),
+            revision: revision,
             load: (cursor) => employee
                 ? scope.api.employees(cursor, search, activeOnly: false)
                 : scope.api.customers(
@@ -292,10 +343,12 @@ class _DirectoryState extends State<_Directory> {
                   : row['kind'] == 'ENTERPRISE'
                   ? '企业客户'
                   : '个人客户',
-              () => scope.open<void>(
-                context,
-                _Records(scope, row, employee: employee),
-              ),
+              () => employee
+                  ? scope.open<void>(
+                      context,
+                      _Records(scope, row, employee: true),
+                    )
+                  : openCustomer(row),
             ),
           ),
         ],

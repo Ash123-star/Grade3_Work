@@ -25,6 +25,29 @@ class HrContractIntegrationTest extends MemberBHttpSupport {
   var people=call(200,"GET","/hr/employees",employee,null);assertFalse(people.toString().contains("password_hash"));assertFalse(people.toString().contains("id_card_number"));
  }
 
+ @Test void dutyWriteWaitingOnRevocationRechecksAuthorization() throws Exception {
+  call(200,"PUT","/hr/grants/"+employee,admin,Map.of("access","MANAGE","version",0));
+  var transaction = new org.springframework.transaction.support.TransactionTemplate(manager);
+  try (var pool = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+   var write = transaction.execute(status -> {
+    db.one("SELECT id FROM users WHERE id=? FOR UPDATE",employee);
+    db.update("UPDATE hr_grants SET access='READ',version=version+1 WHERE company_id=? AND user_id=?",company,employee);
+    var pending = pool.submit(() -> rawStatus("PUT","/hr/employees/"+employee+"/duties",employee,Map.of("duties","不应保存","version",0)));
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(8);
+    while (!pending.isDone() && System.nanoTime() < deadline) {
+     db.rows("SELECT pg_stat_clear_snapshot()");
+     if (db.count("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE ?",
+         "SELECT id FROM users WHERE company_id=% FOR SHARE") > 0) return pending;
+     java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(20));
+    }
+    fail("Expected duty request to wait for the employee lock");
+    return pending;
+   });
+   assertEquals(403,write.get(10,java.util.concurrent.TimeUnit.SECONDS));
+  }
+  assertEquals(0,db.count("SELECT count(*) FROM employee_duties WHERE company_id=?",company));
+ }
+
  @Test void concurrentReminderScansWriteOnce() throws Exception {
   String id=call(200,"POST","/hr/contracts",admin,command(attachment(admin))).get("id").asText();
   try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){

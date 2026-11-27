@@ -23,11 +23,11 @@ public class CustomerController {
     @GetMapping public Map<String,Object> list(HttpServletRequest r,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String kind,@RequestParam(defaultValue="0") int cursor,@RequestParam(defaultValue="20") int limit) {
         query(r,"search","kind","cursor","limit");return service.list(Actor.current(r),search,kind,cursor,limit);
     }
-    /** 新建个人/企业客户；externalId为商城外部ID，可空且公司内唯一。 */
-    @Operation(operationId="createCustomer",summary="新建客户档案",description="kind/name必填；phone/email/externalId/note可选；externalId公司内唯一；仅ADMIN；无审核链。")
+    /** 本公司 ADMIN 建档。带幂等键时检测疑似重复；同键同内容返回已建档案，同键异内容 409。不需版本。 */
+    @Operation(operationId="createCustomer",summary="新建客户档案",description="kind/name必填；phone/email/externalId/note/ownerId/contacts可选；externalId公司内唯一；仅ADMIN。正式手帐提交Idempotency-Key，疑似重复409，核对后以confirmDuplicate=true提交。")
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
-    public Map<String,Object> create(HttpServletRequest r,@RequestBody Map<String,Object> body) {
-        query(r);return service.create(Actor.current(r),body);
+    public Map<String,Object> create(HttpServletRequest r,@RequestHeader(value="Idempotency-Key",required=false) String key,@RequestBody Map<String,Object> body) {
+        query(r);return service.create(Actor.current(r),body,key);
     }
     /** 商城外部ID反查统一客户ID；供E同步会员/订单时使用。 */
     @Operation(operationId="customerByExternalId",summary="按商城外部ID查询客户",description="仅ADMIN；externalId公司内唯一；不存在404；不跨公司。")
@@ -40,7 +40,7 @@ public class CustomerController {
         query(r);return service.detail(Actor.current(r),id);
     }
     /** 更新客户档案，必须带当前version；externalId冲突409。 */
-    @Operation(operationId="updateCustomer",summary="更新客户档案",description="全量kind/name/phone/email/externalId/note/status和version；仅ADMIN；版本冲突409。")
+    @Operation(operationId="updateCustomer",summary="更新客户档案",description="全量kind/name/phone/email/externalId/note/status和version；省略ownerId/contacts保留原值；仅ADMIN；版本或外部ID冲突409。")
     @PutMapping("/{id}") public Map<String,Object> update(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> body) {
         query(r);return service.update(Actor.current(r),id,body);
     }
@@ -54,11 +54,11 @@ public class CustomerController {
     @GetMapping("/{id}/benefits") public List<Map<String,Object>> benefits(HttpServletRequest r,@PathVariable String id) {
         query(r);return service.benefits(Actor.current(r),id);
     }
-    /** 发放权益；validTo不得早于validFrom，maxUses为空表示不限次。 */
-    @Operation(operationId="createCustomerBenefit",summary="发放客户权益",description="kind=ANNUAL_CARD/MALL_MEMBER/OTHER；name/validFrom/validTo必填；maxUses可选1–100000；仅ADMIN。")
+    /** 本公司管理员发放权益；不需要版本，归档拒绝新增，同键同请求返回已有权益，异内容409。 */
+    @Operation(operationId="createCustomerBenefit",summary="发放客户权益",description="kind=ANNUAL_CARD/MALL_MEMBER/OTHER；name/validFrom/validTo必填；maxUses可选1–100000；仅ADMIN；支持Idempotency-Key；已归档或键冲突409。")
     @PostMapping("/{id}/benefits") @ResponseStatus(HttpStatus.CREATED)
-    public Map<String,Object> createBenefit(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> body) {
-        query(r);return service.createBenefit(Actor.current(r),id,body);
+    public Map<String,Object> createBenefit(HttpServletRequest r,@PathVariable String id,@RequestHeader(value="Idempotency-Key",required=false) String key,@RequestBody Map<String,Object> body) {
+        query(r);return service.createBenefit(Actor.current(r),id,body,key);
     }
     /** 权益核销历史；用于查年卡有效期与使用记录，按时间倒序。 */
     @Operation(operationId="listCustomerBenefitRedemptions",summary="读取权益核销历史",description="仅ADMIN；校验权益属于该客户；按核销时间倒序；不跨公司。")
@@ -76,10 +76,10 @@ public class CustomerController {
     @GetMapping("/{id}/progress") public List<Map<String,Object>> progress(HttpServletRequest r,@PathVariable String id) {
         query(r);return service.progress(Actor.current(r),id);
     }
-    /** 追加会员服务进度；stage必填，note可选。 */
-    @Operation(operationId="addCustomerProgress",summary="追加会员服务进度",description="stage 1–100字，note最多1000字；仅ADMIN；无审核链。")
+    /** 本公司管理员追加服务进度；不需要版本，归档拒绝新增，同键同请求返回已有进度，异内容409。 */
+    @Operation(operationId="addCustomerProgress",summary="追加会员服务进度",description="stage 1–100字，note最多1000字；仅ADMIN；无审核链；支持Idempotency-Key；已归档或键冲突409。")
     @PostMapping("/{id}/progress") @ResponseStatus(HttpStatus.CREATED)
-    public Map<String,Object> addProgress(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> body) {
-        query(r);return service.addProgress(Actor.current(r),id,body);
+    public Map<String,Object> addProgress(HttpServletRequest r,@PathVariable String id,@RequestHeader(value="Idempotency-Key",required=false) String key,@RequestBody Map<String,Object> body) {
+        query(r);return service.addProgress(Actor.current(r),id,body,key);
     }
 }

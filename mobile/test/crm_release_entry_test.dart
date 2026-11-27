@@ -55,6 +55,103 @@ void main() {
     expect(tester.takeException(), isNull);
   }, skip: AppConfig.mock);
 
+  testWidgets('正式客户档案查重、保留重试键、处理冲突和服务端失权', (tester) async {
+    final repository = HttpRepository('https://fixture.invalid/api', 'token');
+    final fixture = _CustomerFixture();
+    repository.dio.interceptors.add(
+      InterceptorsWrapper(onRequest: fixture.handle),
+    );
+    final container = ProviderContainer(
+      overrides: [httpRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+    container.read(sessionProvider.notifier).state = const Session(
+      id: 'admin',
+      role: UserRole.admin,
+      token: 'token',
+    );
+    final router = container.read(routerProvider)..go('/crm/customers');
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(theme: appTheme(), routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    Future<void> tap(String label) async {
+      final finder = find.text(label);
+      if (finder.hitTestable().evaluate().isEmpty) {
+        await tester.ensureVisible(finder.last);
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(finder.hitTestable().last);
+      await tester.pumpAndSettle();
+    }
+
+    await tap('新增客户');
+    await tap('企业客户');
+    await tester.enterText(find.widgetWithText(TextFormField, '客户名称'), '山海工作室');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tap('新增联系人');
+    await tester.enterText(find.widgetWithText(TextFormField, '联系人姓名'), '王联系人');
+    await tap('保存');
+    await tap('保存档案');
+    await tap('取消');
+    expect(fixture.creates, hasLength(1));
+    expect(find.text('王联系人'), findsOneWidget);
+    await tap('保存档案');
+    await tap('仍然建档');
+    expect(find.text('新增客户'), findsOneWidget);
+    await tap('保存档案');
+    expect(fixture.creates, hasLength(4));
+    expect(fixture.creates.take(2).toSet(), hasLength(1));
+    expect(fixture.creates.skip(2).toSet(), hasLength(1));
+    expect(fixture.creates.first, isNot(fixture.creates.last));
+    expect(find.text('王联系人'), findsOneWidget);
+
+    await tap('编辑档案');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '客户名称'),
+      '未保存的名称',
+    );
+    await tap('保存档案');
+    expect(find.text('这条记录已更新，请返回详情查看最新版本。'), findsOneWidget);
+    expect(find.text('未保存的名称'), findsOneWidget);
+    await tap('读取新版');
+    await tap('读取新版');
+    expect(find.text('新版工作室'), findsOneWidget);
+    expect(fixture.versions, [1]);
+    await tap('保存档案');
+    expect(fixture.versions, [1, 2]);
+
+    await tap('会员');
+    await tap('体验权益');
+    await tap('核销一次');
+    await tester.enterText(find.widgetWithText(TextFormField, '核销说明'), '到店使用');
+    await tap('确认核销');
+    expect(find.text('到店使用'), findsOneWidget);
+    expect(find.text('0 次'), findsOneWidget);
+    expect(find.text('核销一次'), findsNothing);
+    expect(fixture.redemptions, hasLength(1));
+    router.pop();
+    await tester.pumpAndSettle();
+
+    await tap('业务');
+    await tap('商城订单');
+    await tap('订单 O-12');
+    expect(find.text('CNY 50.00'), findsOneWidget);
+    expect(fixture.orderScopes.last, containsPair('customerId', 'company'));
+    expect(fixture.orderScopes.last, containsPair('externalOrderId', 'O-12'));
+    router.pop();
+    await tester.pumpAndSettle();
+    fixture.denied = true;
+    await tap('订单 O-12');
+    expect(find.text('无权访问客户目录'), findsOneWidget);
+    expect(find.text('CNY 50.00'), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, skip: AppConfig.mock);
+
   testWidgets('正式管理员在小屏登记、申请、查看审批及从员工入口打开同一记录', (tester) async {
     const evidence = String.fromEnvironment('DELIVERY_SCREENSHOTS');
     const width = int.fromEnvironment('DELIVERY_TEST_WIDTH', defaultValue: 320);
@@ -150,6 +247,8 @@ void main() {
     }
 
     await tap('雁山客户');
+    await tap('业务');
+    await tap('线下业务');
     await tap('登记线下业务');
     await tester.enterText(find.widgetWithText(TextFormField, '业务标题'), '现场参访');
     await tester.enterText(
@@ -239,6 +338,7 @@ void main() {
     await tap('待交付');
     expect(fixture.filters.last['pendingOnly'], true);
     await back();
+    await back();
     await tap('员工视角');
     await tap('王负责人');
     await tap('现场参访');
@@ -255,6 +355,115 @@ void main() {
     expect(find.text('无权访问客户目录'), findsOneWidget);
     expect(tester.takeException(), isNull);
   }, skip: AppConfig.mock);
+}
+
+class _CustomerFixture {
+  final creates = <String>[];
+  final versions = <int>[];
+  final orderScopes = <Map<String, dynamic>>[];
+  final redemptions = <Map<String, dynamic>>[];
+  Map<String, dynamic>? customer;
+  bool denied = false;
+
+  void handle(RequestOptions req, RequestInterceptorHandler handler) {
+    void answer(Object data, [int status = 200]) => handler.resolve(
+      Response(requestOptions: req, statusCode: status, data: data),
+    );
+    void fail(int status, String code) => handler.reject(
+      DioException.badResponse(
+        statusCode: status,
+        requestOptions: req,
+        response: Response(
+          statusCode: status,
+          requestOptions: req,
+          data: {'code': code, 'message': '请求未完成'},
+        ),
+      ),
+    );
+    switch ((req.method, req.path)) {
+      case ('GET', '/customers'):
+        answer({
+          'items': [?customer],
+          'total': customer == null ? 0 : 1,
+        });
+      case ('POST', '/customers'):
+        final body = req.data as Map<String, dynamic>;
+        creates.add(req.headers['Idempotency-Key'] as String);
+        if (body['confirmDuplicate'] != true) {
+          fail(409, 'CUSTOMER_POSSIBLE_DUPLICATE');
+        } else if (creates.length == 3) {
+          fail(503, 'UNAVAILABLE');
+        } else {
+          customer = {
+            ...body,
+            'id': 'company',
+            'status': 'ACTIVE',
+            'version': 1,
+          };
+          answer(customer!, 201);
+        }
+      case ('GET', '/customers/company'):
+        answer({
+          'customer': customer,
+          'membership': {'mallMemberId': 'member'},
+          'benefits': [
+            {
+              'id': 'trial',
+              'name': '体验权益',
+              'kind': 'OTHER',
+              'status': 'ACTIVE',
+              'validFrom': '2000-01-01',
+              'validTo': '2099-12-31',
+              'maxUses': 1,
+            },
+          ],
+          'progress': [],
+        });
+      case ('PUT', '/customers/company'):
+        final body = req.data as Map<String, dynamic>;
+        versions.add(body['version'] as int);
+        if (versions.length == 1) {
+          customer = {...customer!, 'name': '新版工作室', 'version': 2};
+          fail(409, 'VERSION_CONFLICT');
+        } else {
+          customer = {...customer!, ...body, 'version': 3};
+          answer(customer!);
+        }
+      case ('GET', '/customers/company/benefits/trial/redemptions'):
+        answer(redemptions);
+      case ('POST', '/customers/company/benefits/trial/redemptions'):
+        if (req.headers['Idempotency-Key'] == null || redemptions.isNotEmpty) {
+          fail(409, 'BENEFIT_UNAVAILABLE');
+        } else {
+          final row = {
+            ...req.data as Map<String, dynamic>,
+            'redeemedAt': '2026-11-27T03:00:00Z',
+          };
+          redemptions.add(row);
+          answer(row, 201);
+        }
+      case ('GET', '/commerce/orders'):
+        orderScopes.add(req.queryParameters);
+        if (denied) {
+          fail(403, 'FORBIDDEN');
+        } else {
+          answer({
+            'total': 1,
+            'items': [
+              {
+                'externalOrderId': 'O-12',
+                'currency': 'CNY',
+                'amount': '50.00',
+                'status': 'PAID',
+                'orderedAt': '2026-11-26T03:00:00Z',
+              },
+            ],
+          });
+        }
+      default:
+        fail(500, 'UNEXPECTED_FIXTURE_REQUEST');
+    }
+  }
 }
 
 class _DeliveryFixture {
@@ -316,6 +525,19 @@ class _DeliveryFixture {
         ]);
       case '/offline-deliveries/employees':
         page([employee]);
+      case '/customers/customer':
+        answer({
+          'customer': {
+            'id': 'customer',
+            'name': '雁山客户',
+            'kind': 'ENTERPRISE',
+            'status': 'ACTIVE',
+            'version': 1,
+          },
+          'membership': null,
+          'benefits': [],
+          'progress': [],
+        });
       case '/offline-deliveries':
         if (req.method == 'POST') {
           create = req.data as Map;

@@ -158,4 +158,66 @@ class CustomerIntegrationTest {
         assertEquals(1,detail.get("progress").size());assertEquals("首次接待",detail.get("progress").get(0).get("stage").asText());
         call(404,"POST","/customers/"+id+"/progress","otherAdmin",Map.of("stage","x"),null);
     }
+    @Test void companyProfileIsIdempotentAndContactsCannotMoveBetweenCustomers()throws Exception{
+        var body=new LinkedHashMap<String,Object>(Map.of("kind","ENTERPRISE","name","企业客户",
+            "ownerId",uid("employee"),"contacts",List.of(Map.of("name","李经理","role","采购"))));
+        var start=new CyclicBarrier(2);
+        Callable<JsonNode> attempt=()->{
+            start.await(5,TimeUnit.SECONDS);
+            return call(201,"POST","/customers","admin",body,"profile-create");
+        };
+        JsonNode created;
+        try(var requests=Executors.newVirtualThreadPerTaskExecutor()) {
+            var one=requests.submit(attempt);
+            var two=requests.submit(attempt);
+            created=one.get(25,TimeUnit.SECONDS);
+            assertEquals(created,two.get(25,TimeUnit.SECONDS));
+        }
+        String path="/customers/"+created.path("id").asText();
+        var contact=created.path("contacts").get(0);
+        assertFalse(contact.path("id").asText().isBlank());
+        assertEquals("employee",created.path("ownerName").asText());
+        var list=call(200,"GET","/customers","admin",null,null);
+        assertEquals(1,list.path("total").asInt());
+        assertFalse(list.path("items").get(0).has("contacts"));
+        assertEquals("CUSTOMER_POSSIBLE_DUPLICATE",call(409,"POST","/customers","admin",body,"check").path("code").asText());
+        var confirmed=new LinkedHashMap<>(body);
+        confirmed.put("confirmDuplicate",true);
+        assertEquals("IDEMPOTENCY_CONFLICT",call(409,"POST","/customers","admin",confirmed,"profile-create").path("code").asText());
+        var another=call(201,"POST","/customers","admin",confirmed,"confirmed");
+        assertNotEquals(another.path("id"),created.path("id"));
+        var changed=new LinkedHashMap<>(body);
+        changed.put("version",1);
+        changed.put("contacts",List.of(Map.of("id",contact.path("id").asText(),"name","新联系人")));
+        changed.put("ownerId",uid("otherAdmin"));
+        call(400,"PUT",path,"admin",changed,null);
+        changed.put("ownerId",uid("employee"));
+        call(400,"PUT","/customers/"+another.path("id").asText(),"admin",changed,null);
+        var updated=call(200,"PUT",path,"admin",changed,null);
+        assertEquals(contact.path("id"),updated.path("contacts").get(0).path("id"));
+        call(409,"PUT",path,"admin",changed,null);
+        call(404,"GET",path,"otherAdmin",null,null);
+    }
+    @Test void keyedAppendsAndMembershipRejectNewWritesAfterArchive()throws Exception{
+        var customer=create();
+        String path="/customers/"+customer.path("id").asText();
+        var benefit=benefitBody("2020-01-01","2100-12-31",1);
+        var stage=Map.of("stage","准备资料");
+        var member=Map.of("mallMemberId","member-test","version",0);
+        var receipt=call(201,"POST",path+"/benefits","admin",benefit,"grant");
+        var entry=call(201,"POST",path+"/progress","admin",stage,"progress");
+        assertEquals(entry,call(201,"POST",path+"/progress","admin",stage,"progress"));
+        call(409,"POST",path+"/progress","admin",Map.of("stage","已回访"),"progress");
+        call(200,"PUT",path+"/membership","admin",member,null);
+        call(409,"PUT",path+"/membership","admin",member,null);
+        var archived=customerBody();archived.put("status","ARCHIVED");archived.put("version",1);
+        call(200,"PUT",path,"admin",archived,null);
+        assertEquals(receipt,call(201,"POST",path+"/benefits","admin",benefit,"grant"));
+        call(409,"POST",path+"/benefits","admin",benefit,"grant-again");
+        call(409,"POST",path+"/progress","admin",stage,"progress-again");
+        call(409,"PUT",path+"/membership","admin",Map.of("mallMemberId","other-member","version",1),null);
+        var result=call(200,"GET",path,"admin",null,null);
+        assertEquals(1,result.path("benefits").size());
+        assertEquals(1,result.path("progress").size());
+    }
 }

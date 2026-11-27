@@ -33,3 +33,82 @@ test('刷新遇到非JSON失权响应清除合同资料',async({page})=>{
  let data:unknown={};if(path==='/api/auth/login')data={token:'test'};else if(path==='/api/hr/me')data={admin:false,manage:false};else if(path==='/api/hr/employees')data=[];else if(path==='/api/hr/reminders')data=[];else if(path==='/api/hr/contracts')data={items:[{id:'secret',title:'私有合同',starts_on:'2026-01-01',ends_on:'2027-01-01'}],total:1};await route.fulfill({json:data});});
  await page.goto('/hr');await page.getByLabel('账号',{exact:true}).fill('reader');await page.getByLabel('密码',{exact:true}).fill('test');await page.getByRole('button',{name:'登录人事入口'}).click();await expect(page.getByText('私有合同',{exact:true})).toBeVisible();denied=true;await page.getByRole('button',{name:'刷新',exact:true}).click();await expect(page.getByText('私有合同',{exact:true})).toHaveCount(0);await expect(page.getByRole('alert')).toBeVisible();
 });
+
+test('退出中止慢请求，不恢复旧会话合同', async ({ page }) => {
+  let notifyRequested!: () => void;
+  let release!: () => void;
+  const requested = new Promise<void>(resolve => notifyRequested = resolve);
+  const paused = new Promise<void>(resolve => release = resolve);
+  let logoutAuthorization: string | null = null;
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === '/api/auth/login') {
+      return route.fulfill({ json: { token: 'slow-session' } });
+    }
+    if (path === '/api/auth/logout') {
+      logoutAuthorization = await request.headerValue('authorization');
+      return route.fulfill({ json: {} });
+    }
+    if (path === '/api/hr/me') {
+      return route.fulfill({ json: { admin: false, manage: false } });
+    }
+    if (path === '/api/hr/contracts') {
+      notifyRequested();
+      await paused;
+      await route.fulfill({
+        json: { items: [{ id: 'old', title: '旧会话合同' }], total: 1 },
+      }).catch(() => {});
+      return;
+    }
+    await route.fulfill({ json: [] });
+  });
+
+  await page.goto('/hr');
+  await page.getByLabel('账号', { exact: true }).fill('reader');
+  await page.getByLabel('密码', { exact: true }).fill('test');
+  await page.getByRole('button', { name: '登录人事入口' }).click();
+  try {
+    await Promise.race([requested, page.waitForRequest('**/api/hr/contracts?*')]);
+    await page.getByRole('button', { name: '退出', exact: true }).click();
+  } finally {
+    release();
+  }
+  await expect.poll(() => logoutAuthorization).toBe('Bearer slow-session');
+  await expect(page.getByRole('button', { name: '登录人事入口' })).toBeEnabled();
+  await expect(page.getByText('旧会话合同')).toHaveCount(0);
+  expect(await page.evaluate(() => sessionStorage.getItem('hr-token'))).toBeNull();
+});
+
+test('合同修订加载期间禁止编辑旧表单', async ({ page }) => {
+  let resume!: () => void;
+  const paused = new Promise<void>(resolve => resume = resolve);
+  const contract = { id: 'contract', title: '已归档合同', employee_id: 'e', starts_on: '2026-01-01',
+    ends_on: '2027-01-01', attachment_id: 'file', recipients: ['e'], version: 1 };
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/auth/login') return route.fulfill({ json: { token: 'test' } });
+    if (path === '/api/hr/me') return route.fulfill({ json: { manage: true } });
+    if (path === '/api/hr/contracts/contract') {
+      await paused;
+      return route.fulfill({ json: contract });
+    }
+    if (path === '/api/hr/contracts') return route.fulfill({ json: { items: [contract], total: 1 } });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto('/hr');
+  await page.getByLabel('账号', { exact: true }).fill('manager');
+  await page.getByLabel('密码', { exact: true }).fill('test');
+  await page.getByRole('button', { name: '登录人事入口' }).click();
+  const title = page.getByLabel('合同名称');
+  try {
+    await page.getByRole('button', { name: '修订', exact: true }).click();
+    await expect(title).toBeDisabled();
+    await expect(page.getByRole('button', { name: '取消', exact: true })).toBeDisabled();
+  } finally {
+    resume();
+  }
+  await expect(page.getByRole('heading', { name: '修订合同' })).toBeVisible();
+  await expect(title).toBeEditable();
+  await expect(title).toHaveValue(contract.title);
+});
