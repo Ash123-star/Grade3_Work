@@ -11,7 +11,10 @@ test('合同归档与提醒详情保留历史',async({page},info)=>{
   const path=new URL(route.request().url()).pathname;let data:unknown={};
   if(path==='/api/auth/login')data={token:'test'};
   else if(path==='/api/hr/me')data={admin:true,manage:true};
-  else if(path==='/api/hr/employees')data=[{id:'e',name:'员工甲',department_name:'产品部',business_position:'NONE',duties:'客户服务',access:'MANAGE',status:'ACTIVE',grant_version:1}];
+  else if(path==='/api/hr/employees')data=[
+    {id:'a',name:'管理员甲',business_position:'NONE',duties:'',access:'NONE',status:'ACTIVE',is_admin:true},
+    {id:'e',name:'员工甲',department_name:'产品部',business_position:'NONE',duties:'客户服务',access:'MANAGE',status:'ACTIVE',grant_version:1},
+  ];
   else if(path==='/api/attachments')data={id:'file'};
   else if(path==='/api/hr/contracts'&&route.request().method()==='POST') {const b=route.request().postDataJSON();saved={id:'contract',title:b.title,employee_id:b.employeeId,employee_name:'员工甲',starts_on:b.startsOn,ends_on:b.endsOn,attachment_id:b.attachmentId,recipients:b.recipients,version:1};data=saved;}
   else if(path==='/api/hr/contracts')data={items:saved?[saved]:[],total:saved?1:0};
@@ -21,10 +24,22 @@ test('合同归档与提醒详情保留历史',async({page},info)=>{
   await route.fulfill({json:data});
  });
  await page.goto('/hr');await page.getByLabel('账号',{exact:true}).fill('manager');await page.getByLabel('密码',{exact:true}).fill('test');await page.getByRole('button',{name:'登录人事入口'}).click();
+ const adminCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: '管理员甲' }) });
+ await expect(adminCard.getByText('合同权限：管理员（角色授权）')).toBeVisible();
+ await expect(adminCard.getByLabel('合同权限')).toHaveCount(0);
+ await expect(page.getByLabel('合同权限')).toHaveValue('MANAGE');
  await page.getByLabel('员工',{exact:true}).selectOption('e');await page.getByLabel('合同名称').fill('劳动合同测试');await page.getByLabel('开始日期').fill('2026-11-01');await page.getByLabel('到期日期').fill('2027-11-01');
  await page.getByLabel('合同专用附件').setInputFiles({name:'contract.pdf',mimeType:'application/pdf',buffer:Buffer.from('test fixture')});await expect(page.getByText('附件已就绪',{exact:true})).toBeVisible();await page.getByLabel('提醒接收人（可多选）').selectOption('e');await page.getByRole('button',{name:'保存合同',exact:true}).click();await expect(page.getByRole('status')).toHaveText('合同已归档');await expect(page.getByLabel('合同专用附件')).toHaveValue('');
- await page.getByRole('button',{name:'劳动合同测试 · 到期日 2027-11-01'}).click();await expect(page.getByRole('heading',{name:'合同详情：劳动合同测试'})).toBeVisible();await expect(page.getByText('版本 1 · 劳动合同测试 · 2026-11-01 至 2027-11-01')).toBeVisible();
+ const reminder = page.getByRole('button',{name:'劳动合同测试 · 到期日 2027-11-01'});
+ await reminder.click();
+ const details = page.getByRole('heading',{name:'合同详情：劳动合同测试'});
+ await expect(details).toBeFocused();
+ await expect(details).toBeInViewport();
+ await expect(page.getByText('版本 1 · 劳动合同测试 · 2026-11-01 至 2027-11-01')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:`../output/phase2-hr-${info.project.name}.png`,fullPage:true});
+ await page.getByRole('button', { name: '关闭详情' }).click();
+ await expect(details).toHaveCount(0);
+ await expect(reminder).toBeFocused();
 });
 
 test('刷新遇到非JSON失权响应清除合同资料',async({page})=>{
@@ -101,14 +116,20 @@ test('合同修订加载期间禁止编辑旧表单', async ({ page }) => {
   await page.getByLabel('密码', { exact: true }).fill('test');
   await page.getByRole('button', { name: '登录人事入口' }).click();
   const title = page.getByLabel('合同名称');
+  const edit = page.getByRole('button', { name: '修订', exact: true });
   try {
-    await page.getByRole('button', { name: '修订', exact: true }).click();
+    await edit.click();
     await expect(title).toBeDisabled();
     await expect(page.getByRole('button', { name: '取消', exact: true })).toBeDisabled();
   } finally {
     resume();
   }
-  await expect(page.getByRole('heading', { name: '修订合同' })).toBeVisible();
+  const formTitle = page.getByRole('heading', { name: '修订合同' });
+  await expect(formTitle).toBeFocused();
+  await expect(formTitle).toBeInViewport();
   await expect(title).toBeEditable();
   await expect(title).toHaveValue(contract.title);
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(edit).toBeFocused();
+  await expect(title).toHaveValue('');
 });

@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import {ref,onMounted,onBeforeUnmount} from 'vue';
+import {nextTick,ref,onMounted,onBeforeUnmount} from 'vue';
 import {FolderOpened, Refresh, SwitchButton} from '@element-plus/icons-vue';
 type Row=Record<string,any>;
 const token=ref(sessionStorage.getItem('hr-token')??''), account=ref(''), password=ref(''), error=ref(''), message=ref(''), busy=ref(false);
 const capability=ref<Row|null>(null), people=ref<Row[]>([]), contracts=ref<Row[]>([]), total=ref(0), cursor=ref(0);
 const uploadKey=ref(0);
 const reminders=ref<Row[]>([]), selected=ref<Row|null>(null), history=ref<Row[]>([]);
+const detailHeading=ref<HTMLElement|null>(null), formHeading=ref<HTMLElement|null>(null);
 const form=ref<Row>({employeeId:'',title:'',startsOn:'',endsOn:'',attachmentId:'',recipients:[],version:0}), editing=ref('');
 let operation: AbortController | undefined;
+let detailTrigger: HTMLElement | undefined;
+let editTrigger: HTMLElement | undefined;
 let mounted = true;
-function clearPrivate(){capability.value=null;people.value=[];contracts.value=[];reminders.value=[];selected.value=null;history.value=[];cursor.value=0;total.value=0;reset();}
+function clearPrivate(){capability.value=null;people.value=[];contracts.value=[];reminders.value=[];selected.value=null;history.value=[];detailTrigger=undefined;cursor.value=0;total.value=0;reset();}
 function clearSession(){token.value='';password.value='';sessionStorage.removeItem('hr-token');clearPrivate();}
 async function request<T>(path:string, init:RequestInit, decode:(response:Response)=>Promise<T>):Promise<T>{
   const signal=operation!.signal;
@@ -53,11 +56,46 @@ function logout(){
   clearSession();error.value='';message.value='';
   if(previous)void fetch('/api/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+previous},cache:'no-store'}).catch(()=>{});
 }
-function reset(){uploadKey.value++;editing.value='';form.value={employeeId:'',title:'',startsOn:'',endsOn:'',attachmentId:'',recipients:[],version:0};}
+function reset(){editTrigger=undefined;uploadKey.value++;editing.value='';form.value={employeeId:'',title:'',startsOn:'',endsOn:'',attachmentId:'',recipients:[],version:0};}
+async function cancelEdit(){
+  const trigger=editTrigger;
+  reset();
+  await nextTick();
+  if(trigger?.isConnected)trigger.focus();
+}
+function reveal(heading:HTMLElement|null){
+  heading?.focus({preventScroll:true});
+  heading?.scrollIntoView({block:'start'});
+}
 async function upload(event:Event){const file=(event.target as HTMLInputElement).files?.[0];if(!file)return;await act(async()=>{form.value.attachmentId='';const b=new FormData();b.append('file',file);const data=await request('/attachments',{method:'POST',body:b},r=>r.json());form.value.attachmentId=data.id;message.value='附件已上传，请保存合同完成归档';});}
 async function save(){await act(async()=>{await api('/hr/contracts'+(editing.value?'/'+editing.value:''),editing.value?'PUT':'POST',form.value);reset();await load();message.value='合同已归档';});}
-async function view(id:string){await act(async()=>{selected.value=null;history.value=[];const contract=await api('/hr/contracts/'+id);const revisions=await api('/hr/contracts/'+id+'/history');selected.value=contract;history.value=revisions;});}
-async function edit(row:Row){await act(async()=>{const d=await api('/hr/contracts/'+row.id);editing.value=d.id;form.value={employeeId:d.employee_id,title:d.title,startsOn:String(d.starts_on).slice(0,10),endsOn:String(d.ends_on).slice(0,10),attachmentId:d.attachment_id,recipients:d.recipients,version:d.version};});}
+async function view(id:string,event:MouseEvent){
+  const trigger=event.currentTarget as HTMLElement;
+  await act(async()=>{
+    selected.value=null;history.value=[];detailTrigger=undefined;
+    const contract=await api('/hr/contracts/'+id);
+    const revisions=await api('/hr/contracts/'+id+'/history');
+    selected.value=contract;history.value=revisions;detailTrigger=trigger;
+    await nextTick();
+    if(mounted&&token.value)reveal(detailHeading.value);
+  });
+}
+async function closeDetail(){
+  const trigger=detailTrigger;
+  selected.value=null;history.value=[];detailTrigger=undefined;
+  await nextTick();
+  if(trigger?.isConnected)trigger.focus();
+}
+async function edit(row:Row,event:MouseEvent){
+  const trigger=event.currentTarget as HTMLElement;
+  await act(async()=>{
+    const d=await api('/hr/contracts/'+row.id);
+    editing.value=d.id;editTrigger=trigger;
+    form.value={employeeId:d.employee_id,title:d.title,startsOn:String(d.starts_on).slice(0,10),endsOn:String(d.ends_on).slice(0,10),attachmentId:d.attachment_id,recipients:d.recipients,version:d.version};
+    await nextTick();
+    if(mounted&&token.value)reveal(formHeading.value);
+  });
+}
 async function download(row:Row){await act(async()=>{const blob=await request('/attachments/'+row.attachment_id,{},r=>r.blob());const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='合同附件';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});}
 async function grant(person:Row,event:Event){const level=(event.target as HTMLSelectElement).value;await act(async()=>{await api('/hr/grants/'+person.id,'PUT',{access:level,version:person.grant_version});await load();message.value='授权已更新';});}
 async function duties(person:Row){await act(async()=>{await api('/hr/employees/'+person.id+'/duties','PUT',{duties:person.duties,version:person.duties_version});await load();message.value='职责已保存';});}
@@ -69,9 +107,29 @@ onBeforeUnmount(()=>{mounted=false;operation?.abort();});
 <p v-if="error" role="alert">{{error}}</p><p v-if="message" role="status">{{message}}</p>
 <form v-if="!token" @submit.prevent="login"><label>账号<input v-model="account" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button :disabled="busy">登录人事入口</button></form>
 <template v-else-if="capability">
-<section><h2>我的合同提醒</h2><p v-if="!reminders.length">暂无到期提醒</p><p v-for="n in reminders" :key="n.id"><button :disabled="busy" @click="view(n.object_id)">{{n.title}} · 到期日 {{String(n.ends_on).slice(0,10)}}</button></p></section><section><h2>员工档案</h2><p v-if="!people.length">暂无员工</p><article v-for="p in people" :key="p.id"><h3>{{p.name}}</h3><p>部门：{{p.department_name || '未分配'}} · 岗位：{{({NONE:'未设置',GENERAL_MANAGER:'总经理',DEPUTY_GENERAL_MANAGER:'副总经理'} as Record<string,string>)[p.business_position] ?? p.business_position}}</p><label>工作职责<textarea v-model="p.duties" :readonly="!capability.manage" maxlength="4000"/></label><button v-if="capability.manage" :disabled="busy" @click="duties(p)">保存职责</button><label v-if="capability.admin">合同权限<select :value="p.access" :disabled="busy" @change="grant(p,$event)"><option value="NONE">无授权</option><option value="READ">只读</option><option value="MANAGE">管理</option></select></label></article></section>
+<section><h2>我的合同提醒</h2><p v-if="!reminders.length">暂无到期提醒</p><p v-for="n in reminders" :key="n.id"><button :disabled="busy" @click="view(n.object_id,$event)">{{n.title}} · 到期日 <time>{{String(n.ends_on).slice(0,10)}}</time></button></p></section>
+<section>
+  <h2>员工档案</h2>
+  <p v-if="!people.length">暂无员工</p>
+  <article v-for="p in people" :key="p.id">
+    <h3>{{ p.name }}</h3>
+    <p>部门：{{ p.department_name || '未分配' }} · 岗位：{{ ({NONE:'未设置',GENERAL_MANAGER:'总经理',DEPUTY_GENERAL_MANAGER:'副总经理'} as Record<string,string>)[p.business_position] ?? p.business_position }}</p>
+    <label>工作职责<textarea v-model="p.duties" :readonly="!capability.manage || busy" maxlength="4000"/></label>
+    <button v-if="capability.manage" :disabled="busy" @click="duties(p)">保存职责</button>
+    <template v-if="capability.admin">
+      <p v-if="p.is_admin">合同权限：{{ p.status === 'ACTIVE' ? '管理员（角色授权）' : '管理员（账号未启用）' }}</p>
+      <label v-else>合同权限
+        <select :value="p.access" :disabled="busy" @change="grant(p,$event)">
+          <option value="NONE">无授权</option>
+          <option value="READ">只读</option>
+          <option value="MANAGE">管理</option>
+        </select>
+      </label>
+    </template>
+  </article>
+</section>
 <section v-if="capability.manage">
-  <h2>{{ editing ? '修订合同' : '归档合同' }}</h2>
+  <h2 ref="formHeading" tabindex="-1">{{ editing ? '修订合同' : '归档合同' }}</h2>
   <form @submit.prevent="save">
     <fieldset :disabled="busy">
       <label>员工<select v-model="form.employeeId" aria-label="员工" required>
@@ -89,12 +147,12 @@ onBeforeUnmount(()=>{mounted=false;operation?.abort();});
       </select></label>
       <p>接收人必须拥有合同访问权限，服务器会再次检查。</p>
       <button :disabled="!form.attachmentId">保存合同</button>
-      <button type="button" @click="reset">取消</button>
+      <button type="button" @click="cancelEdit">取消</button>
     </fieldset>
   </form>
 </section>
-<section v-if="selected"><h2>合同详情：{{selected.title}}</h2><p>{{selected.starts_on}} 至 {{selected.ends_on}}</p><button :disabled="busy" @click="download(selected)">下载此合同</button><h3>修订记录</h3><p v-for="v in history" :key="v.version">版本 {{v.version}} · {{v.snapshot.title}} · {{v.snapshot.starts_on}} 至 {{v.snapshot.ends_on}}</p><button @click="selected=null">关闭详情</button></section>
-<section><h2>已归档合同（{{total}}）</h2><p v-if="!contracts.length">暂无合同</p><article v-for="c in contracts" :key="c.id"><h3>{{c.title}}</h3><p>{{c.employee_name}} · {{String(c.starts_on).slice(0,10)}} 至 {{String(c.ends_on).slice(0,10)}}</p><button :disabled="busy" @click="view(c.id)">查看详情</button><button :disabled="busy" @click="download(c)">下载合同</button><button v-if="capability.manage" :disabled="busy" @click="edit(c)">修订</button></article><button :disabled="busy||cursor===0" @click="page(-20)">上一页</button><button :disabled="busy||cursor+20>=total" @click="page(20)">下一页</button></section>
+<section v-if="selected"><h2 ref="detailHeading" tabindex="-1">合同详情：{{selected.title}}</h2><p>{{selected.starts_on}} 至 {{selected.ends_on}}</p><button :disabled="busy" @click="download(selected)">下载此合同</button><h3>修订记录</h3><p v-for="v in history" :key="v.version">版本 {{v.version}} · {{v.snapshot.title}} · {{v.snapshot.starts_on}} 至 {{v.snapshot.ends_on}}</p><button :disabled="busy" @click="closeDetail">关闭详情</button></section>
+<section><h2>已归档合同（{{total}}）</h2><p v-if="!contracts.length">暂无合同</p><article v-for="c in contracts" :key="c.id"><h3>{{c.title}}</h3><p>{{c.employee_name}} · {{String(c.starts_on).slice(0,10)}} 至 {{String(c.ends_on).slice(0,10)}}</p><button :disabled="busy" @click="view(c.id,$event)">查看详情</button><button :disabled="busy" @click="download(c)">下载合同</button><button v-if="capability.manage" :disabled="busy" @click="edit(c,$event)">修订</button></article><button :disabled="busy||cursor===0" @click="page(-20)">上一页</button><button :disabled="busy||cursor+20>=total" @click="page(20)">下一页</button></section>
 </template></main></template>
 <style scoped>
 .hr-shell{max-width:1080px;margin:auto;padding:24px;color:#243b35;overflow-wrap:anywhere}
@@ -102,7 +160,9 @@ onBeforeUnmount(()=>{mounted=false;operation?.abort();});
 .hr-header{justify-content:space-between;border-bottom:2px solid #b8c9bd;padding:0 0 18px}
 .hr-header h1{margin:6px 0 0;font-size:26px}.hr-category{font-size:14px;color:#3d6050}.hr-category svg,.hr-actions svg{width:18px;height:18px}
 .hr-actions button{display:inline-grid;place-items:center;width:44px;height:44px;padding:0}
+.hr-actions a{display:inline-flex;align-items:center;min-height:44px;color:#285746;text-underline-offset:3px}
 .hr-shell section{margin-top:24px;padding:16px 0;border-top:1px solid #cbd6cd}.hr-shell section h2{margin:0 0 12px;font-size:19px}
+.hr-shell h2[tabindex]{scroll-margin-top:16px}.hr-shell time{white-space:nowrap}
 .hr-shell article{padding:14px 16px;background:#fff;border:1px solid #cbd6cd;border-radius:8px;margin:12px 0}.hr-shell article h3{margin:0}
 .hr-shell form{max-width:540px}.hr-shell fieldset{border:0;margin:0;padding:0;min-width:0}.hr-shell label{display:flex;flex-direction:column;gap:6px;margin:12px 0}
 .hr-shell input,.hr-shell select,.hr-shell textarea{box-sizing:border-box;min-height:44px;width:100%;min-width:0;padding:9px;border:1px solid #aebfb6;border-radius:6px;background:#fff;color:inherit;font:inherit}
