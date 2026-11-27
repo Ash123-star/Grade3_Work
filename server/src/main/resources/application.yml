@@ -84,7 +84,7 @@ springdoc:
 # 全部审核消费者兼容 MOVE 候选后才在部署配置中启用。
 workpanel:
   task:
-    proposals-enabled: ${TASK_PROPOSALS_ENABLED:false}
+    proposals-enabled: ${TASK_PROPOSALS_ENABLED:true}
   calendar:
     move-enabled: ${CALENDAR_MOVE_ENABLED:false}
 logging:
